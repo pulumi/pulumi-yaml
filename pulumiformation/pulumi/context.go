@@ -168,8 +168,9 @@ func (ctx *Context) Invoke(tok string, args interface{}, result interface{}, opt
 	}
 
 	resultV := reflect.ValueOf(result)
-	if resultV.Kind() != reflect.Ptr || resultV.Elem().Kind() != reflect.Struct {
-		return errors.New("result must be a pointer to a struct value")
+	if resultV.Kind() != reflect.Ptr ||
+		(resultV.Elem().Kind() != reflect.Struct && resultV.Elem().Kind() != reflect.Map) {
+		return errors.New("result must be a pointer to a struct or map value")
 	}
 
 	options := &invokeOptions{}

@@ -260,6 +260,8 @@ func (r *runner) evaluateBuiltinGetAtt(v map[string]interface{}) (interface{}, e
 	if !ok {
 		return nil, errors.Errorf("resource %s named by Fn::GetAtt could not be found", resourceName)
 	}
+	// HACKHACK: I had to add GetOutput, and make it lazily allocate, for this to work. Our registered
+	//     resource types are untyped and so don't get pre-populated with all the right output properties.
 	return res.Pending.GetOutput(propertyName), nil
 }
 
@@ -279,8 +281,71 @@ func (r *runner) evaluateBuiltinImportValue(v map[string]interface{}) (interface
 	return nil, errors.New("NYI")
 }
 
+// evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
+// data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
 func (r *runner) evaluateBuiltinInvoke(v map[string]interface{}) (interface{}, error) {
-	return nil, errors.New("NYI")
+	// Read and validate the arguments to Fn::Invoke.
+	inv := v["Fn::Invoke"]
+	invoke, ok := inv.(map[string]interface{})
+	if !ok {
+		return nil, errors.Errorf(
+			"expected Fn::Invoke to be a map containing the 'Function', 'Arguments', and a 'Return', got %v",
+			reflect.TypeOf(inv))
+	}
+	fn := invoke["Function"]
+	if fn == nil {
+		return nil, errors.New("missing function name, Function, in the Fn::Invoke map")
+	}
+	tok, ok := fn.(string)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected function name, Function, in the Fn::Invoke map to be a string, got %v",
+			reflect.TypeOf(fn))
+	}
+	var args map[string]interface{}
+	argsmap := invoke["Arguments"]
+	if argsmap != nil {
+		// It's ok if arguments are missing, they are optional, but if present, we need a map.
+		args, ok = argsmap.(map[string]interface{})
+		if !ok {
+			return nil, errors.Errorf(
+				"expected function args, Arguments, in the Fn::Invoke map to be a map, got %v",
+				reflect.TypeOf(argsmap))
+		}
+	}
+	ret := invoke["Return"]
+	if ret == nil {
+		// TODO: not clear this will be sufficiently expressive, or that it's even required!
+		return nil, errors.New("missing return directive, Return, in the Fn::Invoke map")
+	}
+	rets, ok := ret.(string)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected return directive, Return, in the Fn::Invoke map to be a string, got %v",
+			reflect.TypeOf(fn))
+	}
+
+	// The arguments may very well have expressions within them, so evaluate those now.
+	for k, v := range args {
+		nv, err := r.evaluateUntypedExpression(v)
+		if err != nil {
+			return nil, err
+		}
+		args[k] = nv
+	}
+
+	// At this point, we've got a function to invoke and some parameters! Invoke away.
+	result := make(map[string]interface{})
+	// HACKHACK: had to change Invoke to let maps through, not just structs per the previous code.
+	if err := r.ctx.Invoke(tok, args, &result); err != nil {
+		return nil, err
+	}
+	retv, ok := result[rets]
+	if !ok {
+		return nil, errors.Errorf(
+			"Fn::Invoke of %s did not contain a property '%s' in the returned value", tok, rets)
+	}
+	return retv, nil
 }
 
 // untypedArgs is an untyped interface for a bag of properties.
