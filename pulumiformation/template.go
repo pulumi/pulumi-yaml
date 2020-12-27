@@ -62,7 +62,7 @@ type Parameter struct {
 	MinValue *int64 `json:",omitempty"`
 }
 
-// Resource declares a single infrastructure resource, such asn an AWS S3 bucket or EC2 instance,
+// Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
 // complete with its properties and various other behavioral elements. Read more at
 // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html.
 type Resource struct {

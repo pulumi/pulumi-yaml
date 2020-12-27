@@ -28,11 +28,11 @@ import (
 	"github.com/pulumi/pulumi/sdk/v2/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/version"
+	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v2/proto/go"
 	"google.golang.org/grpc"
 
-	"github.com/joeduffy/pulumiformation/pulumiformation"
-	"github.com/joeduffy/pulumiformation/pulumiformation/pulumi"
+	"github.com/pulumi/pulumiformation/pulumiformation"
 )
 
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the
