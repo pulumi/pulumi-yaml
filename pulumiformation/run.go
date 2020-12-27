@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
@@ -208,6 +210,12 @@ func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
 		return r.evaluateBuiltinGetAtt(t)
 	case *Invoke:
 		return r.evaluateBuiltinInvoke(t)
+	case *Join:
+		return r.evaluateBuiltinJoin(t)
+	case *Sub:
+		return r.evaluateBuiltinSub(t)
+	case *Select:
+		return r.evaluateBuiltinSelect(t)
 	default:
 		panic("fatal: invalid expr type")
 	}
@@ -220,7 +228,7 @@ func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
 	if !ok {
 		return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
 	}
-	return res.ID(), nil
+	return res.ID().ToStringOutput(), nil
 }
 
 // evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,
@@ -261,6 +269,108 @@ func (r *runner) evaluateBuiltinInvoke(t *Invoke) (interface{}, error) {
 			"Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token, t.Return)
 	}
 	return retv, nil
+}
+
+func (r *runner) evaluateBuiltinJoin(v *Join) (interface{}, error) {
+	delim, err := r.evaluateExpr(v.Delimiter)
+	if err != nil {
+		return nil, err
+	}
+	var parts []interface{}
+	for i, e := range v.Values.Elems {
+		if i != 0 {
+			parts = append(parts, delim)
+		}
+		part, err := r.evaluateExpr(e)
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, part)
+	}
+	return joinStringOutputs(parts), nil
+}
+
+func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
+	indexV, err := r.evaluateExpr(v.Index)
+	if err != nil {
+		return nil, err
+	}
+	index, ok := indexV.(int)
+	if !ok {
+		return nil, errors.Errorf("expected index passed to Fn::Select to be an int, got %v", reflect.TypeOf(indexV))
+	}
+	return r.evaluateExpr(v.Values.Elems[index])
+}
+
+var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
+
+func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
+	// Evaluate all the substition mapping expressions.
+	substitutions := make(map[string]interface{})
+	if v.Substitutions != nil {
+		for k, sub := range v.Substitutions.Elems {
+			sub, err := r.evaluateExpr(sub)
+			if err != nil {
+				return "", err
+			}
+			substitutions[k] = sub
+		}
+	}
+
+	// Find all replacement expressions in the string, and construct the array of
+	// parts, which may be strings or Outputs of evalauted expressions.
+	matches := substitionRegexp.FindAllStringSubmatchIndex(v.String, -1)
+	i := 0
+	var parts []interface{}
+	for _, match := range matches {
+		parts = append(parts, v.String[i:match[0]])
+		i = match[1]
+		expr := v.String[match[2]:match[3]]
+		v, err := r.evaluateBuiltinSubTemplateExpression(expr, substitutions)
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, v)
+	}
+	parts = append(parts, v.String[i:])
+
+	// Lift the concatenation of the parts into a StringOutput and return it.
+	return joinStringOutputs(parts), nil
+}
+
+func (r *runner) evaluateBuiltinSubTemplateExpression(expr string, subs map[string]interface{}) (interface{}, error) {
+	// If it's an index expression 'a.b', then treat as an `Fn::GetAtt`
+	if parts := strings.Split(expr, "."); len(parts) > 1 {
+		if len(parts) > 2 {
+			return nil, errors.Errorf("expected expression '%s' in Fn::Sub to have at most one '.' property access", expr)
+		}
+		return r.evaluateBuiltinGetAtt(&GetAtt{
+			ResourceName: parts[0],
+			PropertyName: parts[1],
+		})
+	}
+	// Else, if it's a string that's in the substitutions map, evaluate that expression in the substitution map
+	if sub, ok := subs[expr]; ok {
+		return sub, nil
+	}
+	// Else, treat as a `Ref`
+	return r.evaluateBuiltinRef(&Ref{
+		ResourceName: expr,
+	})
+}
+
+func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
+	return pulumi.All(parts...).ApplyString(func(arr []interface{}) (string, error) {
+		s := ""
+		for _, x := range arr {
+			xs, ok := x.(string)
+			if !ok {
+				return "", errors.Errorf("expected expression in Fn::Join or Fn::Sub to produce a string, got %v", reflect.TypeOf(x))
+			}
+			s += xs
+		}
+		return s, nil
+	})
 }
 
 // untypedArgs is an untyped interface for a bag of properties.

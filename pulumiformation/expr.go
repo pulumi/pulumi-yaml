@@ -56,6 +56,33 @@ type Invoke struct {
 
 func (*Invoke) isExpr() {}
 
+// Join appends a set of values into a single value, separated by the specified delimiter.
+// If a delimiter is the empty string, the set of values are concatenated with no delimiter.
+type Join struct {
+	Delimiter Expr
+	Values    *Array
+}
+
+func (*Join) isExpr() {}
+
+// Sub substitutes variables in an input string with values that you specify.
+// In your templates, you can use this function to construct commands or outputs
+// that include values that aren't available until you create or update a stack.
+type Sub struct {
+	String        string
+	Substitutions *Object
+}
+
+func (*Sub) isExpr() {}
+
+// Select returns a single object from a list of objects by index.
+type Select struct {
+	Index  Expr
+	Values *Array
+}
+
+func (*Select) isExpr() {}
+
 // Parse a given untyped expression value from a template into an Expr object
 func Parse(v interface{}) (Expr, error) {
 	if v == nil {
@@ -93,10 +120,12 @@ func Parse(v interface{}) (Expr, error) {
 				return parseGetAtt(elems)
 			case "Fn::Invoke":
 				return parseInvoke(elems)
-				// case "Fn::Join":
-				// 	return r.evaluateBuiltinJoin(v)
-				// case "Fn::Select":
-				// 	return r.evaluateBuiltinSelect(v)
+			case "Fn::Join":
+				return parseJoin(elems)
+			case "Fn::Sub":
+				return parseSub(elems)
+			case "Fn::Select":
+				return parseSelect(elems)
 				// case "Fn::FindInMap":
 				// 	return r.evaluateBuiltinFindInMap(v)
 				// case "Fn::Base64":
@@ -227,6 +256,84 @@ func parseInvoke(v map[string]Expr) (*Invoke, error) {
 	}, nil
 }
 
+func parseJoin(v map[string]Expr) (*Join, error) {
+	// Read and validate the arguments to Fn::Join.
+	j := v["Fn::Join"]
+	join, ok := j.(*Array)
+	if !ok || (len(join.Elems) != 2) {
+		return nil, errors.Errorf(
+			"expected Fn::Join to be an array containing the delimiter and an array of values, got %v",
+			reflect.TypeOf(join))
+	}
+	values, ok := join.Elems[1].(*Array)
+	if !ok {
+		return nil, errors.Errorf("expected Fn::Join values to be an array, got %v", reflect.TypeOf(join.Elems[1]))
+	}
+	return &Join{
+		Delimiter: join.Elems[0],
+		Values:    values,
+	}, nil
+}
+
+func parseSelect(v map[string]Expr) (*Select, error) {
+	// Read and validate the arguments to Fn::Select.
+	s := v["Fn::Select"]
+	sel, ok := s.(*Array)
+	if !ok || (len(sel.Elems) != 2) {
+		return nil, errors.Errorf(
+			"expected Fn::Select to be an array containing an index and an array of values, got %v",
+			reflect.TypeOf(sel))
+	}
+	values, ok := sel.Elems[1].(*Array)
+	if !ok {
+		return nil, errors.Errorf("expected Fn::Select values to be an array, got %v", reflect.TypeOf(sel.Elems[1]))
+	}
+	return &Select{
+		Index:  sel.Elems[0],
+		Values: values,
+	}, nil
+}
+
+func parseSub(v map[string]Expr) (*Sub, error) {
+	// Read and validate the arguments to Fn::Sub.
+	s := v["Fn::Sub"]
+	if sa, ok := s.(*Array); ok {
+		if len(sa.Elems) != 2 {
+			return nil, errors.Errorf(
+				"expected Fn::Sub with an array to contain a string value and a map of names to values, got %v",
+				reflect.TypeOf(sa))
+		}
+		sv, ok := sa.Elems[0].(*Value)
+		if !ok {
+			return nil, errors.Errorf("expected first argument to Fn::Sub to be a string, got %v", reflect.TypeOf(sa.Elems[0]))
+		}
+		s, ok := sv.Val.(string)
+		if !ok {
+			return nil, errors.Errorf("expected first argument to Fn::Sub to be a string, got %v", reflect.TypeOf(sv.Val))
+		}
+		subs, ok := sa.Elems[1].(*Object)
+		if !ok {
+			return nil, errors.Errorf("expected second argument to Fn::Sub to be an object, got %v", reflect.TypeOf(sa.Elems[1]))
+		}
+		return &Sub{
+			String:        s,
+			Substitutions: subs,
+		}, nil
+	} else if sv, ok := s.(*Value); ok {
+		s, ok := sv.Val.(string)
+		if !ok {
+			return nil, errors.Errorf("expected first argument to Fn::Sub to be a string, got %v", reflect.TypeOf(sv.Val))
+		}
+		return &Sub{
+			String: s,
+		}, nil
+	} else {
+		return nil, errors.Errorf(
+			"expected Fn::Sub to be either a string value, or an array containing a string value and a map of names to values, got %v",
+			reflect.TypeOf(s))
+	}
+}
+
 // GetResourceDependencies gets the full set of implicit and explicit dependencies for a Resource.
 func GetResourceDependencies(r *Resource) ([]string, error) {
 	var deps []string
@@ -252,8 +359,10 @@ func getExpressionDependencies(e Expr) []string {
 			deps = append(deps, getExpressionDependencies(x)...)
 		}
 	case *Object:
-		for _, x := range t.Elems {
-			deps = append(deps, getExpressionDependencies(x)...)
+		if t != nil {
+			for _, x := range t.Elems {
+				deps = append(deps, getExpressionDependencies(x)...)
+			}
 		}
 	case *Ref:
 		deps = append(deps, t.ResourceName)
@@ -261,6 +370,14 @@ func getExpressionDependencies(e Expr) []string {
 		deps = append(deps, t.ResourceName)
 	case *Invoke:
 		deps = append(deps, getExpressionDependencies(t.Args)...)
+	case *Join:
+		deps = append(deps, getExpressionDependencies(t.Delimiter)...)
+		deps = append(deps, getExpressionDependencies(t.Values)...)
+	case *Sub:
+		deps = append(deps, getExpressionDependencies(t.Substitutions)...)
+	case *Select:
+		deps = append(deps, getExpressionDependencies(t.Index)...)
+		deps = append(deps, getExpressionDependencies(t.Values)...)
 	default:
 		panic("fatal: invalid expr type")
 	}

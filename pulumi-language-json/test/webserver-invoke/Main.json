@@ -36,7 +36,11 @@
                         "Return": "id"
                     }
                 },
-                "userData": "let userData =\n`#!/bin/bash\necho 'Hello, World!' > index.html\nnohup python -m SimpleHTTPServer 80 &`;",
+                "userData": { "Fn::Join": ["\n", [
+                    "#!/bin/bash",
+                    { "Fn::Sub": "echo 'Hello, World from ${WebSecGrp.arn}!' > index.html" },
+                    "nohup python -m SimpleHTTPServer 80 &"
+                ]]},
                 "vpcSecurityGroupIds": [
                     { "Ref": "WebSecGrp" }
                 ]
