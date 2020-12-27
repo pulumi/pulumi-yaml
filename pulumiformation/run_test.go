@@ -44,8 +44,9 @@ func testTemplate(t *testing.T, template Template, callback func(*runner)) {
 			assert.Equal(t, "", id)
 
 			return "someID", resource.PropertyMap{
-				"foo": resource.NewStringProperty("qux"),
-				"out": resource.NewStringProperty("tuo"),
+				"foo":    resource.NewStringProperty("qux"),
+				"out":    resource.NewStringProperty("tuo"),
+				"outNum": resource.NewNumberProperty(1),
 			}, nil
 		},
 	}
@@ -79,6 +80,40 @@ func TestJoin(t *testing.T) {
 		assert.NoError(t, err)
 		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 			assert.Equal(t, "a,b,c", x)
+			return nil, nil
+		})
+		r.ctx.Export("out", out)
+	})
+}
+
+func TestSelect(t *testing.T) {
+	tmpl := Template{
+		Resources: map[string]*Resource{
+			"resA": {
+				Type: "test:resource:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+		},
+	}
+	testTemplate(t, tmpl, func(r *runner) {
+		v, err := r.evaluateBuiltinSelect(&Select{
+			Index: &GetAtt{
+				ResourceName: "resA",
+				PropertyName: "outNum",
+			},
+			Values: &Array{
+				Elems: []Expr{
+					&Value{Val: "first"},
+					&Value{Val: "second"},
+					&Value{Val: "third"},
+				},
+			},
+		})
+		assert.NoError(t, err)
+		out := pulumi.ToOutput(v).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "second", x.(string))
 			return nil, nil
 		})
 		r.ctx.Export("out", out)

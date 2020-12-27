@@ -42,6 +42,7 @@ func (*Ref) isExpr() {}
 // GetAtt is a function expression that accesses an output property of another resources.
 type GetAtt struct {
 	ResourceName string
+	// TODO: CloudFormation allows nested Ref in PropertyName, so this could be an Expr
 	PropertyName string
 }
 
@@ -60,7 +61,8 @@ func (*Invoke) isExpr() {}
 // If a delimiter is the empty string, the set of values are concatenated with no delimiter.
 type Join struct {
 	Delimiter Expr
-	Values    *Array
+	// TODO: CloudFormation allows nested functions to produce the Values - so this should be an Expr
+	Values *Array
 }
 
 func (*Join) isExpr() {}
@@ -77,7 +79,8 @@ func (*Sub) isExpr() {}
 
 // Select returns a single object from a list of objects by index.
 type Select struct {
-	Index  Expr
+	Index Expr
+	// TODO: CloudFormation allows nested functions to produce the Values - so this should be an Expr
 	Values *Array
 }
 

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -291,15 +292,29 @@ func (r *runner) evaluateBuiltinJoin(v *Join) (interface{}, error) {
 }
 
 func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
-	indexV, err := r.evaluateExpr(v.Index)
+	index, err := r.evaluateExpr(v.Index)
 	if err != nil {
 		return nil, err
 	}
-	index, ok := indexV.(int)
-	if !ok {
-		return nil, errors.Errorf("expected index passed to Fn::Select to be an int, got %v", reflect.TypeOf(indexV))
+	var elems []interface{}
+	for _, e := range v.Values.Elems {
+		ev, err := r.evaluateExpr(e)
+		if err != nil {
+			return nil, err
+		}
+		elems = append(elems, ev)
 	}
-	return r.evaluateExpr(v.Values.Elems[index])
+	args := append([]interface{}{index}, elems...)
+	out := pulumi.All(args...).ApplyT(func(args []interface{}) (interface{}, error) {
+		indexV := args[0]
+		index, err := massageToInt(indexV)
+		if err != nil {
+			return nil, err
+		}
+		elems := args[1:]
+		return elems[index], nil
+	})
+	return out, nil
 }
 
 var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
@@ -371,6 +386,32 @@ func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
 		}
 		return s, nil
 	})
+}
+
+// massageToInt defines an implicit conversion from raw values to
+// int for use in Fn::Select.
+func massageToInt(v interface{}) (int, error) {
+	switch t := v.(type) {
+	case int:
+		return t, nil
+	case int32:
+		return int(t), nil
+	case int64:
+		return int(t), nil
+	case float32:
+		return int(t), nil
+	case float64:
+		return int(t), nil
+	case bool:
+		if t {
+			return 1, nil
+		}
+		return 0, nil
+	case string:
+		return strconv.Atoi(t)
+	default:
+		return 0, errors.Errorf("expected type that can be converted to int, got %v", reflect.TypeOf(v))
+	}
 }
 
 // untypedArgs is an untyped interface for a bag of properties.
