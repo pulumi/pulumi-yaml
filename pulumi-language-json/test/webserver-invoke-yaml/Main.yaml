@@ -16,6 +16,7 @@ Resources:
           fromPort: 80
           toPort: 80
           cidrBlocks: ["0.0.0.0/0"]
+    Protect: true
   WebServer:
     Type: aws:ec2/instance:Instance
     Properties:

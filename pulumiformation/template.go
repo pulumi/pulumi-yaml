@@ -80,6 +80,38 @@ type Resource struct {
 	Metadata map[string]interface{} `json:",omitempty" yaml:"Metadata,omitempty"`
 	// Properties contains the primary resource-specific keys and values to initialize the resource state.
 	Properties map[string]interface{} `json:",omitempty" yaml:"Properties,omitempty"`
+
+	// AdditionalSecretOutputs specifies properties that must be encrypted as secrets
+	AdditionalSecretOutputs []string `json:",omitempty" yaml:"AdditionalSecretOutputs,omitempty"`
+	// Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it
+	Aliases []string `json:",omitempty" yaml:"Aliases,omitempty"`
+	// CustomTimeouts overrides the default retry/timeout behavior for resource provisioning
+	CustomTimeouts *CustomTimeoutResourceOption `json:",omitempty" yaml:"CustomTimeouts,omitempty"`
+	// DeleteBeforeReplace  overrides the default create-before-delete behavior when replacing
+	DeleteBeforeReplace bool `json:",omitempty" yaml:"DeleteBeforeReplace,omitempty"`
+	// IgnoreChangs declares that changes to certain properties should be ignored during diffing
+	IgnoreChanges []string `json:",omitempty" yaml:"IgnoreChanges,omitempty"`
+	// Import adopts an existing resource from your cloud account under the control of Pulumi
+	Import string `json:",omitempty" yaml:"Import,omitempty"`
+	// Parent specifies a parent for the resource
+	Parent string `json:",omitempty" yaml:"Parent,omitempty"`
+	// Protect prevents accidental deletion of a resource
+	Protect bool `json:",omitempty" yaml:"Protect,omitempty"`
+	// Version specifies a provider plugin version that should be used when operating on a resource
+	Version string `json:",omitempty" yaml:"Version,omitempty"`
+}
+
+// CustomTimeoutResourceOption provides a set of custom timeouts for create, update, and delete operations on a
+// resource. These timeouts are specified using a duration string like "5m" (5 minutes), "40s" (40 seconds), or
+// "1d" (1 day). Supported duration units are "ns", "us" (or "µs"), "ms", "s", "m", and "h" (nanoseconds,
+// microseconds, milliseconds, seconds, minutes, and hours, respectively).
+type CustomTimeoutResourceOption struct {
+	// Create is the custom timeout for create operations.
+	Create string `json:",omitempty" yaml:"Create,omitempty"`
+	// Delete is the custom timeout for delete operations.
+	Delete string `json:",omitempty" yaml:"Delete,omitempty"`
+	// Update is the custom timeout for update operations.
+	Update string `json:",omitempty" yaml:"Update,omitempty"`
 }
 
 // Output represents a single template output directive, which manifest as Pulumi exports. Read more

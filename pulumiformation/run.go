@@ -149,9 +149,50 @@ func (r *runner) registerResources() error {
 			props[k] = vv
 		}
 
+		var opts []pulumi.ResourceOption
+		if v.AdditionalSecretOutputs != nil {
+			opts = append(opts, pulumi.AdditionalSecretOutputs(v.AdditionalSecretOutputs))
+		}
+		if v.Aliases != nil {
+			var aliases []pulumi.Alias
+			for _, s := range v.Aliases {
+				alias := pulumi.Alias{
+					URN: pulumi.URN(s),
+				}
+				aliases = append(aliases, alias)
+			}
+			opts = append(opts, pulumi.Aliases(aliases))
+		}
+		if v.CustomTimeouts != nil {
+			opts = append(opts, pulumi.Timeouts(&pulumi.CustomTimeouts{
+				Create: v.CustomTimeouts.Create,
+				Delete: v.CustomTimeouts.Delete,
+				Update: v.CustomTimeouts.Update,
+			}))
+		}
+		if v.DeleteBeforeReplace {
+			opts = append(opts, pulumi.DeleteBeforeReplace(v.DeleteBeforeReplace))
+		}
+		if v.DependsOn != nil {
+			var dependsOn []pulumi.Resource
+			for _, s := range v.DependsOn {
+				dependsOn = append(dependsOn, r.resources[s])
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
+		}
+		if v.IgnoreChanges != nil {
+			opts = append(opts, pulumi.IgnoreChanges(v.IgnoreChanges))
+		}
+		if v.Protect {
+			opts = append(opts, pulumi.Protect(v.Protect))
+		}
+		if v.Version != "" {
+			opts = append(opts, pulumi.Version(v.Version))
+		}
+
 		// Now register the resulting resource with the engine.
 		state := lateboundCustomResourceState{name: k}
-		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), &state)
+		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), &state, opts...)
 		if err != nil {
 			return errors.Wrapf(err, "registering resource %s", k)
 		}
