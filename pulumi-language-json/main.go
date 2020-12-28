@@ -28,6 +28,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v2/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v2/go/common/version"
+	"github.com/pulumi/pulumi/sdk/v2/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v2/proto/go"
 	"google.golang.org/grpc"
@@ -90,9 +91,24 @@ func newLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeSer
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
 func (host *jsonLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	// TODO: implement this. To do so, we just need to parse the resource list and fetch the package
-	//     names from the types.
-	return &pulumirpc.GetRequiredPluginsResponse{}, nil
+	tmpl, err := pulumiformation.Load()
+	if err != nil {
+		return nil, err
+	}
+	pkgs := pulumiformation.GetReferencedPackages(&tmpl)
+	var plugins []*pulumirpc.PluginDependency
+	for _, pkg := range pkgs {
+		plugins = append(plugins, &pulumirpc.PluginDependency{
+			Kind:    string(workspace.ResourcePlugin),
+			Name:    pkg.Package,
+			Version: pkg.Version,
+			// TODO: Offer a way to specify this either globally or on a per-resource basis
+			Server: "",
+		})
+	}
+	return &pulumirpc.GetRequiredPluginsResponse{
+		Plugins: plugins,
+	}, nil
 }
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
