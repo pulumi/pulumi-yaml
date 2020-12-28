@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/goccy/go-yaml"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
+	"gopkg.in/yaml.v3"
 )
 
 // MainTemplate is the assumed name of the JSON template file.
@@ -29,7 +29,7 @@ func Load() (Template, error) {
 			return t, errors.Wrapf(err, "decoding template %s.json", MainTemplate)
 		}
 	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
-		if err = yaml.Unmarshal(b, &t); err != nil {
+		if err = yaml.Unmarshal(b, &TagProcessor{&t}); err != nil {
 			return t, errors.Wrapf(err, "decoding template %s.yaml", MainTemplate)
 		}
 	} else {

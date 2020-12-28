@@ -1,6 +1,7 @@
 package pulumiformation
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -382,7 +383,7 @@ func getExpressionDependencies(e Expr) []string {
 		deps = append(deps, getExpressionDependencies(t.Index)...)
 		deps = append(deps, getExpressionDependencies(t.Values)...)
 	default:
-		panic("fatal: invalid expr type")
+		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(e)))
 	}
 	return deps
 }
