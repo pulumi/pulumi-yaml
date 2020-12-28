@@ -93,7 +93,7 @@ func Parse(v interface{}) (Expr, error) {
 	}
 
 	switch t := v.(type) {
-	case bool, int, int32, int64, float32, float64, string:
+	case bool, int, int32, int64, uint64, float32, float64, string:
 		return &Value{Val: t}, nil
 	case []interface{}:
 		var elems []Expr

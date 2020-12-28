@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
 )
@@ -16,23 +17,23 @@ import (
 // TODO: would be nice to permit multiple files, but we'd need to know which is "main", and there's
 //     no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
 //     One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
-const MainTemplate = "Main.json"
+const MainTemplate = "Main"
 
 // Load a template from the current working directory
 func Load() (Template, error) {
 	t := Template{}
 
 	// Read in the template file (for now, hard coded as Main.*).
-	b, err := ioutil.ReadFile(MainTemplate)
-	if err != nil {
+	if b, err := ioutil.ReadFile(MainTemplate + ".json"); err == nil {
+		if err = json.Unmarshal(b, &t); err != nil {
+			return t, errors.Wrapf(err, "decoding template %s.json", MainTemplate)
+		}
+	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
+		if err = yaml.Unmarshal(b, &t); err != nil {
+			return t, errors.Wrapf(err, "decoding template %s.yaml", MainTemplate)
+		}
+	} else {
 		return t, errors.Wrapf(err, "reading template %s", MainTemplate)
-	}
-
-	// Now decode the file using CloudFormation rules.
-	// TODO: eventually this won't work because we'll need to customize (e.g., with !Invoke). Hopefully
-	//     we can just fork rather than needing to recreate the CloudFormation oddities.
-	if err = json.Unmarshal(b, &t); err != nil {
-		return t, errors.Wrapf(err, "decoding template %s", MainTemplate)
 	}
 
 	return t, nil
@@ -152,7 +153,7 @@ func (r *runner) registerResources() error {
 		state := lateboundCustomResourceState{name: k}
 		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), &state)
 		if err != nil {
-			return errors.Wrapf(err, "registering resource %s/%s", v.Type, k)
+			return errors.Wrapf(err, "registering resource %s", k)
 		}
 		r.resources[k] = &state
 	}
@@ -397,6 +398,8 @@ func massageToInt(v interface{}) (int, error) {
 	case int32:
 		return int(t), nil
 	case int64:
+		return int(t), nil
+	case uint64:
 		return int(t), nil
 	case float32:
 		return int(t), nil

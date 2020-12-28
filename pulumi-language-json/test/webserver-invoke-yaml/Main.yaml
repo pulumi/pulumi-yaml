@@ -1,0 +1,49 @@
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+Resources:
+  WebSecGrp:
+    Type: aws:ec2/securityGroup:SecurityGroup
+    Properties:
+      ingress:
+        - protocol: tcp
+          fromPort: 80
+          toPort: 80
+          cidrBlocks: ["0.0.0.0/0"]
+  WebServer:
+    Type: aws:ec2/instance:Instance
+    Properties:
+      instanceType: t2.micro
+      ami:
+        Fn::Invoke:
+          Function: aws:index/getAmi:getAmi
+          Arguments:
+            filters:
+              - name: name
+                values: ["amzn-ami-hvm-*-x86_64-ebs"]
+            owners: ["137112412989"]
+            mostRecent: true
+          Return: id
+      userData: 
+        Fn::Sub: |-
+          #!/bin/bash
+          echo 'Hello, World from ${WebSecGrp.arn}!' > index.html
+          nohup python -m SimpleHTTPServer 80 &
+      vpcSecurityGroupIds:
+        - Ref: WebSecGrp
+Outputs:
+  InstanceId:
+    Value:
+      Ref: WebServer
+  PublicIp:
+    Value:
+      Fn::GetAtt: ["WebServer", "publicIp"]
+  PublicHostName:
+    Value:
+      Fn::GetAtt: ["WebServer", "publicDns"]

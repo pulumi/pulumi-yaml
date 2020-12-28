@@ -4,7 +4,7 @@ package pulumiformation
 // containing cloud infrastructure resources.
 type Template struct {
 	// Description is an informational bit of metadata about this template.
-	Description string `json:",omitempty"`
+	Description string `json:",omitempty" yaml:"Description,omitempty"`
 	// Mappings provides the ability to have a static set of maps for programs that need to
 	// perform lookups using Fn::FindInMap. For instance, we can map from region name to AMI IDs:
 	//      "Mappings": {
@@ -17,20 +17,20 @@ type Template struct {
 	//          }
 	//      }
 	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/mappings-section-structure.html.
-	Mappings map[string]map[string]map[string]string `json:",omitempty"`
+	Mappings map[string]map[string]map[string]string `json:",omitempty" yaml:"Mappings,omitempty"`
 	// Parameters allows the template to be conditional based on Pulumi configuration values. Read more at
 	// https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html.
-	Parameters map[string]*Parameter `json:",omitempty"`
+	Parameters map[string]*Parameter `json:",omitempty" yaml:"Parameters,omitempty"`
 	// Conditions can optionally contain a set of statements that defines the circumstances under which
 	// entities are created or configured. This can be based on parameters to enable dynamic resource creation.
 	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html.
-	Conditions map[string]interface{} `json:",omitempty"`
+	Conditions map[string]interface{} `json:",omitempty" yaml:"Conditions,omitempty"`
 	// Resources is a required section that declares resources you want to include in the stack.
 	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html.
-	Resources map[string]*Resource `json:",omitempty"`
+	Resources map[string]*Resource `json:",omitempty" yaml:"Resources,omitempty"`
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
 	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html.
-	Outputs map[string]*Output `json:",omitempty"`
+	Outputs map[string]*Output `json:",omitempty" yaml:"Outputs,omitempty"`
 }
 
 // Parameter represents a single configurable parameter for this template. The parameters are
@@ -39,27 +39,27 @@ type Template struct {
 type Parameter struct {
 	// Type is the (required) data type for the parameter. It can be one of: `String`, `Number`,
 	// `List<Number>`, or `CommaDelimetedList`.
-	Type string
+	Type string `yaml:"Type"`
 	// AllowedPattern is a regular expression that represents the patterns to allow for string types.
-	AllowedPattern *string `json:",omitempty"`
+	AllowedPattern *string `json:",omitempty" yaml:"AllowedPattern,omitempty"`
 	// AllowedValues is an array containing the list of values allowed for the parameter.
-	AllowedValues *[]string `json:",omitempty"`
+	AllowedValues *[]string `json:",omitempty" yaml:"AllowedValues,omitempty"`
 	// ConstraintDescription is a string that explains a constraint when the constraint is violated.
-	ConstraintDescription string `json:",omitempty"`
+	ConstraintDescription string `json:",omitempty" yaml:"ConstraintDescription,omitempty"`
 	// Default is a value of the appropriate type for the template to use if no value is specified.
-	Default interface{} `json:",omitempty"`
+	Default interface{} `json:",omitempty" yaml:"Default,omitempty"`
 	// Description is a string that describes the parameter.
-	Description string `json:",omitempty"`
+	Description string `json:",omitempty" yaml:"Description,omitempty"`
 	// NoEcho masks the parameter by marking it a secret.
-	NoEcho *bool `json:",omitempty"`
+	NoEcho *bool `json:",omitempty" yaml:"NoEcho,omitempty"`
 	// MaxLength is an integer value that determines the largest number of characters you want to allow for strings.
-	MaxLength *int64 `json:",omitempty"`
+	MaxLength *int64 `json:",omitempty" yaml:"MaxLength,omitempty"`
 	// MaxValue is a numeric value that determines the largest numeric value you want to allow for numbers.
-	MaxValue *int64 `json:",omitempty"`
+	MaxValue *int64 `json:",omitempty" yaml:"MaxValue,omitempty"`
 	// MinLength is an integer value that determines the smallest number of characters you want to allow for strings.
-	MinLength *int64 `json:",omitempty"`
+	MinLength *int64 `json:",omitempty" yaml:"MinLength,omitempty"`
 	// MinValue is a numeric value that determines the smallest numeric value you want to allow for numbers.
-	MinValue *int64 `json:",omitempty"`
+	MinValue *int64 `json:",omitempty" yaml:"MinValue,omitempty"`
 }
 
 // Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
@@ -67,19 +67,19 @@ type Parameter struct {
 // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html.
 type Resource struct {
 	// Type is the Pulumi type token for this resource.
-	Type string
+	Type string `yaml:"Type"`
 	// Condition makes this resource's creation conditional upon a predefined Condition attribute;
 	// see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html.
-	Condition string `json:",omitempty"`
+	Condition string `json:",omitempty" yaml:"Condition,omitempty"`
 	// DependsOn makes this resource explicitly depend on another resource, by name, so that it won't
 	// be created before the dependent finishes being created (and the reverse for destruction). Normally,
 	// Pulumi automatically tracks implicit dependencies through inputs/outputs, but this can be used when
 	// dependencies aren't captured purely from input/output edges.
-	DependsOn []string `json:",omitempty"`
+	DependsOn []string `json:",omitempty" yaml:"DependsOn:omitempty"`
 	// Metadata enables arbitrary metadata values to be associated with a resource.
-	Metadata map[string]interface{} `json:",omitempty"`
+	Metadata map[string]interface{} `json:",omitempty" yaml:"Metadata,omitempty"`
 	// Properties contains the primary resource-specific keys and values to initialize the resource state.
-	Properties map[string]interface{} `json:",omitempty"`
+	Properties map[string]interface{} `json:",omitempty" yaml:"Properties,omitempty"`
 }
 
 // Output represents a single template output directive, which manifest as Pulumi exports. Read more
@@ -87,9 +87,9 @@ type Resource struct {
 type Output struct {
 	// Value is the (required) value of the property. The value of an output can include literals,
 	// references, mapping values, builtin functions, and so on.
-	Value interface{}
+	Value interface{} `yaml:"Value"`
 	// Description is an optional string that describes the output.
-	Description string `json:",omitempty"`
+	Description string `json:",omitempty" yaml:"Description,omitempty"`
 }
 
 // Note that there are many AWS-specific properties not supported by the above:
