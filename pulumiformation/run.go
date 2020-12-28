@@ -54,7 +54,16 @@ type runner struct {
 	ctx       *pulumi.Context
 	t         Template
 	params    map[string]interface{}
-	resources map[string]*lateboundCustomResourceState
+	resources map[string]lateboundResource
+}
+
+// lateboundResource is an interface shared by lateboundCustomResourceState and
+// lateboundProviderResourceState so that both normal and provider resources can be
+// created and managed as part of a deployment.
+type lateboundResource interface {
+	GetOutput(k string) pulumi.Output
+	CustomResource() *pulumi.CustomResourceState
+	ProviderResource() *pulumi.ProviderResourceState
 }
 
 // lateboundCustomResourceState is a resource state that stores all computed outputs into a single
@@ -77,12 +86,45 @@ func (st *lateboundCustomResourceState) GetOutput(k string) pulumi.Output {
 	})
 }
 
+func (st *lateboundCustomResourceState) CustomResource() *pulumi.CustomResourceState {
+	return &st.CustomResourceState
+}
+
+func (st *lateboundCustomResourceState) ProviderResource() *pulumi.ProviderResourceState {
+	return nil
+}
+
+type lateboundProviderResourceState struct {
+	pulumi.ProviderResourceState
+	name    string
+	Outputs pulumi.MapOutput `pulumi:""`
+}
+
+// GetOutput returns the named output of the resource.
+func (st *lateboundProviderResourceState) GetOutput(k string) pulumi.Output {
+	return st.Outputs.ApplyT(func(outputs map[string]interface{}) (interface{}, error) {
+		out, ok := outputs[k]
+		if !ok {
+			return nil, errors.Errorf("no output '%s' on resource '%s'", k, st.name)
+		}
+		return out, nil
+	})
+}
+
+func (st *lateboundProviderResourceState) CustomResource() *pulumi.CustomResourceState {
+	return &st.CustomResourceState
+}
+
+func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderResourceState {
+	return &st.ProviderResourceState
+}
+
 func newRunner(ctx *pulumi.Context, t Template) *runner {
 	return &runner{
 		ctx:       ctx,
 		t:         t,
 		params:    make(map[string]interface{}),
-		resources: make(map[string]*lateboundCustomResourceState),
+		resources: make(map[string]lateboundResource),
 	}
 }
 
@@ -176,27 +218,50 @@ func (r *runner) registerResources() error {
 		if v.DependsOn != nil {
 			var dependsOn []pulumi.Resource
 			for _, s := range v.DependsOn {
-				dependsOn = append(dependsOn, r.resources[s])
+				dependsOn = append(dependsOn, r.resources[s].CustomResource())
 			}
 			opts = append(opts, pulumi.DependsOn(dependsOn))
 		}
 		if v.IgnoreChanges != nil {
 			opts = append(opts, pulumi.IgnoreChanges(v.IgnoreChanges))
 		}
+		if v.Parent != "" {
+			opts = append(opts, pulumi.Parent(r.resources[v.Parent].CustomResource()))
+		}
 		if v.Protect {
 			opts = append(opts, pulumi.Protect(v.Protect))
+		}
+		if v.Provider != "" {
+			provider := r.resources[v.Provider].ProviderResource()
+			if provider == nil {
+				return errors.Errorf("resource passed as Provider was not a provider resource '%s'", v.Provider)
+			}
+			opts = append(opts, pulumi.Provider(provider))
 		}
 		if v.Version != "" {
 			opts = append(opts, pulumi.Version(v.Version))
 		}
 
+		// Create either a latebound custom resource or latebound provider resource depending on
+		// whether the type token indicates a special provider type.
+		var state lateboundResource
+		var res pulumi.Resource
+		if strings.HasPrefix(v.Type, "pulumi:providers:") {
+			r := lateboundProviderResourceState{name: k}
+			state = &r
+			res = &r
+		} else {
+			r := lateboundCustomResourceState{name: k}
+			state = &r
+			res = &r
+		}
+
 		// Now register the resulting resource with the engine.
-		state := lateboundCustomResourceState{name: k}
-		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), &state, opts...)
+		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), res, opts...)
 		if err != nil {
 			return errors.Wrapf(err, "registering resource %s", k)
 		}
-		r.resources[k] = &state
+		r.resources[k] = state
 	}
 
 	return nil
@@ -271,7 +336,7 @@ func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
 	if !ok {
 		return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
 	}
-	return res.ID().ToStringOutput(), nil
+	return res.CustomResource().ID().ToStringOutput(), nil
 }
 
 // evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,

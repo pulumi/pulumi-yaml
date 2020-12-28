@@ -37,6 +37,13 @@ Resources:
           nohup python -m SimpleHTTPServer 80 &
       vpcSecurityGroupIds:
         - Ref: WebSecGrp
+  UsEast2Provider:
+    Type: pulumi:providers:aws
+    Properties:
+      region: us-east-2
+  MyBucket:
+    Type: aws:s3/bucket:Bucket
+    Provider: UsEast2Provider
 Outputs:
   InstanceId:
     Value: !Ref WebServer

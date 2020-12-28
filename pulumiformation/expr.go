@@ -349,6 +349,12 @@ func GetResourceDependencies(r *Resource) ([]string, error) {
 		deps = append(deps, getExpressionDependencies(e)...)
 	}
 	deps = append(deps, r.DependsOn...)
+	if r.Provider != "" {
+		deps = append(deps, r.Provider)
+	}
+	if r.Parent != "" {
+		deps = append(deps, r.Parent)
+	}
 	return deps, nil
 }
 

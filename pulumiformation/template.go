@@ -97,6 +97,8 @@ type Resource struct {
 	Parent string `json:",omitempty" yaml:"Parent,omitempty"`
 	// Protect prevents accidental deletion of a resource
 	Protect bool `json:",omitempty" yaml:"Protect,omitempty"`
+	// Provider specifies an explicitly configured provider, instead of using the default global provider
+	Provider string `json:",omitempty" yaml:"Provider,omitempty"`
 	// Version specifies a provider plugin version that should be used when operating on a resource
 	Version string `json:",omitempty" yaml:"Version,omitempty"`
 }
