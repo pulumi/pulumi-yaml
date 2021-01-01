@@ -5,11 +5,12 @@ import (
 	"io/ioutil"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v2/go/pulumi/config"
+	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 )
 
@@ -137,7 +138,9 @@ func (r *runner) Evaluate() error {
 	///
 	// The Parameters must be populated before proceeding, as they can be used during subsequent evaluation.
 
-	// TODO
+	if err := r.registerParameters(); err != nil {
+		return err
+	}
 
 	//     2) Conditions: prepare the conditions which will produce boolean conditions we can use during execution.
 
@@ -166,6 +169,48 @@ func (r *runner) Evaluate() error {
 	// Note that we don't currently support Transforms or Macros. This might be interesting eventually, but
 	// currently depends on a fair bit of the CloudFormation server-side machinery to work.
 
+	return nil
+}
+
+func (r *runner) registerParameters() error {
+	for k, p := range r.t.Parameters {
+		var v interface{}
+		var err error
+		switch p.Type {
+		case "String":
+			v, err = config.Try(r.ctx, k)
+		case "Number":
+			v, err = config.TryFloat64(r.ctx, k)
+		case "List<Number>":
+			v, err = config.Try(r.ctx, k)
+			if err == nil {
+				var arr []float64
+				for _, nstr := range strings.Split(v.(string), ",") {
+					f, err := cast.ToFloat64E(nstr)
+					if err != nil {
+						return err
+					}
+					arr = append(arr, f)
+				}
+				v = arr
+			}
+		case "CommaDelimitedList":
+			v, err = config.Try(r.ctx, k)
+			if err == nil {
+				var arr []string
+				for _, item := range strings.Split(v.(string), ",") {
+					arr = append(arr, item)
+				}
+				v = arr
+			}
+		}
+		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
+		// TODO: Most likely want a real Secret property on parameters instead of co-opting NoEcho
+		if p.NoEcho != nil && *p.NoEcho {
+			v = pulumi.ToSecret(v)
+		}
+		r.params[k] = v
+	}
 	return nil
 }
 
@@ -333,10 +378,15 @@ func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
 // the resource name whose ID will be looked up and substituted in its place.
 func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
 	res, ok := r.resources[v.ResourceName]
-	if !ok {
-		return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
+	if ok {
+		return res.CustomResource().ID().ToStringOutput(), nil
 	}
-	return res.CustomResource().ID().ToStringOutput(), nil
+	p, ok := r.params[v.ResourceName]
+	if ok {
+		return p, nil
+	}
+	return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
+
 }
 
 // evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,
@@ -414,7 +464,7 @@ func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
 	args := append([]interface{}{index}, elems...)
 	out := pulumi.All(args...).ApplyT(func(args []interface{}) (interface{}, error) {
 		indexV := args[0]
-		index, err := massageToInt(indexV)
+		index, err := cast.ToIntE(indexV)
 		if err != nil {
 			return nil, err
 		}
@@ -493,34 +543,6 @@ func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
 		}
 		return s, nil
 	})
-}
-
-// massageToInt defines an implicit conversion from raw values to
-// int for use in Fn::Select.
-func massageToInt(v interface{}) (int, error) {
-	switch t := v.(type) {
-	case int:
-		return t, nil
-	case int32:
-		return int(t), nil
-	case int64:
-		return int(t), nil
-	case uint64:
-		return int(t), nil
-	case float32:
-		return int(t), nil
-	case float64:
-		return int(t), nil
-	case bool:
-		if t {
-			return 1, nil
-		}
-		return 0, nil
-	case string:
-		return strconv.Atoi(t)
-	default:
-		return 0, errors.Errorf("expected type that can be converted to int, got %v", reflect.TypeOf(v))
-	}
 }
 
 // untypedArgs is an untyped interface for a bag of properties.
