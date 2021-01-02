@@ -1,25 +1,25 @@
-Parameters:
+parameters:
   InstanceType:
-    Type: String
-    Default: t2.micro
-    AllowedValues:
+    type: String
+    default: t2.micro
+    allowedValues:
       - t2.micro
       - m1.small
       - m1.large
-    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
-Resources:
+    description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+resources:
   WebSecGrp:
-    Type: aws:ec2/securityGroup:SecurityGroup
-    Properties:
+    type: aws:ec2/securityGroup:SecurityGroup
+    properties:
       ingress:
         - protocol: tcp
           fromPort: 80
           toPort: 80
           cidrBlocks: ["0.0.0.0/0"]
-    Protect: true
+    protect: true
   WebServer:
-    Type: aws:ec2/instance:Instance
-    Properties:
+    type: aws:ec2/instance:Instance
+    properties:
       instanceType: t2.micro
       ami:
         Fn::Invoke:
@@ -38,16 +38,16 @@ Resources:
       vpcSecurityGroupIds:
         - Ref: WebSecGrp
   UsEast2Provider:
-    Type: pulumi:providers:aws
-    Properties:
+    type: pulumi:providers:aws
+    properties:
       region: us-east-2
   MyBucket:
-    Type: aws:s3/bucket:Bucket
-    Provider: UsEast2Provider
-Outputs:
+    type: aws:s3/bucket:Bucket
+    provider: UsEast2Provider
+outputs:
   InstanceId:
-    Value: !Ref WebServer
+    value: !Ref WebServer
   PublicIp:
-    Value: !GetAtt WebServer.publicIp
+    value: !GetAtt WebServer.publicIp
   PublicHostName:
-    Value: !GetAtt WebServer.publicDns
+    value: !GetAtt WebServer.publicDns

@@ -87,6 +87,22 @@ type Select struct {
 
 func (*Select) isExpr() {}
 
+type AssetKind string
+
+const (
+	FileAsset   AssetKind = "File"
+	StringAsset AssetKind = "String"
+	RemoteAsset AssetKind = "Remote"
+)
+
+// Asset references a file either on disk ("File"), created in memory ("String") or accessed remotely ("Remote").
+type Asset struct {
+	Kind AssetKind
+	Path string
+}
+
+func (*Asset) isExpr() {}
+
 // Parse a given untyped expression value from a template into an Expr object
 func Parse(v interface{}) (Expr, error) {
 	if v == nil {
@@ -130,6 +146,8 @@ func Parse(v interface{}) (Expr, error) {
 				return parseSub(elems)
 			case "Fn::Select":
 				return parseSelect(elems)
+			case "Fn::Asset":
+				return parseAsset(elems)
 				// case "Fn::FindInMap":
 				// 	return r.evaluateBuiltinFindInMap(v)
 				// case "Fn::Base64":
@@ -338,6 +356,41 @@ func parseSub(v map[string]Expr) (*Sub, error) {
 	}
 }
 
+func parseAsset(v map[string]Expr) (*Asset, error) {
+	// Read and validate the arguments to Fn::Select.
+	s := v["Fn::Asset"]
+	asset, ok := s.(*Object)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected Fn::Asset to be a map containing one of the 'File', 'String', or 'Remote' keys, got %v",
+			reflect.TypeOf(s))
+	}
+	if len(asset.Elems) != 1 {
+		return nil, errors.Errorf(
+			"expected Fn::Asset to be a map containing one of the 'File', 'String', or 'Remote' keys, got %v",
+			reflect.TypeOf(s))
+	}
+
+	for k, v := range asset.Elems {
+		vval, ok := v.(*Value)
+		if !ok {
+			return nil, errors.Errorf("expected string paramter for Fn::Asset, got %v", reflect.TypeOf(k))
+		}
+		vs, ok := vval.Val.(string)
+		if !ok {
+			return nil, errors.Errorf("expected string paramter for Fn::Asset, got %v", reflect.TypeOf(vval.Val))
+		}
+		if !(k == "File" || k == "String" || k == "Remote") {
+			return nil, errors.Errorf("expected Fn::Asset to be a map containing one of the 'File', 'String', or 'Remote' keys, got %s", k)
+		}
+		return &Asset{
+			Kind: AssetKind(k),
+			Path: vs,
+		}, nil
+	}
+	panic("unreachable")
+}
+
 // GetResourceDependencies gets the full set of implicit and explicit dependencies for a Resource.
 func GetResourceDependencies(r *Resource) ([]string, error) {
 	var deps []string
@@ -388,6 +441,8 @@ func getExpressionDependencies(e Expr) []string {
 	case *Select:
 		deps = append(deps, getExpressionDependencies(t.Index)...)
 		deps = append(deps, getExpressionDependencies(t.Values)...)
+	case *Asset:
+		// Nothing
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(e)))
 	}

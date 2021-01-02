@@ -24,7 +24,9 @@ const MainTemplate = "Main"
 func Load() (Template, error) {
 	t := Template{}
 
-	// Read in the template file (for now, hard coded as Main.*).
+	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
+	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
+	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	if b, err := ioutil.ReadFile(MainTemplate + ".json"); err == nil {
 		if err = json.Unmarshal(b, &t); err != nil {
 			return t, errors.Wrapf(err, "decoding template %s.json", MainTemplate)
@@ -32,6 +34,10 @@ func Load() (Template, error) {
 	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
 		if err = yaml.Unmarshal(b, &TagProcessor{&t}); err != nil {
 			return t, errors.Wrapf(err, "decoding template %s.yaml", MainTemplate)
+		}
+	} else if b, err := ioutil.ReadFile("Pulumi.yaml"); err == nil {
+		if err = yaml.Unmarshal(b, &TagProcessor{&t}); err != nil {
+			return t, errors.Wrapf(err, "decoding template Pulumi.yaml")
 		}
 	} else {
 		return t, errors.Wrapf(err, "reading template %s", MainTemplate)
@@ -369,6 +375,8 @@ func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
 		return r.evaluateBuiltinSub(t)
 	case *Select:
 		return r.evaluateBuiltinSelect(t)
+	case *Asset:
+		return r.evaluateBuiltinAsset(t)
 	default:
 		panic("fatal: invalid expr type")
 	}
@@ -529,6 +537,19 @@ func (r *runner) evaluateBuiltinSubTemplateExpression(expr string, subs map[stri
 	return r.evaluateBuiltinRef(&Ref{
 		ResourceName: expr,
 	})
+}
+
+func (r *runner) evaluateBuiltinAsset(v *Asset) (interface{}, error) {
+	switch v.Kind {
+	case FileAsset:
+		return pulumi.NewFileAsset(v.Path), nil
+	case StringAsset:
+		return pulumi.NewStringAsset(v.Path), nil
+	case RemoteAsset:
+		return pulumi.NewRemoteAsset(v.Path), nil
+	default:
+		return nil, errors.Errorf("unexpected Asset kind '%s'", v.Kind)
+	}
 }
 
 func joinStringOutputs(parts []interface{}) pulumi.StringOutput {

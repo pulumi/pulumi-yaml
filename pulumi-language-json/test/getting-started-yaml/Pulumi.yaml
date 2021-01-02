@@ -1,0 +1,20 @@
+name: simple-yaml
+runtime: json
+resources: 
+  my-bucket:
+    type: aws:s3/bucket:Bucket
+    properties:
+      website:
+        indexDocument: index.html
+  index.html:
+    type: aws:s3/bucketObject:BucketObject
+    properties:
+      bucket: !Ref my-bucket
+      source:
+        Fn::Asset:
+          String: <h1>Hello, world!</h1>
+      acl: public-read
+      contentType: text/html
+outputs:
+  bucketEndpoint:
+    value: !Sub http://${my-bucket.websiteEndpoint}
