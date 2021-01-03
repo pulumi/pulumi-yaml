@@ -62,6 +62,7 @@ type runner struct {
 	t         Template
 	params    map[string]interface{}
 	resources map[string]lateboundResource
+	stackRefs map[string]*pulumi.StackReference
 }
 
 // lateboundResource is an interface shared by lateboundCustomResourceState and
@@ -132,6 +133,7 @@ func newRunner(ctx *pulumi.Context, t Template) *runner {
 		t:         t,
 		params:    make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
+		stackRefs: make(map[string]*pulumi.StackReference),
 	}
 }
 
@@ -382,6 +384,8 @@ func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
 		return r.evaluateBuiltinSelect(t)
 	case *Asset:
 		return r.evaluateBuiltinAsset(t)
+	case *StackReference:
+		return r.evaluateBuiltinStackReference(t)
 	default:
 		panic("fatal: invalid expr type")
 	}
@@ -555,6 +559,33 @@ func (r *runner) evaluateBuiltinAsset(v *Asset) (interface{}, error) {
 	default:
 		return nil, errors.Errorf("unexpected Asset kind '%s'", v.Kind)
 	}
+}
+
+func (r *runner) evaluateBuiltinStackReference(v *StackReference) (interface{}, error) {
+	stackRef, ok := r.stackRefs[v.StackName]
+	if !ok {
+		var err error
+		stackRef, err = pulumi.NewStackReference(r.ctx, v.StackName, &pulumi.StackReferenceArgs{})
+		if err != nil {
+			return nil, err
+		}
+		r.stackRefs[v.StackName] = stackRef
+	}
+
+	property, err := r.evaluateExpr(v.PropertyName)
+	if err != nil {
+		return nil, err
+	}
+
+	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(v interface{}) (string, error) {
+		s, ok := v.(string)
+		if !ok {
+			return "", errors.Errorf("expected property name argument to Fn::StackReference to be a string, got %v", reflect.TypeOf(v))
+		}
+		return s, nil
+	}).(pulumi.StringOutput)
+
+	return stackRef.GetOutput(propertyStringOutput), nil
 }
 
 func joinStringOutputs(parts []interface{}) pulumi.StringOutput {

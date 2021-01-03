@@ -103,6 +103,14 @@ type Asset struct {
 
 func (*Asset) isExpr() {}
 
+// StackReference gets an output of another stack for use in this deployment.
+type StackReference struct {
+	StackName    string
+	PropertyName Expr
+}
+
+func (*StackReference) isExpr() {}
+
 // Parse a given untyped expression value from a template into an Expr object
 func Parse(v interface{}) (Expr, error) {
 	if v == nil {
@@ -148,6 +156,8 @@ func Parse(v interface{}) (Expr, error) {
 				return parseSelect(elems)
 			case "Fn::Asset":
 				return parseAsset(elems)
+			case "Fn::StackReference":
+				return parseStackReference(elems)
 				// case "Fn::FindInMap":
 				// 	return r.evaluateBuiltinFindInMap(v)
 				// case "Fn::Base64":
@@ -389,6 +399,35 @@ func parseAsset(v map[string]Expr) (*Asset, error) {
 		}, nil
 	}
 	panic("unreachable")
+}
+
+func parseStackReference(v map[string]Expr) (*StackReference, error) {
+	// Read and validate the arguments to Fn::StackReference.
+	sr := v["Fn::StackReference"]
+	arr, ok := sr.(*Array)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected Fn::StackReference to contain a two-valued array, got %v", reflect.TypeOf(sr))
+	}
+	args := arr.Elems
+	if len(args) != 2 {
+		return nil, errors.Errorf(
+			"incorrect number of elements for Fn::StackReference array; got %d, expected 2", len(args))
+	}
+	stackNameV, ok := args[0].(*Value)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected first argument to Fn::StackReference to be a stack name string; got %v", reflect.TypeOf(args[0]))
+	}
+	stackName, ok := stackNameV.Val.(string)
+	if !ok {
+		return nil, errors.Errorf(
+			"expected first argument to Fn::StackReference to be a stack name string; got %v", reflect.TypeOf(args[0]))
+	}
+	return &StackReference{
+		StackName:    stackName,
+		PropertyName: args[1],
+	}, nil
 }
 
 // GetResourceDependencies gets the full set of implicit and explicit dependencies for a Resource.

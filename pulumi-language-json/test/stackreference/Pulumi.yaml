@@ -1,0 +1,8 @@
+name: stack-reference
+runtime: json
+outputs:
+  out:
+    value: 
+      Fn::StackReference:
+        - lukehoban/aws/dev
+        - image1Name
