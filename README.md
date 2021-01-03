@@ -1,6 +1,6 @@
-# PulumiFormation
+# PulumiYAML
 
-A YAML and JSON language provider for Pulumi, inspired by CloudFormation.
+A YAML and JSON language provider for Pulumi.
 
 TODO:
-- [ ] CodeGen (PCL -> PulumiFormation)
+- [ ] CodeGen (PCL -> PulumiYAML)

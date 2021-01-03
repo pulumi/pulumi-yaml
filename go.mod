@@ -1,4 +1,4 @@
-module github.com/pulumi/pulumiformation
+module github.com/pulumi/pulumi-yaml
 
 go 1.14
 

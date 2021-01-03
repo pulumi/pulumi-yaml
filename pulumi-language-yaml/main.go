@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// pulumi-language-json is the "language host" for Pulumi programs written in JSON. It is responsible for
-// evaluating JSON templates, registering resources, outputs, and so on, with the Pulumi engine.
+// pulumi-language-yaml is the "language host" for Pulumi programs written in YAML or JSON. It is responsible for
+// evaluating JSON/YAML templates, registering resources, outputs, and so on, with the Pulumi engine.
 package main
 
 import (
@@ -33,7 +33,7 @@ import (
 	pulumirpc "github.com/pulumi/pulumi/sdk/v2/proto/go"
 	"google.golang.org/grpc"
 
-	"github.com/pulumi/pulumiformation/pulumiformation"
+	pulumiyaml "github.com/pulumi/pulumi-yaml/pulumiyaml"
 )
 
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the
@@ -45,7 +45,7 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
-	cmdutil.InitTracing("pulumi-language-json", "pulumi-language-json", tracing)
+	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
 
 	// Fetch the engine address if available so we can do logging, etc.
 	var engineAddress string
@@ -74,28 +74,28 @@ func main() {
 	}
 }
 
-// jsonLanguageHost implements the LanguageRuntimeServer interface
+// yamlLanguageHost implements the LanguageRuntimeServer interface
 // for use as an API endpoint.
-type jsonLanguageHost struct {
+type yamlLanguageHost struct {
 	engineAddress string
 	tracing       string
 }
 
 func newLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeServer {
-	return &jsonLanguageHost{
+	return &yamlLanguageHost{
 		engineAddress: engineAddress,
 		tracing:       tracing,
 	}
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
-func (host *jsonLanguageHost) GetRequiredPlugins(ctx context.Context,
+func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	tmpl, err := pulumiformation.Load()
+	tmpl, err := pulumiyaml.Load()
 	if err != nil {
 		return nil, err
 	}
-	pkgs := pulumiformation.GetReferencedPackages(&tmpl)
+	pkgs := pulumiyaml.GetReferencedPackages(&tmpl)
 	var plugins []*pulumirpc.PluginDependency
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{
@@ -112,7 +112,7 @@ func (host *jsonLanguageHost) GetRequiredPlugins(ctx context.Context,
 }
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
-func (host *jsonLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
+func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
 	// Ensure we're in the right directory so files, etc, are in the expected place.
 	// TODO: ignoring main for now until we figure out what this means.
 	if pwd := req.GetPwd(); pwd != "" {
@@ -135,15 +135,15 @@ func (host *jsonLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	}
 	defer pctx.Close()
 
-	// Now instruct the Pulumi Go SDK to run the pulumformation interpreter.
-	if err := pulumi.RunWithContext(pctx, pulumiformation.Run); err != nil {
+	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
+	if err := pulumi.RunWithContext(pctx, pulumiyaml.Run); err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
 
 	return &pulumirpc.RunResponse{}, nil
 }
 
-func (host *jsonLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Empty) (*pulumirpc.PluginInfo, error) {
+func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Empty) (*pulumirpc.PluginInfo, error) {
 	return &pulumirpc.PluginInfo{
 		Version: version.Version,
 	}, nil

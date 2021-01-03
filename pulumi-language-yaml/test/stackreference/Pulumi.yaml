@@ -1,5 +1,5 @@
 name: stack-reference
-runtime: json
+runtime: yaml
 outputs:
   out:
     Fn::StackReference:

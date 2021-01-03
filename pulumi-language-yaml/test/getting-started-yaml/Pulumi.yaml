@@ -1,5 +1,5 @@
 name: simple-yaml
-runtime: json
+runtime: yaml
 resources: 
   my-bucket:
     type: aws:s3/bucket:Bucket

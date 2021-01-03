@@ -1,4 +1,4 @@
-package pulumiformation
+package pulumiyaml
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Expr is an expression in the Pulumiformation language
+// Expr is an expression in the Pulumi YAML language
 type Expr interface {
 	isExpr()
 }

@@ -1,17 +1,14 @@
-package pulumiformation
+package pulumiyaml
 
 // Template is a YAML or JSON sttructure which defines a Pulumi stack containing cloud infrastructure resources.
 type Template struct {
 	// Description is an informational bit of metadata about this template.
 	Description string `json:",omitempty" yaml:",omitempty"`
-	// Config allows the template to be conditional based on Pulumi configuration values. Read more at
-	// https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html.
+	// Config allows the template to be conditional based on Pulumi configuration values.
 	Config map[string]*Config `json:",omitempty" yaml:",omitempty"`
 	// Resources is a required section that declares resources you want to include in the stack.
-	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html.
 	Resources map[string]*Resource `json:",omitempty" yaml:",omitempty"`
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
-	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html.
 	Outputs map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 
 	// TODO: Mappins and Conditions
@@ -37,7 +34,6 @@ type Template struct {
 
 // Config represents a single configurable parameter for this template. The parameters are
 // validated before evaluating the template and may be specified using the Pulumi configuration system.
-// Read more at http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html.
 type Config struct {
 	// Type is the (required) data type for the parameter. It can be one of: `String`, `Number`,
 	// `List<Number>`, or `CommaDelimetedList`.
@@ -68,8 +64,7 @@ type Config struct {
 }
 
 // Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
-// complete with its properties and various other behavioral elements. Read more at
-// https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html.
+// complete with its properties and various other behavioral elements.
 type Resource struct {
 	// Type is the Pulumi type token for this resource.
 	Type string `yaml:""`

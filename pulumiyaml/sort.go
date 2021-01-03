@@ -1,4 +1,4 @@
-package pulumiformation
+package pulumiyaml
 
 import "github.com/pkg/errors"
 
