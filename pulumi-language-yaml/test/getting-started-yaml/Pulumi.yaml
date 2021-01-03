@@ -16,4 +16,4 @@ resources:
       acl: public-read
       contentType: text/html
 outputs:
-  bucketEndpoint: !Sub http://${my-bucket.websiteEndpoint}
+  bucketEndpoint: http://${my-bucket.websiteEndpoint}

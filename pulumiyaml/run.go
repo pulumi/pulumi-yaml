@@ -480,10 +480,18 @@ func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
 	// Find all replacement expressions in the string, and construct the array of
 	// parts, which may be strings or Outputs of evalauted expressions.
 	matches := substitionRegexp.FindAllStringSubmatchIndex(v.String, -1)
+	// If the template is just a single substitutuion, return it directly instead of turning it
+	// into a string.
+	if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(v.String) {
+
+		expr := v.String[matches[0][2]:matches[0][3]]
+		return r.evaluateBuiltinSubTemplateExpression(expr, substitutions)
+	}
+	// Else, concatenate all 2n+1 literal and substitution pieces together into a string.
 	i := 0
 	var parts []interface{}
 	for _, match := range matches {
-		parts = append(parts, v.String[i:match[0]])
+		parts = append(parts, escapeTemplateString(v.String[i:match[0]]))
 		i = match[1]
 		expr := v.String[match[2]:match[3]]
 		v, err := r.evaluateBuiltinSubTemplateExpression(expr, substitutions)
@@ -492,10 +500,17 @@ func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
 		}
 		parts = append(parts, v)
 	}
-	parts = append(parts, v.String[i:])
+	parts = append(parts, escapeTemplateString(v.String[i:]))
 
 	// Lift the concatenation of the parts into a StringOutput and return it.
 	return joinStringOutputs(parts), nil
+}
+
+// Replace `\\` with `\` and `\$`` with `$`
+var escapeTemplateStringReplacer = strings.NewReplacer("\\\\", "\\", "\\$", "$")
+
+func escapeTemplateString(s string) string {
+	return escapeTemplateStringReplacer.Replace(s)
 }
 
 func (r *runner) evaluateBuiltinSubTemplateExpression(expr string, subs map[string]interface{}) (interface{}, error) {

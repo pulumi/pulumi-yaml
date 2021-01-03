@@ -3,6 +3,7 @@ package pulumiyaml
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 
 	"github.com/pkg/errors"
 )
@@ -118,8 +119,21 @@ func Parse(v interface{}) (Expr, error) {
 	}
 
 	switch t := v.(type) {
-	case bool, int, int32, int64, uint64, float32, float64, string:
+	case bool, int, int32, int64, uint64, float32, float64:
 		return &Value{Val: t}, nil
+	case string:
+		var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
+		matches := substitionRegexp.FindAllStringSubmatchIndex(t, -1)
+		if len(matches) == 0 {
+			// Raw string with no interpolations, emit as a string
+			return &Value{Val: t}, nil
+		}
+		// Else, it's an Fn::Sub
+		return &Sub{
+			String:        t,
+			Substitutions: &Object{Elems: make(map[string]Expr)},
+		}, nil
+
 	case []interface{}:
 		var elems []Expr
 		for _, x := range t {

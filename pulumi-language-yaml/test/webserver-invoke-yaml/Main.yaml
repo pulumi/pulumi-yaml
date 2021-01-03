@@ -31,12 +31,12 @@ resources:
             owners: ["137112412989"]
             mostRecent: true
           Return: id
-      userData: !Sub |-
+      userData: |-
           #!/bin/bash
           echo 'Hello, World from ${WebSecGrp.arn}!' > index.html
           nohup python -m SimpleHTTPServer 80 &
       vpcSecurityGroupIds:
-        - Ref: WebSecGrp
+        - ${WebSecGrp}
   UsEast2Provider:
     type: pulumi:providers:aws
     properties:
@@ -45,6 +45,6 @@ resources:
     type: aws:s3/bucket:Bucket
     provider: UsEast2Provider
 outputs:
-  InstanceId: !Ref WebServer
-  PublicIp: !GetAtt WebServer.publicIp
-  PublicHostName: !GetAtt WebServer.publicDns
+  InstanceId: ${WebServer}
+  PublicIp: ${WebServer.publicIp}
+  PublicHostName: ${WebServer.publicDns}
