@@ -1,5 +1,5 @@
 {
-    "Parameters": {
+    "Config": {
         "InstanceType": {
             "Type": "String",
             "Default": "t2.micro",

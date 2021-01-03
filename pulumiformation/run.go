@@ -61,7 +61,7 @@ func Run(ctx *pulumi.Context) error {
 type runner struct {
 	ctx       *pulumi.Context
 	t         Template
-	params    map[string]interface{}
+	config    map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 }
@@ -132,60 +132,31 @@ func newRunner(ctx *pulumi.Context, t Template) *runner {
 	return &runner{
 		ctx:       ctx,
 		t:         t,
-		params:    make(map[string]interface{}),
+		config:    make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 	}
 }
 
 func (r *runner) Evaluate() error {
-	// Evaluating the template takes multiple passes. Much of the template is static, like Metadata and Mappings,
-	// and aren't interesting other than that they can be used below. Evaluation consists of these steps:
-	//
-	//     1) Parameters: populate parameters using config, verifying the values substituting
-	//        default values as necessary. These will then be available during execution.
-	///
-	// The Parameters must be populated before proceeding, as they can be used during subsequent evaluation.
-
-	if err := r.registerParameters(); err != nil {
+	if err := r.registerConfig(); err != nil {
 		return err
 	}
-
-	//     2) Conditions: prepare the conditions which will produce boolean conditions we can use during execution.
-
-	// TODO
-
-	// Next comes the important bit:
-	//
-	//     3) Resources: evaluate all resources and their properties, registering each one with
-	//        the Pulumi engine. Because properties may depend upon one another using features like
-	//        Fn::GetAtt, order of evaluation matters. We prefer to execute resources in the order
-	//        defined, but we generally need to evaluate resources in topologically sorted order.
-	//        The order is constrained only by these implicit dependencies formed by referencing
-	//        resource properties as inputs as well as the explicit dependencies specified by DependsOn.
+	// TODO: Conditions
 	if err := r.registerResources(); err != nil {
 		return err
 	}
-
-	// Finally:
-	//
-	//     4) Outputs: after all resources have been registered, we can compute the exported stack
-	//        outputs by evaluating this section. These are simply key/value pairs.
 	if err := r.registerOutputs(); err != nil {
 		return err
 	}
-
-	// Note that we don't currently support Transforms or Macros. This might be interesting eventually, but
-	// currently depends on a fair bit of the CloudFormation server-side machinery to work.
-
 	return nil
 }
 
-func (r *runner) registerParameters() error {
-	for k, p := range r.t.Parameters {
+func (r *runner) registerConfig() error {
+	for k, c := range r.t.Config {
 		var v interface{}
 		var err error
-		switch p.Type {
+		switch c.Type {
 		case "String":
 			v, err = config.Try(r.ctx, k)
 		case "Number":
@@ -214,10 +185,10 @@ func (r *runner) registerParameters() error {
 			}
 		}
 		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-		if p.Secret != nil && *p.Secret {
+		if c.Secret != nil && *c.Secret {
 			v = pulumi.ToSecret(v)
 		}
-		r.params[k] = v
+		r.config[k] = v
 	}
 	return nil
 }
@@ -398,7 +369,7 @@ func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
 	if ok {
 		return res.CustomResource().ID().ToStringOutput(), nil
 	}
-	p, ok := r.params[v.ResourceName]
+	p, ok := r.config[v.ResourceName]
 	if ok {
 		return p, nil
 	}
