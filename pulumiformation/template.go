@@ -39,7 +39,7 @@ type Template struct {
 type Parameter struct {
 	// Type is the (required) data type for the parameter. It can be one of: `String`, `Number`,
 	// `List<Number>`, or `CommaDelimetedList`.
-	Type string `yaml:"Type"`
+	Type string `yaml:""`
 	// AllowedPattern is a regular expression that represents the patterns to allow for string types.
 	AllowedPattern *string `json:",omitempty" yaml:",omitempty"`
 	// AllowedValues is an array containing the list of values allowed for the parameter.
@@ -68,6 +68,8 @@ type Parameter struct {
 type Resource struct {
 	// Type is the Pulumi type token for this resource.
 	Type string `yaml:""`
+	// Component indicates this resources is a component
+	Component bool `yaml:",omitempty"`
 	// Condition makes this resource's creation conditional upon a predefined Condition attribute;
 	// see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/conditions-section-structure.html.
 	Condition string `json:",omitempty" yaml:",omitempty"`

@@ -308,7 +308,12 @@ func (r *runner) registerResources() error {
 		}
 
 		// Now register the resulting resource with the engine.
-		err := r.ctx.RegisterResource(v.Type, k, untypedArgs(props), res, opts...)
+		var err error
+		if v.Component {
+			err = r.ctx.RegisterRemoteComponentResource(v.Type, k, untypedArgs(props), res, opts...)
+		} else {
+			err = r.ctx.RegisterResource(v.Type, k, untypedArgs(props), res, opts...)
+		}
 		if err != nil {
 			return errors.Wrapf(err, "registering resource %s", k)
 		}
