@@ -30,7 +30,7 @@ type Template struct {
 	Resources map[string]*Resource `json:",omitempty" yaml:",omitempty"`
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
 	// Read more at https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html.
-	Outputs map[string]*Output `json:",omitempty" yaml:",omitempty"`
+	Outputs map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 }
 
 // Parameter represents a single configurable parameter for this template. The parameters are
@@ -116,16 +116,6 @@ type CustomTimeoutResourceOption struct {
 	Delete string `json:",omitempty" yaml:",omitempty"`
 	// Update is the custom timeout for update operations.
 	Update string `json:",omitempty" yaml:",omitempty"`
-}
-
-// Output represents a single template output directive, which manifest as Pulumi exports. Read more
-// at http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html.
-type Output struct {
-	// Value is the (required) value of the property. The value of an output can include literals,
-	// references, mapping values, builtin functions, and so on.
-	Value interface{} `yaml:""`
-	// Description is an optional string that describes the output.
-	Description string `json:",omitempty" yaml:",omitempty"`
 }
 
 // Note that there are many AWS-specific properties not supported by the above:

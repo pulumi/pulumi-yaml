@@ -2,6 +2,7 @@ package pulumiformation
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"regexp"
@@ -327,7 +328,7 @@ func (r *runner) registerResources() error {
 
 func (r *runner) registerOutputs() error {
 	for k, v := range r.t.Outputs {
-		out, err := r.evaluateUntypedExpression(v.Value)
+		out, err := r.evaluateUntypedExpression(v)
 		if err != nil {
 			return err
 		}
@@ -387,7 +388,7 @@ func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
 	case *StackReference:
 		return r.evaluateBuiltinStackReference(t)
 	default:
-		panic("fatal: invalid expr type")
+		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(e)))
 	}
 }
 

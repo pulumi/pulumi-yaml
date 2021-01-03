@@ -49,19 +49,13 @@
     },
     "Outputs": {
         "InstanceId": {
-            "Value": {
-                "Ref": "WebServer"
-            }
+            "Ref": "WebServer"
         },
         "PublicIp": {
-            "Value": {
-                "Fn::GetAtt": ["WebServer", "publicIp"]
-            }
+            "Fn::GetAtt": ["WebServer", "publicIp"]
         },
         "PublicHostName": {
-            "Value": {
-                "Fn::GetAtt": ["WebServer", "publicDns"]
-            }
+            "Fn::GetAtt": ["WebServer", "publicDns"]
         }
     }
 }

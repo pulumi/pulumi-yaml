@@ -45,9 +45,6 @@ resources:
     type: aws:s3/bucket:Bucket
     provider: UsEast2Provider
 outputs:
-  InstanceId:
-    value: !Ref WebServer
-  PublicIp:
-    value: !GetAtt WebServer.publicIp
-  PublicHostName:
-    value: !GetAtt WebServer.publicDns
+  InstanceId: !Ref WebServer
+  PublicIp: !GetAtt WebServer.publicIp
+  PublicHostName: !GetAtt WebServer.publicDns
