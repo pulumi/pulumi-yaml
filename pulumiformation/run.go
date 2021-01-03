@@ -214,8 +214,7 @@ func (r *runner) registerParameters() error {
 			}
 		}
 		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-		// TODO: Most likely want a real Secret property on parameters instead of co-opting NoEcho
-		if p.NoEcho != nil && *p.NoEcho {
+		if p.Secret != nil && *p.Secret {
 			v = pulumi.ToSecret(v)
 		}
 		r.params[k] = v

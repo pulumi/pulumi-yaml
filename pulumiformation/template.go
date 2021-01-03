@@ -50,8 +50,8 @@ type Parameter struct {
 	Default interface{} `json:",omitempty" yaml:",omitempty"`
 	// Description is a string that describes the parameter.
 	Description string `json:",omitempty" yaml:",omitempty"`
-	// NoEcho masks the parameter by marking it a secret.
-	NoEcho *bool `json:",omitempty" yaml:",omitempty"`
+	// Secret masks the parameter by marking it a secret.
+	Secret *bool `json:",omitempty" yaml:",omitempty"`
 	// MaxLength is an integer value that determines the largest number of characters you want to allow for strings.
 	MaxLength *int64 `json:",omitempty" yaml:",omitempty"`
 	// MaxValue is a numeric value that determines the largest numeric value you want to allow for numbers.
