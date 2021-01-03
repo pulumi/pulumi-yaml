@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -462,8 +461,6 @@ func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
 	return out, nil
 }
 
-var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
-
 func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
 	// Evaluate all the substition mapping expressions.
 	substitutions := make(map[string]interface{})
@@ -477,61 +474,24 @@ func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
 		}
 	}
 
-	// Find all replacement expressions in the string, and construct the array of
-	// parts, which may be strings or Outputs of evalauted expressions.
-	matches := substitionRegexp.FindAllStringSubmatchIndex(v.String, -1)
-	// If the template is just a single substitutuion, return it directly instead of turning it
-	// into a string.
-	if len(matches) == 1 && matches[0][0] == 0 && matches[0][1] == len(v.String) {
-
-		expr := v.String[matches[0][2]:matches[0][3]]
-		return r.evaluateBuiltinSubTemplateExpression(expr, substitutions)
-	}
-	// Else, concatenate all 2n+1 literal and substitution pieces together into a string.
-	i := 0
 	var parts []interface{}
-	for _, match := range matches {
-		parts = append(parts, escapeTemplateString(v.String[i:match[0]]))
-		i = match[1]
-		expr := v.String[match[2]:match[3]]
-		v, err := r.evaluateBuiltinSubTemplateExpression(expr, substitutions)
+
+	var i int
+	var expr Expr
+	for i, expr = range v.ExpressionParts {
+		parts = append(parts, v.StringParts[i])
+		// TODO: We are (no longer) handling the subsitutions as part of Fn::Sub.  We will need to introduct
+		// a notion of local scopes so we can inject these in scope for the Ref to lookup.
+		v, err := r.evaluateExpr(expr)
 		if err != nil {
 			return nil, err
 		}
 		parts = append(parts, v)
 	}
-	parts = append(parts, escapeTemplateString(v.String[i:]))
+	parts = append(parts, v.StringParts[i+1])
 
 	// Lift the concatenation of the parts into a StringOutput and return it.
 	return joinStringOutputs(parts), nil
-}
-
-// Replace `\\` with `\` and `\$`` with `$`
-var escapeTemplateStringReplacer = strings.NewReplacer("\\\\", "\\", "\\$", "$")
-
-func escapeTemplateString(s string) string {
-	return escapeTemplateStringReplacer.Replace(s)
-}
-
-func (r *runner) evaluateBuiltinSubTemplateExpression(expr string, subs map[string]interface{}) (interface{}, error) {
-	// If it's an index expression 'a.b', then treat as an `Fn::GetAtt`
-	if parts := strings.Split(expr, "."); len(parts) > 1 {
-		if len(parts) > 2 {
-			return nil, errors.Errorf("expected expression '%s' in Fn::Sub to have at most one '.' property access", expr)
-		}
-		return r.evaluateBuiltinGetAtt(&GetAtt{
-			ResourceName: parts[0],
-			PropertyName: parts[1],
-		})
-	}
-	// Else, if it's a string that's in the substitutions map, evaluate that expression in the substitution map
-	if sub, ok := subs[expr]; ok {
-		return sub, nil
-	}
-	// Else, treat as a `Ref`
-	return r.evaluateBuiltinRef(&Ref{
-		ResourceName: expr,
-	})
 }
 
 func (r *runner) evaluateBuiltinAsset(v *Asset) (interface{}, error) {

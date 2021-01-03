@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -73,8 +74,9 @@ func (*Join) isExpr() {}
 // In your templates, you can use this function to construct commands or outputs
 // that include values that aren't available until you create or update a stack.
 type Sub struct {
-	String        string
-	Substitutions *Object
+	StringParts     []string
+	ExpressionParts []Expr
+	Substitutions   *Object
 }
 
 func (*Sub) isExpr() {}
@@ -122,18 +124,20 @@ func Parse(v interface{}) (Expr, error) {
 	case bool, int, int32, int64, uint64, float32, float64:
 		return &Value{Val: t}, nil
 	case string:
-		var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
-		matches := substitionRegexp.FindAllStringSubmatchIndex(t, -1)
-		if len(matches) == 0 {
+		stringParts, expressionParts, err := parseTemplate(t)
+		if err != nil {
+			return nil, err
+		}
+		if len(stringParts) == 1 {
 			// Raw string with no interpolations, emit as a string
 			return &Value{Val: t}, nil
 		}
 		// Else, it's an Fn::Sub
 		return &Sub{
-			String:        t,
-			Substitutions: &Object{Elems: make(map[string]Expr)},
+			StringParts:     stringParts,
+			ExpressionParts: expressionParts,
+			Substitutions:   &Object{Elems: make(map[string]Expr)},
 		}, nil
-
 	case []interface{}:
 		var elems []Expr
 		for _, x := range t {
@@ -361,23 +365,84 @@ func parseSub(v map[string]Expr) (*Sub, error) {
 		if !ok {
 			return nil, errors.Errorf("expected second argument to Fn::Sub to be an object, got %v", reflect.TypeOf(sa.Elems[1]))
 		}
+		stringParts, expressionParts, err := parseTemplate(s)
+		if err != nil {
+			return nil, err
+		}
 		return &Sub{
-			String:        s,
-			Substitutions: subs,
+			StringParts:     stringParts,
+			ExpressionParts: expressionParts,
+			Substitutions:   subs,
 		}, nil
 	} else if sv, ok := s.(*Value); ok {
 		s, ok := sv.Val.(string)
 		if !ok {
 			return nil, errors.Errorf("expected first argument to Fn::Sub to be a string, got %v", reflect.TypeOf(sv.Val))
 		}
+		stringParts, expressionParts, err := parseTemplate(s)
+		if err != nil {
+			return nil, err
+		}
 		return &Sub{
-			String: s,
+			StringParts:     stringParts,
+			ExpressionParts: expressionParts,
 		}, nil
 	} else {
 		return nil, errors.Errorf(
 			"expected Fn::Sub to be either a string value, or an array containing a string value and a map of names to values, got %v",
 			reflect.TypeOf(s))
 	}
+}
+
+var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
+
+// parseTempalte parses a strng that may containr template substitutions "${something}" into
+// a collection of raw strings and expressions that should be concatenated.  The returned array of strings
+// will always have one elemenet more than the array of Exprs.  If the array of strings is length 1 (in
+// which case the array of Exprs will be empty), the template was a raw string with no substitutions.
+func parseTemplate(s string) ([]string, []Expr, error) {
+	// Find all replacement expressions in the string, and construct the array of
+	// parts, which may be strings or Outputs of evalauted expressions.
+	matches := substitionRegexp.FindAllStringSubmatchIndex(s, -1)
+	var stringParts []string
+	var expressionParts []Expr
+	i := 0
+	for _, match := range matches {
+		stringParts = append(stringParts, escapeTemplateString(s[i:match[0]]))
+		i = match[1]
+		sexpr := s[match[2]:match[3]]
+		expr, err := parseTemplateExpression(sexpr)
+		if err != nil {
+			return nil, nil, err
+		}
+		expressionParts = append(expressionParts, expr)
+	}
+	stringParts = append(stringParts, escapeTemplateString(s[i:]))
+	return stringParts, expressionParts, nil
+}
+
+// Replace `\\` with `\` and `\$`` with `$`
+var escapeTemplateStringReplacer = strings.NewReplacer("\\\\", "\\", "\\$", "$")
+
+func escapeTemplateString(s string) string {
+	return escapeTemplateStringReplacer.Replace(s)
+}
+
+func parseTemplateExpression(expr string) (Expr, error) {
+	// If it's an index expression 'a.b', then treat as an `Fn::GetAtt`
+	if parts := strings.Split(expr, "."); len(parts) > 1 {
+		if len(parts) > 2 {
+			return nil, errors.Errorf("expected expression '%s' in Fn::Sub to have at most one '.' property access", expr)
+		}
+		return &GetAtt{
+			ResourceName: parts[0],
+			PropertyName: parts[1],
+		}, nil
+	}
+	// Else, treat as a `Ref`
+	return &Ref{
+		ResourceName: expr,
+	}, nil
 }
 
 func parseAsset(v map[string]Expr) (*Asset, error) {
@@ -490,6 +555,9 @@ func getExpressionDependencies(e Expr) []string {
 		deps = append(deps, getExpressionDependencies(t.Delimiter)...)
 		deps = append(deps, getExpressionDependencies(t.Values)...)
 	case *Sub:
+		for _, x := range t.ExpressionParts {
+			deps = append(deps, getExpressionDependencies(x)...)
+		}
 		deps = append(deps, getExpressionDependencies(t.Substitutions)...)
 	case *Select:
 		deps = append(deps, getExpressionDependencies(t.Index)...)
