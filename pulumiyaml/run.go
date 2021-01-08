@@ -183,6 +183,9 @@ func (r *runner) registerConfig() error {
 				v = arr
 			}
 		}
+		if err != nil {
+			v = c.Default
+		}
 		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
 		if c.Secret != nil && *c.Secret {
 			v = pulumi.ToSecret(v)
@@ -202,6 +205,12 @@ func (r *runner) registerResources() error {
 		v := r.t.Resources[k]
 		if _, has := r.resources[k]; has {
 			return errors.Errorf("unexpected duplicate resource name '%s'", k)
+		}
+		if v == nil {
+			// TODO:Non-resource names can end up in topologicallySortedResources, in cases where
+			// they are config settings (or in the future, variables).  This should be handled at
+			// the right layer instead.
+			continue
 		}
 
 		// Read the properties and then evaluate them in case there are expressions contained inside.
@@ -480,7 +489,7 @@ func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
 	var expr Expr
 	for i, expr = range v.ExpressionParts {
 		parts = append(parts, v.StringParts[i])
-		// TODO: We are (no longer) handling the subsitutions as part of Fn::Sub.  We will need to introduct
+		// TODO: We are (no longer) handling the subsitutions as part of Fn::Sub.  We will need to introduce
 		// a notion of local scopes so we can inject these in scope for the Ref to lookup.
 		v, err := r.evaluateExpr(expr)
 		if err != nil {

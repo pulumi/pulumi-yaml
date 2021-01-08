@@ -20,7 +20,7 @@ resources:
   WebServer:
     type: aws:ec2/instance:Instance
     properties:
-      instanceType: t2.micro
+      instanceType: ${InstanceType}
       ami:
         Fn::Invoke:
           Function: aws:index/getAmi:getAmi
