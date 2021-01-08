@@ -1,4 +1,4 @@
-config:
+configuration:
   InstanceType:
     type: String
     default: t2.micro

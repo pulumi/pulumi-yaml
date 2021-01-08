@@ -4,8 +4,8 @@ package pulumiyaml
 type Template struct {
 	// Description is an informational bit of metadata about this template.
 	Description string `json:",omitempty" yaml:",omitempty"`
-	// Config allows the template to be conditional based on Pulumi configuration values.
-	Config map[string]*Config `json:",omitempty" yaml:",omitempty"`
+	// Configuration allows the template to be conditional based on Pulumi configuration values.
+	Configuration map[string]*Configuration `json:",omitempty" yaml:",omitempty"`
 	// Resources is a required section that declares resources you want to include in the stack.
 	Resources map[string]*Resource `json:",omitempty" yaml:",omitempty"`
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
@@ -32,9 +32,9 @@ type Template struct {
 	Conditions map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 }
 
-// Config represents a single configurable parameter for this template. The parameters are
+// Configuration represents a single configurable parameter for this template. The parameters are
 // validated before evaluating the template and may be specified using the Pulumi configuration system.
-type Config struct {
+type Configuration struct {
 	// Type is the (required) data type for the parameter. It can be one of: `String`, `Number`,
 	// `List<Number>`, or `CommaDelimetedList`.
 	Type string `yaml:""`

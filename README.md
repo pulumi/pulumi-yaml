@@ -31,7 +31,7 @@ outputs:
 Webserver + kitchen sink (providers, config, resource options, invokes, interpolations):
 
 ```yaml
-config:
+configuration:
   InstanceType:
     type: String
     default: t2.micro

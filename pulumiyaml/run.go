@@ -152,7 +152,7 @@ func (r *runner) Evaluate() error {
 }
 
 func (r *runner) registerConfig() error {
-	for k, c := range r.t.Config {
+	for k, c := range r.t.Configuration {
 		var v interface{}
 		var err error
 		switch c.Type {
