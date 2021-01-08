@@ -6,7 +6,7 @@ require (
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/golang/protobuf v1.4.3
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/sdk/v2 v2.16.2-0.20201227001221-7b4a5e54137f
+	github.com/pulumi/pulumi/sdk/v2 v2.17.0
 	github.com/spf13/cast v1.3.1
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
