@@ -11,7 +11,7 @@ type Template struct {
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
 	Outputs map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 
-	// TODO: Mappins and Conditions
+	// TODO: Mappings and Conditions
 
 	// Mappings provides the ability to have a static set of maps for programs that need to
 	// perform lookups using Fn::FindInMap. For instance, we can map from region name to AMI IDs:

@@ -396,7 +396,7 @@ func parseSub(v map[string]Expr) (*Sub, error) {
 
 var substitionRegexp = regexp.MustCompile(`\$\{([^\}]*)\}`)
 
-// parseTempalte parses a strng that may containr template substitutions "${something}" into
+// parseTempalte parses a string that may contain template substitutions "${something}" into
 // a collection of raw strings and expressions that should be concatenated.  The returned array of strings
 // will always have one elemenet more than the array of Exprs.  If the array of strings is length 1 (in
 // which case the array of Exprs will be empty), the template was a raw string with no substitutions.
