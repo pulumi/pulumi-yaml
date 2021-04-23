@@ -9,11 +9,11 @@ import (
 func TestSortOrdered(t *testing.T) {
 	tmpl := &Template{
 		Resources: map[string]*Resource{
-			"my-bucket": &Resource{
+			"my-bucket": {
 				Type:       "aws:s3/bucket:Bucket",
 				Properties: map[string]interface{}{},
 			},
-			"my-object": &Resource{
+			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
 					"Bucket": map[string]interface{}{
@@ -35,7 +35,7 @@ func TestSortOrdered(t *testing.T) {
 func TestSortUnordered(t *testing.T) {
 	tmpl := &Template{
 		Resources: map[string]*Resource{
-			"my-object": &Resource{
+			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
 					"Bucket": map[string]interface{}{
@@ -45,7 +45,7 @@ func TestSortUnordered(t *testing.T) {
 					"Key":     "info.txt",
 				},
 			},
-			"my-bucket": &Resource{
+			"my-bucket": {
 				Type:       "aws:s3/bucket:Bucket",
 				Properties: map[string]interface{}{},
 			},
@@ -61,7 +61,7 @@ func TestSortUnordered(t *testing.T) {
 func TestSortErrorCycle(t *testing.T) {
 	tmpl := &Template{
 		Resources: map[string]*Resource{
-			"my-object": &Resource{
+			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
 					"Bucket": map[string]interface{}{
@@ -71,7 +71,7 @@ func TestSortErrorCycle(t *testing.T) {
 					"Key":     "info.txt",
 				},
 			},
-			"my-bucket": &Resource{
+			"my-bucket": {
 				Type: "aws:s3/bucket:Bucket",
 				Properties: map[string]interface{}{
 					"Invalid": map[string]interface{}{

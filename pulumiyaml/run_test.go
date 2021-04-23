@@ -77,7 +77,9 @@ func TestJoin(t *testing.T) {
 				},
 			},
 		})
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 			assert.Equal(t, "a,b,c", x)
 			return nil, nil
@@ -111,7 +113,9 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		})
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		out := pulumi.ToOutput(v).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "second", x.(string))
 			return nil, nil
@@ -133,16 +137,22 @@ func TestSub(t *testing.T) {
 	}
 	testTemplate(t, tmpl, func(r *runner) {
 		v, err := r.evaluateBuiltinSub(&Sub{
-			String: "Hello ${resA.out} - ${resA} - ${someName}!!",
-			Substitutions: &Object{
-				Elems: map[string]Expr{
-					"someName": &Value{Val: "someVal"},
+			StringParts: []string{"Hello ", " - ", "!!"},
+			ExpressionParts: []Expr{
+				&GetAtt{
+					ResourceName: "resA",
+					PropertyName: "out",
+				},
+				&Ref{
+					ResourceName: "resA",
 				},
 			},
 		})
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return
+		}
 		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
-			assert.Equal(t, "Hello tuo - someID - someVal!!", x)
+			assert.Equal(t, "Hello tuo - someID!!", x)
 			return nil, nil
 		})
 		r.ctx.Export("out", out)

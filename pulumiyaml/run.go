@@ -176,11 +176,7 @@ func (r *runner) registerConfig() error {
 		case "CommaDelimitedList":
 			v, err = config.Try(r.ctx, k)
 			if err == nil {
-				var arr []string
-				for _, item := range strings.Split(v.(string), ",") {
-					arr = append(arr, item)
-				}
-				v = arr
+				v = strings.Split(v.(string), ",")
 			}
 		}
 		if err != nil {
@@ -382,7 +378,6 @@ func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
 		return p, nil
 	}
 	return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
-
 }
 
 // evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,
@@ -544,7 +539,7 @@ func (r *runner) evaluateBuiltinStackReference(v *StackReference) (interface{}, 
 }
 
 func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
-	return pulumi.All(parts...).ApplyString(func(arr []interface{}) (string, error) {
+	return pulumi.All(parts...).ApplyT(func(arr []interface{}) (string, error) {
 		s := ""
 		for _, x := range arr {
 			xs, ok := x.(string)
@@ -554,7 +549,7 @@ func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
 			s += xs
 		}
 		return s, nil
-	})
+	}).(pulumi.StringOutput)
 }
 
 // untypedArgs is an untyped interface for a bag of properties.
