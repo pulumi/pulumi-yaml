@@ -3,8 +3,8 @@ package pulumiyaml
 import (
 	"testing"
 
-	"github.com/pulumi/pulumi/sdk/v2/go/common/resource"
-	"github.com/pulumi/pulumi/sdk/v2/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,20 +14,19 @@ type testMonitor struct {
 		provider, id string) (string, resource.PropertyMap, error)
 }
 
-func (m *testMonitor) Call(tok string, args resource.PropertyMap, provider string) (resource.PropertyMap, error) {
+func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 	if m.CallF == nil {
 		return resource.PropertyMap{}, nil
 	}
-	return m.CallF(tok, args, provider)
+	return m.CallF(args.Token, args.Args, args.Provider)
 }
 
-func (m *testMonitor) NewResource(typeToken, name string, inputs resource.PropertyMap,
-	provider, id string) (string, resource.PropertyMap, error) {
+func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 
 	if m.NewResourceF == nil {
-		return name, resource.PropertyMap{}, nil
+		return args.Name, resource.PropertyMap{}, nil
 	}
-	return m.NewResourceF(typeToken, name, inputs, provider, id)
+	return m.NewResourceF(args.TypeToken, args.Name, args.Inputs, args.Provider, args.ID)
 }
 
 func testTemplate(t *testing.T, template Template, callback func(*runner)) {
