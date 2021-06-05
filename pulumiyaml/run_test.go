@@ -3,6 +3,7 @@ package pulumiyaml
 import (
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
@@ -34,19 +35,31 @@ func testTemplate(t *testing.T, template Template, callback func(*runner)) {
 		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
 			provider, id string) (string, resource.PropertyMap, error) {
 
-			assert.Equal(t, "test:resource:type", typeToken)
-			assert.Equal(t, "resA", name)
-			assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
-				"foo": "oof",
-			})))
-			assert.Equal(t, "", provider)
-			assert.Equal(t, "", id)
+			switch typeToken {
+			case "test:resource:type":
+				assert.Equal(t, "test:resource:type", typeToken)
+				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
+					"foo": "oof",
+				})))
+				assert.Equal(t, "", provider)
+				assert.Equal(t, "", id)
 
-			return "someID", resource.PropertyMap{
-				"foo":    resource.NewStringProperty("qux"),
-				"out":    resource.NewStringProperty("tuo"),
-				"outNum": resource.NewNumberProperty(1),
-			}, nil
+				return "someID", resource.PropertyMap{
+					"foo":    resource.NewStringProperty("qux"),
+					"out":    resource.NewStringProperty("tuo"),
+					"outNum": resource.NewNumberProperty(1),
+				}, nil
+			case "test:component:type":
+				assert.Equal(t, "test:component:type", typeToken)
+				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
+					"foo": "oof",
+				})))
+				assert.Equal(t, "", provider)
+				assert.Equal(t, "", id)
+
+				return "", resource.PropertyMap{}, nil
+			}
+			return "", resource.PropertyMap{}, errors.Errorf("Unexpected resource type %s", typeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
@@ -155,5 +168,49 @@ func TestSub(t *testing.T) {
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
+	})
+}
+
+func TestRef(t *testing.T) {
+	tmpl := Template{
+		Resources: map[string]*Resource{
+			"resA": {
+				Type: "test:resource:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+			"compA": {
+				Type: "test:component:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+		},
+	}
+	testTemplate(t, tmpl, func(r *runner) {
+		{
+			v, err := r.evaluateBuiltinRef(&Ref{ResourceName: "resA"})
+			if !assert.NoError(t, err) {
+				return
+			}
+			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
+				assert.Equal(t, "someID", x)
+				return nil, nil
+			})
+			r.ctx.Export("out", out)
+		}
+		{
+			v, err := r.evaluateBuiltinRef(&Ref{ResourceName: "compA"})
+			if !assert.NoError(t, err) {
+				return
+			}
+			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
+				assert.Equal(t, "", x)
+				return nil, nil
+			})
+			r.ctx.Export("out", out)
+		}
+
 	})
 }

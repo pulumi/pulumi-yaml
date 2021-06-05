@@ -41,7 +41,9 @@ import (
 func main() {
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
+	var root string
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
+	flag.StringVar(&root, "root", "", "Root of the program execition")
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)

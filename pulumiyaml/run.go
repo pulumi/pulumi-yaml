@@ -284,12 +284,23 @@ func (r *runner) registerResources() error {
 			res = &r
 		}
 
+		// If the provided type token is `pkg:type`, expand it to `pkd:index:type` automatically.  We may
+		// well want to handle this more fundamentally in Pulumi itself to avoid the need for `:index:`
+		// ceremony quite generally.
+		typ := v.Type
+		typParts := strings.Split(typ, ":")
+		if len(typParts) < 2 || len(typParts) > 3 {
+			return errors.Errorf("invalid type token %q for resource %q", v.Type, k)
+		} else if len(typParts) == 2 {
+			typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
+		}
+
 		// Now register the resulting resource with the engine.
 		var err error
 		if v.Component {
-			err = r.ctx.RegisterRemoteComponentResource(v.Type, k, untypedArgs(props), res, opts...)
+			err = r.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
 		} else {
-			err = r.ctx.RegisterResource(v.Type, k, untypedArgs(props), res, opts...)
+			err = r.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)
 		}
 		if err != nil {
 			return errors.Wrapf(err, "registering resource %s", k)
