@@ -1,17 +1,25 @@
 package pulumiyaml
 
 import (
-	"encoding/json"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
+
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax/encoding"
 )
 
 // MainTemplate is the assumed name of the JSON template file.
@@ -21,36 +29,90 @@ import (
 const MainTemplate = "Main"
 
 // Load a template from the current working directory
-func Load() (Template, error) {
-	t := Template{}
-
+func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
 	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
+	var filename string
+	var bs []byte
 	if b, err := ioutil.ReadFile(MainTemplate + ".json"); err == nil {
-		if err = json.Unmarshal(b, &t); err != nil {
-			return t, errors.Wrapf(err, "decoding template %s.json", MainTemplate)
-		}
+		filename, bs = MainTemplate+".json", b
 	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
-		if err = yaml.Unmarshal(b, &TagProcessor{&t}); err != nil {
-			return t, errors.Wrapf(err, "decoding template %s.yaml", MainTemplate)
-		}
+		filename, bs = MainTemplate+".yaml", b
 	} else if b, err := ioutil.ReadFile("Pulumi.yaml"); err == nil {
-		if err = yaml.Unmarshal(b, &TagProcessor{&t}); err != nil {
-			return t, errors.Wrapf(err, "decoding template Pulumi.yaml")
-		}
+		filename, bs = "Pulumi.yaml", b
 	} else {
-		return t, errors.Wrapf(err, "reading template %s", MainTemplate)
+		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
 	}
 
-	return t, nil
+	return LoadYAMLBytes(filename, bs)
+}
+
+// Load a template from the current working directory
+func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	return LoadYAML(filepath.Base(path), f)
+}
+
+// LoadYAML decodes a YAML template from an io.Reader.
+func LoadYAML(filename string, r io.Reader) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	bytes, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	return LoadYAMLBytes(filename, bytes)
+}
+
+// LoadYAMLBytes decodes a YAML template from a byte array.
+func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	var diags syntax.Diagnostics
+
+	syn, sdiags := encoding.DecodeYAML(filename, yaml.NewDecoder(bytes.NewReader(source)), TagDecoder)
+	diags.Extend(sdiags...)
+	if sdiags.HasErrors() {
+		return nil, diags, nil
+	}
+
+	t, tdiags := ast.ParseTemplate(source, syn)
+	diags.Extend(tdiags...)
+
+	return t, diags, nil
+}
+
+func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
+	if err == nil {
+		return nil, false
+	}
+
+	switch err := err.(type) {
+	case syntax.Diagnostics:
+		return err, true
+	case *multierror.Error:
+		var diags syntax.Diagnostics
+		var has bool
+		for _, err := range err.Errors {
+			if ediags, ok := HasDiagnostics(err); ok {
+				diags.Extend(ediags...)
+				has = true
+			}
+		}
+		return diags, has
+	default:
+		var diags syntax.Diagnostics
+		return diags, errors.As(err, &diags)
+	}
 }
 
 // Run the JSON evaluator against a template using the given request/settings.
 func Run(ctx *pulumi.Context) error {
-	t, err := Load()
+	t, diags, err := Load()
 	if err != nil {
-		return err
+		return multierror.Append(err, diags)
 	}
 
 	// Now "evaluate" the template.
@@ -59,7 +121,7 @@ func Run(ctx *pulumi.Context) error {
 
 type runner struct {
 	ctx       *pulumi.Context
-	t         Template
+	t         *ast.TemplateDecl
 	config    map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
@@ -70,6 +132,7 @@ type runner struct {
 // created and managed as part of a deployment.
 type lateboundResource interface {
 	GetOutput(k string) pulumi.Output
+	GetOutputs() pulumi.Output
 	CustomResource() *pulumi.CustomResourceState
 	ProviderResource() *pulumi.ProviderResourceState
 }
@@ -83,12 +146,17 @@ type lateboundCustomResourceState struct {
 	Outputs pulumi.MapOutput `pulumi:""`
 }
 
+// GetOutputs returns the resource's outputs.
+func (st *lateboundCustomResourceState) GetOutputs() pulumi.Output {
+	return st.Outputs
+}
+
 // GetOutput returns the named output of the resource.
 func (st *lateboundCustomResourceState) GetOutput(k string) pulumi.Output {
 	return st.Outputs.ApplyT(func(outputs map[string]interface{}) (interface{}, error) {
 		out, ok := outputs[k]
 		if !ok {
-			return nil, errors.Errorf("no output '%s' on resource '%s'", k, st.name)
+			return nil, fmt.Errorf("no output '%s' on resource '%s'", k, st.name)
 		}
 		return out, nil
 	})
@@ -108,12 +176,17 @@ type lateboundProviderResourceState struct {
 	Outputs pulumi.MapOutput `pulumi:""`
 }
 
+// GetOutputs returns the resource's outputs.
+func (st *lateboundProviderResourceState) GetOutputs() pulumi.Output {
+	return st.Outputs
+}
+
 // GetOutput returns the named output of the resource.
 func (st *lateboundProviderResourceState) GetOutput(k string) pulumi.Output {
 	return st.Outputs.ApplyT(func(outputs map[string]interface{}) (interface{}, error) {
 		out, ok := outputs[k]
 		if !ok {
-			return nil, errors.Errorf("no output '%s' on resource '%s'", k, st.name)
+			return nil, fmt.Errorf("no output '%s' on resource '%s'", k, st.name)
 		}
 		return out, nil
 	})
@@ -127,7 +200,7 @@ func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderRes
 	return &st.ProviderResourceState
 }
 
-func newRunner(ctx *pulumi.Context, t Template) *runner {
+func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 	return &runner{
 		ctx:       ctx,
 		t:         t,
@@ -137,25 +210,50 @@ func newRunner(ctx *pulumi.Context, t Template) *runner {
 	}
 }
 
-func (r *runner) Evaluate() error {
-	if err := r.registerConfig(); err != nil {
-		return err
+func (r *runner) Evaluate() syntax.Diagnostics {
+	var diags syntax.Diagnostics
+
+	cdiags := r.registerConfig()
+	diags.Extend(cdiags...)
+	if cdiags.HasErrors() {
+		return diags
 	}
+
 	// TODO: Conditions
-	if err := r.registerResources(); err != nil {
-		return err
+
+	rdiags := r.registerResources()
+	diags.Extend(rdiags...)
+	if rdiags.HasErrors() {
+		return diags
 	}
-	if err := r.registerOutputs(); err != nil {
-		return err
-	}
-	return nil
+
+	odiags := r.registerOutputs()
+	diags.Extend(odiags...)
+	return diags
 }
 
-func (r *runner) registerConfig() error {
-	for k, c := range r.t.Configuration {
+func (r *runner) registerConfig() syntax.Diagnostics {
+	if r.t.Configuration == nil {
+		return nil
+	}
+
+	var diags syntax.Diagnostics
+	for _, kvp := range r.t.Configuration.Entries {
+		k, c := kvp.Key.Value, kvp.Value
+
+		var defaultValue interface{}
+		if c.Default != nil {
+			d, ddiags := r.evaluateExpr(c.Default)
+			diags.Extend(ddiags...)
+			if ddiags.HasErrors() {
+				continue
+			}
+			defaultValue = d
+		}
+
 		var v interface{}
 		var err error
-		switch c.Type {
+		switch c.Type.Value {
 		case "String":
 			v, err = config.Try(r.ctx, k)
 		case "Number":
@@ -167,7 +265,8 @@ func (r *runner) registerConfig() error {
 				for _, nstr := range strings.Split(v.(string), ",") {
 					f, err := cast.ToFloat64E(nstr)
 					if err != nil {
-						return err
+						diags.Extend(ast.ExprError(kvp.Key, err.Error(), ""))
+						continue
 					}
 					arr = append(arr, f)
 				}
@@ -180,10 +279,10 @@ func (r *runner) registerConfig() error {
 			}
 		}
 		if err != nil {
-			v = c.Default
+			v = defaultValue
 		}
 		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-		if c.Secret != nil && *c.Secret {
+		if c.Secret != nil && c.Secret.Value {
 			v = pulumi.ToSecret(v)
 		}
 		r.config[k] = v
@@ -191,90 +290,92 @@ func (r *runner) registerConfig() error {
 	return nil
 }
 
-func (r *runner) registerResources() error {
+func (r *runner) registerResources() syntax.Diagnostics {
 	// Topologically sort the resources based on implicit and explicit dependencies
-	resnames, err := topologicallySortedResources(&r.t)
-	if err != nil {
-		return err
+	resources, rdiags := topologicallySortedResources(r.t)
+	if rdiags.HasErrors() {
+		return rdiags
 	}
-	for _, k := range resnames {
-		v := r.t.Resources[k]
-		if _, has := r.resources[k]; has {
-			return errors.Errorf("unexpected duplicate resource name '%s'", k)
-		}
-		if v == nil {
-			// TODO:Non-resource names can end up in topologicallySortedResources, in cases where
-			// they are config settings (or in the future, variables).  This should be handled at
-			// the right layer instead.
-			continue
-		}
+
+	var diags syntax.Diagnostics
+	for _, kvp := range resources {
+		k, v := kvp.Key.Value, kvp.Value
 
 		// Read the properties and then evaluate them in case there are expressions contained inside.
 		props := make(map[string]interface{})
-		for k, v := range v.Properties {
-			vv, err := r.evaluateUntypedExpression(v)
-			if err != nil {
-				return err
+		for _, kvp := range v.Properties.Entries {
+			vv, vdiags := r.evaluateExpr(kvp.Value)
+			diags.Extend(vdiags...)
+			if vdiags.HasErrors() {
+				return diags
 			}
-			props[k] = vv
+			props[kvp.Key.Value] = vv
 		}
 
 		var opts []pulumi.ResourceOption
 		if v.AdditionalSecretOutputs != nil {
-			opts = append(opts, pulumi.AdditionalSecretOutputs(v.AdditionalSecretOutputs))
+			opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.AdditionalSecretOutputs)))
 		}
 		if v.Aliases != nil {
 			var aliases []pulumi.Alias
-			for _, s := range v.Aliases {
+			for _, s := range v.Aliases.Elements {
 				alias := pulumi.Alias{
-					URN: pulumi.URN(s),
+					URN: pulumi.URN(s.Value),
 				}
 				aliases = append(aliases, alias)
 			}
 			opts = append(opts, pulumi.Aliases(aliases))
 		}
 		if v.CustomTimeouts != nil {
-			opts = append(opts, pulumi.Timeouts(&pulumi.CustomTimeouts{
-				Create: v.CustomTimeouts.Create,
-				Delete: v.CustomTimeouts.Delete,
-				Update: v.CustomTimeouts.Update,
-			}))
+			var cts pulumi.CustomTimeouts
+			if v.CustomTimeouts.Create != nil {
+				cts.Create = v.CustomTimeouts.Create.Value
+			}
+			if v.CustomTimeouts.Update != nil {
+				cts.Update = v.CustomTimeouts.Update.Value
+			}
+			if v.CustomTimeouts.Delete != nil {
+				cts.Delete = v.CustomTimeouts.Delete.Value
+			}
+
+			opts = append(opts, pulumi.Timeouts(&cts))
 		}
-		if v.DeleteBeforeReplace {
-			opts = append(opts, pulumi.DeleteBeforeReplace(v.DeleteBeforeReplace))
+		if v.DeleteBeforeReplace != nil {
+			opts = append(opts, pulumi.DeleteBeforeReplace(v.DeleteBeforeReplace.Value))
 		}
 		if v.DependsOn != nil {
 			var dependsOn []pulumi.Resource
-			for _, s := range v.DependsOn {
-				dependsOn = append(dependsOn, r.resources[s].CustomResource())
+			for _, s := range v.DependsOn.Elements {
+				dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
 			}
 			opts = append(opts, pulumi.DependsOn(dependsOn))
 		}
 		if v.IgnoreChanges != nil {
-			opts = append(opts, pulumi.IgnoreChanges(v.IgnoreChanges))
+			opts = append(opts, pulumi.IgnoreChanges(listStrings(v.IgnoreChanges)))
 		}
-		if v.Parent != "" {
-			opts = append(opts, pulumi.Parent(r.resources[v.Parent].CustomResource()))
+		if v.Parent != nil && v.Parent.Value != "" {
+			opts = append(opts, pulumi.Parent(r.resources[v.Parent.Value].CustomResource()))
 		}
-		if v.Protect {
-			opts = append(opts, pulumi.Protect(v.Protect))
+		if v.Protect != nil {
+			opts = append(opts, pulumi.Protect(v.Protect.Value))
 		}
-		if v.Provider != "" {
-			provider := r.resources[v.Provider].ProviderResource()
+		if v.Provider != nil && v.Provider.Value != "" {
+			provider := r.resources[v.Provider.Value].ProviderResource()
 			if provider == nil {
-				return errors.Errorf("resource passed as Provider was not a provider resource '%s'", v.Provider)
+				diags.Extend(ast.ExprError(v.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Provider.Value), ""))
+				return diags
 			}
 			opts = append(opts, pulumi.Provider(provider))
 		}
-		if v.Version != "" {
-			opts = append(opts, pulumi.Version(v.Version))
+		if v.Version != nil {
+			opts = append(opts, pulumi.Version(v.Version.Value))
 		}
 
 		// Create either a latebound custom resource or latebound provider resource depending on
 		// whether the type token indicates a special provider type.
 		var state lateboundResource
 		var res pulumi.Resource
-		if strings.HasPrefix(v.Type, "pulumi:providers:") {
+		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 			r := lateboundProviderResourceState{name: k}
 			state = &r
 			res = &r
@@ -287,23 +388,25 @@ func (r *runner) registerResources() error {
 		// If the provided type token is `pkg:type`, expand it to `pkd:index:type` automatically.  We may
 		// well want to handle this more fundamentally in Pulumi itself to avoid the need for `:index:`
 		// ceremony quite generally.
-		typ := v.Type
+		typ := v.Type.Value
 		typParts := strings.Split(typ, ":")
 		if len(typParts) < 2 || len(typParts) > 3 {
-			return errors.Errorf("invalid type token %q for resource %q", v.Type, k)
+			diags.Extend(ast.ExprError(v.Type, fmt.Sprintf("invalid type token %q for resource %q", v.Type.Value, k), ""))
+			return diags
 		} else if len(typParts) == 2 {
 			typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
 		}
 
 		// Now register the resulting resource with the engine.
 		var err error
-		if v.Component {
+		if v.Component != nil && v.Component.Value {
 			err = r.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
 		} else {
 			err = r.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)
 		}
 		if err != nil {
-			return errors.Wrapf(err, "registering resource %s", k)
+			diags.Extend(ast.ExprError(kvp.Key, err.Error(), ""))
+			return diags
 		}
 		r.resources[k] = state
 	}
@@ -311,155 +414,302 @@ func (r *runner) registerResources() error {
 	return nil
 }
 
-func (r *runner) registerOutputs() error {
-	for k, v := range r.t.Outputs {
-		out, err := r.evaluateUntypedExpression(v)
-		if err != nil {
-			return err
+func (r *runner) registerOutputs() syntax.Diagnostics {
+	if r.t.Outputs == nil {
+		return nil
+	}
+
+	var diags syntax.Diagnostics
+	for _, kvp := range r.t.Outputs.Entries {
+		out, odiags := r.evaluateExpr(kvp.Value)
+		diags.Extend(odiags...)
+		if odiags.HasErrors() {
+			return diags
 		}
-		r.ctx.Export(k, pulumi.Any(out))
+		r.ctx.Export(kvp.Key.Value, pulumi.Any(out))
 	}
-	return nil
+	return diags
 }
 
-// evaluateUntypedExpression takes an object structure that is a mixture of JSON primitives and builtin functions
-// and turns it into an untyped bag of values that are suitable to pass as inputs to the Pulumi Go SDK.
-func (r *runner) evaluateUntypedExpression(v interface{}) (interface{}, error) {
-	e, err := Parse(v)
-	if err != nil {
-		return nil, err
-	}
-	return r.evaluateExpr(e)
-}
-
-func (r *runner) evaluateExpr(e Expr) (interface{}, error) {
-	switch t := e.(type) {
-	case *Value:
-		return t.Val, nil
-	case *Array:
+func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
+	switch x := x.(type) {
+	case *ast.NullExpr:
+		return nil, nil
+	case *ast.BooleanExpr:
+		return x.Value, nil
+	case *ast.NumberExpr:
+		return x.Value, nil
+	case *ast.StringExpr:
+		return x.Value, nil
+	case *ast.ListExpr:
+		var diags syntax.Diagnostics
 		var xs []interface{}
-		for _, x := range t.Elems {
-			vv, err := r.evaluateExpr(x)
-			if err != nil {
-				return nil, err
+		for _, e := range x.Elements {
+			ev, ediags := r.evaluateExpr(e)
+			diags.Extend(ediags...)
+			if ediags.HasErrors() {
+				return nil, diags
 			}
-			xs = append(xs, vv)
+			xs = append(xs, ev)
 		}
-		return xs, nil
-	case *Object:
-		m := make(map[string]interface{})
-		for k, e := range t.Elems {
-			vv, err := r.evaluateExpr(e)
-			if err != nil {
-				return nil, err
-			}
-			m[k] = vv
-		}
-		return m, nil
-	case *Ref:
-		return r.evaluateBuiltinRef(t)
-	case *GetAtt:
-		return r.evaluateBuiltinGetAtt(t)
-	case *Invoke:
-		return r.evaluateBuiltinInvoke(t)
-	case *Join:
-		return r.evaluateBuiltinJoin(t)
-	case *Sub:
-		return r.evaluateBuiltinSub(t)
-	case *Select:
-		return r.evaluateBuiltinSelect(t)
-	case *Asset:
-		return r.evaluateBuiltinAsset(t)
-	case *StackReference:
-		return r.evaluateBuiltinStackReference(t)
+		return xs, diags
+	case *ast.ObjectExpr:
+		return r.evaluateObject(x, nil, map[string]interface{}{}, x.Entries)
+	case *ast.InterpolateExpr:
+		return r.evaluateInterpolate(x, nil)
+	case *ast.SymbolExpr:
+		return r.evaluatePropertyAccess(x, x.Property, nil)
+	case *ast.RefExpr:
+		return r.evaluateBuiltinRef(x)
+	case *ast.GetAttExpr:
+		return r.evaluateBuiltinGetAtt(x)
+	case *ast.InvokeExpr:
+		return r.evaluateBuiltinInvoke(x)
+	case *ast.JoinExpr:
+		return r.evaluateBuiltinJoin(x)
+	case *ast.SubExpr:
+		return r.evaluateBuiltinSub(x)
+	case *ast.SelectExpr:
+		return r.evaluateBuiltinSelect(x)
+	case *ast.AssetExpr:
+		return r.evaluateBuiltinAsset(x)
+	case *ast.StackReferenceExpr:
+		return r.evaluateBuiltinStackReference(x)
 	default:
-		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(e)))
+		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
+}
+
+func (r *runner) evaluateObject(x *ast.ObjectExpr, diags syntax.Diagnostics, m map[string]interface{}, entries []ast.ObjectProperty) (interface{}, syntax.Diagnostics) {
+	if len(entries) == 0 {
+		return m, diags
+	}
+
+	kvp := entries[0]
+
+	kv, kdiags := r.evaluateExpr(kvp.Key)
+	diags.Extend(kdiags...)
+	if kdiags.HasErrors() {
+		return nil, diags
+	}
+
+	if o, ok := kv.(pulumi.Output); ok {
+		return o.ApplyT(func(kv interface{}) (interface{}, error) {
+			// TODO: this could leak warnings
+			v, diags := r.continueObject(x, diags, m, kvp, kv, entries)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			return v, diags
+		}), nil
+	}
+
+	return r.continueObject(x, diags, m, kvp, kv, entries)
+}
+
+func (r *runner) continueObject(x *ast.ObjectExpr, diags syntax.Diagnostics, m map[string]interface{}, kvp ast.ObjectProperty, kv interface{}, entries []ast.ObjectProperty) (interface{}, syntax.Diagnostics) {
+	k, ok := kv.(string)
+	if !ok {
+		diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("object key must evaluate to a string, not %v", typeString(kv)), ""))
+		return nil, diags
+	}
+
+	v, vdiags := r.evaluateExpr(kvp.Value)
+	diags.Extend(vdiags...)
+	if vdiags.HasErrors() {
+		return nil, diags
+	}
+
+	m[k] = v
+	return r.evaluateObject(x, diags, m, entries[1:])
+}
+
+func (r *runner) evaluateInterpolate(x *ast.InterpolateExpr, subs map[string]interface{}) (interface{}, syntax.Diagnostics) {
+	return r.evaluateInterpolations(x, nil, &strings.Builder{}, x.Parts, subs)
+}
+
+func (r *runner) evaluateInterpolations(x *ast.InterpolateExpr, diags syntax.Diagnostics, b *strings.Builder, parts []ast.Interpolation, subs map[string]interface{}) (interface{}, syntax.Diagnostics) {
+	for ; len(parts) > 0; parts = parts[1:] {
+		i := parts[0]
+		b.WriteString(i.Text)
+
+		if i.Value != nil {
+			p, pdiags := r.evaluatePropertyAccess(x, i.Value, subs)
+			diags.Extend(pdiags...)
+			if pdiags.HasErrors() {
+				return nil, diags
+			}
+
+			if o, ok := p.(pulumi.Output); ok {
+				return o.ApplyT(func(v interface{}) (interface{}, error) {
+					fmt.Fprintf(b, "%v", v)
+					// TODO: this could leak warnings
+					v, diags := r.evaluateInterpolations(x, diags, b, parts[1:], subs)
+					if diags.HasErrors() {
+						return nil, diags
+					}
+					return v, nil
+				}), nil
+			}
+
+			fmt.Fprintf(b, "%v", p)
+		}
+	}
+	return b.String(), diags
+}
+
+func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, subs map[string]interface{}) (interface{}, syntax.Diagnostics) {
+	resourceName := access.Accessors[0].(*ast.PropertyName).Name
+
+	var receiver interface{}
+	if res, ok := r.resources[resourceName]; ok {
+		if len(access.Accessors) == 1 {
+			return res.CustomResource().ID().ToStringOutput(), nil
+		}
+		receiver = res.GetOutputs()
+	} else if p, ok := r.config[resourceName]; ok {
+		receiver = p
+	} else if s, ok := subs[resourceName]; ok {
+		receiver = s
+	} else {
+		return nil, syntax.Diagnostics{ast.ExprError(x, fmt.Sprintf("resource named %s could not be found", resourceName), "")}
+	}
+
+	v, err := r.evaluateAccess(receiver, access.Accessors[1:])
+	if err != nil {
+		return nil, syntax.Diagnostics{ast.ExprError(x, err.Error(), "")}
+	}
+	return v, nil
+}
+
+func (r *runner) evaluateAccess(receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, error) {
+	for ; len(accessors) > 0; accessors = accessors[1:] {
+		switch x := receiver.(type) {
+		case pulumi.Output:
+			return x.ApplyT(func(v interface{}) (interface{}, error) {
+				return r.evaluateAccess(v, accessors)
+			}), nil
+		case []interface{}:
+			sub, ok := accessors[0].(*ast.PropertySubscript)
+			if !ok {
+				return nil, fmt.Errorf("cannot access a list element using a property name")
+			}
+			index, ok := sub.Index.(int)
+			if !ok {
+				return nil, fmt.Errorf("cannot access a list element using a property name")
+			}
+			if index < 0 || index >= len(x) {
+				return nil, fmt.Errorf("list index %v out-of-bounds for list of length %v", index, len(x))
+			}
+			receiver = x[index]
+		case map[string]interface{}:
+			var k string
+			switch a := accessors[0].(type) {
+			case *ast.PropertyName:
+				k = a.Name
+			case *ast.PropertySubscript:
+				s, ok := a.Index.(string)
+				if !ok {
+					return nil, fmt.Errorf("cannot access an object property using an integer index")
+				}
+				k = s
+			}
+			receiver = x[k]
+		default:
+			return nil, fmt.Errorf("receiver must be a list or object, not %v", typeString(receiver))
+		}
+	}
+	return receiver, nil
 }
 
 // evaluateBuiltinRef evaluates a "Ref" builtin. This map entry has a single value, which represents
 // the resource name whose ID will be looked up and substituted in its place.
-func (r *runner) evaluateBuiltinRef(v *Ref) (interface{}, error) {
-	res, ok := r.resources[v.ResourceName]
+func (r *runner) evaluateBuiltinRef(v *ast.RefExpr) (interface{}, syntax.Diagnostics) {
+	res, ok := r.resources[v.ResourceName.Value]
 	if ok {
 		return res.CustomResource().ID().ToStringOutput(), nil
 	}
-	p, ok := r.config[v.ResourceName]
+	p, ok := r.config[v.ResourceName.Value]
 	if ok {
 		return p, nil
 	}
-	return nil, errors.Errorf("resource Ref named %s could not be found", v.ResourceName)
+	return nil, syntax.Diagnostics{ast.ExprError(v, fmt.Sprintf("resource Ref named %s could not be found", v.ResourceName.Value), "")}
 }
 
 // evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,
 // the first value being the resource name, and the second being the property to read, and whose
 // value will be looked up and substituted in its place.
-func (r *runner) evaluateBuiltinGetAtt(v *GetAtt) (interface{}, error) {
+func (r *runner) evaluateBuiltinGetAtt(v *ast.GetAttExpr) (interface{}, syntax.Diagnostics) {
 	// Look up the resource and ensure it exists.
-	res, ok := r.resources[v.ResourceName]
+	res, ok := r.resources[v.ResourceName.Value]
 	if !ok {
-		return nil, errors.Errorf("resource %s named by Fn::GetAtt could not be found", v.ResourceName)
+		return nil, syntax.Diagnostics{ast.ExprError(v, fmt.Sprintf("resource %s named by Fn::GetAtt could not be found", v.ResourceName.Value), "")}
 	}
 
 	// Get the requested property's output value from the resource state
-	return res.GetOutput(v.PropertyName), nil
+	return res.GetOutput(v.PropertyName.Value), nil
 }
 
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
-func (r *runner) evaluateBuiltinInvoke(t *Invoke) (interface{}, error) {
-	argVals := make(map[string]interface{})
-	// The arguments may very well have expressions within them, so evaluate those now.
-	for k, v := range t.Args.Elems {
-		nv, err := r.evaluateExpr(v)
-		if err != nil {
-			return nil, err
-		}
-		argVals[k] = nv
+func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+
+	args, adiags := r.evaluateExpr(t.CallArgs)
+	diags.Extend(adiags...)
+	if adiags.HasErrors() {
+		return nil, diags
 	}
 
 	// At this point, we've got a function to invoke and some parameters! Invoke away.
-	result := make(map[string]interface{})
-	if err := r.ctx.Invoke(t.Token, argVals, &result); err != nil {
-		return nil, err
+	result := map[string]interface{}{}
+	if err := r.ctx.Invoke(t.Token.Value, args, &result); err != nil {
+		diags.Extend(ast.ExprError(t, err.Error(), ""))
+		return nil, diags
 	}
-	retv, ok := result[t.Return]
+	retv, ok := result[t.Return.Value]
 	if !ok {
-		return nil, errors.Errorf(
-			"Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token, t.Return)
+		diags.Extend(ast.ExprError(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value), ""))
+		return nil, diags
 	}
-	return retv, nil
+	return retv, diags
 }
 
-func (r *runner) evaluateBuiltinJoin(v *Join) (interface{}, error) {
-	delim, err := r.evaluateExpr(v.Delimiter)
-	if err != nil {
-		return nil, err
+func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	delim, ddiags := r.evaluateExpr(v.Delimiter)
+	diags.Extend(ddiags...)
+	if ddiags.HasErrors() {
+		return nil, ddiags
 	}
 	var parts []interface{}
-	for i, e := range v.Values.Elems {
+	for i, e := range v.Values.Elements {
 		if i != 0 {
 			parts = append(parts, delim)
 		}
-		part, err := r.evaluateExpr(e)
-		if err != nil {
-			return nil, err
+		part, pdiags := r.evaluateExpr(e)
+		diags.Extend(pdiags...)
+		if pdiags.HasErrors() {
+			return nil, diags
 		}
 		parts = append(parts, part)
 	}
-	return joinStringOutputs(parts), nil
+	return joinStringOutputs(parts), diags
 }
 
-func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
-	index, err := r.evaluateExpr(v.Index)
-	if err != nil {
-		return nil, err
+func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	index, idiags := r.evaluateExpr(v.Index)
+	diags.Extend(idiags...)
+	if idiags.HasErrors() {
+		return nil, idiags
 	}
 	var elems []interface{}
-	for _, e := range v.Values.Elems {
-		ev, err := r.evaluateExpr(e)
-		if err != nil {
-			return nil, err
+	for _, e := range v.Values.Elements {
+		ev, ediags := r.evaluateExpr(e)
+		diags.Extend(ediags...)
+		if ediags.HasErrors() {
+			return nil, diags
 		}
 		elems = append(elems, ev)
 	}
@@ -468,80 +718,79 @@ func (r *runner) evaluateBuiltinSelect(v *Select) (interface{}, error) {
 		indexV := args[0]
 		index, err := cast.ToIntE(indexV)
 		if err != nil {
-			return nil, err
+			diags.Extend(ast.ExprError(v.Index, err.Error(), ""))
+			return nil, diags
 		}
 		elems := args[1:]
+		// TODO: this could leak warnings
+		if diags.HasErrors() {
+			return nil, diags
+		}
 		return elems[index], nil
 	})
 	return out, nil
 }
 
-func (r *runner) evaluateBuiltinSub(v *Sub) (interface{}, error) {
+func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+
 	// Evaluate all the substition mapping expressions.
 	substitutions := make(map[string]interface{})
 	if v.Substitutions != nil {
-		for k, sub := range v.Substitutions.Elems {
-			sub, err := r.evaluateExpr(sub)
-			if err != nil {
-				return "", err
+		for _, kvp := range v.Substitutions.Entries {
+			k := kvp.Key.(*ast.StringExpr).Value
+
+			v, vdiags := r.evaluateExpr(kvp.Value)
+			diags.Extend(vdiags...)
+			if vdiags.HasErrors() {
+				return nil, diags
 			}
-			substitutions[k] = sub
+			substitutions[k] = v
 		}
 	}
-
-	var parts []interface{}
-
-	var i int
-	var expr Expr
-	for i, expr = range v.ExpressionParts {
-		parts = append(parts, v.StringParts[i])
-		// TODO: We are (no longer) handling the subsitutions as part of Fn::Sub.  We will need to introduce
-		// a notion of local scopes so we can inject these in scope for the Ref to lookup.
-		v, err := r.evaluateExpr(expr)
-		if err != nil {
-			return nil, err
-		}
-		parts = append(parts, v)
-	}
-	parts = append(parts, v.StringParts[i+1])
-
-	// Lift the concatenation of the parts into a StringOutput and return it.
-	return joinStringOutputs(parts), nil
+	return r.evaluateInterpolate(v.Interpolate, substitutions)
 }
 
-func (r *runner) evaluateBuiltinAsset(v *Asset) (interface{}, error) {
-	switch v.Kind {
-	case FileAsset:
-		return pulumi.NewFileAsset(v.Path), nil
-	case StringAsset:
-		return pulumi.NewStringAsset(v.Path), nil
-	case RemoteAsset:
-		return pulumi.NewRemoteAsset(v.Path), nil
+func (r *runner) evaluateBuiltinAsset(v *ast.AssetExpr) (interface{}, syntax.Diagnostics) {
+	switch v.Kind.Value {
+	case "File":
+		return pulumi.NewFileAsset(v.Path.Value), nil
+	case "String":
+		return pulumi.NewStringAsset(v.Path.Value), nil
+	case "Remote":
+		return pulumi.NewRemoteAsset(v.Path.Value), nil
 	default:
-		return nil, errors.Errorf("unexpected Asset kind '%s'", v.Kind)
+		panic(fmt.Errorf("unexpected Asset kind '%s'", v.Kind.Value))
 	}
 }
 
-func (r *runner) evaluateBuiltinStackReference(v *StackReference) (interface{}, error) {
-	stackRef, ok := r.stackRefs[v.StackName]
+func (r *runner) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, syntax.Diagnostics) {
+	stackRef, ok := r.stackRefs[v.StackName.Value]
 	if !ok {
 		var err error
-		stackRef, err = pulumi.NewStackReference(r.ctx, v.StackName, &pulumi.StackReferenceArgs{})
+		stackRef, err = pulumi.NewStackReference(r.ctx, v.StackName.Value, &pulumi.StackReferenceArgs{})
 		if err != nil {
-			return nil, err
+			return nil, syntax.Diagnostics{ast.ExprError(v.StackName, err.Error(), "")}
 		}
-		r.stackRefs[v.StackName] = stackRef
+		r.stackRefs[v.StackName.Value] = stackRef
 	}
 
-	property, err := r.evaluateExpr(v.PropertyName)
-	if err != nil {
-		return nil, err
+	var diags syntax.Diagnostics
+
+	property, pdiags := r.evaluateExpr(v.PropertyName)
+	diags.Extend(pdiags...)
+	if pdiags.HasErrors() {
+		return nil, diags
 	}
 
-	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(v interface{}) (string, error) {
-		s, ok := v.(string)
+	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(n interface{}) (string, error) {
+		s, ok := n.(string)
 		if !ok {
-			return "", errors.Errorf("expected property name argument to Fn::StackReference to be a string, got %v", reflect.TypeOf(v))
+			diags.Extend(ast.ExprError(v.PropertyName, fmt.Sprintf("expected property name argument to Fn::StackReference to be a string, got %v", typeString(n)), ""))
+		}
+		// TODO: this could leak warnings
+		if diags.HasErrors() {
+			return "", diags
 		}
 		return s, nil
 	}).(pulumi.StringOutput)
@@ -555,7 +804,7 @@ func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
 		for _, x := range arr {
 			xs, ok := x.(string)
 			if !ok {
-				return "", errors.Errorf("expected expression in Fn::Join or Fn::Sub to produce a string, got %v", reflect.TypeOf(x))
+				return "", fmt.Errorf("expected expression in Fn::Join or Fn::Sub to produce a string, got %v", reflect.TypeOf(x))
 			}
 			s += xs
 		}
@@ -568,4 +817,35 @@ type untypedArgs map[string]interface{}
 
 func (untypedArgs) ElementType() reflect.Type {
 	return reflect.TypeOf((*map[string]interface{})(nil)).Elem()
+}
+
+func typeString(v interface{}) string {
+	if v == nil {
+		return "nil"
+	}
+
+	switch v.(type) {
+	case bool:
+		return "a boolean"
+	case int:
+		return "an integer"
+	case float64:
+		return "a number"
+	case string:
+		return "a string"
+	case []interface{}:
+		return "a list"
+	case map[string]interface{}:
+		return "an object"
+	default:
+		return fmt.Sprintf("%T", v)
+	}
+}
+
+func listStrings(v *ast.StringListDecl) []string {
+	a := make([]string, len(v.Elements))
+	for i, s := range v.Elements {
+		a[i] = s.Value
+	}
+	return a
 }

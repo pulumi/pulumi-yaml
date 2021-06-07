@@ -1,52 +1,68 @@
 package pulumiyaml
 
-import "github.com/pkg/errors"
+import (
+	"fmt"
 
-func topologicallySortedResources(t *Template) ([]string, error) {
-	var sorted []string               // will hold the sorted vertices.
-	visiting := make(map[string]bool) // temporary entries to detect cycles.
-	visited := make(map[string]bool)  // entries to avoid visiting the same node twice.
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax"
+)
+
+func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry, syntax.Diagnostics) {
+	if t.Resources == nil {
+		return nil, nil
+	}
+
+	var diags syntax.Diagnostics
+
+	var sorted []ast.ResourcesMapEntry // will hold the sorted vertices.
+	visiting := map[string]bool{}      // temporary entries to detect cycles.
+	visited := map[string]bool{}       // entries to avoid visiting the same node twice.
 
 	// Precompute dependencies for each resource
-	dependencies := make(map[string][]string)
-	for rname, r := range t.Resources {
-		resnames, err := GetResourceDependencies(r)
-		if err != nil {
-			return nil, err
+	resources := map[string]ast.ResourcesMapEntry{}
+	dependencies := map[string][]*ast.StringExpr{}
+	for _, kvp := range t.Resources.Entries {
+		rname, r := kvp.Key.Value, kvp.Value
+		if _, has := resources[rname]; has {
+			diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("duplicate resource name '%s'", rname), ""))
+			continue
 		}
-		dependencies[rname] = resnames
+		resources[rname] = kvp
+		dependencies[rname] = GetResourceDependencies(r)
 	}
 
 	// Depth-first visit each node
-	var visit func(name string) error
-	visit = func(name string) error {
-		if visiting[name] {
-			return errors.Errorf("circular dependency of resource '%s' transitively on itself", name)
+	var visit func(name *ast.StringExpr) bool
+	visit = func(name *ast.StringExpr) bool {
+		if visiting[name.Value] {
+			diags.Extend(ast.ExprError(name, fmt.Sprintf("circular dependency of resource '%s' transitively on itself", name.Value), ""))
+			return false
 		}
-		if !visited[name] {
-			visiting[name] = true
-			for _, mname := range dependencies[name] {
-				if err := visit(mname); err != nil {
-					return err
+		if !visited[name.Value] {
+			visiting[name.Value] = true
+			for _, mname := range dependencies[name.Value] {
+				if !visit(mname) {
+					return false
 				}
 			}
-			visited[name] = true
-			visiting[name] = false
-			sorted = append(sorted, name)
+			visited[name.Value] = true
+			visiting[name.Value] = false
+
+			if r, ok := resources[name.Value]; ok {
+				sorted = append(sorted, r)
+			}
 		}
-		return nil
+		return true
 	}
 
 	// Repeatedly visit the first unvisited unode until none are left
 	for {
 		progress := false
-		for rname := range t.Resources {
-			if !visited[rname] {
-				err := visit(rname)
-				if err != nil {
-					return nil, err
+		for _, kvp := range t.Resources.Entries {
+			if !visited[kvp.Key.Value] {
+				if visit(kvp.Key) {
+					progress = true
 				}
-				progress = true
 				break
 			}
 		}
@@ -54,5 +70,5 @@ func topologicallySortedResources(t *Template) ([]string, error) {
 			break
 		}
 	}
-	return sorted, nil
+	return sorted, diags
 }
