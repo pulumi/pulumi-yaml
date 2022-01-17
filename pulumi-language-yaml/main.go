@@ -1,4 +1,4 @@
-// Copyright 2020, Pulumi Corporation.
+// Copyright 2022, Pulumi Corporation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import (
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"google.golang.org/grpc"
 
-	pulumiyaml "github.com/pulumi/pulumi-yaml/pulumiyaml"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml"
 )
 
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the

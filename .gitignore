@@ -1,3 +1,4 @@
+.idea
 *.swp
 Pulumi.*.yaml
 stack.json
