@@ -2,16 +2,14 @@ package pulumiyaml
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax"
-	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax/encoding"
 )
 
 func diagString(d *hcl.Diagnostic) string {
@@ -28,22 +26,15 @@ func requireNoErrors(t *testing.T, diags syntax.Diagnostics) {
 }
 
 func yamlTemplate(t *testing.T, source string) *ast.TemplateDecl {
-	syntax, diags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(source)), TagDecoder)
+	pt, diags, err := LoadYAMLBytes("<stdin>", []byte(source))
+	require.NoError(t, err)
 	requireNoErrors(t, diags)
-
-	pt, diags := ast.ParseTemplate([]byte(source), syntax)
-	requireNoErrors(t, diags)
-
 	return pt
 }
 
 func template(t *testing.T, tm *Template) *ast.TemplateDecl {
-	syntax, diags := encoding.DecodeValue(tm)
+	pt, diags := LoadTemplate(tm)
 	requireNoErrors(t, diags)
-
-	pt, diags := ast.ParseTemplate(nil, syntax)
-	requireNoErrors(t, diags)
-
 	return pt
 }
 

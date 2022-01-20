@@ -84,6 +84,22 @@ func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Di
 	return t, diags, nil
 }
 
+// LoadTemplate decodes a Template value into a YAML template.
+func LoadTemplate(t *Template) (*ast.TemplateDecl, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+
+	syn, sdiags := encoding.DecodeValue(t)
+	diags.Extend(sdiags...)
+	if sdiags.HasErrors() {
+		return nil, diags
+	}
+
+	td, tdiags := ast.ParseTemplate(nil, syn)
+	diags.Extend(tdiags...)
+
+	return td, diags
+}
+
 func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	if err == nil {
 		return nil, false
@@ -108,7 +124,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-// Run the JSON evaluator against a template using the given request/settings.
+// Run loads and evaluates a template using the given request/settings.
 func Run(ctx *pulumi.Context) error {
 	t, diags, err := Load()
 	if err != nil {
@@ -116,6 +132,11 @@ func Run(ctx *pulumi.Context) error {
 	}
 
 	// Now "evaluate" the template.
+	return RunTemplate(ctx, t)
+}
+
+// RunTemplate runs the evaluator against a template using the given request/settings.
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl) error {
 	return newRunner(ctx, t).Evaluate()
 }
 

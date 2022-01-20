@@ -66,7 +66,7 @@ func yamlEndPos(n *yaml.Node) hcl.Pos {
 func yamlNodeRange(filename string, n *yaml.Node) *hcl.Range {
 	startPos := hcl.Pos{Line: n.Line, Column: n.Column}
 	endPos := yamlEndPos(n)
-	return &hcl.Range{Start: startPos, End: endPos}
+	return &hcl.Range{Filename: filename, Start: startPos, End: endPos}
 }
 
 // UnmarshalYAMLNode unmarshals the given YAML node into a syntax Node. UnmarshalYAMLNode does _not_ use the tag decoder

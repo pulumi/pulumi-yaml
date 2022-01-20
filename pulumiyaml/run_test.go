@@ -27,7 +27,6 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 }
 
 func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 	if m.NewResourceF == nil {
 		return args.Name, resource.PropertyMap{}, nil
 	}
