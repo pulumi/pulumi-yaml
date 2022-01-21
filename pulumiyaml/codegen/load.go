@@ -458,14 +458,14 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 		})
 	}
 	if resource.Provider != nil && resource.Provider.Value != "" {
-		resourceName := resource.Parent.Value
+		resourceName := resource.Provider.Value
 		if resourceVar, ok := imp.resources[resourceName]; ok {
 			optionItems = append(optionItems, &model.Attribute{
 				Name:  "provider",
 				Value: model.VariableReference(resourceVar),
 			})
 		} else {
-			diags.Extend(ast.ExprError(resource.Parent, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+			diags.Extend(ast.ExprError(resource.Provider, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
 		}
 	}
 
