@@ -1,98 +1,67 @@
 package pulumiyaml
 
 import (
-	"bytes"
 	"strings"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax/encoding"
 )
 
-// TagProcessor processes custom tags during YAML parsing of a Template.
-type TagProcessor struct {
-	template *Template
-}
+// The TagDecoder is responsible for decoding YAML tags that represent calls to builtin functions. Supported tags are:
+//
+// - !Ref variable, which expands to { "Ref": "variable" }
+// - !GetAtt variable.property, which expands to { "Fn::GetAtt": [ "variable", "property" ] }
+// - !Sub [ ... ], which expands to { "Fn::Sub": [ ... ] }
+// - !Select [ ... ], which expands to { "Fn::Select": [ ... ] }
+// - !Join [ ... ], which expands to { "Fn::Join": [ ... ] }
+//
+// TODO: add support for Fn::Invoke and Fn::StackReference?
+var TagDecoder = tagDecoder(0)
 
-// UnmarshalYAML unmarshals a YAML document that includes customer tags.
-func (i *TagProcessor) UnmarshalYAML(value *yaml.Node) error {
-	resolved, err := resolveTags(value)
-	if err != nil {
-		return err
-	}
-	return resolved.Decode(i.template)
-}
+type tagDecoder int
 
-func resolveTags(node *yaml.Node) (*yaml.Node, error) {
-	// Recursively resolve tags on any nested sequence or mapping nodes
-	if node.Kind == yaml.SequenceNode || node.Kind == yaml.MappingNode {
-		var err error
-		for i := range node.Content {
-			node.Content[i], err = resolveTags(node.Content[i])
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
+func (d tagDecoder) DecodeTag(filename string, n *yaml.Node) (syntax.Node, syntax.Diagnostics, bool) {
 	// Then process tags on this node
-	switch node.Tag {
+	switch n.Tag {
 	case "!Ref":
-		if node.Kind != yaml.ScalarNode {
-			return nil, errors.New("expected !Ref argument to be a string")
+		resourceName, diags := encoding.UnmarshalYAMLNode(filename, n, d)
+		if diags.HasErrors() {
+			return resourceName, diags, true
 		}
-		return replacementNode(map[string]interface{}{
-			"Ref": node.Value,
-		})
+		return builtin(resourceName.Syntax(), "Ref", resourceName), diags, true
 	case "!GetAtt":
-		if node.Kind != yaml.ScalarNode {
-			return nil, errors.New("expected !GetAtt argument to be a string")
+		property, diags := encoding.UnmarshalYAMLNode(filename, n, d)
+		if diags.HasErrors() {
+			return property, diags, true
 		}
-		parts := strings.Split(node.Value, ".")
+
+		s := property.Syntax()
+
+		str, ok := property.(*syntax.StringNode)
+		if !ok {
+			diags.Extend(syntax.NodeError(property, "the argument to !GetAtt must be a string of the form 'resourceName.propertyName'", ""))
+			return property, diags, true
+		}
+		parts := strings.Split(str.Value(), ".")
 		if len(parts) != 2 {
-			return nil, errors.Errorf("expected !GetAtt argument to be 'resourceName.propertyName', got '%s'", node.Value)
+			diags.Extend(syntax.NodeError(property, "the argument to !GetAtt must be a string of the form 'resourceName.propertyName'", ""))
+			return property, diags, true
 		}
-		return replacementNode(map[string]interface{}{
-			"Fn::GetAtt": parts,
-		})
-	case "!Sub":
-		if node.Kind == yaml.ScalarNode {
-			return replacementNode(map[string]interface{}{
-				"Fn::Sub": node.Value,
-			})
-		} else if node.Kind == yaml.SequenceNode {
-			return replacementNode(map[string]interface{}{
-				"Fn::Sub": node.Content,
-			})
+
+		return builtin(s, "Fn::GetAtt", syntax.ListSyntax(s, syntax.StringSyntax(s, parts[0]), syntax.StringSyntax(s, parts[1]))), diags, true
+	case "!Sub", "!Select", "!Join":
+		args, diags := encoding.UnmarshalYAMLNode(filename, n, d)
+		if diags.HasErrors() {
+			return args, diags, true
 		}
-		return nil, errors.New("expected !Sub argument to be a scalar or list")
-	case "!Select":
-		if node.Kind != yaml.SequenceNode {
-			return nil, errors.New("expected !Select argument to be a list")
-		}
-		return replacementNode(map[string]interface{}{
-			"Fn::Select": node.Content,
-		})
-	case "!Join":
-		if node.Kind != yaml.SequenceNode {
-			return nil, errors.New("expected !Join argument to be a list")
-		}
-		return replacementNode(map[string]interface{}{
-			"Fn::Join": node.Content,
-		})
+
+		return builtin(args.Syntax(), "Fn::"+n.Tag[1:], args), diags, true
 	}
-	// If it was not a tagged node just return it.
-	return node, nil
+	return nil, nil, false
 }
 
-func replacementNode(v map[string]interface{}) (*yaml.Node, error) {
-	var buf bytes.Buffer
-	err := yaml.NewEncoder(&buf).Encode(v)
-	if err != nil {
-		return nil, err
-	}
-	var ret yaml.Node
-	err = yaml.NewDecoder(&buf).Decode(&ret)
-	if err != nil {
-		return nil, err
-	}
-	return &ret, nil
+func builtin(s syntax.Syntax, name string, args syntax.Node) syntax.Node {
+	return syntax.ObjectSyntax(s, syntax.ObjectPropertySyntax(s, syntax.StringSyntax(s, name), args))
 }

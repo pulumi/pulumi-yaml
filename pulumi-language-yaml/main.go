@@ -23,6 +23,7 @@ import (
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/hashicorp/hcl/v2"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
@@ -93,11 +94,15 @@ func newLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeSer
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	tmpl, err := pulumiyaml.Load()
+	tmpl, diags, err := pulumiyaml.Load()
 	if err != nil {
 		return nil, err
 	}
-	pkgs := pulumiyaml.GetReferencedPackages(&tmpl)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	pkgs := pulumiyaml.GetReferencedPackages(tmpl)
 	var plugins []*pulumirpc.PluginDependency
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{
@@ -121,6 +126,19 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		os.Chdir(pwd)
 	}
 
+	template, diags, err := pulumiyaml.Load()
+	if err != nil {
+		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	}
+
+	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
+	if len(diags) != 0 {
+		diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+	}
+	if diags.HasErrors() {
+		return &pulumirpc.RunResponse{Error: "failed to load template"}, nil
+	}
+
 	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
 	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
 	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
@@ -139,6 +157,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, pulumiyaml.Run); err != nil {
+		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
+			diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+			return &pulumirpc.RunResponse{Error: "failed to evaluate template"}, nil
+		}
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
 

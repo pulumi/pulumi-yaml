@@ -1,12 +1,16 @@
 package pulumiyaml
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax"
 )
 
 type testMonitor struct {
@@ -23,14 +27,13 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 }
 
 func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 	if m.NewResourceF == nil {
 		return args.Name, resource.PropertyMap{}, nil
 	}
 	return m.NewResourceF(args.TypeToken, args.Name, args.Inputs, args.Provider, args.ID)
 }
 
-func testTemplate(t *testing.T, template Template, callback func(*runner)) {
+func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
 			provider, id string) (string, resource.PropertyMap, error) {
@@ -46,6 +49,7 @@ func testTemplate(t *testing.T, template Template, callback func(*runner)) {
 
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
+					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
 				}, nil
@@ -59,7 +63,7 @@ func testTemplate(t *testing.T, template Template, callback func(*runner)) {
 
 				return "", resource.PropertyMap{}, nil
 			}
-			return "", resource.PropertyMap{}, errors.Errorf("Unexpected resource type %s", typeToken)
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
@@ -68,30 +72,141 @@ func testTemplate(t *testing.T, template Template, callback func(*runner)) {
 		if err != nil {
 			return err
 		}
-		callback(runner)
+		if callback != nil {
+			callback(runner)
+		}
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		return diags
+	}
 	assert.NoError(t, err)
+	return nil
+}
+
+func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) {
+	diags := testTemplateDiags(t, template, callback)
+	requireNoErrors(t, diags)
+}
+
+func TestYAML(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+resources: 
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  comp-a:
+    type: test:component:type
+    component: true
+    properties:
+      foo: ${res-a.bar}
+outputs:
+  foo: !GetAtt res-a.foo
+  bar: !Ref res-a
+`
+
+	tmpl := yamlTemplate(t, text)
+	testTemplate(t, tmpl, func(r *runner) {})
+}
+
+func TestYAMLDiags(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+resources: 
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+outputs:
+  out: !Ref res-b
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	require.True(t, diags.HasErrors())
+	require.Len(t, diags, 1)
+	assert.Equal(t, "<stdin>:9:8: resource Ref named res-b could not be found", diagString(diags[0]))
+}
+
+func TestJSON(t *testing.T) {
+	const text = `{
+	"name": "test-yaml",
+	"runtime": "yaml",
+	"resources": {
+		"res-a": {
+			"type": "test:resource:type",
+			"properties": {
+				"foo": "oof"
+			}
+		},
+		"comp-a": {
+			"type": "test:component:type",
+			"component": true,
+			"properties": {
+				"foo": "${res-a.bar}"
+			}
+		}
+	},
+	"outputs": {
+		"foo": {
+			"Fn::GetAtt": [
+				"res-a",
+				"bar"
+			]
+		},
+		"bar": {
+			"Ref": "res-a"
+		}
+	}
+}`
+
+	tmpl := yamlTemplate(t, text)
+	testTemplate(t, tmpl, func(r *runner) {})
+}
+
+func TestJSONDiags(t *testing.T) {
+	const text = `{
+	"name": "test-yaml",
+	"runtime": "yaml",
+	"resources": {
+		"res-a": {
+			"type": "test:resource:type",
+			"properties": {
+				"foo": "oof"
+			}
+		}
+	},
+	"outputs": {
+		"foo": {
+			"Ref": "res-b"
+		}
+	}
+}
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	require.True(t, diags.HasErrors())
+	require.Len(t, diags, 1)
+	assert.Equal(t, "<stdin>:13:10: resource Ref named res-b could not be found", diagString(diags[0]))
 }
 
 func TestJoin(t *testing.T) {
-	tmpl := Template{
+	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{},
-	}
+	})
 	testTemplate(t, tmpl, func(r *runner) {
-		v, err := r.evaluateBuiltinJoin(&Join{
-			Delimiter: &Value{Val: pulumi.String(",").ToStringOutput()},
-			Values: &Array{
-				Elems: []Expr{
-					&Value{Val: "a"},
-					&Value{Val: pulumi.String("b").ToStringOutput()},
-					&Value{Val: "c"},
-				},
-			},
+		v, diags := r.evaluateBuiltinJoin(&ast.JoinExpr{
+			Delimiter: ast.String(","),
+			Values: ast.List(
+				ast.String("a"),
+				ast.String("b"),
+				ast.String("c"),
+			),
 		})
-		if !assert.NoError(t, err) {
-			return
-		}
+		requireNoErrors(t, diags)
 		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 			assert.Equal(t, "a,b,c", x)
 			return nil, nil
@@ -101,7 +216,7 @@ func TestJoin(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	tmpl := Template{
+	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
 				Type: "test:resource:type",
@@ -110,24 +225,20 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		},
-	}
+	})
 	testTemplate(t, tmpl, func(r *runner) {
-		v, err := r.evaluateBuiltinSelect(&Select{
-			Index: &GetAtt{
-				ResourceName: "resA",
-				PropertyName: "outNum",
+		v, diags := r.evaluateBuiltinSelect(&ast.SelectExpr{
+			Index: &ast.GetAttExpr{
+				ResourceName: ast.String("resA"),
+				PropertyName: ast.String("outNum"),
 			},
-			Values: &Array{
-				Elems: []Expr{
-					&Value{Val: "first"},
-					&Value{Val: "second"},
-					&Value{Val: "third"},
-				},
-			},
+			Values: ast.List(
+				ast.String("first"),
+				ast.String("second"),
+				ast.String("third"),
+			),
 		})
-		if !assert.NoError(t, err) {
-			return
-		}
+		requireNoErrors(t, diags)
 		out := pulumi.ToOutput(v).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "second", x.(string))
 			return nil, nil
@@ -137,7 +248,7 @@ func TestSelect(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
-	tmpl := Template{
+	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
 				Type: "test:resource:type",
@@ -146,24 +257,13 @@ func TestSub(t *testing.T) {
 				},
 			},
 		},
-	}
+	})
 	testTemplate(t, tmpl, func(r *runner) {
-		v, err := r.evaluateBuiltinSub(&Sub{
-			StringParts: []string{"Hello ", " - ", "!!"},
-			ExpressionParts: []Expr{
-				&GetAtt{
-					ResourceName: "resA",
-					PropertyName: "out",
-				},
-				&Ref{
-					ResourceName: "resA",
-				},
-			},
+		v, diags := r.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA}!!"),
 		})
-		if !assert.NoError(t, err) {
-			return
-		}
-		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
+		requireNoErrors(t, diags)
+		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "Hello tuo - someID!!", x)
 			return nil, nil
 		})
@@ -172,7 +272,7 @@ func TestSub(t *testing.T) {
 }
 
 func TestRef(t *testing.T) {
-	tmpl := Template{
+	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
 				Type: "test:resource:type",
@@ -187,13 +287,11 @@ func TestRef(t *testing.T) {
 				},
 			},
 		},
-	}
+	})
 	testTemplate(t, tmpl, func(r *runner) {
 		{
-			v, err := r.evaluateBuiltinRef(&Ref{ResourceName: "resA"})
-			if !assert.NoError(t, err) {
-				return
-			}
+			v, diags := r.evaluateBuiltinRef(ast.Ref("resA"))
+			requireNoErrors(t, diags)
 			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 				assert.Equal(t, "someID", x)
 				return nil, nil
@@ -201,16 +299,13 @@ func TestRef(t *testing.T) {
 			r.ctx.Export("out", out)
 		}
 		{
-			v, err := r.evaluateBuiltinRef(&Ref{ResourceName: "compA"})
-			if !assert.NoError(t, err) {
-				return
-			}
+			v, diags := r.evaluateBuiltinRef(ast.Ref("compA"))
+			requireNoErrors(t, diags)
 			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 				assert.Equal(t, "", x)
 				return nil, nil
 			})
 			r.ctx.Export("out", out)
 		}
-
 	})
 }
