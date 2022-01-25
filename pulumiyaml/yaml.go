@@ -9,6 +9,15 @@ import (
 	"github.com/pulumi/pulumi-yaml/pulumiyaml/syntax/encoding"
 )
 
+// The TagDecoder is responsible for decoding YAML tags that represent calls to builtin functions. Supported tags are:
+//
+// - !Ref variable, which expands to { "Ref": "variable" }
+// - !GetAtt variable.property, which expands to { "Fn::GetAtt": [ "variable", "property" ] }
+// - !Sub [ ... ], which expands to { "Fn::Sub": [ ... ] }
+// - !Select [ ... ], which expands to { "Fn::Select": [ ... ] }
+// - !Join [ ... ], which expands to { "Fn::Join": [ ... ] }
+//
+// TODO: add support for Fn::Invoke and Fn::StackReference?
 var TagDecoder = tagDecoder(0)
 
 type tagDecoder int

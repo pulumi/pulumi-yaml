@@ -452,6 +452,16 @@ func (r *runner) registerOutputs() syntax.Diagnostics {
 	return diags
 }
 
+// evaluateExpr evaluates an expression tree. The result must be one of the following types:
+//
+// - nil
+// - string
+// - bool
+// - float64
+// - []interface{}
+// - map[string]interface{}
+// - pulumi.Output, where the element type is one of the above
+//
 func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 	switch x := x.(type) {
 	case *ast.NullExpr:
@@ -463,17 +473,7 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 	case *ast.StringExpr:
 		return x.Value, nil
 	case *ast.ListExpr:
-		var diags syntax.Diagnostics
-		var xs []interface{}
-		for _, e := range x.Elements {
-			ev, ediags := r.evaluateExpr(e)
-			diags.Extend(ediags...)
-			if ediags.HasErrors() {
-				return nil, diags
-			}
-			xs = append(xs, ev)
-		}
-		return xs, diags
+		return r.evaluateList(x)
 	case *ast.ObjectExpr:
 		return r.evaluateObject(x, nil, map[string]interface{}{}, x.Entries)
 	case *ast.InterpolateExpr:
@@ -499,6 +499,20 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
+}
+
+func (r *runner) evaluateList(x *ast.ListExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	xs := make([]interface{}, len(x.Elements))
+	for i, e := range x.Elements {
+		ev, ediags := r.evaluateExpr(e)
+		diags.Extend(ediags...)
+		if ediags.HasErrors() {
+			return nil, diags
+		}
+		xs[i] = ev
+	}
+	return xs, diags
 }
 
 func (r *runner) evaluateObject(x *ast.ObjectExpr, diags syntax.Diagnostics, m map[string]interface{}, entries []ast.ObjectProperty) (interface{}, syntax.Diagnostics) {
