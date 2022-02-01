@@ -137,7 +137,12 @@ func Run(ctx *pulumi.Context) error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl) error {
-	return newRunner(ctx, t).Evaluate()
+	diags := newRunner(ctx, t).Evaluate()
+
+	if diags.HasErrors() {
+		return diags
+	}
+	return nil
 }
 
 type runner struct {
