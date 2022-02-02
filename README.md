@@ -4,12 +4,14 @@ A YAML (and JSON) language provider for Pulumi.
 
 ## Examples
 
+See [examples dir](./examples) for tested examples.
+
 The Pulumi Getting Started:
 
 ```yaml
 name: simple-yaml
 runtime: yaml
-resources: 
+resources:
   my-bucket:
     type: aws:s3/bucket:Bucket
     properties:
@@ -41,7 +43,7 @@ configuration:
       - m1.large
     description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
 variables:
-  AmazonLinuxAmi: 
+  AmazonLinuxAmi:
     Fn::Invoke:
       Function: aws:index/getAmi:getAmi
       Arguments:
@@ -87,9 +89,9 @@ outputs:
 
 ## Spec
 
-Pulumi programs can be defined in many languages, and the Pulumi YAML dialect offers an additional language for authoring Pulumi programs.  
+Pulumi programs can be defined in many languages, and the Pulumi YAML dialect offers an additional language for authoring Pulumi programs.
 
-The Pulumi YAML provider supports programs written in YAML or JSON.  In both cases, the programs (`.yaml` or `.json` files) follow a simple schema, including four top level sections: 
+The Pulumi YAML provider supports programs written in YAML or JSON.  In both cases, the programs (`.yaml` or `.json` files) follow a simple schema, including four top level sections:
 
 | Property        | Type | Required           | Expression  | Description |
 | ------------- |---|-------------| -----|---|
@@ -100,13 +102,13 @@ The Pulumi YAML provider supports programs written in YAML or JSON.  In both cas
 In many locations within this schema, values may be expressions which computed a value based on the `configuration` or outputs of `resources`.  These expressions can be provided in two ways:
 
 * If an object is provided as a value, and has a key that is `Ref` or has the prefix `Fn::`, the object is treated as an expression, and the expression will be resolved to a new value that will be used in place of the object.
-* Any string value is interpreted as an interoplation, with `${...}` being replaced by evaluating the expression in the `...`.
+* Any string value is interpreted as an interpolation, with `${...}` being replaced by evaluating the expression in the `...`.
 
 The supported expression forms for each of these is detailed below.
 
 ### Configuration
 
-The value of `configuration` is an object whose keys are logical names by whith the config input will be refrenced in expressions within the program, and whose values are elements of the schema below.  Each item in this object represents an independent config input.
+The value of `configuration` is an object whose keys are logical names by which the config input will be referenced in expressions within the program, and whose values are elements of the schema below.  Each item in this object represents an independent config input.
 
 | Property        | Type | Required           | Expression  | Description |
 | ------------- |---|-------------| -----|---|

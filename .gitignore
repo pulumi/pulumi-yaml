@@ -2,3 +2,5 @@
 *.swp
 Pulumi.*.yaml
 stack.json
+goreleaser/
+bin/*
