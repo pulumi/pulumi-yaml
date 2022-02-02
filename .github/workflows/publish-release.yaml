@@ -1,0 +1,24 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - v*.*.*
+      - '!v*.*.*-**'
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  lint:
+    uses: ./.github/workflows/stage-lint.yml
+  test:
+    uses: ./.github/workflows/stage-test.yml
+    with:
+      # TODO: Enable live tests after configuring secrets
+      live-test: true
+  publish:
+    needs: [test, lint]
+    uses: ./.github/workflows/stage-publish.yml
+    with:
+      goreleaser-args: -p 3 -f .goreleaser.yml --rm-dist --skip-validate --timeout 60m0s --release-notes=CHANGELOG_PENDING.md

@@ -1,6 +1,6 @@
 name: simple-yaml
 runtime: yaml
-resources: 
+resources:
   my-bucket:
     type: aws:s3/bucket:Bucket
     properties:

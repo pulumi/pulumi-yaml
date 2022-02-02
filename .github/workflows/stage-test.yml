@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      live-test:
+        description: |
+          Whether to run tests against a live environment. When false, tests that require secrets
+          should be skipped.
+        default: false
+        required: false
+        type: boolean
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+          stable: ${{ matrix.go-stable }}
+      - name: Set live test variable
+        run: |
+          echo "PULUMI_LIVE_TEST=${{ inputs.live-test }}" >> $GITHUB_ENV
+          echo "GO_VERSION=${{ matrix.go-version }}" >> $GITHUB_ENV
+      - name: Fixup go.mod if we're not targeting 1.17x
+        run: |
+          if [ "$GO_VERSION" != "1.17.x" ]; then
+            go mod tidy
+          fi
+      - name: Test
+        run: make test
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.17.x]
+        go-stable: [true]
+        include:
+          - go-version: 1.18.0-beta2
+            go-stable: false

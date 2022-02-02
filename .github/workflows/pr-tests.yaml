@@ -1,0 +1,13 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+
+jobs:
+  # TODO: change branch target to @main after updating
+  lint:
+    uses: pulumi/pulumi-yaml/.github/workflows/stage-lint.yml@feature-ci
+  test:
+    uses: pulumi/pulumi-yaml/.github/workflows/stage-test.yml@feature-ci
+    with:
+      live-test: false

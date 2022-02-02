@@ -1,0 +1,16 @@
+name: Lint
+
+on:
+  workflow_call:
+
+jobs:
+  lint:
+    container: golangci/golangci-lint:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Lint
+        # TODO: Enable linting after a cleanup commit.
+        # Avoiding in this commit so as to not mix code changes w/ CI changes.
+        run: golangci-lint run || true

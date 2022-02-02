@@ -1,0 +1,44 @@
+dist: goreleaser
+project_name: pulumi-yaml
+snapshot:
+  name_template: "{{ .Version }}-SNAPSHOT"
+checksum:
+  name_template: "{{ .ProjectName }}-{{ .Version }}-checksums.txt"
+archives:
+- id: archive
+  name_template: '{{ .Binary }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}'
+builds:
+- id: pulumi-language-yaml
+  binary: pulumi-language-yaml
+  env:
+  - CGO_ENABLED=0
+  - GO111MODULE=on
+  goarch:
+  - amd64
+  - arm64
+  goos:
+  - darwin
+  - windows
+  - linux
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
+  main: ./cmd/pulumi-language-yaml/
+- id: yaml2pulumi
+  binary: yaml2pulumi
+  env:
+  - CGO_ENABLED=0
+  - GO111MODULE=on
+  goarch:
+  - amd64
+  - arm64
+  goos:
+  - darwin
+  - windows
+  - linux
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
+  main: ./cmd/yaml2pulumi/
