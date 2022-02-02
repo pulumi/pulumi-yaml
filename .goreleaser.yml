@@ -10,7 +10,6 @@ archives:
 builds:
 - id: pulumi-resource-yaml
   binary: pulumi-resource-yaml
-  dir: provider
   env:
   - CGO_ENABLED=0
   - GO111MODULE=on
@@ -28,7 +27,6 @@ builds:
   main: ./cmd/pulumi-resource-yaml/
 - id: yaml2pulumi
   binary: yaml2pulumi
-  dir: provider
   env:
   - CGO_ENABLED=0
   - GO111MODULE=on
