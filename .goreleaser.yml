@@ -8,8 +8,8 @@ archives:
 - id: archive
   name_template: '{{ .Binary }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}'
 builds:
-- id: pulumi-resource-yaml
-  binary: pulumi-resource-yaml
+- id: pulumi-language-yaml
+  binary: pulumi-language-yaml
   env:
   - CGO_ENABLED=0
   - GO111MODULE=on
@@ -24,7 +24,7 @@ builds:
   - -s
   - -w
   - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
-  main: ./cmd/pulumi-resource-yaml/
+  main: ./cmd/pulumi-language-yaml/
 - id: yaml2pulumi
   binary: yaml2pulumi
   env:
