@@ -14,3 +14,16 @@ jobs:
         # TODO: Enable linting after a cleanup commit.
         # Avoiding in this commit so as to not mix code changes w/ CI changes.
         run: golangci-lint run || true
+  check-copyright:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Install pulumictl
+        uses: jaxxstorm/action-install-gh-release@v1.2.0
+        with:
+          repo: pulumi/pulumictl
+      - name: Lint
+        # TODO: Enable copyright checking after adding notices
+        # Avoiding in this commit so as to not mix code changes w/ CI changes.
+        run: pulumictl copyright || true
