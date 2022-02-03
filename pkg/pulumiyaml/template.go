@@ -1,3 +1,5 @@
+// Copyright 2022, Pulumi Corporation.  All rights reserved.
+
 package pulumiyaml
 
 // Template is a YAML or JSON sttructure which defines a Pulumi stack containing cloud infrastructure resources.

@@ -1,3 +1,5 @@
+// Copyright 2022, Pulumi Corporation.  All rights reserved.
+
 package syntax
 
 // The syntax package defines a syntax tree for a JSON-like object language. The language
