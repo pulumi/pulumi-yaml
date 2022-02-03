@@ -41,9 +41,9 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			switch typeToken {
 			case "test:resource:type":
 				assert.Equal(t, "test:resource:type", typeToken)
-				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
+				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
-				})))
+				}), state, "expected resource test:resource:type to have property foo: oof")
 				assert.Equal(t, "", provider)
 				assert.Equal(t, "", id)
 
@@ -61,6 +61,44 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 				assert.Equal(t, "", provider)
 				assert.Equal(t, "", id)
 
+				return "", resource.PropertyMap{}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(ctx, template)
+		err := runner.Evaluate()
+		if err != nil {
+			return err
+		}
+		if callback != nil {
+			callback(runner)
+		}
+		return nil
+	}, pulumi.WithMocks("foo", "dev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		return diags
+	}
+	assert.NoError(t, err)
+	return nil
+}
+
+func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
+	// Same mocks as in testTemplateDiags but without assertions, just pure syntax checking.
+	mocks := &testMonitor{
+		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
+			provider, id string) (string, resource.PropertyMap, error) {
+
+			switch typeToken {
+			case "test:resource:type":
+				return "someID", resource.PropertyMap{
+					"foo":    resource.NewStringProperty("qux"),
+					"bar":    resource.NewStringProperty("oof"),
+					"out":    resource.NewStringProperty("tuo"),
+					"outNum": resource.NewNumberProperty(1),
+				}, nil
+			case "test:component:type":
 				return "", resource.PropertyMap{}, nil
 			}
 			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
@@ -109,6 +147,22 @@ outputs:
 
 	tmpl := yamlTemplate(t, text)
 	testTemplate(t, tmpl, func(r *runner) {})
+}
+
+func TestPropertiesAbsent(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+resources:
+  res-a:
+    type: test:resource:type
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	require.Len(t, diags, 0)
+	// Consider warning on this?
+	// require.True(t, diags.HasErrors())
+	// assert.Equal(t, "<stdin>:4:3: resource res-a passed has an empty properties value", diagString(diags[0]))
 }
 
 func TestYAMLDiags(t *testing.T) {

@@ -13,11 +13,17 @@ import (
 )
 
 func diagString(d *hcl.Diagnostic) string {
-	return fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
+	if d.Subject != nil {
+		return fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
+	} else if d.Context != nil {
+		return fmt.Sprintf("%v:%v:%v: %s", d.Context.Filename, d.Context.Start.Line, d.Context.End.Line, d.Summary)
+	} else {
+		return fmt.Sprintf("%v", d.Summary)
+	}
 }
 
 func requireNoErrors(t *testing.T, diags syntax.Diagnostics) {
-	if !assert.False(t, diags.HasErrors()) {
+	if diags.HasErrors() {
 		for _, d := range diags {
 			t.Log(diagString(d))
 		}
