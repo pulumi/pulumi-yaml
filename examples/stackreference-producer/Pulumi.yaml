@@ -1,0 +1,4 @@
+name: stackreference-producer
+runtime: yaml
+outputs:
+  imageName: "pulumi/pulumi:latest"

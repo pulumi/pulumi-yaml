@@ -10,6 +10,7 @@
     "Resources": {
         "WebSecGrp": {
             "Type": "aws:ec2/securityGroup:SecurityGroup",
+            "Version": "4.37.1",
             "Properties": {
                 "ingress": [
                     {

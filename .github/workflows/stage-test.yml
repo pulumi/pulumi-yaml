@@ -10,6 +10,24 @@ on:
         default: false
         required: false
         type: boolean
+      commit-ref:
+        description: Commit ref to check out and run tests against.
+        default: ''
+        required: false
+        type: string
+    secrets:
+      PULUMI_ACCESS_TOKEN:   { required: false }
+      AWS_ACCESS_KEY_ID:     { required: false }
+      AWS_SECRET_ACCESS_KEY: { required: false }
+      AWS_CI_ROLE_ARN:       { required: false }
+
+env:
+  PULUMI_LIVE_TEST: ${{ inputs.live-test }}
+  PULUMI_TEST_ORG: moolumi
+  PULUMI_API: https://api.pulumi-staging.io
+  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  AWS_REGION: us-west-2
 
 jobs:
   test:
@@ -18,18 +36,29 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.commit-ref }}
       - name: Install Go
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
           stable: ${{ matrix.go-stable }}
-      - name: Set live test variable
-        run: |
-          echo "PULUMI_LIVE_TEST=${{ inputs.live-test }}" >> $GITHUB_ENV
-          echo "GO_VERSION=${{ matrix.go-version }}" >> $GITHUB_ENV
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        # Skip on dry-run
+        if: ${{ inputs.live-test }}
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-duration-seconds: 3600
+          role-session-name: pulumi-yaml@githubActions
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+      - name: Install Pulumi CLI
+        uses: pulumi/action-install-pulumi-cli@v2
       - name: Fixup go.mod if we're not targeting 1.17x
         run: |
-          if [ "$GO_VERSION" != "1.17.x" ]; then
+          if [ "${{ matrix.go-version }}" != "1.17.x" ]; then
             go mod tidy
           fi
       - name: Test

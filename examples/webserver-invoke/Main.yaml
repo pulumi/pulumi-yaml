@@ -10,6 +10,7 @@ configuration:
 resources:
   WebSecGrp:
     type: aws:ec2/securityGroup:SecurityGroup
+    version: 4.37.1
     properties:
       ingress:
         - protocol: tcp

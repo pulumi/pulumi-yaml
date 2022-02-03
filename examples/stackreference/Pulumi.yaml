@@ -1,7 +1,0 @@
-name: stack-reference
-runtime: yaml
-outputs:
-  out:
-    Fn::StackReference:
-      - lukehoban/aws/dev
-      - image1Name
