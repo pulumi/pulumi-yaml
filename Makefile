@@ -4,6 +4,11 @@ PULUMI_LIVE_TEST  ?= false
 export PULUMI_TEST_ORG
 export PULUMI_TEST_OWNER
 
+CONCURRENCY       := 10
+
+install::
+	go install ./cmd/...
+
 clean::
 	rm ./bin/*
 
@@ -17,7 +22,7 @@ build:: ensure
 # Ensure that in tests, the language server is accessible
 test:: build
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  go test -v --timeout 10m -parallel 4 ./pkg/...
+	  go test -v --timeout 10m -parallel ${CONCURRENCY} ./pkg/...
 
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test
