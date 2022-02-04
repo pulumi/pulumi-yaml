@@ -1,4 +1,4 @@
-name: Pull Request Dry Run Tests
+name: Pull Request Acceptance Tests
 
 on:
   repository_dispatch:
