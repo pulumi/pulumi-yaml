@@ -10,8 +10,10 @@ import (
 // GetResourceDependencies gets the full set of implicit and explicit dependencies for a Resource.
 func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 	var deps []*ast.StringExpr
-	for _, kvp := range r.Properties.Entries {
-		getExpressionDependencies(&deps, kvp.Value)
+	if r.Properties != nil {
+		for _, kvp := range r.Properties.Entries {
+			getExpressionDependencies(&deps, kvp.Value)
+		}
 	}
 	if r.DependsOn != nil {
 		for _, r := range r.DependsOn.Elements {
@@ -42,7 +44,9 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 	case *ast.InterpolateExpr:
 		for _, p := range x.Parts {
 			if p.Value != nil {
-				getExpressionDependencies(deps, &ast.SymbolExpr{Property: p.Value})
+				name := p.Value.Accessors[0].(*ast.PropertyName).Name
+				sx := ast.StringSyntax(syntax.StringSyntax(x.Syntax().Syntax(), name))
+				*deps = append(*deps, sx)
 			}
 		}
 	case *ast.SymbolExpr:

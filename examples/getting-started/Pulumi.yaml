@@ -3,6 +3,7 @@ runtime: yaml
 resources:
   my-bucket:
     type: aws:s3/bucket:Bucket
+    version: 4.37.1
     properties:
       website:
         indexDocument: index.html

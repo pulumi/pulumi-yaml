@@ -1,0 +1,14 @@
+name: stackreference-consumer
+runtime: yaml
+outputs:
+  referencedImageName:
+    Fn::StackReference:
+      # These are placeholders that our test environment replaces.
+      #
+      # If you're using this sample:
+      # * Your org will either be a username or org, such as "alice" or "pulumi".
+      # * Stack name is determined when you run "pulumi up" for the first time, such as "dev"
+      #
+      # So you might use "alice/infra-project-name/dev", as an example.
+      - PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
+      - imageName

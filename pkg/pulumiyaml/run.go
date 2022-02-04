@@ -331,13 +331,18 @@ func (r *runner) registerResources() syntax.Diagnostics {
 
 		// Read the properties and then evaluate them in case there are expressions contained inside.
 		props := make(map[string]interface{})
-		for _, kvp := range v.Properties.Entries {
-			vv, vdiags := r.evaluateExpr(kvp.Value)
-			diags.Extend(vdiags...)
-			if vdiags.HasErrors() {
-				return diags
+		if v.Properties != nil {
+			for _, kvp := range v.Properties.Entries {
+				vv, vdiags := r.evaluateExpr(kvp.Value)
+				diags.Extend(vdiags...)
+				if vdiags.HasErrors() {
+					return diags
+				}
+				props[kvp.Key.Value] = vv
 			}
-			props[kvp.Key.Value] = vv
+		} else {
+			// TODO: Make this a diagnostic warning?
+			// diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("resource %v passed has an empty properties value", kvp.Key.Value), ""))
 		}
 
 		var opts []pulumi.ResourceOption
@@ -437,6 +442,10 @@ func (r *runner) registerResources() syntax.Diagnostics {
 			return diags
 		}
 		r.resources[k] = state
+	}
+
+	if diags.HasErrors() {
+		return diags
 	}
 
 	return nil

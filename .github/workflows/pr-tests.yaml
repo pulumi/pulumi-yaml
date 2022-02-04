@@ -1,13 +1,15 @@
-name: Pull Request Validation
+name: Pull Request Dry Run Tests
 
 on:
   pull_request:
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'CHANGELOG_PENDING.md'
 
 jobs:
-  # TODO: change branch target to @main after updating
   lint:
-    uses: pulumi/pulumi-yaml/.github/workflows/stage-lint.yml@feature-ci
+    uses: pulumi/pulumi-yaml/.github/workflows/stage-lint.yml@main
   test:
-    uses: pulumi/pulumi-yaml/.github/workflows/stage-test.yml@feature-ci
+    uses: pulumi/pulumi-yaml/.github/workflows/stage-test.yml@main
     with:
       live-test: false
