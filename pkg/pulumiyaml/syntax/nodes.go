@@ -1,3 +1,5 @@
+// Copyright 2022, Pulumi Corporation.  All rights reserved.
+
 package syntax
 
 // A Node represents a single node in an object tree.
