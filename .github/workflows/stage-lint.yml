@@ -3,6 +3,11 @@ name: Lint
 on:
   workflow_call:
 
+permissions: read-all
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   lint:
     container: golangci/golangci-lint:latest
