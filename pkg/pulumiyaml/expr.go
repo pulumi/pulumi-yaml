@@ -42,7 +42,9 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 	case *ast.InterpolateExpr:
 		for _, p := range x.Parts {
 			if p.Value != nil {
-				getExpressionDependencies(deps, &ast.SymbolExpr{Property: p.Value})
+				name := p.Value.Accessors[0].(*ast.PropertyName).Name
+				sx := ast.StringSyntax(syntax.StringSyntax(x.Syntax().Syntax(), name))
+				*deps = append(*deps, sx)
 			}
 		}
 	case *ast.SymbolExpr:
