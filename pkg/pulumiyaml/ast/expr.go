@@ -556,20 +556,6 @@ func StackReference(stackName string, propertyName Expr) *StackReferenceExpr {
 	}
 }
 
-func isFunction(node *syntax.ObjectNode) bool {
-	if node.Len() != 1 {
-		return false
-	}
-
-	kvp := node.Index(0)
-
-	switch kvp.Key.Value() {
-	case "Ref", "Fn::GetAtt", "Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select", "Fn::Asset", "Fn::StackReference":
-		return true
-	}
-	return false
-}
-
 func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) {
 	if node.Len() != 1 {
 		return nil, nil, false

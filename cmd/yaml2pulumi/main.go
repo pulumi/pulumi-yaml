@@ -48,6 +48,7 @@ func generateCmd(name, friendlyName string, generate codegen.GenerateFunc) *cobr
 
 			defer func() {
 				if len(diags) != 0 {
+					//nolint:errcheck // in defer, lack a proper recourse for an error here.
 					template.NewDiagnosticWriter(os.Stderr, 0, true).WriteDiagnostics(diags)
 				}
 			}()

@@ -37,7 +37,7 @@ type TestOption interface {
 
 type requireLiveRun struct{}
 
-var RequireLiveRun requireLiveRun = requireLiveRun{}
+var RequireLiveRun = requireLiveRun{}
 
 func (o requireLiveRun) apply(options *testOptions) {
 	options.requireLiveRun = boolRef(true)
@@ -45,7 +45,7 @@ func (o requireLiveRun) apply(options *testOptions) {
 
 type noParallel struct{}
 
-var NoParallel noParallel = noParallel{}
+var NoParallel = noParallel{}
 
 func (o noParallel) apply(options *testOptions) {
 	options.programTestOptions = options.programTestOptions.With(integration.ProgramTestOptions{

@@ -222,7 +222,7 @@ func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 			if yamlNode.Tag == "!!int" {
 				yamlNode.Value = strconv.FormatInt(int64(n.Value()), 10)
 			} else {
-				yamlNode.Value = strconv.FormatFloat(float64(n.Value()), 'g', -1, 64)
+				yamlNode.Value = strconv.FormatFloat(n.Value(), 'g', -1, 64)
 			}
 		}
 	case *syntax.StringNode:

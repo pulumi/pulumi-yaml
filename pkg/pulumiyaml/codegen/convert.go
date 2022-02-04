@@ -33,7 +33,7 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[str
 	if err := parser.ParseFile(strings.NewReader(programText), "prorgram.pp"); err != nil {
 		return nil, diags, err
 	}
-	diags.Extend(parser.Diagnostics)
+	diags = diags.Extend(parser.Diagnostics)
 	if diags.HasErrors() {
 		return nil, diags, nil
 	}
@@ -47,7 +47,10 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[str
 		return nil, diags, fmt.Errorf("internal error: %w", pdiags)
 	}
 
-	ioutil.WriteFile("program.pp", []byte(programText), 0600)
+	err = ioutil.WriteFile("program.pp", []byte(programText), 0600)
+	if err != nil {
+		return nil, diags, err
+	}
 
 	files, gdiags, err := generate(program)
 	diags = diags.Extend(gdiags)

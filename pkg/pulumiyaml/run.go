@@ -837,7 +837,10 @@ func (r *runner) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (inter
 	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(n interface{}) (string, error) {
 		s, ok := n.(string)
 		if !ok {
-			diags.Extend(ast.ExprError(v.PropertyName, fmt.Sprintf("expected property name argument to Fn::StackReference to be a string, got %v", typeString(n)), ""))
+			diags.Extend(ast.ExprError(
+				v.PropertyName,
+				fmt.Sprintf("expected property name argument to Fn::StackReference to be a string, got %v", typeString(n)), ""),
+			)
 		}
 		// TODO: this could leak warnings
 		if diags.HasErrors() {
