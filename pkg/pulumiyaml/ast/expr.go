@@ -708,7 +708,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) == 2 {
+	if !ok || len(list.Elements) != 2 {
 		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Join must be a two-valued list", "")}
 	}
 
