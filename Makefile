@@ -17,12 +17,12 @@ ensure::
 
 build:: ensure
 	mkdir -p ./bin
-	go build -o ./bin -p 4 ./cmd/...
+	go build -o ./bin -p ${CONCURRENCY} ./cmd/...
 
 # Ensure that in tests, the language server is accessible
 test:: build
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  go test -v --timeout 10m -parallel ${CONCURRENCY} ./pkg/...
+	  go test -v --timeout 10m -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test
