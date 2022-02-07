@@ -76,7 +76,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// Ensure we're in the right directory so files, etc, are in the expected place.
 	// TODO: ignoring main for now until we figure out what this means.
 	if pwd := req.GetPwd(); pwd != "" {
-		os.Chdir(pwd)
+		err := os.Chdir(pwd)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	template, diags, err := pulumiyaml.Load()
@@ -86,7 +89,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
-		diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+		err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+		if err != nil {
+			return nil, err
+		}
 	}
 	if diags.HasErrors() {
 		return &pulumirpc.RunResponse{Error: "failed to load template"}, nil
@@ -111,7 +117,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, pulumiyaml.Run); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
-			diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+			err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+			if err != nil {
+				return nil, err
+			}
 			return &pulumirpc.RunResponse{Error: "failed to evaluate template"}, nil
 		}
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil

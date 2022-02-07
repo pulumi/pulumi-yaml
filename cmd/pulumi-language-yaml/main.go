@@ -68,7 +68,3 @@ func main() {
 		cmdutil.Exit(errors.Wrapf(err, "language host RPC stopped serving"))
 	}
 }
-
-func NewLanguageHost(engineAddress, tracing string) {
-	panic("unimplemented")
-}

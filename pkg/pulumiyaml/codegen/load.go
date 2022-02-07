@@ -90,7 +90,7 @@ func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAcc
 	}, diags
 }
 
-// importInterpolate imports a string interpolation. The call is converted to a template expression. If an envrionment map is
+// importInterpolate imports a string interpolation. The call is converted to a template expression. If an environment map is
 // provided, references to map elements are replaced with the corresponding elements.
 func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions *ast.ObjectExpr) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
@@ -462,6 +462,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	if resource.Provider != nil && resource.Provider.Value != "" {
 		resourceName := resource.Provider.Value
 		if resourceVar, ok := imp.resources[resourceName]; ok {
+			//nolint:ineffassign // TODO
 			optionItems = append(optionItems, &model.Attribute{
 				Name:  "provider",
 				Value: model.VariableReference(resourceVar),

@@ -18,7 +18,7 @@ jobs:
       - name: Lint
         # TODO: Enable linting after a cleanup commit.
         # Avoiding in this commit so as to not mix code changes w/ CI changes.
-        run: golangci-lint run || true
+        run: golangci-lint run
   check-copyright:
     runs-on: ubuntu-latest
     steps:
@@ -31,4 +31,4 @@ jobs:
       - name: Lint
         # TODO: Enable copyright checking after adding notices
         # Avoiding in this commit so as to not mix code changes w/ CI changes.
-        run: pulumictl copyright || true
+        run: pulumictl copyright

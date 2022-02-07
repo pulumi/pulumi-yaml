@@ -37,7 +37,11 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 	var visit func(name *ast.StringExpr) bool
 	visit = func(name *ast.StringExpr) bool {
 		if visiting[name.Value] {
-			diags.Extend(ast.ExprError(name, fmt.Sprintf("circular dependency of resource '%s' transitively on itself", name.Value), ""))
+			diags.Extend(ast.ExprError(
+				name,
+				fmt.Sprintf("circular dependency of resource '%s' transitively on itself", name.Value),
+				"",
+			))
 			return false
 		}
 		if !visited[name.Value] {

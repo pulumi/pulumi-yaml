@@ -3,11 +3,10 @@
 package tests
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/engine"
@@ -19,7 +18,7 @@ var awsConfig = StackConfig{map[string]string{
 	"aws:region": "us-east-1",
 }}
 
-var org string = os.Getenv("PULUMI_TEST_ORG")
+var org = os.Getenv("PULUMI_TEST_ORG")
 
 func exampleDir(dir string) string {
 	return filepath.Join("../../examples/", dir)
@@ -50,7 +49,7 @@ func TestExampleStackreference(t *testing.T) {
 			// TODO: Replace rewriting the file with config setting instead:
 			//
 			// See: https://github.com/pulumi/pulumi-yaml/issues/6#issuecomment-1028306579
-			filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+			err = filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 				if path == dir {
 					return nil
 				}
@@ -60,13 +59,25 @@ func TestExampleStackreference(t *testing.T) {
 				if info.Name() != "Pulumi.yaml" {
 					return nil
 				}
-				cmd := exec.Command("sed", "-i", fmt.Sprintf("s/PLACEHOLDER_ORG_NAME/%s/g", org), path)
-				cmd.Run()
-				cmd = exec.Command("sed", "-i", fmt.Sprintf("s/PLACEHOLDER_STACK_NAME/%s/g", sourceStackName), path)
-				cmd.Run()
+				bytes, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				template := string(bytes)
+				template = strings.Replace(template, "PLACEHOLDER_ORG_NAME", org, -1)
+				template = strings.Replace(template, "PLACEHOLDER_STACK_NAME", sourceStackName, -1)
+				// nolint:gosec // temporary file, no secrets, non-executable
+				err = os.WriteFile(path, []byte(template), 0644)
+				if err != nil {
+					return err
+				}
 
 				return nil
 			})
+
+			if err != nil {
+				return err
+			}
 
 			return nil
 		}},
