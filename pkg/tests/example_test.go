@@ -15,13 +15,18 @@ import (
 )
 
 var awsConfig = StackConfig{map[string]string{
-	"aws:region": "us-east-1",
+	"aws:region":        "us-east-1",
+	"aws-native:region": "us-east-1",
 }}
 
 var org = os.Getenv("PULUMI_TEST_ORG")
 
 func exampleDir(dir string) string {
 	return filepath.Join("../../examples/", dir)
+}
+
+func TestExampleAwsStaticWebsite(t *testing.T) {
+	testWrapper(t, exampleDir("aws-static-website"), RequireLiveRun, awsConfig)
 }
 
 func TestExampleGettingStarted(t *testing.T) {
