@@ -25,6 +25,10 @@ func exampleDir(dir string) string {
 	return filepath.Join("../../examples/", dir)
 }
 
+func TestRandom(t *testing.T) {
+	testWrapper(t, exampleDir("random"))
+}
+
 func TestExampleAwsStaticWebsite(t *testing.T) {
 	testWrapper(t, exampleDir("aws-static-website"), RequireLiveRun, awsConfig)
 }
