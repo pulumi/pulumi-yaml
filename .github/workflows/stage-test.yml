@@ -20,6 +20,11 @@ on:
       AWS_ACCESS_KEY_ID:     { required: false }
       AWS_SECRET_ACCESS_KEY: { required: false }
       AWS_CI_ROLE_ARN:       { required: false }
+      ARM_CLIENT_ID:         { required: false }
+      ARM_CLIENT_SECRET:     { required: false }
+      ARM_SUBSCRIPTION_ID:   { required: false }
+      ARM_TENANT_ID:         { required: false }
+
 
 env:
   PULUMI_LIVE_TEST: ${{ inputs.live-test }}
