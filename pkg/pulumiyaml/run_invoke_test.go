@@ -57,22 +57,22 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 			provider, id string) (string, resource.PropertyMap, error) {
 
 			switch typeToken {
-			case "test:resource:type":
-				assert.Equal(t, "test:resource:type", typeToken)
+			case testResourceToken:
+				assert.Equal(t, testResourceToken, typeToken)
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				}), state, "expected resource test:resource:type to have property foo: oof")
 				assert.Equal(t, "", provider)
 				assert.Equal(t, "", id)
 
-				return "someID", resource.PropertyMap{
+				return "not-tested-here", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
 				}, nil
-			case "test:component:type":
-				assert.Equal(t, "test:component:type", typeToken)
+			case testComponentToken:
+				assert.Equal(t, testComponentToken, typeToken)
 				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				})))
