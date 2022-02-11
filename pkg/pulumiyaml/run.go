@@ -810,6 +810,13 @@ func (r *runner) evaluateBuiltinAsset(v *ast.AssetExpr) (interface{}, syntax.Dia
 		return pulumi.NewStringAsset(v.Path.Value), nil
 	case "Remote":
 		return pulumi.NewRemoteAsset(v.Path.Value), nil
+	// Placeholder or permanent, TBD.
+	case "FileArchive":
+		return pulumi.NewFileArchive(v.Path.Value), nil
+	case "RemoteArchive":
+		return pulumi.NewRemoteArchive(v.Path.Value), nil
+	case "AssetArchive":
+		panic(fmt.Errorf("%s unimplemented", v.Kind.Value))
 	default:
 		panic(fmt.Errorf("unexpected Asset kind '%s'", v.Kind.Value))
 	}
