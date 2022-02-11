@@ -62,8 +62,7 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 			Kind:    string(workspace.ResourcePlugin),
 			Name:    pkg.Package,
 			Version: pkg.Version,
-			// TODO: Offer a way to specify this either globally or on a per-resource basis
-			Server: "",
+			Server:  pkg.PluginDownloadURL,
 		})
 	}
 	return &pulumirpc.GetRequiredPluginsResponse{

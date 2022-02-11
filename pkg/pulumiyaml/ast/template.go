@@ -250,6 +250,7 @@ type ResourceDecl struct {
 	Protect                 *BooleanExpr
 	Provider                *StringExpr
 	Version                 *StringExpr
+	PluginDownloadURL       *StringExpr
 }
 
 func (d *ResourceDecl) recordSyntax() *syntax.Node {
@@ -259,7 +260,7 @@ func (d *ResourceDecl) recordSyntax() *syntax.Node {
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr,
-	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr) *ResourceDecl {
+	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceDecl {
 
 	return &ResourceDecl{
 		declNode:                decl(node),
@@ -277,15 +278,16 @@ func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *Boolean
 		Protect:                 protect,
 		Provider:                provider,
 		Version:                 version,
+		PluginDownloadURL:       pluginDownloadURL,
 	}
 }
 
 func Resource(typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl, additionalSecretOutputs,
 	aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr, parent *StringExpr,
-	protect *BooleanExpr, provider *StringExpr, version *StringExpr) *ResourceDecl {
+	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceDecl {
 
-	return ResourceSyntax(nil, typ, component, properties, additionalSecretOutputs, aliases, customTimeouts, deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, version)
+	return ResourceSyntax(nil, typ, component, properties, additionalSecretOutputs, aliases, customTimeouts, deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, version, pluginDownloadURL)
 }
 
 type CustomTimeoutsDecl struct {
