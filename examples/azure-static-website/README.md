@@ -8,6 +8,12 @@ In addition to the Storage itself, a CDN is configured to serve files from the B
 
 ## Running the App
 
+1.  Install required plugins:
+
+    ```bash
+    $ pulumi plugin install resource azure-native 1.56.0
+    ```
+
 1.  Create a new stack:
 
     ```

@@ -17,6 +17,13 @@ To deploy your infrastructure, follow the below steps.
 
 ### Steps
 
+1.  Install required plugins:
+
+    ```bash
+    $ pulumi plugin install resource azure-native 1.56.0
+    $ pulumi plugin install resource random 4.3.1
+    ```
+
 1.  Create a new stack:
 
     ```

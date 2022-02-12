@@ -8,7 +8,6 @@ configuration:
 resources:
   appservicegroup:
     type: azure-native:resources:ResourceGroup
-    version: 1.54.0
   sa:
     type: azure-native:storage:StorageAccount
     properties:
@@ -47,7 +46,6 @@ resources:
       kind: web
   sqlPassword:
     type: random:index/randomPassword:RandomPassword
-    version: 4.3.1
     properties:
       length: 16
       special: true
