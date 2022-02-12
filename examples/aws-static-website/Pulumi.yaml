@@ -4,13 +4,11 @@ description: A static website hosted on AWS S3
 resources:
   site-bucket:
     type: aws-native:s3:Bucket
-    version: 0.11.0
     properties:
       websiteConfiguration:
         indexDocument: index.html
   index.html:
     type: aws:s3/bucketObject:BucketObject
-    version: 4.37.1
     properties:
       bucket: ${site-bucket}
       source:

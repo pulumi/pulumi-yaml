@@ -14,6 +14,13 @@ available in AWS's Cloud Control API.
 Note: some values in this example will be different from run to run.  These values are indicated
 with `***`.
 
+1.  Install required plugins:
+
+    ```bash
+    $ pulumi plugin install resource aws 4.37.3
+    $ pulumi plugin install resource aws-native 0.11.0
+    ```
+
 1.  Create a new stack:
 
     ```bash
