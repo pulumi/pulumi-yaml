@@ -4,7 +4,6 @@ package codegen
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -45,11 +44,6 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[str
 	}
 	if pdiags.HasErrors() {
 		return nil, diags, fmt.Errorf("internal error: %w", pdiags)
-	}
-
-	err = ioutil.WriteFile("program.pp", []byte(programText), 0600)
-	if err != nil {
-		return nil, diags, err
 	}
 
 	files, gdiags, err := generate(program)
