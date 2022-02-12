@@ -727,7 +727,7 @@ func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.D
 		return retv, diags
 	}
 
-	// Determine if this is a prompt value by checking if there are any dependencies
+	// TODO[pulumi/pulumi-yaml#14]: Use dynamic Output-or-not information to decide whether the lift the invoke
 	var deps []*ast.StringExpr
 	getExpressionDependencies(&deps, t.CallArgs)
 
@@ -830,12 +830,12 @@ func (r *runner) evaluateBuiltinAsset(v *ast.AssetExpr) (interface{}, syntax.Dia
 		return pulumi.NewStringAsset(v.Path.Value), nil
 	case "Remote":
 		return pulumi.NewRemoteAsset(v.Path.Value), nil
-	// Placeholder or permanent, TBD.
 	case "FileArchive":
 		return pulumi.NewFileArchive(v.Path.Value), nil
 	case "RemoteArchive":
 		return pulumi.NewRemoteArchive(v.Path.Value), nil
 	case "AssetArchive":
+		// TODO[pulumi/pulumi-yaml#53]: Implement Fn::Archive or support all variants as args to Fn::Asset
 		panic(fmt.Errorf("%s unimplemented", v.Kind.Value))
 	default:
 		panic(fmt.Errorf("unexpected Asset kind '%s'", v.Kind.Value))
