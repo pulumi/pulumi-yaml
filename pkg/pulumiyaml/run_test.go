@@ -15,6 +15,9 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
+const testComponentToken = "test:component:type"
+const testResourceToken = "test:resource:type"
+
 type testMonitor struct {
 	CallF        func(tok string, args resource.PropertyMap, provider string) (resource.PropertyMap, error)
 	NewResourceF func(typeToken, name string, inputs resource.PropertyMap,
@@ -41,8 +44,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			provider, id string) (string, resource.PropertyMap, error) {
 
 			switch typeToken {
-			case "test:resource:type":
-				assert.Equal(t, "test:resource:type", typeToken)
+			case testResourceToken:
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				}), state, "expected resource test:resource:type to have property foo: oof")
@@ -55,8 +57,8 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
 				}, nil
-			case "test:component:type":
-				assert.Equal(t, "test:component:type", typeToken)
+			case testComponentToken:
+				assert.Equal(t, testComponentToken, typeToken)
 				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				})))
@@ -93,14 +95,14 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 			provider, id string) (string, resource.PropertyMap, error) {
 
 			switch typeToken {
-			case "test:resource:type":
+			case testResourceToken:
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
 				}, nil
-			case "test:component:type":
+			case testComponentToken:
 				return "", resource.PropertyMap{}, nil
 			}
 			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
@@ -275,7 +277,7 @@ func TestSelect(t *testing.T) {
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
-				Type: "test:resource:type",
+				Type: testResourceToken,
 				Properties: map[string]interface{}{
 					"foo": "oof",
 				},
@@ -307,7 +309,7 @@ func TestSub(t *testing.T) {
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
-				Type: "test:resource:type",
+				Type: testResourceToken,
 				Properties: map[string]interface{}{
 					"foo": "oof",
 				},
@@ -331,13 +333,13 @@ func TestRef(t *testing.T) {
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
-				Type: "test:resource:type",
+				Type: testResourceToken,
 				Properties: map[string]interface{}{
 					"foo": "oof",
 				},
 			},
 			"compA": {
-				Type: "test:component:type",
+				Type: testComponentToken,
 				Properties: map[string]interface{}{
 					"foo": "oof",
 				},

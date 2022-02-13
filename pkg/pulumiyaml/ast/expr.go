@@ -791,8 +791,8 @@ func parseAsset(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syn
 	kind, ok := kvp.Key.(*StringExpr)
 	if !ok {
 		diags.Extend(ExprError(kvp.Key, "the asset kind must be a string literal", ""))
-	} else if kind.Value != "File" && kind.Value != "String" && kind.Value != "Remote" {
-		diags.Extend(ExprError(kvp.Key, "the asset kind must be one of 'File', 'String', or 'Remote'", ""))
+	} else if kind.Value != "File" && kind.Value != "String" && kind.Value != "Remote" && kind.Value != "FileArchive" && kind.Value != "RemoteArchive" {
+		diags.Extend(ExprError(kvp.Key, "the asset kind must be one of 'File', 'String', 'Remote', 'FileArchive', or 'RemoteArchive'", ""))
 	}
 
 	path, ok := kvp.Value.(*StringExpr)
