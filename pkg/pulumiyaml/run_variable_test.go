@@ -14,6 +14,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test that a variable can be prior to any resource in the topological sort:
+//
+//  1. Resource `res-a` depends on variable `someVar`
+//  2. Variable `someVar` has no dependencies
+func TestVariableInput(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: tuo
+      Return: retval
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: ${someVar}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
+// Test that a variable can be between two resources in the topological sort:
+//
+//  1. Resource `res-b` depends on variable `someVar`
+//  2. Variable `someVar` depends on resource `res-a`
+//  3. `res-a` has no dependencies
 func TestVariableIntermediate(t *testing.T) {
 	const text = `
 name: test-yaml
@@ -34,6 +66,35 @@ resources:
     type: test:resource:type
     properties:
       foo: ${someVar}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
+// Test that a variable with can be after every resource in the topological sort:
+//
+//  1. Variable `someVar` depends on resource `res-a`
+//  1. Resource `res-a` depends on nothing
+func TestVariableOutput(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: ${res-a.out}
+      Return: retval
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+outputs:
+  out: ${someVar}
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
