@@ -16,9 +16,7 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 		}
 	}
 	if r.DependsOn != nil {
-		for _, r := range r.DependsOn.Elements {
-			deps = append(deps, r)
-		}
+		deps = append(deps, r.DependsOn.Elements...)
 	}
 	if r.Provider != nil && r.Provider.Value != "" {
 		deps = append(deps, r.Provider)
@@ -26,6 +24,13 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 	if r.Parent != nil && r.Parent.Value != "" {
 		deps = append(deps, r.Parent)
 	}
+	return deps
+}
+
+// GetVariableDependencies gets the full set of implicit and explicit dependencies for a Variable.
+func GetVariableDependencies(e *ast.VariablesMapEntry) []*ast.StringExpr {
+	var deps []*ast.StringExpr
+	getExpressionDependencies(&deps, e.Value)
 	return deps
 }
 
@@ -59,5 +64,6 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		*deps = append(*deps, x.ResourceName)
 	case ast.BuiltinExpr:
 		getExpressionDependencies(deps, x.Args())
+
 	}
 }

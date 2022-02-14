@@ -151,6 +151,7 @@ type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
 	config    map[string]interface{}
+	variables map[string]ast.Expr
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 }
@@ -233,6 +234,7 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 		ctx:       ctx,
 		t:         t,
 		config:    make(map[string]interface{}),
+		variables: make(map[string]ast.Expr),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 	}
@@ -323,6 +325,12 @@ func (r *runner) registerResources() syntax.Diagnostics {
 	resources, rdiags := topologicallySortedResources(r.t)
 	if rdiags.HasErrors() {
 		return rdiags
+	}
+
+	if r.t.Variables != nil {
+		for _, v := range r.t.Variables.Entries {
+			r.variables[v.Key.Value] = *v.Value
+		}
 	}
 
 	var diags syntax.Diagnostics
@@ -615,6 +623,8 @@ func (r *runner) evaluateInterpolations(x *ast.InterpolateExpr, diags syntax.Dia
 func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, subs map[string]interface{}) (interface{}, syntax.Diagnostics) {
 	resourceName := access.Accessors[0].(*ast.PropertyName).Name
 
+	var diags syntax.Diagnostics
+
 	var receiver interface{}
 	if res, ok := r.resources[resourceName]; ok {
 		if len(access.Accessors) == 1 {
@@ -623,15 +633,23 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 		receiver = res.GetOutputs()
 	} else if p, ok := r.config[resourceName]; ok {
 		receiver = p
+	} else if v, ok := r.variables[resourceName]; ok {
+		value, d := r.evaluateExpr(v)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+		diags.Extend(d...)
+		receiver = value
 	} else if s, ok := subs[resourceName]; ok {
 		receiver = s
 	} else {
-		return nil, syntax.Diagnostics{ast.ExprError(x, fmt.Sprintf("resource named %s could not be found", resourceName), "")}
+		return nil, syntax.Diagnostics{ast.ExprError(x, fmt.Sprintf("resource or variable named %s could not be found", resourceName), "")}
 	}
 
 	v, err := r.evaluateAccess(receiver, access.Accessors[1:])
 	if err != nil {
-		return nil, syntax.Diagnostics{ast.ExprError(x, err.Error(), "")}
+		diags.Extend(ast.ExprError(x, err.Error(), ""))
+		return nil, diags
 	}
 	return v, nil
 }
@@ -682,6 +700,10 @@ func (r *runner) evaluateBuiltinRef(v *ast.RefExpr) (interface{}, syntax.Diagnos
 	res, ok := r.resources[v.ResourceName.Value]
 	if ok {
 		return res.CustomResource().ID().ToStringOutput(), nil
+	}
+	x, ok := r.variables[v.ResourceName.Value]
+	if ok {
+		return x, nil
 	}
 	p, ok := r.config[v.ResourceName.Value]
 	if ok {

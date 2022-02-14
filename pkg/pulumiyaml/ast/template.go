@@ -112,6 +112,51 @@ func (d *ConfigMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics 
 	return diags
 }
 
+type VariablesMapEntry struct {
+	syntax syntax.ObjectPropertyDef
+	Key    *StringExpr
+	Value  Expr
+}
+
+type VariablesMapDecl struct {
+	declNode
+
+	Entries []VariablesMapEntry
+}
+
+func (d *VariablesMapDecl) GetEntries() []VariablesMapEntry {
+	if d == nil {
+		return nil
+	}
+	return d.Entries
+}
+
+func (d *VariablesMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
+	obj, ok := node.(*syntax.ObjectNode)
+	if !ok {
+		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", name), "")}
+	}
+
+	var diags syntax.Diagnostics
+
+	entries := make([]VariablesMapEntry, obj.Len(), obj.Len())
+	for i := range entries {
+		kvp := obj.Index(i)
+
+		v, vdiags := ParseExpr(kvp.Value)
+		diags.Extend(vdiags...)
+
+		entries[i] = VariablesMapEntry{
+			syntax: kvp,
+			Key:    StringSyntax(kvp.Key),
+			Value:  v,
+		}
+	}
+	d.Entries = entries
+
+	return diags
+}
+
 type ResourcesMapEntry struct {
 	syntax syntax.ObjectPropertyDef
 	Key    *StringExpr
@@ -157,6 +202,65 @@ func (d *ResourcesMapDecl) parse(name string, node syntax.Node) syntax.Diagnosti
 	d.Entries = entries
 
 	return diags
+}
+
+type Intermediate struct {
+	IntermediateEntry
+}
+
+type IntermediateEntry interface {
+	Visit(v IntermediateVisitor)
+}
+
+type IntermediateVisitor struct {
+	VisitResource func(*ResourcesMapEntry)
+	VisitVariable func(*VariablesMapEntry)
+	VisitConfig   func(*ConfigMapEntry)
+}
+
+func (e *ResourcesMapEntry) Visit(v IntermediateVisitor) {
+	v.VisitResource(e)
+}
+
+func (e *VariablesMapEntry) Visit(v IntermediateVisitor) {
+	v.VisitVariable(e)
+}
+
+func (e *ConfigMapEntry) Visit(v IntermediateVisitor) {
+	v.VisitConfig(e)
+}
+
+type IntermediateKind string
+
+const (
+	IntermediateResource IntermediateKind = "resource"
+	IntermediateVariable IntermediateKind = "variable"
+	IntermediateConfig   IntermediateKind = "config"
+)
+
+type IntermediateExtensions interface {
+	Kind() IntermediateKind
+	Key() *StringExpr
+}
+
+func (e Intermediate) Kind() IntermediateKind {
+	var kind IntermediateKind
+	e.Visit(IntermediateVisitor{
+		VisitResource: func(_ *ResourcesMapEntry) { kind = IntermediateResource },
+		VisitVariable: func(_ *VariablesMapEntry) { kind = IntermediateVariable },
+		VisitConfig:   func(_ *ConfigMapEntry) { kind = IntermediateConfig },
+	})
+	return kind
+}
+
+func (e Intermediate) Key() *StringExpr {
+	var name *StringExpr
+	e.Visit(IntermediateVisitor{
+		VisitResource: func(x *ResourcesMapEntry) { name = x.Key },
+		VisitVariable: func(x *VariablesMapEntry) { name = x.Key },
+		VisitConfig:   func(x *ConfigMapEntry) { name = x.Key },
+	})
+	return name
 }
 
 type PropertyMapEntry struct {
@@ -323,6 +427,7 @@ type TemplateDecl struct {
 
 	Description   *StringExpr
 	Configuration *ConfigMapDecl
+	Variables     *VariablesMapDecl
 	Resources     *ResourcesMapDecl
 	Outputs       *PropertyMapDecl
 }
@@ -348,21 +453,22 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 }
 
 func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration *ConfigMapDecl,
-	resources *ResourcesMapDecl, outputs *PropertyMapDecl) *TemplateDecl {
+	variables *VariablesMapDecl, resources *ResourcesMapDecl, outputs *PropertyMapDecl) *TemplateDecl {
 
 	return &TemplateDecl{
 		syntax:        node,
 		Description:   description,
 		Configuration: configuration,
+		Variables:     variables,
 		Resources:     resources,
 		Outputs:       outputs,
 	}
 }
 
-func Template(description *StringExpr, configuration *ConfigMapDecl, resources *ResourcesMapDecl,
+func Template(description *StringExpr, configuration *ConfigMapDecl, variables *VariablesMapDecl, resources *ResourcesMapDecl,
 	outputs *PropertyMapDecl) *TemplateDecl {
 
-	return TemplateSyntax(nil, description, configuration, resources, outputs)
+	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
 
 // ParseTemplate parses a template from the given syntax node. The source text is optional, and is only used to print
