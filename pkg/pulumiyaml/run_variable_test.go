@@ -73,6 +73,45 @@ resources:
 	requireNoErrors(t, diags)
 }
 
+// Test that a variable can be between two resources in the topological sort:
+//
+//  1. Resource `res-b` depends on variable `someVar`
+//  2. Variable `someVar` depends on variable `passthrough`
+//  2. Variable `passthrough` depends on resource `res-a`
+//  3. `res-a` has no dependencies
+func TestVariableDoubleIntermediate(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  passthrough:
+    Fn::Invoke:
+      Function: test:invoke-passthrough:type
+      Arguments:
+        returnValue: ${res-a.out}
+      Return: returnValue
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: ${passthrough}
+      Return: retval
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  res-b:
+    type: test:resource:type
+    properties:
+      foo: ${someVar}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
 // Test that a variable with can be after every resource in the topological sort:
 //
 //  1. Variable `someVar` depends on resource `res-a`
@@ -139,6 +178,9 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	mocks := &testMonitor{
 		CallF: func(token string, args resource.PropertyMap, provider string) (resource.PropertyMap, error) {
 			switch token {
+			case "test:invoke-passthrough:type":
+				// returns the same shape as the arguments
+				return args, nil
 			case "test:invoke:type":
 				testInvokeCalls++
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
