@@ -41,6 +41,37 @@ resources:
 	requireNoErrors(t, diags)
 }
 
+func TestVariableMemozied(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: ${res-a.out}
+      Return: retval
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  res-b:
+    type: test:resource:type
+    properties:
+      foo: ${someVar}
+  res-c:
+    type: test:resource:type
+    properties:
+      foo: ${someVar}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
 func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	testInvokeCalls := 0
 

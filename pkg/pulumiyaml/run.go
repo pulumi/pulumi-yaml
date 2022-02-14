@@ -151,9 +151,15 @@ type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
 	config    map[string]interface{}
-	variables map[string]ast.Expr
+	variables map[string]*memoizedVariable
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
+}
+
+type memoizedVariable struct {
+	expr     *ast.Expr
+	value    interface{}
+	evaluted bool
 }
 
 // lateboundResource is an interface shared by lateboundCustomResourceState and
@@ -234,7 +240,7 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 		ctx:       ctx,
 		t:         t,
 		config:    make(map[string]interface{}),
-		variables: make(map[string]ast.Expr),
+		variables: make(map[string]*memoizedVariable),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 	}
@@ -329,7 +335,11 @@ func (r *runner) registerResources() syntax.Diagnostics {
 
 	if r.t.Variables != nil {
 		for _, v := range r.t.Variables.Entries {
-			r.variables[v.Key.Value] = *v.Value
+			r.variables[v.Key.Value] = &memoizedVariable{
+				expr:     &v.Value,
+				value:    nil,
+				evaluted: false,
+			}
 		}
 	}
 
@@ -634,12 +644,7 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 	} else if p, ok := r.config[resourceName]; ok {
 		receiver = p
 	} else if v, ok := r.variables[resourceName]; ok {
-		value, d := r.evaluateExpr(v)
-		if diags.HasErrors() {
-			return nil, diags
-		}
-		diags.Extend(d...)
-		receiver = value
+		receiver = r.evaluateMemoizedVariable(v, diags)
 	} else if s, ok := subs[resourceName]; ok {
 		receiver = s
 	} else {
@@ -652,6 +657,19 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 		return nil, diags
 	}
 	return v, nil
+}
+
+func (r *runner) evaluateMemoizedVariable(v *memoizedVariable, diags syntax.Diagnostics) interface{} {
+	if v.evaluted {
+		return v.value
+	}
+
+	value, d := r.evaluateExpr(*v.expr)
+	diags.Extend(d...)
+	v.evaluted = true
+	v.value = value
+
+	return value
 }
 
 func (r *runner) evaluateAccess(receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, error) {
