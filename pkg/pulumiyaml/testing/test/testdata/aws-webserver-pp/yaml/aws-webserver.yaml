@@ -1,0 +1,41 @@
+resources:
+    securityGroup:
+        type: aws:ec2:SecurityGroup
+        properties:
+            ingress:
+                - cidrBlocks:
+                    - 0.0.0.0/0
+                  fromPort: "0"
+                  protocol: tcp
+                  toPort: "0"
+    server:
+        type: aws:ec2:Instance
+        properties:
+            ami: ${ami.id}
+            instanceType: t2.micro
+            securityGroups:
+                - ${securityGroup.name}
+            tags:
+                Name: web-server-www
+            userData: |
+                #!/bin/bash
+                echo "Hello, World!" > index.html
+                nohup python -m SimpleHTTPServer 80 &
+outputs:
+    publicHostName: ${server.publicDns}
+    publicIp: ${server.publicIp}
+variables:
+    ami:
+        Fn::Invoke:
+            Arguments:
+                ? |-
+                    // Amazon
+                    	mostRecent
+                : "true"
+                filters:
+                    - name: name
+                      values:
+                        - amzn-ami-hvm-*-x86_64-ebs
+                owners:
+                    - "137112412989"
+            Function: aws::getAmi

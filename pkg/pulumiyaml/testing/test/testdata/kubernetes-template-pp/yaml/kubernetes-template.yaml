@@ -1,0 +1,24 @@
+resources:
+    argocd_serverDeployment:
+        type: kubernetes:apps/v1:Deployment
+        properties:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+                name: argocd-server
+            spec:
+                replicas: "1"
+                selector:
+                    matchLabels:
+                        app: server
+                template:
+                    metadata:
+                        labels:
+                            app: server
+                    spec:
+                        containers:
+                            - image: nginx
+                              name: nginx
+                              readinessProbe:
+                                httpGet:
+                                    port: "8080"

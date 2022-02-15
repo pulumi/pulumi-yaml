@@ -1,0 +1,42 @@
+resources:
+    aws_vpc:
+        type: aws:ec2:Vpc
+        properties:
+            cidrBlock: 10.0.0.0/16
+            instanceTenancy: default
+    bar:
+        type: aws:ec2:NetworkAcl
+        properties:
+            vpcId: ${aws_vpc.id}
+    privateS3NetworkAclRule:
+        type: aws:ec2:NetworkAclRule
+        properties:
+            cidrBlock: ${privateS3PrefixList.cidrBlocks[0]}
+            egress: "false"
+            fromPort: "443"
+            networkAclId: ${bar.id}
+            protocol: tcp
+            ruleAction: allow
+            ruleNumber: "200"
+            toPort: "443"
+    privateS3VpcEndpoint:
+        type: aws:ec2:VpcEndpoint
+        properties:
+            serviceName: com.amazonaws.us-west-2.s3
+            vpcId: ${aws_vpc.id}
+variables:
+    amis:
+        Fn::Invoke:
+            Arguments:
+                filters:
+                    - name: ${bar.id}
+                      values:
+                        - pulumi*
+                owners:
+                    - ${bar.id}
+            Function: aws:ec2:getAmiIds
+    privateS3PrefixList:
+        Fn::Invoke:
+            Arguments:
+                prefixListId: ${privateS3VpcEndpoint.prefixListId}
+            Function: aws:ec2:getPrefixList

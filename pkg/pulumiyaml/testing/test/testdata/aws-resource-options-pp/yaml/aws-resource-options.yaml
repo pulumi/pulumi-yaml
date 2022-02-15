@@ -1,0 +1,8 @@
+resources:
+    bucket1:
+        type: aws:s3:Bucket
+        provider: ${provider}
+    provider:
+        type: pulumi:providers:aws
+        properties:
+            region: us-west-2

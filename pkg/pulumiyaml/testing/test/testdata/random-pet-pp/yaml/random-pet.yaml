@@ -1,0 +1,5 @@
+resources:
+    random-pet:
+        type: random::RandomPet
+        properties:
+            prefix: doggo

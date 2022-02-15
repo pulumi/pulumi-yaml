@@ -1,0 +1,19 @@
+resources:
+    example:
+        type: aws:iam:Policy
+        properties:
+            name: example_policy
+            path: /
+            policy: ${policyDocument.json}
+variables:
+    policyDocument:
+        Fn::Invoke:
+            Arguments:
+                statements:
+                    - actions:
+                        - s3:ListAllMyBuckets
+                        - s3:GetBucketLocation
+                      resources:
+                        - arn:aws:s3:::*
+                      sid: "1"
+            Function: aws:iam:getPolicyDocument
