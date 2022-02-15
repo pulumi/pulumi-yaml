@@ -1,0 +1,69 @@
+{
+  "Configuration": {
+    "InstanceType": {
+      "type": "String",
+      "default": "t3.micro",
+      "allowedValues": ["t3.micro", "t3.small", "m4.large"],
+      "description": "Enter t3.micro, t3.small, or m4.large. Default is t3.micro."
+    }
+  },
+  "Resources": {
+    "WebSecGrp": {
+      "Type": "aws:ec2/securityGroup:SecurityGroup",
+      "Version": "4.37.1",
+      "Properties": {
+        "ingress": [
+          {
+            "protocol": "tcp",
+            "fromPort": 80,
+            "toPort": 80,
+            "cidrBlocks": ["0.0.0.0/0"]
+          }
+        ]
+      }
+    },
+    "WebServer": {
+      "Type": "aws:ec2/instance:Instance",
+      "Properties": {
+        "instanceType": "${InstanceType}",
+        "ami": {
+          "Fn::Invoke": {
+            "Function": "aws:index/getAmi:getAmi",
+            "Arguments": {
+              "filters": [
+                { "name": "name", "values": ["amzn-ami-hvm-*-x86_64-ebs"] }
+              ],
+              "owners": ["137112412989"],
+              "mostRecent": true
+            },
+            "Return": "id"
+          }
+        },
+        "userData": {
+          "Fn::Join": [
+            "\n",
+            [
+              "#!/bin/bash",
+              {
+                "Fn::Sub": "echo 'Hello, World from ${WebSecGrp.arn}!' > index.html"
+              },
+              "nohup python -m SimpleHTTPServer 80 &"
+            ]
+          ]
+        },
+        "vpcSecurityGroupIds": [{ "Ref": "WebSecGrp" }]
+      }
+    }
+  },
+  "Outputs": {
+    "InstanceId": {
+      "Ref": "WebServer"
+    },
+    "PublicIp": {
+      "Fn::GetAtt": ["WebServer", "publicIp"]
+    },
+    "PublicHostName": {
+      "Fn::GetAtt": ["WebServer", "publicDns"]
+    }
+  }
+}
