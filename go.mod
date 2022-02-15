@@ -8,9 +8,8 @@ require (
 	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hexops/autogold v1.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.23.2
-	github.com/pulumi/pulumi/sdk v1.14.1
-	github.com/pulumi/pulumi/sdk/v3 v3.23.2
+	github.com/pulumi/pulumi/pkg/v3 v3.24.2-0.20220207111004-a1e18dae4dc0
+	github.com/pulumi/pulumi/sdk/v3 v3.24.2-0.20220207111004-a1e18dae4dc0
 	github.com/spf13/cast v1.4.1
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
@@ -59,7 +58,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.6.2 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.2+incompatible // indirect
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
-	github.com/gofrs/flock v0.7.1 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
@@ -155,7 +153,3 @@ require (
 	mvdan.cc/gofumpt v0.1.0 // indirect
 	sourcegraph.com/sourcegraph/appdash v0.0.0-20211028080628-e2786a622600 // indirect
 )
-
-replace github.com/pulumi/pulumi/pkg/v3 => github.com/pulumi/pulumi/pkg/v3 v3.23.3-0.20220203202701-5bf427507c9f
-
-replace github.com/pulumi/pulumi/sdk/v3 => github.com/pulumi/pulumi/sdk/v3 v3.23.3-0.20220203202701-5bf427507c9f
