@@ -27,6 +27,6 @@ outputs:
 variables:
     resourceGroupVar:
         Fn::Invoke:
-            Function: azure:core:getResourceGroup
             Arguments:
                 name: ${resourceGroupNameParam}
+            Function: azure:core:getResourceGroup

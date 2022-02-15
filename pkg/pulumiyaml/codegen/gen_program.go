@@ -13,6 +13,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
@@ -30,8 +31,7 @@ func GenerateProgram(p *pcl.Program) (map[string][]byte, hcl.Diagnostics, error)
 
 // Generate a serializable YAML template.
 func GenerateTemplate(program *pcl.Program) (pulumiyaml.Template, hcl.Diagnostics, error) {
-	// This is not strictly necessary, but will lead to more human seeming generated code.
-	nodes := pcl.Linearize(program)
+	nodes := program.Nodes
 	g := generator{}
 
 	for _, n := range nodes {
@@ -45,6 +45,35 @@ type generator struct {
 	result pulumiyaml.Template
 	diags  hcl.Diagnostics
 	errs   multierror.Error
+}
+
+type yamlLimitationKind string
+
+var (
+	Splat    yamlLimitationKind = "splat"
+	ToJSON   yamlLimitationKind = "toJSON"
+	toBase64 yamlLimitationKind = "toBase64"
+)
+
+func (y yamlLimitationKind) Summary() string {
+	return fmt.Sprintf("Failed to generate YAML program. Missing %s", string(y))
+}
+
+func (g *generator) yamlLimitation(kind yamlLimitationKind) {
+	if g.diags == nil {
+		g.diags = hcl.Diagnostics{}
+	}
+	g.diags = g.diags.Append(&hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  kind.Summary(),
+	})
+}
+
+func (g *generator) missingSchema() {
+	g.diags.Append(&hcl.Diagnostic{
+		Severity: hcl.DiagWarning,
+		Summary:  "Could not get schema. This might lead to inacurate generation",
+	})
 }
 
 func (g *generator) genNode(n pcl.Node) {
@@ -65,12 +94,27 @@ func (g *generator) genNode(n pcl.Node) {
 func (g *generator) genResource(n *pcl.Resource) {
 	var provider, version, parent string
 	if opts := n.Options; opts != nil {
-		provider = g.expr(opts.Provider).(string)
-		parent = g.expr(opts.Parent).(string)
+		if p, ok := g.expr(opts.Provider).(string); ok {
+			provider = p
+		}
+		if p, ok := g.expr(opts.Parent).(string); ok {
+			parent = p
+		}
 	}
 	properties := map[string]interface{}{}
+	var additionalSecrets []string
 	for _, input := range n.Inputs {
-		properties[input.Name] = g.expr(input.Value)
+		value := input.Value
+		if f, ok := value.(*model.FunctionCallExpression); ok && f.Name == "secret" {
+			contract.Assert(len(f.Args) == 1)
+			additionalSecrets = append(additionalSecrets, input.Name)
+			value = f.Args[0]
+		}
+		properties[input.Name] = g.expr(value)
+	}
+	if n.Schema == nil {
+		g.missingSchema()
+		n.Schema = &schema.Resource{}
 	}
 	r := &pulumiyaml.Resource{
 		Type:                    n.Token,
@@ -120,10 +164,16 @@ func (g *generator) expr(e model.Expression) interface{} {
 				f, _ := v.Float64()
 				return f
 			}
+		case model.NoneType:
+			return nil
+		default:
+			r := strings.TrimSpace(fmt.Sprintf("%v", e))
+			return r
 		}
-		return fmt.Sprintf("%.v", e.Value)
 	case *model.FunctionCallExpression:
 		return g.function(e)
+	case *model.RelativeTraversalExpression:
+		return "${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}"
 	case *model.ScopeTraversalExpression:
 		return "${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}"
 	case *model.TemplateExpression:
@@ -136,8 +186,26 @@ func (g *generator) expr(e model.Expression) interface{} {
 			}
 		}
 		return s
+	case *model.TupleConsExpression:
+		ls := make([]interface{}, len(e.Expressions))
+		for i, e := range e.Expressions {
+			ls[i] = g.expr(e)
+		}
+		return ls
+	case *model.ObjectConsExpression:
+		obj := map[string]interface{}{}
+		for _, e := range e.Items {
+			key := strings.TrimSpace(fmt.Sprintf("%#v", e.Key))
+			obj[key] = g.expr(e.Value)
+		}
+		return obj
+	case *model.SplatExpression:
+		g.yamlLimitation(Splat)
+		return nil
+	case nil:
+		return nil
 	default:
-		panic(fmt.Sprintf("Unimplimented: %T", e))
+		panic(fmt.Sprintf("Unimplimented: %[1]T. Needed for %[1]v", e))
 	}
 }
 
@@ -174,27 +242,45 @@ func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
 }
 
 func (g *generator) function(f *model.FunctionCallExpression) interface{} {
-	if f.Name != "invoke" {
-		panic("Can only handle invokes")
-	}
-	contract.Assert(len(f.Args) > 0)
-	name := g.expr(f.Args[0]).(string)
-	arguments := map[string]interface{}{}
-	if len(f.Args) > 1 {
-		args := f.Args[1].(*model.ObjectConsExpression)
-		for _, e := range args.Items {
-			key := strings.TrimSpace(fmt.Sprintf("%#v", e.Key))
-			arguments[key] = g.expr(e.Value)
+	fn := func(name string, body interface{}) map[string]interface{} {
+		return map[string]interface{}{
+			"Fn::" + name: body,
 		}
-	} else {
-		arguments = nil
 	}
-	return map[string]struct {
-		Function  string                 `yaml:"Function"`
-		Arguments map[string]interface{} `yaml:"Arguments,omitempty", json:"Arguments,omitempty"`
-	}{"Fn::Invoke": {
-		name,
-		arguments,
-	}}
-
+	switch f.Name {
+	case pcl.Invoke:
+		contract.Assert(len(f.Args) > 0)
+		name := g.expr(f.Args[0]).(string)
+		arguments := map[string]interface{}{}
+		if len(f.Args) > 1 {
+			_, ok := f.Args[1].(*model.ObjectConsExpression)
+			contract.Assert(ok)
+			arguments = g.expr(f.Args[1]).(map[string]interface{})
+		} else {
+			arguments = nil
+		}
+		return fn("Invoke",
+			map[string]interface{}{
+				"Function":  name,
+				"Arguments": arguments,
+			})
+	case "fileAsset":
+		return fn("Asset", map[string]interface{}{
+			"File": g.expr(f.Args[0]),
+		})
+	case "join":
+		var args []interface{}
+		for _, arg := range f.Args {
+			args = append(args, g.expr(arg))
+		}
+		return fn("Join", args)
+	case "toJSON":
+		g.yamlLimitation(ToJSON)
+		return nil
+	case "toBase64":
+		g.yamlLimitation(toBase64)
+		return nil
+	default:
+		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
+	}
 }
