@@ -9,7 +9,6 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/pkg/v3 v3.23.2
-	github.com/pulumi/pulumi/sdk v1.14.1
 	github.com/pulumi/pulumi/sdk/v3 v3.23.2
 	github.com/spf13/cast v1.4.1
 	github.com/spf13/cobra v1.3.0
@@ -59,7 +58,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.6.2 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.2+incompatible // indirect
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect
-	github.com/gofrs/flock v0.7.1 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
