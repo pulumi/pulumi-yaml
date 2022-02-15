@@ -44,8 +44,6 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-        with:
-          ref: ${{ inputs.commit-ref }}
       - name: Install Go
         uses: actions/setup-go@v2
         with:
