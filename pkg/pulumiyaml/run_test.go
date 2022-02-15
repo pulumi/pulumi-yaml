@@ -52,6 +52,14 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
+					"outList": resource.NewPropertyValue([]interface{}{
+						map[string]interface{}{
+							"value": 42,
+						},
+						map[string]interface{}{
+							"value": 24,
+						},
+					}),
 				}, nil
 			case "test:component:type":
 				assert.Equal(t, "test:component:type", typeToken)
@@ -191,6 +199,27 @@ func TestJSONDiags(t *testing.T) {
 	require.True(t, diags.HasErrors())
 	require.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:13:10: resource Ref named res-b could not be found", diagString(diags[0]))
+}
+
+func TestPropertyAccess(t *testing.T) {
+	tmpl := template(t, &Template{
+		Resources: map[string]*Resource{
+			"resA": {
+				Type: "test:resource:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+		},
+	})
+	testTemplate(t, tmpl, func(r *runner) {
+		x, diags := ast.Interpolate("${resA.outList[0].value}")
+		requireNoErrors(t, diags)
+
+		v, diags := r.evaluatePropertyAccess(x, x.Parts[0].Value, nil)
+		requireNoErrors(t, diags)
+		r.ctx.Export("out", pulumi.Any(v))
+	})
 }
 
 func TestJoin(t *testing.T) {
