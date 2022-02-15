@@ -123,10 +123,9 @@ func stackReferenceSourceProject(t *testing.T) string {
 }
 
 func TestExampleWebserver(t *testing.T) {
-	x := exampleDir("webserver")
-	testWrapper(t, x, RequireLiveRun, awsConfig)
+	testWrapper(t, exampleDir("webserver"), RequireLiveRun, awsConfig)
 }
 
-func TestExampleWebserverInvoke(t *testing.T) {
-	testWrapper(t, exampleDir("webserver-invoke"), RequireLiveRun, awsConfig)
+func TestExampleWebserverJson(t *testing.T) {
+	testWrapper(t, exampleDir("webserver-json"), awsConfig)
 }
