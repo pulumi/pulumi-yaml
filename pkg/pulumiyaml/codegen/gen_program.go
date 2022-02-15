@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
+	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -31,10 +32,13 @@ func GenerateProgram(p *pcl.Program) (map[string][]byte, hcl.Diagnostics, error)
 
 // Generate a serializable YAML template.
 func GenerateTemplate(program *pcl.Program) (pulumiyaml.Template, hcl.Diagnostics, error) {
-	nodes := program.Nodes
-	g := generator{}
+	g := generator{
+		invokeResults: map[*model.FunctionCallExpression]*InvokeCall{},
+	}
 
-	for _, n := range nodes {
+	g.PrepareForInvokes(program)
+
+	for _, n := range program.Nodes {
 		g.genNode(n)
 	}
 
@@ -45,6 +49,81 @@ type generator struct {
 	result pulumiyaml.Template
 	diags  hcl.Diagnostics
 	errs   multierror.Error
+
+	// Because we need a return statement, we might need to call a invoke multiple times.
+	invokeResults map[*model.FunctionCallExpression]*InvokeCall
+}
+
+type InvokeCall struct {
+	name       string
+	usedValues codegen.StringSet
+}
+
+// Maps names to known invoke usages.
+func (g *generator) InvokeNameMap() map[string]*InvokeCall {
+	m := make(map[string]*InvokeCall, len(g.invokeResults))
+	for _, v := range g.invokeResults {
+		m[v.name] = v
+	}
+	return m
+}
+
+// Prepares both the program and the generator for invokes.
+// For the program:
+//   Invokes are rewritten to handle that a return type must be used.
+// For the generator:
+//   We memoize what invokes are used so we can correctly give the Return value.
+func (g *generator) PrepareForInvokes(program *pcl.Program) {
+	for _, n := range program.Nodes {
+		switch t := n.(type) {
+		case *pcl.LocalVariable:
+			if fn, ok := t.Definition.Value.(*model.FunctionCallExpression); ok && fn.Name == pcl.Invoke {
+				// An empty list is different then nil
+				g.invokeResults[fn] = &InvokeCall{t.Name(), codegen.NewStringSet()}
+			}
+		case *pcl.ConfigVariable:
+
+		}
+		// Pre should collect a list of references to invokes
+		calls := g.InvokeNameMap()
+		onTraversal := func(f func(*model.ScopeTraversalExpression) *model.ScopeTraversalExpression) func(n model.Expression) (model.Expression, hcl.Diagnostics) {
+			return func(n model.Expression) (model.Expression, hcl.Diagnostics) {
+				if t, ok := n.(*model.ScopeTraversalExpression); ok {
+					return f(t), nil
+				}
+				return n, nil
+			}
+		}
+		pre := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
+			if call, ok := calls[t.RootName]; ok {
+				path := strings.Split(strings.TrimSpace(fmt.Sprintf("%.v", t)), ".")
+				contract.Assertf(len(path) > 1,
+					"Invokes must use a field. They cannot just use the result of the invoke")
+				// So note the referenced field
+				immediateField := path[1]
+				contract.Assertf(immediateField != "", "Empty path on %.v", t)
+				call.usedValues.Add(path[1])
+			}
+			return t
+		})
+		// Post rewrites invoke variable access:
+		// If only a single variable was accessed, just use the original name
+		// If multiple variables were accessed, create a new named variable for each of them.
+		post := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
+			// This is an invoke
+			if call, ok := calls[t.RootName]; ok {
+				// Keep the root, but remove the first term of the traversal
+				if len(call.usedValues) > 1 {
+					panic("Multiple function calls unimplemented")
+				}
+				t.Parts = t.Parts[1:]
+				t.Traversal = t.Traversal[1:]
+				// remove the second term, which is handled by the return statement
+			}
+			return t
+		})
+		n.VisitExpressions(pre, post)
+	}
 }
 
 type yamlLimitationKind string
@@ -249,21 +328,7 @@ func (g *generator) function(f *model.FunctionCallExpression) interface{} {
 	}
 	switch f.Name {
 	case pcl.Invoke:
-		contract.Assert(len(f.Args) > 0)
-		name := g.expr(f.Args[0]).(string)
-		arguments := map[string]interface{}{}
-		if len(f.Args) > 1 {
-			_, ok := f.Args[1].(*model.ObjectConsExpression)
-			contract.Assert(ok)
-			arguments = g.expr(f.Args[1]).(map[string]interface{})
-		} else {
-			arguments = nil
-		}
-		return fn("Invoke",
-			map[string]interface{}{
-				"Function":  name,
-				"Arguments": arguments,
-			})
+		return fn("Invoke", g.MustInvoke(f))
 	case "fileAsset":
 		return fn("Asset", map[string]interface{}{
 			"File": g.expr(f.Args[0]),
@@ -282,5 +347,43 @@ func (g *generator) function(f *model.FunctionCallExpression) interface{} {
 		return nil
 	default:
 		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
+	}
+}
+
+type Invoke struct {
+	Function  string      `yaml:"Function" json:"Function"`
+	Arguments interface{} `yaml:"Arguments,omitempty" json:"Arguments,omitempty"`
+	Return    string      `yaml:"Return" json:"Return"`
+}
+
+func (g *generator) MustInvoke(f *model.FunctionCallExpression) Invoke {
+	contract.Assert(f.Name == pcl.Invoke)
+	contract.Assert(len(f.Args) > 0)
+	name := g.expr(f.Args[0]).(string)
+	arguments := map[string]interface{}{}
+	if len(f.Args) > 1 {
+		_, ok := f.Args[1].(*model.ObjectConsExpression)
+		contract.Assert(ok)
+		arguments = g.expr(f.Args[1]).(map[string]interface{})
+	} else {
+		arguments = nil
+	}
+
+	// Calculate the return value
+	fnInfo := g.invokeResults[f]
+	contract.Assertf(len(fnInfo.usedValues) > 0,
+		"Invoke assigned to %s has no used values. Dumping known invokes: %#v",
+		fnInfo.name, g.invokeResults)
+	var retValue string
+	if len(fnInfo.usedValues) == 1 {
+		retValue = fnInfo.usedValues.SortedValues()[0]
+	} else {
+		panic("unimplemented")
+	}
+
+	return Invoke{
+		Function:  name,
+		Arguments: arguments,
+		Return:    retValue,
 	}
 }

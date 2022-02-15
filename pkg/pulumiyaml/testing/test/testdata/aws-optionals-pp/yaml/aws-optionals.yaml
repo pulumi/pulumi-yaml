@@ -4,10 +4,11 @@ resources:
         properties:
             name: example_policy
             path: /
-            policy: ${policyDocument.json}
+            policy: ${policyDocument}
 variables:
     policyDocument:
         Fn::Invoke:
+            Function: aws:iam:getPolicyDocument
             Arguments:
                 statements:
                     - actions:
@@ -16,4 +17,4 @@ variables:
                       resources:
                         - arn:aws:s3:::*
                       sid: "1"
-            Function: aws:iam:getPolicyDocument
+            Return: json

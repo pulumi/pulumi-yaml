@@ -1,7 +1,7 @@
 configuration:
     locationParam:
         type: string
-        default: ${resourceGroupVar.location}
+        default: ${resourceGroupVar}
     resourceGroupNameParam:
         type: string
     storageAccountNameParam:
@@ -27,6 +27,7 @@ outputs:
 variables:
     resourceGroupVar:
         Fn::Invoke:
+            Function: azure:core:getResourceGroup
             Arguments:
                 name: ${resourceGroupNameParam}
-            Function: azure:core:getResourceGroup
+            Return: location

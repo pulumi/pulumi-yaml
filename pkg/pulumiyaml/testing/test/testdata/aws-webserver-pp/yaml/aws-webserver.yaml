@@ -11,7 +11,7 @@ resources:
     server:
         type: aws:ec2:Instance
         properties:
-            ami: ${ami.id}
+            ami: ${ami}
             instanceType: t2.micro
             securityGroups:
                 - ${securityGroup.name}
@@ -27,6 +27,7 @@ outputs:
 variables:
     ami:
         Fn::Invoke:
+            Function: aws::getAmi
             Arguments:
                 ? |-
                     // Amazon
@@ -38,4 +39,4 @@ variables:
                         - amzn-ami-hvm-*-x86_64-ebs
                 owners:
                     - "137112412989"
-            Function: aws::getAmi
+            Return: id
