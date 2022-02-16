@@ -21,10 +21,10 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPackages(tmpl)
+	plugins := GetReferencedPlugins(tmpl)
 
 	got := plugins
-	want := autogold.Want("test-plugins", []PackageVersion{{
+	want := autogold.Want("test-plugins", []Plugin{{
 		Package: "test",
 		Version: "1.23.425-beta.6",
 	}})
@@ -46,10 +46,10 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPackages(tmpl)
+	plugins := GetReferencedPlugins(tmpl)
 
 	got := plugins
-	want := autogold.Want("test-plugins", []PackageVersion{{
+	want := autogold.Want("test-plugins", []Plugin{{
 		Package: "test",
 		Version: "1.7.13",
 	}})
@@ -71,10 +71,10 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPackages(tmpl)
+	plugins := GetReferencedPlugins(tmpl)
 
 	got := plugins
-	want := autogold.Want("test-plugins", []PackageVersion{{
+	want := autogold.Want("test-plugins", []Plugin{{
 		Package: "test",
 		Version: "1.2",
 	}})
@@ -140,10 +140,10 @@ outputs:
   `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPackages(tmpl)
+	plugins := GetReferencedPlugins(tmpl)
 
 	gotPlugins := plugins
-	wantPlugins := autogold.Want("test-plugins", []PackageVersion{
+	wantPlugins := autogold.Want("test-plugins", []Plugin{
 		{
 			Package: "aws",
 			Version: "4.37.1",
