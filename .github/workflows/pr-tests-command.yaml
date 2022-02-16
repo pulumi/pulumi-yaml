@@ -1,4 +1,4 @@
-name: Pull Request Acceptance Tests
+name: Acceptance Tests (Command)
 
 on:
   repository_dispatch:
