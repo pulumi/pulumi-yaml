@@ -33,15 +33,18 @@ outputs:
 Webserver + kitchen sink (providers, config, resource options, invokes, interpolations):
 
 ```yaml
+name: webserver
+runtime: yaml
+description: Basic example of an AWS web server accessible over HTTP
 configuration:
   InstanceType:
     type: String
-    default: t2.micro
+    default: t3.micro
     allowedValues:
-      - t2.micro
-      - m1.small
-      - m1.large
-    description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+      - t3.micro
+      - t3.small
+      - m4.large
+    description: Enter t3.micro, t3.small, or m4.large. Default is t3.micro.
 variables:
   AmazonLinuxAmi:
     Fn::Invoke:
@@ -66,7 +69,7 @@ resources:
   WebServer:
     type: aws:ec2/instance:Instance
     properties:
-      instanceType: t2.micro
+      instanceType: ${InstanceType}
       ami: ${AmazonLinuxAmi}
       userData: |-
           #!/bin/bash

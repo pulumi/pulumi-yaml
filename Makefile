@@ -37,6 +37,11 @@ clean::
 ensure::
 	go mod download
 
+.phony: lint
+lint::
+	golangci-lint run
+	pulumictl copyright
+
 build:: ensure
 	mkdir -p ./bin
 	go build -o ./bin -p ${CONCURRENCY} ./cmd/...
