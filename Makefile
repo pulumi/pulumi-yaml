@@ -42,7 +42,7 @@ build:: ensure
 	go build -o ./bin -p ${CONCURRENCY} ./cmd/...
 
 # Ensure that in tests, the language server is accessible
-test:: build get_plugins
+test:: build get_plugins get_schemas
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
 	  go test -v --timeout 10m -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
