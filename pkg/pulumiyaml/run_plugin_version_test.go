@@ -16,7 +16,8 @@ runtime: yaml
 resources:
   res-a:
     type: test:resource:type
-    version: 1.23.425-beta.6
+    options:
+      version: 1.23.425-beta.6
     properties: {}
 `
 
@@ -41,7 +42,8 @@ runtime: yaml
 resources:
   res-a:
     type: test:resource:type
-    version: 1.7.13
+    options:
+      version: 1.7.13
     properties: {}
 `
 
@@ -66,7 +68,8 @@ runtime: yaml
 resources:
   res-a:
     type: test:resource:type
-    version: "1.2"
+    options:
+      version: "1.2"
     properties: {}
 `
 
@@ -98,14 +101,15 @@ configuration:
 resources:
   WebSecGrp:
     type: aws:ec2/securityGroup:SecurityGroup
-    version: 4.37.1
+    options:
+      version: 4.37.1
+      protect: true
     properties:
       ingress:
         - protocol: tcp
           fromPort: 80
           toPort: 80
           cidrBlocks: ["0.0.0.0/0"]
-    protect: true
   WebServer:
     type: aws:ec2/instance:Instance
     properties:
@@ -132,7 +136,8 @@ resources:
       region: us-east-2
   MyBucket:
     type: aws:s3/bucket:Bucket
-    provider: UsEast2Provider
+    options:
+      provider: UsEast2Provider
 outputs:
   InstanceId: ${WebServer}
   PublicIp: ${WebServer.publicIp}
