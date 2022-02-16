@@ -20,7 +20,7 @@ func TestGenerateProgram(t *testing.T) {
 		l := []test.ProgramTest{}
 		for _, tt := range tests {
 			switch tt.Directory {
-			case "aws-s3-logging", "aws-optionals", "aws-webserver", "azure-sa":
+			case "aws-optionals", "aws-webserver", "azure-sa":
 				// Fails to type check
 			case "aws-resource-options":
 				// segfaults
@@ -73,5 +73,20 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 }
 
 func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	switch args.Name {
+	case "bucket":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"loggings": []interface{}{
+				map[string]string{
+					"targetBucket": "foo",
+				},
+			},
+		}), nil
+	case "logs":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"bucket": "foo",
+		}), nil
+	}
+
 	return args.Name, resource.PropertyMap{}, nil
 }
