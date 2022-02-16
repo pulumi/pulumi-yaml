@@ -1,6 +1,12 @@
 resources:
     bucket1:
         type: aws:s3:Bucket
+        dependson:
+            - ${provider}
+        ignorechanges:
+            - ${bucket}
+            - ${lifecycleRules[0]}
+        protect: true
         provider: ${provider}
     provider:
         type: pulumi:providers:aws

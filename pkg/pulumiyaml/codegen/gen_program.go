@@ -172,12 +172,39 @@ func (g *generator) genNode(n pcl.Node) {
 
 func (g *generator) genResource(n *pcl.Resource) {
 	var provider, version, parent string
+	var dependsOn, ignoreChanges []string
+	var protect bool
 	if opts := n.Options; opts != nil {
-		if p, ok := g.expr(opts.Provider).(string); ok {
-			provider = p
+		if opts.Provider != nil {
+			provider = g.expr(opts.Provider).(string)
 		}
-		if p, ok := g.expr(opts.Parent).(string); ok {
-			parent = p
+		if opts.Parent != nil {
+			parent = g.expr(opts.Parent).(string)
+		}
+		if opts.DependsOn != nil {
+			for _, d := range g.expr(opts.DependsOn).([]interface{}) {
+				dependsOn = append(dependsOn, d.(string))
+			}
+		}
+		if opts.IgnoreChanges != nil {
+			for _, d := range g.expr(opts.IgnoreChanges).([]interface{}) {
+				ignoreChanges = append(ignoreChanges, d.(string))
+			}
+		}
+		if opts.Protect != nil {
+			expr := g.expr(opts.Protect)
+			b, ok := expr.(bool)
+			if s, isString := expr.(string); !ok && isString {
+				s = strings.TrimSpace(s)
+				if s == "true" {
+					b = true
+				} else {
+					contract.Assertf(s == "false", "'%s' is neither true nor false", s)
+				}
+			} else {
+				contract.Assertf(ok, "Invalid value for '%v': '%[2]v' (%[2]T)", opts.Protect, g.expr(opts.Protect))
+			}
+			protect = b
 		}
 	}
 	properties := map[string]interface{}{}
@@ -203,11 +230,11 @@ func (g *generator) genResource(n *pcl.Resource) {
 		Aliases:                 nil,
 		CustomTimeouts:          nil,
 		DeleteBeforeReplace:     false,
-		DependsOn:               []string{},
-		IgnoreChanges:           []string{},
+		DependsOn:               dependsOn,
+		IgnoreChanges:           ignoreChanges,
 		Import:                  "",
 		Parent:                  parent,
-		Protect:                 false,
+		Protect:                 protect,
 		Provider:                provider,
 		Version:                 version,
 		Condition:               "",
@@ -245,6 +272,9 @@ func (g *generator) expr(e model.Expression) interface{} {
 			}
 		case model.NoneType:
 			return nil
+		case model.BoolType:
+			r := strings.TrimSpace(fmt.Sprintf("%v", e))
+			return r == "true"
 		default:
 			r := strings.TrimSpace(fmt.Sprintf("%v", e))
 			return r
