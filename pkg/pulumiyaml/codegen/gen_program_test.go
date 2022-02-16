@@ -20,10 +20,8 @@ func TestGenerateProgram(t *testing.T) {
 		l := []test.ProgramTest{}
 		for _, tt := range tests {
 			switch tt.Directory {
-			case "aws-optionals", "aws-webserver", "azure-sa":
-				// Fails to type check
-			case "aws-resource-options":
-				// segfaults
+			case "azure-sa", "aws-webserver", "aws-optionals":
+				// Waiting on variables merging
 			case "aws-s3-folder", "aws-fargate":
 				// Reason: need toJSON function
 			case "aws-eks":

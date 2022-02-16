@@ -170,13 +170,19 @@ func (g *generator) genNode(n pcl.Node) {
 	}
 }
 
+func unquoteInterpolation(s string) string {
+	s = strings.TrimPrefix(s, "${")
+	s = strings.TrimSuffix(s, "}")
+	return s
+}
+
 func (g *generator) genResource(n *pcl.Resource) {
 	var provider, version, parent string
 	var dependsOn, ignoreChanges []string
 	var protect bool
 	if opts := n.Options; opts != nil {
 		if opts.Provider != nil {
-			provider = g.expr(opts.Provider).(string)
+			provider = unquoteInterpolation(g.expr(opts.Provider).(string))
 		}
 		if opts.Parent != nil {
 			parent = g.expr(opts.Parent).(string)
