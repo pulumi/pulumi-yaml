@@ -403,6 +403,9 @@ func (r *runner) registerResources() syntax.Diagnostics {
 		if v.Version != nil {
 			opts = append(opts, pulumi.Version(v.Version.Value))
 		}
+		if v.PluginDownloadURL != nil {
+			opts = append(opts, pulumi.PluginDownloadURL(v.PluginDownloadURL.Value))
+		}
 
 		// Create either a latebound custom resource or latebound provider resource depending on
 		// whether the type token indicates a special provider type.
