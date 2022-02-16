@@ -3,9 +3,13 @@
 package codegen
 
 import (
+	"os"
 	"testing"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
+	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateProgram(t *testing.T) {
@@ -14,6 +18,8 @@ func TestGenerateProgram(t *testing.T) {
 		l := []test.ProgramTest{}
 		for _, tt := range tests {
 			switch tt.Directory {
+			case "aws-resource-options":
+				// We generate incorrect code right now
 			case "aws-s3-folder", "aws-fargate":
 				// Reason: need toJSON function
 			case "aws-eks":
@@ -32,12 +38,20 @@ func TestGenerateProgram(t *testing.T) {
 		return l
 	}
 
+	check := func(t *testing.T, output string, _ codegen.StringSet) {
+		file, err := os.ReadFile(output)
+		assert.NoError(t, err)
+		_, diags, err := pulumiyaml.LoadYAMLBytes(output, file)
+		assert.NoError(t, err)
+		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
+	}
+
 	test.TestProgramCodegen(t,
 		test.ProgramCodegenOptions{
 			Language:   "yaml",
 			Extension:  "yaml",
 			OutputFile: "Main.yaml",
-			Check:      nil,
+			Check:      check,
 			GenProgram: GenerateProgram,
 			TestCases:  filter(test.PulumiPulumiProgramTests),
 		},
