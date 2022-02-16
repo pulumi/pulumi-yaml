@@ -4,8 +4,8 @@ resources:
         dependson:
             - ${provider}
         ignorechanges:
-            - ${bucket}
-            - ${lifecycleRules[0]}
+            - bucket
+            - lifecycleRules[0]
         protect: true
         provider: provider
     provider:

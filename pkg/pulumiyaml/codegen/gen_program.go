@@ -185,7 +185,7 @@ func (g *generator) genResource(n *pcl.Resource) {
 			provider = unquoteInterpolation(g.expr(opts.Provider).(string))
 		}
 		if opts.Parent != nil {
-			parent = g.expr(opts.Parent).(string)
+			parent = unquoteInterpolation(g.expr(opts.Parent).(string))
 		}
 		if opts.DependsOn != nil {
 			for _, d := range g.expr(opts.DependsOn).([]interface{}) {
@@ -194,7 +194,8 @@ func (g *generator) genResource(n *pcl.Resource) {
 		}
 		if opts.IgnoreChanges != nil {
 			for _, d := range g.expr(opts.IgnoreChanges).([]interface{}) {
-				ignoreChanges = append(ignoreChanges, d.(string))
+				path := unquoteInterpolation(d.(string))
+				ignoreChanges = append(ignoreChanges, path)
 			}
 		}
 		if opts.Protect != nil {
