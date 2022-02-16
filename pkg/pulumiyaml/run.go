@@ -250,16 +250,15 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	}
 
 	for _, kvp := range intermediates {
-		kvp := kvp
 		switch kvp := kvp.(type) {
-		case *intermediateConfig:
+		case configNode:
 			r.ctx.Log.Debug(fmt.Sprintf("Registering configuration [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
 			err := r.registerConfig(kvp, diags)
 			if err != nil {
 				r.ctx.Log.Debug(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, err), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
 				continue
 			}
-		case *intermediateVariable:
+		case variableNode:
 			r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
 			value, diags := r.evaluateExpr(kvp.Value)
 			diags.Extend(diags...)
@@ -268,7 +267,7 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 				continue
 			}
 			r.variables[kvp.Key.Value] = value
-		case *intermediateResource:
+		case resourceNode:
 			r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
 			err := r.registerResource(kvp, diags)
 			if err != nil {
@@ -283,7 +282,7 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	return diags
 }
 
-func (r *runner) registerConfig(intm *intermediateConfig, diags syntax.Diagnostics) error {
+func (r *runner) registerConfig(intm configNode, diags syntax.Diagnostics) error {
 	k, c := intm.Key.Value, intm.Value
 
 	var defaultValue interface{}
@@ -335,7 +334,7 @@ func (r *runner) registerConfig(intm *intermediateConfig, diags syntax.Diagnosti
 	return nil
 }
 
-func (r *runner) registerResource(kvp *intermediateResource, diags syntax.Diagnostics) error {
+func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) error {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.

@@ -12,60 +12,60 @@ import (
 //see: https://github.com/BurntSushi/go-sumtype
 //go-sumtype:decl IntermediateSymbol
 
-type IntermediateSymbol interface {
+type graphNode interface {
 	valueKind() string
 	key() *ast.StringExpr
 }
 
-type intermediateResource struct {
+type resourceNode struct {
 	*ast.ResourcesMapEntry
 }
 
-func (e intermediateResource) valueKind() string {
+func (e resourceNode) valueKind() string {
 	return "resource"
 }
 
-func (e intermediateResource) key() *ast.StringExpr {
+func (e resourceNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-type intermediateVariable struct {
+type variableNode struct {
 	*ast.VariablesMapEntry
 }
 
-func (e intermediateVariable) valueKind() string {
+func (e variableNode) valueKind() string {
 	return "variable"
 }
 
-func (e intermediateVariable) key() *ast.StringExpr {
+func (e variableNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-type intermediateConfig struct {
+type configNode struct {
 	*ast.ConfigMapEntry
 }
 
-func (e intermediateConfig) valueKind() string {
+func (e configNode) valueKind() string {
 	return "config"
 }
 
-func (e intermediateConfig) key() *ast.StringExpr {
+func (e configNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, syntax.Diagnostics) {
+func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diagnostics) {
 	if t.Resources == nil {
 		return nil, nil
 	}
 
 	var diags syntax.Diagnostics
 
-	var sorted []IntermediateSymbol // will hold the sorted vertices.
-	visiting := map[string]bool{}   // temporary entries to detect cycles.
-	visited := map[string]bool{}    // entries to avoid visiting the same node twice.
+	var sorted []graphNode        // will hold the sorted vertices.
+	visiting := map[string]bool{} // temporary entries to detect cycles.
+	visited := map[string]bool{}  // entries to avoid visiting the same node twice.
 
 	// Precompute dependencies for each resource
-	intermediates := map[string]IntermediateSymbol{}
+	intermediates := map[string]graphNode{}
 	dependencies := map[string][]*ast.StringExpr{}
 	for _, kvp := range t.Resources.Entries {
 		rname, r := kvp.Key.Value, kvp.Value
@@ -75,7 +75,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, sy
 		}
 		temp := kvp
 		//nolint:govet // safety: we control this composite type
-		intermediates[rname] = intermediateResource{&temp}
+		intermediates[rname] = resourceNode{&temp}
 		dependencies[rname] = GetResourceDependencies(r)
 	}
 	if t.Configuration != nil {
@@ -84,7 +84,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, sy
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[cname] = intermediateConfig{&temp}
+			intermediates[cname] = configNode{&temp}
 			dependencies[cname] = make([]*ast.StringExpr, 0)
 		}
 	}
@@ -102,7 +102,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, sy
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[vname] = intermediateVariable{&temp}
+			intermediates[vname] = variableNode{&temp}
 			dependencies[vname] = GetVariableDependencies(&temp)
 		}
 	}
@@ -139,14 +139,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, sy
 			visited[name.Value] = true
 			visiting[name.Value] = false
 
-			switch e := e.(type) {
-			case intermediateResource:
-				sorted = append(sorted, &e)
-			case intermediateVariable:
-				sorted = append(sorted, &e)
-			case intermediateConfig:
-				sorted = append(sorted, &e)
-			}
+			sorted = append(sorted, e)
 		}
 		return true
 	}

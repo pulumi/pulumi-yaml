@@ -127,7 +127,7 @@ func TestSortErrorCycle(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func sortedNames(rs []IntermediateSymbol) []string {
+func sortedNames(rs []graphNode) []string {
 	names := make([]string, len(rs))
 	for i, kvp := range rs {
 		names[i] = kvp.key().Value
