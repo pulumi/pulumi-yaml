@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl/v2"
 	"gopkg.in/yaml.v3"
 
@@ -48,8 +47,6 @@ func GenerateTemplate(program *pcl.Program) (pulumiyaml.Template, hcl.Diagnostic
 type generator struct {
 	result pulumiyaml.Template
 	diags  hcl.Diagnostics
-	errs   multierror.Error
-
 	// Because we need a return statement, we might need to call a invoke multiple times.
 	invokeResults map[*model.FunctionCallExpression]*InvokeCall
 }
@@ -122,7 +119,8 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 			}
 			return t
 		})
-		n.VisitExpressions(pre, post)
+		diags := n.VisitExpressions(pre, post)
+		g.diags = g.diags.Extend(diags)
 	}
 }
 
@@ -149,7 +147,7 @@ func (g *generator) yamlLimitation(kind yamlLimitationKind) {
 }
 
 func (g *generator) missingSchema() {
-	g.diags.Append(&hcl.Diagnostic{
+	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagWarning,
 		Summary:  "Could not get schema. This might lead to inacurate generation",
 	})
@@ -394,13 +392,11 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) Invoke {
 	contract.Assert(f.Name == pcl.Invoke)
 	contract.Assert(len(f.Args) > 0)
 	name := g.expr(f.Args[0]).(string)
-	arguments := map[string]interface{}{}
+	var arguments map[string]interface{}
 	if len(f.Args) > 1 {
 		_, ok := f.Args[1].(*model.ObjectConsExpression)
 		contract.Assert(ok)
 		arguments = g.expr(f.Args[1]).(map[string]interface{})
-	} else {
-		arguments = nil
 	}
 
 	// Calculate the return value
