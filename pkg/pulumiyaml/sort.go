@@ -9,19 +9,63 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry, syntax.Diagnostics) {
+//see: https://github.com/BurntSushi/go-sumtype
+//go-sumtype:decl IntermediateSymbol
+
+type IntermediateSymbol interface {
+	valueKind() string
+	key() *ast.StringExpr
+}
+
+type intermediateResource struct {
+	*ast.ResourcesMapEntry
+}
+
+func (e intermediateResource) valueKind() string {
+	return "resource"
+}
+
+func (e intermediateResource) key() *ast.StringExpr {
+	return e.Key
+}
+
+type intermediateVariable struct {
+	*ast.VariablesMapEntry
+}
+
+func (e intermediateVariable) valueKind() string {
+	return "variable"
+}
+
+func (e intermediateVariable) key() *ast.StringExpr {
+	return e.Key
+}
+
+type intermediateConfig struct {
+	*ast.ConfigMapEntry
+}
+
+func (e intermediateConfig) valueKind() string {
+	return "config"
+}
+
+func (e intermediateConfig) key() *ast.StringExpr {
+	return e.Key
+}
+
+func topologicallySortedResources(t *ast.TemplateDecl) ([]IntermediateSymbol, syntax.Diagnostics) {
 	if t.Resources == nil {
 		return nil, nil
 	}
 
 	var diags syntax.Diagnostics
 
-	var sorted []ast.ResourcesMapEntry // will hold the sorted vertices.
-	visiting := map[string]bool{}      // temporary entries to detect cycles.
-	visited := map[string]bool{}       // entries to avoid visiting the same node twice.
+	var sorted []IntermediateSymbol // will hold the sorted vertices.
+	visiting := map[string]bool{}   // temporary entries to detect cycles.
+	visited := map[string]bool{}    // entries to avoid visiting the same node twice.
 
 	// Precompute dependencies for each resource
-	intermediates := map[string]ast.Intermediate{}
+	intermediates := map[string]IntermediateSymbol{}
 	dependencies := map[string][]*ast.StringExpr{}
 	for _, kvp := range t.Resources.Entries {
 		rname, r := kvp.Key.Value, kvp.Value
@@ -31,7 +75,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 		}
 		temp := kvp
 		//nolint:govet // safety: we control this composite type
-		intermediates[rname] = ast.Intermediate{&temp}
+		intermediates[rname] = intermediateResource{&temp}
 		dependencies[rname] = GetResourceDependencies(r)
 	}
 	if t.Configuration != nil {
@@ -40,7 +84,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[cname] = ast.Intermediate{&temp}
+			intermediates[cname] = intermediateConfig{&temp}
 			dependencies[cname] = make([]*ast.StringExpr, 0)
 		}
 	}
@@ -58,7 +102,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[vname] = ast.Intermediate{&temp}
+			intermediates[vname] = intermediateVariable{&temp}
 			dependencies[vname] = GetVariableDependencies(&temp)
 		}
 	}
@@ -75,7 +119,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 			))
 			return false
 		}
-		kind := e.Kind()
+		kind := e.valueKind()
 
 		if visiting[name.Value] {
 			diags.Extend(ast.ExprError(
@@ -95,16 +139,14 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 			visited[name.Value] = true
 			visiting[name.Value] = false
 
-			e.Visit(ast.IntermediateVisitor{
-				VisitResource: func(r *ast.ResourcesMapEntry) {
-					sorted = append(sorted, *r)
-				},
-				VisitVariable: func(_ *ast.VariablesMapEntry) {
-					// Variables participate in the topological sort only as intermediate values, but are
-					// elided from the output.
-				},
-				VisitConfig: func(_ *ast.ConfigMapEntry) {},
-			})
+			switch e := e.(type) {
+			case intermediateResource:
+				sorted = append(sorted, &e)
+			case intermediateVariable:
+				sorted = append(sorted, &e)
+			case intermediateConfig:
+				sorted = append(sorted, &e)
+			}
 		}
 		return true
 	}
@@ -113,8 +155,8 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]ast.ResourcesMapEntry,
 	for {
 		progress := false
 		for _, e := range intermediates {
-			if !visited[e.Key().Value] {
-				if visit(e.Key()) {
+			if !visited[e.key().Value] {
+				if visit(e.key()) {
 					progress = true
 				}
 				break

@@ -204,65 +204,6 @@ func (d *ResourcesMapDecl) parse(name string, node syntax.Node) syntax.Diagnosti
 	return diags
 }
 
-type Intermediate struct {
-	IntermediateEntry
-}
-
-type IntermediateEntry interface {
-	Visit(v IntermediateVisitor)
-}
-
-type IntermediateVisitor struct {
-	VisitResource func(*ResourcesMapEntry)
-	VisitVariable func(*VariablesMapEntry)
-	VisitConfig   func(*ConfigMapEntry)
-}
-
-func (e *ResourcesMapEntry) Visit(v IntermediateVisitor) {
-	v.VisitResource(e)
-}
-
-func (e *VariablesMapEntry) Visit(v IntermediateVisitor) {
-	v.VisitVariable(e)
-}
-
-func (e *ConfigMapEntry) Visit(v IntermediateVisitor) {
-	v.VisitConfig(e)
-}
-
-type IntermediateKind string
-
-const (
-	IntermediateResource IntermediateKind = "resource"
-	IntermediateVariable IntermediateKind = "variable"
-	IntermediateConfig   IntermediateKind = "config"
-)
-
-type IntermediateExtensions interface {
-	Kind() IntermediateKind
-	Key() *StringExpr
-}
-
-func (e Intermediate) Kind() IntermediateKind {
-	var kind IntermediateKind
-	e.Visit(IntermediateVisitor{
-		VisitResource: func(_ *ResourcesMapEntry) { kind = IntermediateResource },
-		VisitVariable: func(_ *VariablesMapEntry) { kind = IntermediateVariable },
-		VisitConfig:   func(_ *ConfigMapEntry) { kind = IntermediateConfig },
-	})
-	return kind
-}
-
-func (e Intermediate) Key() *StringExpr {
-	var name *StringExpr
-	e.Visit(IntermediateVisitor{
-		VisitResource: func(x *ResourcesMapEntry) { name = x.Key },
-		VisitVariable: func(x *VariablesMapEntry) { name = x.Key },
-		VisitConfig:   func(x *ConfigMapEntry) { name = x.Key },
-	})
-	return name
-}
-
 type PropertyMapEntry struct {
 	syntax syntax.ObjectPropertyDef
 	Key    *StringExpr

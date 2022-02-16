@@ -30,7 +30,7 @@ variables:
         quux: tuo
       Return: retval
 resources:
-  res-a:
+  resFinal:
     type: test:resource:type
     properties:
       foo: ${someVar}
@@ -62,7 +62,7 @@ resources:
     type: test:resource:type
     properties:
       foo: oof
-  res-b:
+  resFinal:
     type: test:resource:type
     properties:
       foo: ${someVar}
@@ -101,7 +101,7 @@ resources:
     type: test:resource:type
     properties:
       foo: oof
-  res-b:
+  resFinal:
     type: test:resource:type
     properties:
       foo: ${someVar}
@@ -125,10 +125,10 @@ variables:
     Fn::Invoke:
       Function: test:invoke:type
       Arguments:
-        quux: ${res-a.out}
+        quux: ${resFinal.out}
       Return: retval
 resources:
-  res-a:
+  resFinal:
     type: test:resource:type
     properties:
       foo: oof
@@ -161,10 +161,34 @@ resources:
     type: test:resource:type
     properties:
       foo: ${someVar}
-  res-c:
+  resFinal:
     type: test:resource:type
     properties:
       foo: ${someVar}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
+// Tests that the invoke is still called even when it is not referenced by any resource.
+func TestUnusedVariablesEvaluated(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: tuo
+      Return: retval
+resources:
+  resFinal:
+    type: test:resource:type
+    properties:
+      foo: oof
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -232,6 +256,17 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		if callback != nil {
 			callback(runner)
 		}
+
+		v, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("${resFinal.out}"),
+		})
+		requireNoErrors(t, diags)
+		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "tuo", x)
+			return nil, nil
+		})
+		runner.ctx.Export("out", out)
+
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))
 	if diags, ok := HasDiagnostics(err); ok {
