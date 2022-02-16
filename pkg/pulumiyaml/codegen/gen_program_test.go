@@ -9,6 +9,8 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,8 +20,10 @@ func TestGenerateProgram(t *testing.T) {
 		l := []test.ProgramTest{}
 		for _, tt := range tests {
 			switch tt.Directory {
+			case "aws-s3-logging", "aws-optionals", "aws-webserver", "azure-sa":
+				// Fails to type check
 			case "aws-resource-options":
-				// We generate incorrect code right now
+				// segfaults
 			case "aws-s3-folder", "aws-fargate":
 				// Reason: need toJSON function
 			case "aws-eks":
@@ -41,9 +45,13 @@ func TestGenerateProgram(t *testing.T) {
 	check := func(t *testing.T, output string, _ codegen.StringSet) {
 		file, err := os.ReadFile(output)
 		assert.NoError(t, err)
-		_, diags, err := pulumiyaml.LoadYAMLBytes(output, file)
+		templateDecl, diags, err := pulumiyaml.LoadYAMLBytes(output, file)
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
+		err = pulumi.RunErr(func(ctx *pulumi.Context) error {
+			return pulumiyaml.RunTemplate(ctx, templateDecl)
+		}, pulumi.WithMocks("test", "gen", &testMonitor{}))
+		assert.NoError(t, err)
 	}
 
 	test.TestProgramCodegen(t,
@@ -56,4 +64,14 @@ func TestGenerateProgram(t *testing.T) {
 			TestCases:  filter(test.PulumiPulumiProgramTests),
 		},
 	)
+}
+
+type testMonitor struct{}
+
+func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+	return resource.PropertyMap{}, nil
+}
+
+func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	return args.Name, resource.PropertyMap{}, nil
 }

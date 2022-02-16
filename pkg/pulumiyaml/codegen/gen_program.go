@@ -263,13 +263,12 @@ func (g *generator) expr(e model.Expression) interface{} {
 			return v
 		case model.NumberType:
 			v := e.Value.AsBigFloat()
-			if v.IsInt() {
-				i, _ := v.Int64()
-				return i
-			} else {
-				f, _ := v.Float64()
-				return f
-			}
+			f, _ := v.Float64()
+			return f
+		case model.IntType:
+			v := e.Value.AsBigFloat()
+			i, _ := v.Int64()
+			return i
 		case model.NoneType:
 			return nil
 		case model.BoolType:
@@ -281,8 +280,6 @@ func (g *generator) expr(e model.Expression) interface{} {
 		}
 	case *model.FunctionCallExpression:
 		return g.function(e)
-	case *model.RelativeTraversalExpression:
-		return "${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}"
 	case *model.ScopeTraversalExpression:
 		return "${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}"
 	case *model.TemplateExpression:
