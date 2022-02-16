@@ -19,14 +19,30 @@ var awsConfig = StackConfig{map[string]string{
 	"aws-native:region": "us-east-1",
 }}
 
+var azureConfig = StackConfig{map[string]string{
+	"azure-native:location": "centralus",
+}}
+
 var org = os.Getenv("PULUMI_TEST_ORG")
 
 func exampleDir(dir string) string {
 	return filepath.Join("../../examples/", dir)
 }
 
+func TestRandom(t *testing.T) {
+	testWrapper(t, exampleDir("random"))
+}
+
 func TestExampleAwsStaticWebsite(t *testing.T) {
 	testWrapper(t, exampleDir("aws-static-website"), RequireLiveRun, awsConfig)
+}
+
+func TestExampleAzureStaticWebsite(t *testing.T) {
+	testWrapper(t, exampleDir("azure-static-website"), RequireLiveRun, azureConfig)
+}
+
+func TestExampleAzureAppService(t *testing.T) {
+	testWrapper(t, exampleDir("azure-app-service"), RequireLiveRun, azureConfig)
 }
 
 func TestExampleGettingStarted(t *testing.T) {
@@ -111,14 +127,9 @@ func stackReferenceSourceProject(t *testing.T) string {
 }
 
 func TestExampleWebserver(t *testing.T) {
-	x := exampleDir("webserver")
-	testWrapper(t, x, RequireLiveRun, awsConfig)
+	testWrapper(t, exampleDir("webserver"), RequireLiveRun, awsConfig)
 }
 
-func TestExampleWebserverInvokeJson(t *testing.T) {
-	testWrapper(t, exampleDir("webserver-invoke-json"), RequireLiveRun, awsConfig)
-}
-
-func TestExampleWebserverInvoke(t *testing.T) {
-	testWrapper(t, exampleDir("webserver-invoke"), RequireLiveRun, awsConfig)
+func TestExampleWebserverJson(t *testing.T) {
+	testWrapper(t, exampleDir("webserver-json"), awsConfig)
 }

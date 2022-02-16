@@ -715,18 +715,38 @@ func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.D
 		return nil, diags
 	}
 
-	// At this point, we've got a function to invoke and some parameters! Invoke away.
-	result := map[string]interface{}{}
-	if err := r.ctx.Invoke(t.Token.Value, args, &result); err != nil {
-		diags.Extend(ast.ExprError(t, err.Error(), ""))
-		return nil, diags
+	performInvoke := func(args interface{}) (interface{}, syntax.Diagnostics) {
+		// At this point, we've got a function to invoke and some parameters! Invoke away.
+		result := map[string]interface{}{}
+		if err := r.ctx.Invoke(t.Token.Value, args, &result); err != nil {
+			diags.Extend(ast.ExprError(t, err.Error(), ""))
+			return nil, diags
+		}
+		retv, ok := result[t.Return.Value]
+		if !ok {
+			diags.Extend(ast.ExprError(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value), ""))
+			return nil, diags
+		}
+		return retv, diags
 	}
-	retv, ok := result[t.Return.Value]
-	if !ok {
-		diags.Extend(ast.ExprError(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value), ""))
-		return nil, diags
+
+	// TODO[pulumi/pulumi-yaml#14]: Use dynamic Output-or-not information to decide whether the lift the invoke
+	var deps []*ast.StringExpr
+	getExpressionDependencies(&deps, t.CallArgs)
+
+	if len(deps) > 0 {
+		return pulumi.ToOutput(args).ApplyT(func(args interface{}) (interface{}, error) {
+			result, diags := performInvoke(args)
+			if diags.HasErrors() {
+				// TODO: this could leak warnings
+				// Note for reviewer: will need to plumb through a context to providing non-error diagnostics outside of ApplyT
+				return nil, diags
+			}
+			return result, nil
+		}), nil
 	}
-	return retv, diags
+
+	return performInvoke(args)
 }
 
 func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagnostics) {
@@ -813,6 +833,13 @@ func (r *runner) evaluateBuiltinAsset(v *ast.AssetExpr) (interface{}, syntax.Dia
 		return pulumi.NewStringAsset(v.Path.Value), nil
 	case "Remote":
 		return pulumi.NewRemoteAsset(v.Path.Value), nil
+	case "FileArchive":
+		return pulumi.NewFileArchive(v.Path.Value), nil
+	case "RemoteArchive":
+		return pulumi.NewRemoteArchive(v.Path.Value), nil
+	case "AssetArchive":
+		// TODO[pulumi/pulumi-yaml#53]: Implement Fn::Archive or support all variants as args to Fn::Asset
+		panic(fmt.Errorf("%s unimplemented", v.Kind.Value))
 	default:
 		panic(fmt.Errorf("unexpected Asset kind '%s'", v.Kind.Value))
 	}

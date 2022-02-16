@@ -20,6 +20,11 @@ on:
       AWS_ACCESS_KEY_ID:     { required: false }
       AWS_SECRET_ACCESS_KEY: { required: false }
       AWS_CI_ROLE_ARN:       { required: false }
+      ARM_CLIENT_ID:         { required: false }
+      ARM_CLIENT_SECRET:     { required: false }
+      ARM_SUBSCRIPTION_ID:   { required: false }
+      ARM_TENANT_ID:         { required: false }
+
 
 env:
   PULUMI_LIVE_TEST: ${{ inputs.live-test }}
@@ -27,6 +32,10 @@ env:
   PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   AWS_REGION: us-west-2
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
 
 jobs:
   test:

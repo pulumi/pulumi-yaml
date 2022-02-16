@@ -136,7 +136,7 @@ func parsePropertyAccess(node syntax.Node, access string) (string, *PropertyAcce
 					return "", nil, syntax.Diagnostics{syntax.NodeError(node, "the root property must be a string subscript or a name", "")}
 				}
 
-				indexNode, access = float64(index), access[rbracket:]
+				indexNode, access = int(index), access[rbracket:]
 			}
 			accessors, access = append(accessors, &PropertySubscript{Index: indexNode}), access[1:]
 		default:

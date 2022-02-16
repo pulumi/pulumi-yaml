@@ -23,8 +23,12 @@ jobs:
       AWS_ACCESS_KEY_ID:       ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY:   ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_CI_ROLE_ARN:         ${{ secrets.AWS_CI_ROLE_ARN }}
+      ARM_CLIENT_ID:           ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET:       ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID:           ${{ secrets.ARM_TENANT_ID }}
   publish:
     needs: [test, lint]
     uses: ./.github/workflows/stage-publish.yml
     with:
-      goreleaser-args: -p 3 -f .goreleaser.prerelease.yml --rm-dist --skip-validate --timeout 60m0s --release-notes=CHANGELOG_PENDING.md
+      goreleaser-args: -p 10 -f .goreleaser.prerelease.yml --rm-dist --skip-validate --timeout 60m0s --release-notes=CHANGELOG_PENDING.md
