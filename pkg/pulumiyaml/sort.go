@@ -17,9 +17,7 @@ type graphNode interface {
 	key() *ast.StringExpr
 }
 
-type resourceNode struct {
-	*ast.ResourcesMapEntry
-}
+type resourceNode ast.ResourcesMapEntry
 
 func (e resourceNode) valueKind() string {
 	return "resource"
@@ -29,9 +27,7 @@ func (e resourceNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-type variableNode struct {
-	*ast.VariablesMapEntry
-}
+type variableNode ast.VariablesMapEntry
 
 func (e variableNode) valueKind() string {
 	return "variable"
@@ -41,9 +37,7 @@ func (e variableNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-type configNode struct {
-	*ast.ConfigMapEntry
-}
+type configNode ast.ConfigMapEntry
 
 func (e configNode) valueKind() string {
 	return "config"
@@ -75,7 +69,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		}
 		temp := kvp
 		//nolint:govet // safety: we control this composite type
-		intermediates[rname] = resourceNode{&temp}
+		intermediates[rname] = resourceNode(temp)
 		dependencies[rname] = GetResourceDependencies(r)
 	}
 	if t.Configuration != nil {
@@ -84,8 +78,13 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[cname] = configNode{&temp}
+			node := configNode(temp)
+			intermediates[cname] = node
 			dependencies[cname] = make([]*ast.StringExpr, 0)
+
+			// Special case: configuration goes first
+			visited[cname] = true
+			sorted = append(sorted, node)
 		}
 	}
 	if t.Variables != nil {
@@ -102,7 +101,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
 			temp := kvp
 			//nolint:govet // safety: we control this composite type
-			intermediates[vname] = variableNode{&temp}
+			intermediates[vname] = variableNode(temp)
 			dependencies[vname] = GetVariableDependencies(&temp)
 		}
 	}
@@ -112,11 +111,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	visit = func(name *ast.StringExpr) bool {
 		e, ok := intermediates[name.Value]
 		if !ok {
-			diags.Extend(ast.ExprError(
-				name,
-				fmt.Sprintf("dependency %s not found", name.Value),
-				"",
-			))
+			diags.Extend(ast.ExprError(name, fmt.Sprintf("dependency %s not found", name.Value), ""))
 			return false
 		}
 		kind := e.valueKind()
