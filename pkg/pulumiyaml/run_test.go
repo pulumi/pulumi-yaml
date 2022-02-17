@@ -196,6 +196,93 @@ outputs:
 	assert.Equal(t, "<stdin>:9:8: resource Ref named res-b could not be found", diagString(diags[0]))
 }
 
+func TestDuplicateKeyDiags(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    type: string
+  foo:
+    type: int
+variables:
+  bar: 1
+  bar: 2
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	assert.Contains(t, diagStrings, "<stdin>:6:3: found duplicate config foo")
+	assert.Contains(t, diagStrings, "<stdin>:16:3: found duplicate resource res-a")
+	assert.Contains(t, diagStrings, "<stdin>:10:3: found duplicate variable bar")
+	assert.Len(t, diagStrings, 3)
+	require.True(t, diags.HasErrors())
+}
+
+func TestConflictKeyDiags(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    type: string
+variables:
+  foo: 1
+resources:
+  foo:
+    type: test:resource:type
+    properties:
+      foo: oof
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	// Config is evaluated first, so we expect errors on the other two.
+	assert.Contains(t, diagStrings, "<stdin>:9:3: resource foo cannot have the same name as config foo")
+	assert.Contains(t, diagStrings, "<stdin>:7:3: variable foo cannot have the same name as config foo")
+	assert.Len(t, diagStrings, 2)
+	require.True(t, diags.HasErrors())
+}
+
+func TestConflictResourceVarKeyDiags(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+variables:
+  foo: 1
+resources:
+  foo:
+    type: test:resource:type
+    properties:
+      foo: oof
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	// Config is evaluated first, so we expect no errors.
+	assert.Contains(t, diagStrings, "<stdin>:4:3: variable foo cannot have the same name as resource foo")
+	assert.Len(t, diagStrings, 1)
+	require.True(t, diags.HasErrors())
+}
+
 func TestJSON(t *testing.T) {
 	const text = `{
 	"name": "test-yaml",
