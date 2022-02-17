@@ -7,10 +7,7 @@ resources:
             metadata:
                 name: pulumi-kubernetes-operator
             spec:
-                ? |-
-                    # Currently only 1 replica supported, until leader election: https://github.com/pulumi/pulumi-kubernetes-operator/issues/33
-                    replicas
-                : 1
+                replicas: 1
                 selector:
                     matchLabels:
                         name: pulumi-kubernetes-operator

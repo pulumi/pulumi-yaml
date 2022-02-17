@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
 	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
@@ -117,7 +118,7 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 		}
 		pre := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
 			if call, ok := calls[t.RootName]; ok {
-				path := strings.Split(strings.TrimSpace(fmt.Sprintf("%.v", t)), ".")
+				path := strings.Split(g.expr(t).(*syn.StringNode).Value(), ".")
 				contract.Assertf(len(path) > 1,
 					"Invokes must use a field. They cannot just use the result of the invoke")
 				// So note the referenced field
@@ -283,42 +284,88 @@ func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
 func (g *generator) expr(e model.Expression) syn.Node {
 	switch e := e.(type) {
 	case *model.LiteralValueExpression:
-		switch e.Type() {
-		case model.StringType:
+		t := e.Value.Type()
+		switch {
+		case t.Equals(cty.String):
 			v := e.Value.AsString()
 			return syn.String(v)
-		case model.NumberType:
+		case t.Equals(cty.Number):
 			v := e.Value.AsBigFloat()
 			f, _ := v.Float64()
 			return syn.Number(f)
-		case model.IntType:
-			v := e.Value.AsBigFloat()
-			// TODO is there an integer node
-			i, _ := v.Float64()
-			return syn.Number(i)
-		case model.NoneType:
-			return nil
-		case model.BoolType:
-			r := strings.TrimSpace(fmt.Sprintf("%v", e))
-			return syn.Boolean(r == "true")
+		case t.Equals(cty.NilType) || e.Value.IsNull():
+			return syn.Null()
+		case t.Equals(cty.Bool):
+			return syn.Boolean(e.Value.True())
 		default:
-			r := strings.TrimSpace(fmt.Sprintf("%v", e))
-			return syn.String(r)
+			contract.Failf("Unexpected LiteralValueExpression (%[1]v): %[1]v", e.Type(), e)
+			panic(nil)
 		}
 	case *model.FunctionCallExpression:
 		return g.function(e)
 	case *model.ScopeTraversalExpression:
-		return syn.String("${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}")
-	case *model.TemplateExpression:
-		s := ""
-		for _, expr := range e.Parts {
-			if lit, ok := expr.(*model.LiteralValueExpression); ok && model.StringType.AssignableFrom(lit.Type()) {
-				s += lit.Value.AsString()
-			} else {
-				s += fmt.Sprintf("${%.v}", expr)
+		s := e.RootName
+		for _, t := range e.Traversal.SimpleSplit().Rel {
+			var key cty.Value
+			switch t := t.(type) {
+			case hcl.TraverseAttr:
+				key = cty.StringVal(t.Name)
+			case hcl.TraverseIndex:
+				key = t.Key
+			default:
+				contract.Failf("Unexpected traverser of type %T: '%v'", t, t.SourceRange())
+			}
+
+			switch key.Type() {
+			case cty.String:
+				keyVal := key.AsString()
+				s = fmt.Sprintf("%s.%s", s, keyVal)
+			case cty.Number:
+				idx, _ := key.AsBigFloat().Int64()
+				s = fmt.Sprintf("%s[%d]", s, idx)
+			default:
+				keyExpr := &model.LiteralValueExpression{Value: key}
+				diags := keyExpr.Typecheck(false)
+				contract.Ignore(diags)
+
+				s = fmt.Sprintf("%s[%v]", s, keyExpr)
 			}
 		}
+		s = fmt.Sprintf("${%s}", s)
 		return syn.String(s)
+	case *model.TemplateExpression:
+		inline := true
+		nodes := []syn.Node{}
+		for _, expr := range e.Parts {
+			n := g.expr(expr)
+			nodes = append(nodes, n)
+			switch expr := expr.(type) {
+			case *model.LiteralValueExpression:
+				if expr.Type().Equals(model.StringType) {
+					inline = false
+				}
+			case *model.ScopeTraversalExpression:
+			case *model.TemplateExpression:
+				if _, isString := n.(*syn.StringNode); !isString {
+					inline = false
+				}
+			default:
+				inline = false
+			}
+		}
+
+		// Inline implies we can construct the string directly, using string interpolation for traversals.
+		// Not inline means we need to use a Fn::Join statement.
+		if inline {
+			s := ""
+			for _, expr := range e.Parts {
+				// The inline check ensures that the cast is valid.
+				s += g.expr(expr).(*syn.StringNode).Value()
+			}
+			return syn.String(s)
+		}
+		contract.Failf("Non-inline expressions are not implemented yet")
+		panic(nil)
 	case *model.TupleConsExpression:
 		ls := make([]syn.Node, len(e.Expressions))
 		for i, e := range e.Expressions {
@@ -337,9 +384,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		g.yamlLimitation(Splat)
 		return nil
 	case nil:
-		return nil
+		return syn.Null()
 	default:
-		panic(fmt.Sprintf("Unimplimented: %[1]T. Needed for %[1]v", e))
+		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
+		panic(nil)
 	}
 }
 
