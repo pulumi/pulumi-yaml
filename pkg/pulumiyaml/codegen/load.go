@@ -415,9 +415,9 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, import, version
 
 	var optionItems []model.BodyItem
-	if len(resource.DependsOn.GetElements()) != 0 {
+	if len(resource.Options.DependsOn.GetElements()) != 0 {
 		var refs []model.Expression
-		for _, v := range resource.DependsOn.Elements {
+		for _, v := range resource.Options.DependsOn.Elements {
 			resourceName := v.Value
 			if resourceVar, ok := imp.resources[resourceName]; ok {
 				refs = append(refs, model.VariableReference(resourceVar))
@@ -432,9 +432,9 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 			},
 		})
 	}
-	if len(resource.IgnoreChanges.GetElements()) != 0 {
+	if len(resource.Options.IgnoreChanges.GetElements()) != 0 {
 		var paths []model.Expression
-		for _, v := range resource.IgnoreChanges.Elements {
+		for _, v := range resource.Options.IgnoreChanges.Elements {
 			paths = append(paths, plainLit(v.Value))
 		}
 		optionItems = append(optionItems, &model.Attribute{
@@ -442,25 +442,25 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 			Value: &model.TupleConsExpression{Expressions: paths},
 		})
 	}
-	if resource.Parent != nil && resource.Parent.Value != "" {
-		resourceName := resource.Parent.Value
+	if resource.Options.Parent != nil && resource.Options.Parent.Value != "" {
+		resourceName := resource.Options.Parent.Value
 		if resourceVar, ok := imp.resources[resourceName]; ok {
 			optionItems = append(optionItems, &model.Attribute{
 				Name:  "parent",
 				Value: model.VariableReference(resourceVar),
 			})
 		} else {
-			diags.Extend(ast.ExprError(resource.Parent, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+			diags.Extend(ast.ExprError(resource.Options.Parent, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
 		}
 	}
-	if resource.Protect != nil && resource.Protect.Value {
+	if resource.Options.Protect != nil && resource.Options.Protect.Value {
 		optionItems = append(optionItems, &model.Attribute{
 			Name:  "protect",
-			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Protect.Value)},
+			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
 		})
 	}
-	if resource.Provider != nil && resource.Provider.Value != "" {
-		resourceName := resource.Provider.Value
+	if resource.Options.Provider != nil && resource.Options.Provider.Value != "" {
+		resourceName := resource.Options.Provider.Value
 		if resourceVar, ok := imp.resources[resourceName]; ok {
 			//nolint:ineffassign // TODO
 			optionItems = append(optionItems, &model.Attribute{
@@ -468,7 +468,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 				Value: model.VariableReference(resourceVar),
 			})
 		} else {
-			diags.Extend(ast.ExprError(resource.Provider, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+			diags.Extend(ast.ExprError(resource.Options.Provider, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
 		}
 	}
 

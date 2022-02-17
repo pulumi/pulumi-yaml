@@ -15,14 +15,16 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 			getExpressionDependencies(&deps, kvp.Value)
 		}
 	}
-	if r.DependsOn != nil {
-		deps = append(deps, r.DependsOn.Elements...)
-	}
-	if r.Provider != nil && r.Provider.Value != "" {
-		deps = append(deps, r.Provider)
-	}
-	if r.Parent != nil && r.Parent.Value != "" {
-		deps = append(deps, r.Parent)
+	if r.Options != nil {
+		if r.Options.DependsOn != nil {
+			deps = append(deps, r.Options.DependsOn.Elements...)
+		}
+		if r.Options.Provider != nil && r.Options.Provider.Value != "" {
+			deps = append(deps, r.Options.Provider)
+		}
+		if r.Options.Parent != nil && r.Options.Parent.Value != "" {
+			deps = append(deps, r.Options.Parent)
+		}
 	}
 	return deps
 }

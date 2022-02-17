@@ -354,65 +354,67 @@ func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) er
 	}
 
 	var opts []pulumi.ResourceOption
-	if v.AdditionalSecretOutputs != nil {
-		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.AdditionalSecretOutputs)))
-	}
-	if v.Aliases != nil {
-		var aliases []pulumi.Alias
-		for _, s := range v.Aliases.Elements {
-			alias := pulumi.Alias{
-				URN: pulumi.URN(s.Value),
+	if v.Options != nil {
+		if v.Options.AdditionalSecretOutputs != nil {
+			opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
+		}
+		if v.Options.Aliases != nil {
+			var aliases []pulumi.Alias
+			for _, s := range v.Options.Aliases.Elements {
+				alias := pulumi.Alias{
+					URN: pulumi.URN(s.Value),
+				}
+				aliases = append(aliases, alias)
 			}
-			aliases = append(aliases, alias)
+			opts = append(opts, pulumi.Aliases(aliases))
 		}
-		opts = append(opts, pulumi.Aliases(aliases))
-	}
-	if v.CustomTimeouts != nil {
-		var cts pulumi.CustomTimeouts
-		if v.CustomTimeouts.Create != nil {
-			cts.Create = v.CustomTimeouts.Create.Value
-		}
-		if v.CustomTimeouts.Update != nil {
-			cts.Update = v.CustomTimeouts.Update.Value
-		}
-		if v.CustomTimeouts.Delete != nil {
-			cts.Delete = v.CustomTimeouts.Delete.Value
-		}
+		if v.Options.CustomTimeouts != nil {
+			var cts pulumi.CustomTimeouts
+			if v.Options.CustomTimeouts.Create != nil {
+				cts.Create = v.Options.CustomTimeouts.Create.Value
+			}
+			if v.Options.CustomTimeouts.Update != nil {
+				cts.Update = v.Options.CustomTimeouts.Update.Value
+			}
+			if v.Options.CustomTimeouts.Delete != nil {
+				cts.Delete = v.Options.CustomTimeouts.Delete.Value
+			}
 
-		opts = append(opts, pulumi.Timeouts(&cts))
-	}
-	if v.DeleteBeforeReplace != nil {
-		opts = append(opts, pulumi.DeleteBeforeReplace(v.DeleteBeforeReplace.Value))
-	}
-	if v.DependsOn != nil {
-		var dependsOn []pulumi.Resource
-		for _, s := range v.DependsOn.Elements {
-			dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
+			opts = append(opts, pulumi.Timeouts(&cts))
 		}
-		opts = append(opts, pulumi.DependsOn(dependsOn))
-	}
-	if v.IgnoreChanges != nil {
-		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.IgnoreChanges)))
-	}
-	if v.Parent != nil && v.Parent.Value != "" {
-		opts = append(opts, pulumi.Parent(r.resources[v.Parent.Value].CustomResource()))
-	}
-	if v.Protect != nil {
-		opts = append(opts, pulumi.Protect(v.Protect.Value))
-	}
-	if v.Provider != nil && v.Provider.Value != "" {
-		provider := r.resources[v.Provider.Value].ProviderResource()
-		if provider == nil {
-			diags.Extend(ast.ExprError(v.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Provider.Value), ""))
-			return diags
+		if v.Options.DeleteBeforeReplace != nil {
+			opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 		}
-		opts = append(opts, pulumi.Provider(provider))
-	}
-	if v.Version != nil {
-		opts = append(opts, pulumi.Version(v.Version.Value))
-	}
-	if v.PluginDownloadURL != nil {
-		opts = append(opts, pulumi.PluginDownloadURL(v.PluginDownloadURL.Value))
+		if v.Options.DependsOn != nil {
+			var dependsOn []pulumi.Resource
+			for _, s := range v.Options.DependsOn.Elements {
+				dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
+		}
+		if v.Options.IgnoreChanges != nil {
+			opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
+		}
+		if v.Options.Parent != nil && v.Options.Parent.Value != "" {
+			opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
+		}
+		if v.Options.Protect != nil {
+			opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
+		}
+		if v.Options.Provider != nil && v.Options.Provider.Value != "" {
+			provider := r.resources[v.Options.Provider.Value].ProviderResource()
+			if provider == nil {
+				diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
+				return diags
+			}
+			opts = append(opts, pulumi.Provider(provider))
+		}
+		if v.Options.Version != nil {
+			opts = append(opts, pulumi.Version(v.Options.Version.Value))
+		}
+		if v.Options.PluginDownloadURL != nil {
+			opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
+		}
 	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on

@@ -47,7 +47,7 @@ build:: ensure
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  go test -v --timeout 10m -count 1 -parallel ${CONCURRENCY} ./pkg/...
+	  go test -v --timeout 30m -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test

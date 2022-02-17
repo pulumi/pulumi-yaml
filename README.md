@@ -83,7 +83,8 @@ resources:
       region: us-east-2
   MyBucket:
     type: aws:s3/bucket:Bucket
-    provider: UsEast2Provider
+    options:
+      provider: UsEast2Provider
 outputs:
   InstanceId: ${WebServer}
   PublicIp: ${WebServer.publicIp}

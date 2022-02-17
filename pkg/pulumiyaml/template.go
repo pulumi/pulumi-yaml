@@ -65,15 +65,8 @@ type Configuration struct {
 	MinValue *int64 `json:",omitempty" yaml:",omitempty"`
 }
 
-// Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
-// complete with its properties and various other behavioral elements.
-type Resource struct {
-	// Type is the Pulumi type token for this resource.
-	Type string `yaml:""`
-	// Component indicates this resources is a component
-	Component bool `yaml:",omitempty"`
-	// Properties contains the primary resource-specific keys and values to initialize the resource state.
-	Properties map[string]interface{} `json:",omitempty" yaml:",omitempty"`
+// ResourceOptions describes additional options common to all Pulumi resources.
+type ResourceOptions struct {
 	// AdditionalSecretOutputs specifies properties that must be encrypted as secrets
 	AdditionalSecretOutputs []string `json:",omitempty" yaml:",omitempty"`
 	// Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it
@@ -99,6 +92,19 @@ type Resource struct {
 	Provider string `json:",omitempty" yaml:",omitempty"`
 	// Version specifies a provider plugin version that should be used when operating on a resource
 	Version string `json:",omitempty" yaml:",omitempty"`
+}
+
+// Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
+// complete with its properties and various other behavioral elements.
+type Resource struct {
+	// Type is the Pulumi type token for this resource.
+	Type string `yaml:""`
+	// Component indicates this resources is a component
+	Component bool `yaml:",omitempty"`
+	// Properties contains the primary resource-specific keys and values to initialize the resource state.
+	Properties map[string]interface{} `json:",omitempty" yaml:",omitempty"`
+	// Options contains all Pulumi resource options used to register the resource.
+	ResourceOptions *ResourceOptions `json:",omitempty" yaml:",omitempty"`
 
 	// TODO: Condition, Metadata
 
