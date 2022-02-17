@@ -175,25 +175,24 @@ func unquoteInterpolation(s string) string {
 }
 
 func (g *generator) genResource(n *pcl.Resource) {
-	var provider, version, parent string
-	var dependsOn, ignoreChanges []string
-	var protect bool
+	var rOpts *pulumiyaml.ResourceOptions
 	if opts := n.Options; opts != nil {
+		rOpts = &pulumiyaml.ResourceOptions{}
 		if opts.Provider != nil {
-			provider = unquoteInterpolation(g.expr(opts.Provider).(string))
+			rOpts.Provider = unquoteInterpolation(g.expr(opts.Provider).(string))
 		}
 		if opts.Parent != nil {
-			parent = unquoteInterpolation(g.expr(opts.Parent).(string))
+			rOpts.Parent = unquoteInterpolation(g.expr(opts.Parent).(string))
 		}
 		if opts.DependsOn != nil {
 			for _, d := range g.expr(opts.DependsOn).([]interface{}) {
-				dependsOn = append(dependsOn, d.(string))
+				rOpts.DependsOn = append(rOpts.DependsOn, d.(string))
 			}
 		}
 		if opts.IgnoreChanges != nil {
 			for _, d := range g.expr(opts.IgnoreChanges).([]interface{}) {
 				path := unquoteInterpolation(d.(string))
-				ignoreChanges = append(ignoreChanges, path)
+				rOpts.IgnoreChanges = append(rOpts.IgnoreChanges, path)
 			}
 		}
 		if opts.Protect != nil {
@@ -209,7 +208,7 @@ func (g *generator) genResource(n *pcl.Resource) {
 			} else {
 				contract.Assertf(ok, "Invalid value for '%v': '%[2]v' (%[2]T)", opts.Protect, g.expr(opts.Protect))
 			}
-			protect = b
+			rOpts.Protect = b
 		}
 	}
 	properties := map[string]interface{}{}
@@ -228,22 +227,12 @@ func (g *generator) genResource(n *pcl.Resource) {
 		n.Schema = &schema.Resource{}
 	}
 	r := &pulumiyaml.Resource{
-		Type:                    n.Token,
-		Component:               n.Schema.IsComponent,
-		Properties:              properties,
-		AdditionalSecretOutputs: nil,
-		Aliases:                 nil,
-		CustomTimeouts:          nil,
-		DeleteBeforeReplace:     false,
-		DependsOn:               dependsOn,
-		IgnoreChanges:           ignoreChanges,
-		Import:                  "",
-		Parent:                  parent,
-		Protect:                 protect,
-		Provider:                provider,
-		Version:                 version,
-		Condition:               "",
-		Metadata:                nil,
+		Type:            n.Token,
+		Component:       n.Schema.IsComponent,
+		Properties:      properties,
+		ResourceOptions: rOpts,
+		Condition:       "",
+		Metadata:        nil,
 	}
 
 	if g.result.Resources == nil {
