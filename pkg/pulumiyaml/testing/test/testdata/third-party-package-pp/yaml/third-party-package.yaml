@@ -6,4 +6,4 @@ resources:
     Question:
         type: other:module:Object
         properties:
-            answer: "42"
+            answer: 42

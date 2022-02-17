@@ -10,7 +10,7 @@ resources:
                 ? |-
                     # Currently only 1 replica supported, until leader election: https://github.com/pulumi/pulumi-kubernetes-operator/issues/33
                     replicas
-                : "1"
+                : 1
                 selector:
                     matchLabels:
                         name: pulumi-kubernetes-operator
@@ -19,11 +19,17 @@ resources:
                         labels:
                             name: pulumi-kubernetes-operator
                     spec:
+                        serviceAccountName: pulumi-kubernetes-operator
+                        imagePullSecrets:
+                            - name: pulumi-kubernetes-operator
                         containers:
-                            - args:
-                                - --zap-level=debug
+                            - name: pulumi-kubernetes-operator
+                              image: pulumi/pulumi-kubernetes-operator:v0.0.2
                               command:
                                 - pulumi-kubernetes-operator
+                              args:
+                                - --zap-level=debug
+                              imagePullPolicy: Always
                               env:
                                 - name: WATCH_NAMESPACE
                                   valueFrom:
@@ -35,23 +41,17 @@ resources:
                                         fieldPath: metadata.name
                                 - name: OPERATOR_NAME
                                   value: pulumi-kubernetes-operator
-                              image: pulumi/pulumi-kubernetes-operator:v0.0.2
-                              imagePullPolicy: Always
-                              name: pulumi-kubernetes-operator
-                        imagePullSecrets:
-                            - name: pulumi-kubernetes-operator
-                        serviceAccountName: pulumi-kubernetes-operator
     pulumi_kubernetes_operatorRole:
         type: kubernetes:rbac.authorization.k8s.io/v1:Role
         properties:
             apiVersion: rbac.authorization.k8s.io/v1
             kind: Role
             metadata:
-                creationTimestamp: "null"
+                creationTimestamp: null
                 name: pulumi-kubernetes-operator
             rules:
                 - apiGroups:
-                    - ""
+                    -
                   resources:
                     - pods
                     - services
@@ -100,7 +100,7 @@ resources:
                   verbs:
                     - update
                 - apiGroups:
-                    - ""
+                    -
                   resources:
                     - pods
                   verbs:
@@ -127,17 +127,17 @@ resources:
     pulumi_kubernetes_operatorRoleBinding:
         type: kubernetes:rbac.authorization.k8s.io/v1:RoleBinding
         properties:
-            apiVersion: rbac.authorization.k8s.io/v1
             kind: RoleBinding
+            apiVersion: rbac.authorization.k8s.io/v1
             metadata:
-                name: pulumi-kubernetes-operator
-            roleRef:
-                apiGroup: rbac.authorization.k8s.io
-                kind: Role
                 name: pulumi-kubernetes-operator
             subjects:
                 - kind: ServiceAccount
                   name: pulumi-kubernetes-operator
+            roleRef:
+                kind: Role
+                name: pulumi-kubernetes-operator
+                apiGroup: rbac.authorization.k8s.io
     pulumi_kubernetes_operatorServiceAccount:
         type: kubernetes:core/v1:ServiceAccount
         properties:

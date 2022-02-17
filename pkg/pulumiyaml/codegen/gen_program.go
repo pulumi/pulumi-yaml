@@ -3,13 +3,15 @@
 package codegen
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"gopkg.in/yaml.v3"
 
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
+	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
@@ -17,20 +19,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
-func GenerateProgram(p *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
-	t, d, err := GenerateTemplate(p)
-	if err != nil {
-		return nil, nil, err
-	}
-	bYAML, err := yaml.Marshal(t)
-	if err != nil {
-		return nil, nil, err
-	}
-	return map[string][]byte{"Main.yaml": bYAML}, d, nil
-}
-
 // Generate a serializable YAML template.
-func GenerateTemplate(program *pcl.Program) (pulumiyaml.Template, hcl.Diagnostics, error) {
+func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
 	g := generator{
 		invokeResults: map[*model.FunctionCallExpression]*InvokeCall{},
 	}
@@ -41,14 +31,48 @@ func GenerateTemplate(program *pcl.Program) (pulumiyaml.Template, hcl.Diagnostic
 		g.genNode(n)
 	}
 
-	return g.result, g.diags, nil
+	w := &bytes.Buffer{}
+
+	diags := encoding.EncodeYAML(yaml.NewEncoder(w), g.UnifyOutput())
+
+	var err error
+	if diags.HasErrors() {
+		err = diags
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
 }
 
 type generator struct {
-	result pulumiyaml.Template
-	diags  hcl.Diagnostics
+	diags hcl.Diagnostics
 	// Because we need a return statement, we might need to call a invoke multiple times.
 	invokeResults map[*model.FunctionCallExpression]*InvokeCall
+
+	// These values can be assembled into a template
+	config    []syn.ObjectPropertyDef
+	resources []syn.ObjectPropertyDef
+	variables []syn.ObjectPropertyDef
+	outputs   []syn.ObjectPropertyDef
+}
+
+func (g *generator) UnifyOutput() syn.Node {
+	entries := []syn.ObjectPropertyDef{}
+	if len(g.config) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("config"), syn.Object(g.config...)))
+	}
+	if len(g.resources) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("resources"), syn.Object(g.resources...)))
+	}
+	if len(g.variables) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("variables"), syn.Object(g.variables...)))
+	}
+	if len(g.outputs) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("outputs"), syn.Object(g.outputs...)))
+	}
+	return syn.Object(entries...)
 }
 
 type InvokeCall struct {
@@ -168,114 +192,123 @@ func (g *generator) genNode(n pcl.Node) {
 	}
 }
 
-func unquoteInterpolation(s string) string {
-	s = strings.TrimPrefix(s, "${")
-	s = strings.TrimSuffix(s, "}")
-	return s
+func unquoteInterpolation(n syn.Node) *syn.StringNode {
+	s, ok := n.(*syn.StringNode)
+	contract.Assert(ok)
+	v := strings.TrimPrefix(s.Value(), "${")
+	v = strings.TrimSuffix(v, "}")
+	return syn.String(v)
+}
+
+func mustCoerceBoolean(n syn.Node) *syn.BooleanNode {
+	switch n := n.(type) {
+	case *syn.BooleanNode:
+		return n
+	case *syn.StringNode:
+		return syn.Boolean(n.Value() == "true")
+	default:
+		panic(fmt.Sprintf("Could not coerce type %[1]T to a boolean: '%[1]#v'", n))
+	}
 }
 
 func (g *generator) genResource(n *pcl.Resource) {
-	var rOpts *pulumiyaml.ResourceOptions
+	rOpts := []syn.ObjectPropertyDef{}
 	if opts := n.Options; opts != nil {
-		rOpts = &pulumiyaml.ResourceOptions{}
 		if opts.Provider != nil {
-			rOpts.Provider = unquoteInterpolation(g.expr(opts.Provider).(string))
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
+				unquoteInterpolation(g.expr(opts.Provider))))
 		}
 		if opts.Parent != nil {
-			rOpts.Parent = unquoteInterpolation(g.expr(opts.Parent).(string))
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
+				unquoteInterpolation(g.expr(opts.Parent))))
 		}
 		if opts.DependsOn != nil {
-			for _, d := range g.expr(opts.DependsOn).([]interface{}) {
-				rOpts.DependsOn = append(rOpts.DependsOn, d.(string))
-			}
+			elems := g.expr(opts.DependsOn)
+			_, ok := elems.(*syn.ListNode)
+			contract.Assert(ok)
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependson"), elems))
 		}
 		if opts.IgnoreChanges != nil {
-			for _, d := range g.expr(opts.IgnoreChanges).([]interface{}) {
-				path := unquoteInterpolation(d.(string))
-				rOpts.IgnoreChanges = append(rOpts.IgnoreChanges, path)
+			elems := g.expr(opts.IgnoreChanges).(*syn.ListNode)
+			ignoreChanges := make([]syn.Node, elems.Len())
+			for i := range ignoreChanges {
+				ignoreChanges[i] = unquoteInterpolation(elems.Index(i))
 			}
+			list := syn.ListSyntax(elems.Syntax(), ignoreChanges...)
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("ignorechanges"), list))
 		}
 		if opts.Protect != nil {
-			expr := g.expr(opts.Protect)
-			b, ok := expr.(bool)
-			if s, isString := expr.(string); !ok && isString {
-				s = strings.TrimSpace(s)
-				if s == "true" {
-					b = true
-				} else {
-					contract.Assertf(s == "false", "'%s' is neither true nor false", s)
-				}
-			} else {
-				contract.Assertf(ok, "Invalid value for '%v': '%[2]v' (%[2]T)", opts.Protect, g.expr(opts.Protect))
-			}
-			rOpts.Protect = b
+			expr := mustCoerceBoolean(g.expr(opts.Protect))
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("protect"), expr))
 		}
 	}
-	properties := map[string]interface{}{}
-	var additionalSecrets []string
-	for _, input := range n.Inputs {
+	properties := make([]syn.ObjectPropertyDef, len(n.Inputs))
+	var additionalSecrets []*syn.StringNode
+	for i, input := range n.Inputs {
 		value := input.Value
 		if f, ok := value.(*model.FunctionCallExpression); ok && f.Name == "secret" {
 			contract.Assert(len(f.Args) == 1)
-			additionalSecrets = append(additionalSecrets, input.Name)
+			additionalSecrets = append(additionalSecrets, syn.String(input.Name))
 			value = f.Args[0]
 		}
-		properties[input.Name] = g.expr(value)
+		properties[i] = syn.ObjectProperty(syn.String(input.Name), g.expr(value))
 	}
 	if n.Schema == nil {
 		g.missingSchema()
 		n.Schema = &schema.Resource{}
 	}
-	r := &pulumiyaml.Resource{
-		Type:            n.Token,
-		Component:       n.Schema.IsComponent,
-		Properties:      properties,
-		ResourceOptions: rOpts,
-		Condition:       "",
-		Metadata:        nil,
+	entries := []syn.ObjectPropertyDef{
+		syn.ObjectProperty(syn.String("type"), syn.String(n.Token)),
 	}
+	if n.Schema.IsComponent {
+		entries = append(entries, syn.ObjectProperty(syn.String("component"), syn.Boolean(true)))
+	}
+	if len(properties) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("properties"), syn.Object(properties...)))
+	}
+	if len(rOpts) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("resourceoptions"), syn.Object(rOpts...)))
+	}
+	r := syn.Object(entries...)
 
-	if g.result.Resources == nil {
-		g.result.Resources = map[string]*pulumiyaml.Resource{}
-	}
-	g.result.Resources[n.Name()] = r
+	g.resources = append(g.resources, syn.ObjectProperty(syn.String(n.Name()), r))
 }
 
 func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
-	if g.result.Outputs == nil {
-		g.result.Outputs = map[string]interface{}{}
-	}
-	g.result.Outputs[n.Name()] = g.expr(n.Value)
+	k := syn.String(n.Name())
+	v := g.expr(n.Value)
+	g.outputs = append(g.outputs, syn.ObjectProperty(k, v))
 }
 
-func (g *generator) expr(e model.Expression) interface{} {
+func (g *generator) expr(e model.Expression) syn.Node {
 	switch e := e.(type) {
 	case *model.LiteralValueExpression:
 		switch e.Type() {
 		case model.StringType:
 			v := e.Value.AsString()
-			return v
+			return syn.String(v)
 		case model.NumberType:
 			v := e.Value.AsBigFloat()
 			f, _ := v.Float64()
-			return f
+			return syn.Number(f)
 		case model.IntType:
 			v := e.Value.AsBigFloat()
-			i, _ := v.Int64()
-			return i
+			// TODO is there an integer node
+			i, _ := v.Float64()
+			return syn.Number(i)
 		case model.NoneType:
 			return nil
 		case model.BoolType:
 			r := strings.TrimSpace(fmt.Sprintf("%v", e))
-			return r == "true"
+			return syn.Boolean(r == "true")
 		default:
 			r := strings.TrimSpace(fmt.Sprintf("%v", e))
-			return r
+			return syn.String(r)
 		}
 	case *model.FunctionCallExpression:
 		return g.function(e)
 	case *model.ScopeTraversalExpression:
-		return "${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}"
+		return syn.String("${" + strings.TrimSpace(fmt.Sprintf("%.v", e)) + "}")
 	case *model.TemplateExpression:
 		s := ""
 		for _, expr := range e.Parts {
@@ -285,20 +318,21 @@ func (g *generator) expr(e model.Expression) interface{} {
 				s += fmt.Sprintf("${%.v}", expr)
 			}
 		}
-		return s
+		return syn.String(s)
 	case *model.TupleConsExpression:
-		ls := make([]interface{}, len(e.Expressions))
+		ls := make([]syn.Node, len(e.Expressions))
 		for i, e := range e.Expressions {
 			ls[i] = g.expr(e)
 		}
-		return ls
+		return syn.List(ls...)
 	case *model.ObjectConsExpression:
-		obj := map[string]interface{}{}
-		for _, e := range e.Items {
-			key := strings.TrimSpace(fmt.Sprintf("%#v", e.Key))
-			obj[key] = g.expr(e.Value)
+		entries := make([]syn.ObjectPropertyDef, len(e.Items))
+		for i, e := range e.Items {
+			key := g.expr(e.Key).(*syn.StringNode)
+			value := g.expr(e.Value)
+			entries[i] = syn.ObjectProperty(key, value)
 		}
-		return obj
+		return syn.Object(entries...)
 	case *model.SplatExpression:
 		g.yamlLimitation(Splat)
 		return nil
@@ -310,56 +344,44 @@ func (g *generator) expr(e model.Expression) interface{} {
 }
 
 func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
-	var defValue interface{}
-	typ := n.Type()
+	entries := []syn.ObjectPropertyDef{
+		syn.ObjectProperty(syn.String("type"), syn.String(n.Type().String())),
+	}
 	if n.DefaultValue != nil {
-		defValue = g.expr(n.DefaultValue)
+		prop := syn.ObjectProperty(syn.String("default"), g.expr(n.DefaultValue))
+		entries = append(entries, prop)
 	}
-	config := &pulumiyaml.Configuration{
-		Type:                  typ.String(),
-		Default:               defValue,
-		Secret:                nil,
-		AllowedPattern:        nil,
-		AllowedValues:         nil,
-		ConstraintDescription: "",
-		Description:           "",
-		MaxLength:             nil,
-		MaxValue:              nil,
-		MinLength:             nil,
-		MinValue:              nil,
-	}
-	if g.result.Configuration == nil {
-		g.result.Configuration = map[string]*pulumiyaml.Configuration{}
-	}
-	g.result.Configuration[n.Name()] = config
+
+	k := syn.String(n.Name())
+	v := syn.Object(entries...)
+	g.config = append(g.config, syn.ObjectProperty(k, v))
 }
 
 func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
-	if v := g.result.Variables; v == nil {
-		g.result.Variables = map[string]interface{}{}
-	}
-	g.result.Variables[n.Name()] = g.expr(n.Definition.Value)
+	k := syn.String(n.Name())
+	v := g.expr(n.Definition.Value)
+	entry := syn.ObjectProperty(k, v)
+	g.variables = append(g.variables, entry)
 }
 
-func (g *generator) function(f *model.FunctionCallExpression) interface{} {
-	fn := func(name string, body interface{}) map[string]interface{} {
-		return map[string]interface{}{
-			"Fn::" + name: body,
-		}
+func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
+	fn := func(name string, body syn.Node) *syn.ObjectNode {
+		entry := syn.ObjectProperty(syn.String("Fn::"+name), body)
+		return syn.Object(entry)
 	}
 	switch f.Name {
 	case pcl.Invoke:
 		return fn("Invoke", g.MustInvoke(f))
 	case "fileAsset":
-		return fn("Asset", map[string]interface{}{
-			"File": g.expr(f.Args[0]),
-		})
+		return fn("Asset", syn.Object(
+			syn.ObjectProperty(syn.String("File"), g.expr(f.Args[0])),
+		))
 	case "join":
-		var args []interface{}
-		for _, arg := range f.Args {
-			args = append(args, g.expr(arg))
+		args := make([]syn.Node, len(f.Args))
+		for i, arg := range f.Args {
+			args[i] = g.expr(arg)
 		}
-		return fn("Join", args)
+		return fn("Join", syn.List(args...))
 	case "toJSON":
 		g.yamlLimitation(ToJSON)
 		return nil
@@ -377,15 +399,15 @@ type Invoke struct {
 	Return    string      `yaml:"Return" json:"Return"`
 }
 
-func (g *generator) MustInvoke(f *model.FunctionCallExpression) Invoke {
+func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode {
 	contract.Assert(f.Name == pcl.Invoke)
 	contract.Assert(len(f.Args) > 0)
-	name := g.expr(f.Args[0]).(string)
-	var arguments map[string]interface{}
+	name := g.expr(f.Args[0])
+	var arguments syn.Node
 	if len(f.Args) > 1 {
 		_, ok := f.Args[1].(*model.ObjectConsExpression)
 		contract.Assert(ok)
-		arguments = g.expr(f.Args[1]).(map[string]interface{})
+		arguments = g.expr(f.Args[1])
 	}
 
 	// Calculate the return value
@@ -393,16 +415,15 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) Invoke {
 	contract.Assertf(len(fnInfo.usedValues) > 0,
 		"Invoke assigned to %s has no used values. Dumping known invokes: %#v",
 		fnInfo.name, g.invokeResults)
-	var retValue string
+	var retValue *syn.StringNode
 	if len(fnInfo.usedValues) == 1 {
-		retValue = fnInfo.usedValues.SortedValues()[0]
+		retValue = syn.String(fnInfo.usedValues.SortedValues()[0])
 	} else {
 		panic("unimplemented")
 	}
-
-	return Invoke{
-		Function:  name,
-		Arguments: arguments,
-		Return:    retValue,
-	}
+	return syn.Object(
+		syn.ObjectProperty(syn.String("Function"), name),
+		syn.ObjectProperty(syn.String("Arguments"), arguments),
+		syn.ObjectProperty(syn.String("Return"), retValue),
+	)
 }

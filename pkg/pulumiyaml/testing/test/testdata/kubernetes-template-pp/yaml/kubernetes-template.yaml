@@ -7,18 +7,18 @@ resources:
             metadata:
                 name: argocd-server
             spec:
-                replicas: "1"
                 selector:
                     matchLabels:
                         app: server
+                replicas: 1
                 template:
                     metadata:
                         labels:
                             app: server
                     spec:
                         containers:
-                            - image: nginx
-                              name: nginx
+                            - name: nginx
+                              image: nginx
                               readinessProbe:
                                 httpGet:
-                                    port: "8080"
+                                    port: 8080
