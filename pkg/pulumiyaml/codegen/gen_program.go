@@ -268,7 +268,7 @@ func (g *generator) genResource(n *pcl.Resource) {
 		entries = append(entries, syn.ObjectProperty(syn.String("properties"), syn.Object(properties...)))
 	}
 	if len(rOpts) > 0 {
-		entries = append(entries, syn.ObjectProperty(syn.String("resourceoptions"), syn.Object(rOpts...)))
+		entries = append(entries, syn.ObjectProperty(syn.String("options"), syn.Object(rOpts...)))
 	}
 	r := syn.Object(entries...)
 
@@ -286,6 +286,8 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	case *model.LiteralValueExpression:
 		t := e.Value.Type()
 		switch {
+		case t.Equals(cty.NilType) || e.Value.IsNull():
+			return syn.Null()
 		case t.Equals(cty.String):
 			v := e.Value.AsString()
 			return syn.String(v)
@@ -293,14 +295,13 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			v := e.Value.AsBigFloat()
 			f, _ := v.Float64()
 			return syn.Number(f)
-		case t.Equals(cty.NilType) || e.Value.IsNull():
-			return syn.Null()
 		case t.Equals(cty.Bool):
 			return syn.Boolean(e.Value.True())
 		default:
 			contract.Failf("Unexpected LiteralValueExpression (%[1]v): %[1]v", e.Type(), e)
 			panic(nil)
 		}
+
 	case *model.FunctionCallExpression:
 		return g.function(e)
 	case *model.ScopeTraversalExpression:
@@ -333,45 +334,39 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		}
 		s = fmt.Sprintf("${%s}", s)
 		return syn.String(s)
+
 	case *model.TemplateExpression:
-		inline := true
+		useJoin := false
 		nodes := []syn.Node{}
 		for _, expr := range e.Parts {
 			n := g.expr(expr)
 			nodes = append(nodes, n)
-			switch expr := expr.(type) {
-			case *model.LiteralValueExpression:
-				if expr.Type().Equals(model.StringType) {
-					inline = false
-				}
-			case *model.ScopeTraversalExpression:
-			case *model.TemplateExpression:
-				if _, isString := n.(*syn.StringNode); !isString {
-					inline = false
-				}
-			default:
-				inline = false
+			if _, ok := n.(*syn.StringNode); !ok {
+				useJoin = true
 			}
 		}
 
 		// Inline implies we can construct the string directly, using string interpolation for traversals.
 		// Not inline means we need to use a Fn::Join statement.
-		if inline {
-			s := ""
-			for _, expr := range e.Parts {
-				// The inline check ensures that the cast is valid.
-				s += g.expr(expr).(*syn.StringNode).Value()
-			}
-			return syn.String(s)
+		if useJoin {
+			contract.Failf("Non-inline expressions are not implemented yet")
+			panic(nil)
 		}
-		contract.Failf("Non-inline expressions are not implemented yet")
-		panic(nil)
+
+		s := ""
+		for _, expr := range e.Parts {
+			// The inline check ensures that the cast is valid.
+			s += g.expr(expr).(*syn.StringNode).Value()
+		}
+		return syn.String(s)
+
 	case *model.TupleConsExpression:
 		ls := make([]syn.Node, len(e.Expressions))
 		for i, e := range e.Expressions {
 			ls[i] = g.expr(e)
 		}
 		return syn.List(ls...)
+
 	case *model.ObjectConsExpression:
 		entries := make([]syn.ObjectPropertyDef, len(e.Items))
 		for i, e := range e.Items {
@@ -380,11 +375,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			entries[i] = syn.ObjectProperty(key, value)
 		}
 		return syn.Object(entries...)
+
 	case *model.SplatExpression:
 		g.yamlLimitation(Splat)
 		return nil
-	case nil:
-		return syn.Null()
 	default:
 		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
 		panic(nil)
