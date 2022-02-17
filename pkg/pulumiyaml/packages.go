@@ -23,12 +23,8 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) []Plugin {
 	for _, kvp := range tmpl.Resources.GetEntries() {
 		res := kvp.Value
 		typeParts := strings.Split(res.Type.Value, ":")
-		version := ""
-		pluginDownloadURL := ""
-		if res.Options != nil {
-			version = res.Options.Version.GetValue()
-			pluginDownloadURL = res.Options.PluginDownloadURL.GetValue()
-		}
+		version := res.Options.Version.GetValue()
+		pluginDownloadURL := res.Options.PluginDownloadURL.GetValue()
 		if len(typeParts) == 3 && typeParts[0] == "pulumi" && typeParts[1] == "providers" {
 			// If it's pulumi:providers:aws, use the third part.
 			pkgs = append(pkgs, Plugin{

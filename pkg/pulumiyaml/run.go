@@ -349,85 +349,78 @@ func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) er
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
 	props := make(map[string]interface{})
-	if v.Properties != nil {
-		for _, kvp := range v.Properties.Entries {
-			vv, vdiags := r.evaluateExpr(kvp.Value)
-			diags.Extend(vdiags...)
-			if vdiags.HasErrors() {
-				return fmt.Errorf("internal error: %w", vdiags)
-			}
-			props[kvp.Key.Value] = vv
+	for _, kvp := range v.Properties.Entries {
+		vv, vdiags := r.evaluateExpr(kvp.Value)
+		diags.Extend(vdiags...)
+		if vdiags.HasErrors() {
+			return fmt.Errorf("internal error: %w", vdiags)
 		}
-	} else {
-		// TODO: Make this a diagnostic warning?
-		// diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("resource %v passed has an empty properties value", kvp.Key.Value), ""))
+		props[kvp.Key.Value] = vv
 	}
 
 	var opts []pulumi.ResourceOption
-	if v.Options != nil {
-		if v.Options.AdditionalSecretOutputs != nil {
-			opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
+	if v.Options.AdditionalSecretOutputs != nil {
+		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
+	}
+	if v.Options.Aliases != nil {
+		var aliases []pulumi.Alias
+		for _, s := range v.Options.Aliases.Elements {
+			alias := pulumi.Alias{
+				URN: pulumi.URN(s.Value),
+			}
+			aliases = append(aliases, alias)
 		}
-		if v.Options.Aliases != nil {
-			var aliases []pulumi.Alias
-			for _, s := range v.Options.Aliases.Elements {
-				alias := pulumi.Alias{
-					URN: pulumi.URN(s.Value),
-				}
-				aliases = append(aliases, alias)
-			}
-			opts = append(opts, pulumi.Aliases(aliases))
+		opts = append(opts, pulumi.Aliases(aliases))
+	}
+	if v.Options.CustomTimeouts != nil {
+		var cts pulumi.CustomTimeouts
+		if v.Options.CustomTimeouts.Create != nil {
+			cts.Create = v.Options.CustomTimeouts.Create.Value
 		}
-		if v.Options.CustomTimeouts != nil {
-			var cts pulumi.CustomTimeouts
-			if v.Options.CustomTimeouts.Create != nil {
-				cts.Create = v.Options.CustomTimeouts.Create.Value
-			}
-			if v.Options.CustomTimeouts.Update != nil {
-				cts.Update = v.Options.CustomTimeouts.Update.Value
-			}
-			if v.Options.CustomTimeouts.Delete != nil {
-				cts.Delete = v.Options.CustomTimeouts.Delete.Value
-			}
+		if v.Options.CustomTimeouts.Update != nil {
+			cts.Update = v.Options.CustomTimeouts.Update.Value
+		}
+		if v.Options.CustomTimeouts.Delete != nil {
+			cts.Delete = v.Options.CustomTimeouts.Delete.Value
+		}
 
-			opts = append(opts, pulumi.Timeouts(&cts))
+		opts = append(opts, pulumi.Timeouts(&cts))
+	}
+	if v.Options.DeleteBeforeReplace != nil {
+		opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
+	}
+	if v.Options.DependsOn != nil {
+		var dependsOn []pulumi.Resource
+		for _, s := range v.Options.DependsOn.Elements {
+			dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
 		}
-		if v.Options.DeleteBeforeReplace != nil {
-			opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
+		opts = append(opts, pulumi.DependsOn(dependsOn))
+	}
+	if v.Options.IgnoreChanges != nil {
+		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
+	}
+	if v.Options.Parent != nil && v.Options.Parent.Value != "" {
+		opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
+	}
+	if v.Options.Protect != nil {
+		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
+	}
+	if v.Options.Provider != nil && v.Options.Provider.Value != "" {
+		provider := r.resources[v.Options.Provider.Value].ProviderResource()
+		if provider == nil {
+			diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
+			return diags
 		}
-		if v.Options.DependsOn != nil {
-			var dependsOn []pulumi.Resource
-			for _, s := range v.Options.DependsOn.Elements {
-				dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
-			}
-			opts = append(opts, pulumi.DependsOn(dependsOn))
-		}
-		if v.Options.IgnoreChanges != nil {
-			opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
-		}
-		if v.Options.Parent != nil && v.Options.Parent.Value != "" {
-			opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
-		}
-		if v.Options.Protect != nil {
-			opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
-		}
-		if v.Options.Provider != nil && v.Options.Provider.Value != "" {
-			provider := r.resources[v.Options.Provider.Value].ProviderResource()
-			if provider == nil {
-				diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
-				return diags
-			}
-			opts = append(opts, pulumi.Provider(provider))
-		}
-		if v.Options.Version != nil {
-			opts = append(opts, pulumi.Version(v.Options.Version.Value))
-		}
-		if v.Options.PluginDownloadURL != nil {
-			opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
-		}
-		if v.Options.ReplaceOnChanges != nil {
-			opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
-		}
+		opts = append(opts, pulumi.Provider(provider))
+	}
+	if v.Options.Version != nil {
+		opts = append(opts, pulumi.Version(v.Options.Version.Value))
+	}
+	if v.Options.PluginDownloadURL != nil {
+		opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
+	}
+	if v.Options.ReplaceOnChanges != nil {
+		opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
 	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
@@ -472,10 +465,6 @@ func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) er
 }
 
 func (r *runner) registerOutputs() syntax.Diagnostics {
-	if r.t.Outputs == nil {
-		return nil
-	}
-
 	var diags syntax.Diagnostics
 	for _, kvp := range r.t.Outputs.Entries {
 		out, odiags := r.evaluateExpr(kvp.Value)

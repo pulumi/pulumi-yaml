@@ -39,6 +39,10 @@ type StringListDecl struct {
 	Elements []*StringExpr
 }
 
+type nonNilDecl interface {
+	defaultValue() interface{}
+}
+
 func (d *StringListDecl) GetElements() []*StringExpr {
 	if d == nil {
 		return nil
@@ -75,6 +79,10 @@ type ConfigMapDecl struct {
 	declNode
 
 	Entries []ConfigMapEntry
+}
+
+func (d *ConfigMapDecl) defaultValue() interface{} {
+	return &ConfigMapDecl{}
 }
 
 func (d *ConfigMapDecl) GetEntries() []ConfigMapEntry {
@@ -124,6 +132,10 @@ type VariablesMapDecl struct {
 	Entries []VariablesMapEntry
 }
 
+func (d *VariablesMapDecl) defaultValue() interface{} {
+	return &VariablesMapDecl{}
+}
+
 func (d *VariablesMapDecl) GetEntries() []VariablesMapEntry {
 	if d == nil {
 		return nil
@@ -167,6 +179,10 @@ type ResourcesMapDecl struct {
 	declNode
 
 	Entries []ResourcesMapEntry
+}
+
+func (d *ResourcesMapDecl) defaultValue() interface{} {
+	return &ResourcesMapDecl{}
 }
 
 func (d *ResourcesMapDecl) GetEntries() []ResourcesMapEntry {
@@ -214,6 +230,10 @@ type PropertyMapDecl struct {
 	declNode
 
 	Entries []PropertyMapEntry
+}
+
+func (d *PropertyMapDecl) defaultValue() interface{} {
+	return &PropertyMapDecl{}
 }
 
 func (d *PropertyMapDecl) GetEntries() []PropertyMapEntry {
@@ -296,7 +316,11 @@ type ResourceOptionsDecl struct {
 	ReplaceOnChanges        *StringListDecl
 }
 
-func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
+func (d *ResourceOptionsDecl) defaultValue() interface{} {
+	return &ResourceOptionsDecl{}
+}
+
+func (d ResourceOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
@@ -304,9 +328,9 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr,
 	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr,
-	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl) *ResourceOptionsDecl {
+	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl) ResourceOptionsDecl {
 
-	return &ResourceOptionsDecl{
+	return ResourceOptionsDecl{
 		declNode:                decl(node),
 		AdditionalSecretOutputs: additionalSecretOutputs,
 		Aliases:                 aliases,
@@ -328,7 +352,7 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr, parent *StringExpr,
 	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr,
-	replaceOnChanges *StringListDecl) *ResourceOptionsDecl {
+	replaceOnChanges *StringListDecl) ResourceOptionsDecl {
 
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
 		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider,
@@ -340,8 +364,8 @@ type ResourceDecl struct {
 
 	Type       *StringExpr
 	Component  *BooleanExpr
-	Properties *PropertyMapDecl
-	Options    *ResourceOptionsDecl
+	Properties PropertyMapDecl
+	Options    ResourceOptionsDecl
 }
 
 func (d *ResourceDecl) recordSyntax() *syntax.Node {
@@ -349,11 +373,7 @@ func (d *ResourceDecl) recordSyntax() *syntax.Node {
 }
 
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *BooleanExpr,
-	properties *PropertyMapDecl, options *ResourceOptionsDecl) *ResourceDecl {
-	if options == nil {
-		options = &ResourceOptionsDecl{}
-	}
-
+	properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:   decl(node),
 		Type:       typ,
@@ -363,11 +383,7 @@ func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *Boolean
 	}
 }
 
-func Resource(typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl, options *ResourceOptionsDecl) *ResourceDecl {
-	if options == nil {
-		options = &ResourceOptionsDecl{}
-	}
-
+func Resource(typ *StringExpr, component *BooleanExpr, properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
 	return ResourceSyntax(nil, typ, component, properties, options)
 }
 
@@ -403,10 +419,10 @@ type TemplateDecl struct {
 	syntax syntax.Node
 
 	Description   *StringExpr
-	Configuration *ConfigMapDecl
-	Variables     *VariablesMapDecl
-	Resources     *ResourcesMapDecl
-	Outputs       *PropertyMapDecl
+	Configuration ConfigMapDecl
+	Variables     VariablesMapDecl
+	Resources     ResourcesMapDecl
+	Outputs       PropertyMapDecl
 }
 
 func (d *TemplateDecl) Syntax() syntax.Node {
@@ -429,8 +445,8 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 	return newDiagnosticWriter(w, fileMap, width, color)
 }
 
-func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration *ConfigMapDecl,
-	variables *VariablesMapDecl, resources *ResourcesMapDecl, outputs *PropertyMapDecl) *TemplateDecl {
+func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
+	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl) *TemplateDecl {
 
 	return &TemplateDecl{
 		syntax:        node,
@@ -442,8 +458,8 @@ func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configurat
 	}
 }
 
-func Template(description *StringExpr, configuration *ConfigMapDecl, variables *VariablesMapDecl, resources *ResourcesMapDecl,
-	outputs *PropertyMapDecl) *TemplateDecl {
+func Template(description *StringExpr, configuration ConfigMapDecl, variables VariablesMapDecl, resources ResourcesMapDecl,
+	outputs PropertyMapDecl) *TemplateDecl {
 
 	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
@@ -458,6 +474,7 @@ func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagn
 }
 
 var parseDeclType = reflect.TypeOf((*parseDecl)(nil)).Elem()
+var nonNilDeclType = reflect.TypeOf((*nonNilDecl)(nil)).Elem()
 var recordDeclType = reflect.TypeOf((*recordDecl)(nil)).Elem()
 var exprType = reflect.TypeOf((*Expr)(nil)).Elem()
 
@@ -468,6 +485,24 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 
 	var v reflect.Value
 	var diags syntax.Diagnostics
+
+	if dest.CanAddr() && dest.Addr().Type().AssignableTo(nonNilDeclType) {
+		// destination is T, and must be a record type (right now)
+		defaultValue := (dest.Addr().Interface().(nonNilDecl)).defaultValue()
+		switch x := defaultValue.(type) {
+		case parseDecl:
+			pdiags := x.parse(name, node)
+			diags.Extend(pdiags...)
+			v = reflect.ValueOf(defaultValue).Elem().Convert(dest.Type())
+		case recordDecl:
+			pdiags := parseRecord(name, x, node)
+			diags.Extend(pdiags...)
+			v = reflect.ValueOf(defaultValue).Elem().Convert(dest.Type())
+		}
+		dest.Set(v)
+		return diags
+	}
+
 	switch {
 	case dest.Type().AssignableTo(parseDeclType):
 		// assume that dest is *T
