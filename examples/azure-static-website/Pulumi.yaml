@@ -4,7 +4,6 @@ description: A static website hosted on AWS S3
 resources:
   staticsitegroup:
     type: azure-native:resources:ResourceGroup
-    version: 1.54.0
   storageaccount:
     type: azure-native:storage:StorageAccount
     properties:
