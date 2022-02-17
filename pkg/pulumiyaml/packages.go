@@ -20,7 +20,7 @@ type Plugin struct {
 func GetReferencedPlugins(tmpl *ast.TemplateDecl) []Plugin {
 	// TODO: Should this de-dupe providers?
 	var pkgs []Plugin
-	for _, kvp := range tmpl.Resources.GetEntries() {
+	for _, kvp := range tmpl.Resources.Entries {
 		res := kvp.Value
 		typeParts := strings.Split(res.Type.Value, ":")
 		version := res.Options.Version.GetValue()

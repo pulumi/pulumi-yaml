@@ -402,7 +402,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
-	for _, kvp := range resource.Properties.GetEntries() {
+	for _, kvp := range resource.Properties.Entries {
 		v, vdiags := imp.importExpr(kvp.Value)
 		diags.Extend(vdiags...)
 
@@ -582,16 +582,16 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	var diags syntax.Diagnostics
 
 	// Declare config variables, resources, and outputs.
-	for _, kvp := range file.Configuration.GetEntries() {
+	for _, kvp := range file.Configuration.Entries {
 		imp.configuration[kvp.Key.Value] = nil
 	}
-	for _, kvp := range file.Resources.GetEntries() {
-		for _, kvp := range kvp.Value.Properties.GetEntries() {
+	for _, kvp := range file.Resources.Entries {
+		for _, kvp := range kvp.Value.Properties.Entries {
 			imp.findStackReferences(kvp.Value)
 		}
 		imp.resources[kvp.Key.Value] = nil
 	}
-	for _, kvp := range file.Outputs.GetEntries() {
+	for _, kvp := range file.Outputs.Entries {
 		imp.findStackReferences(kvp.Value)
 		imp.outputs[kvp.Key.Value] = nil
 	}
@@ -600,7 +600,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	var items []model.BodyItem
 
 	// Import config.
-	for _, kvp := range file.Configuration.GetEntries() {
+	for _, kvp := range file.Configuration.Entries {
 		config, cdiags := imp.importConfig(kvp)
 		diags.Extend(cdiags...)
 
@@ -624,7 +624,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	}
 
 	// Import resources.
-	for _, kvp := range file.Resources.GetEntries() {
+	for _, kvp := range file.Resources.Entries {
 		resource, rdiags := imp.importResource(kvp)
 		diags.Extend(rdiags...)
 
@@ -634,7 +634,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	}
 
 	// Import outputs.
-	for _, kvp := range file.Outputs.GetEntries() {
+	for _, kvp := range file.Outputs.Entries {
 		output, odiags := imp.importOutput(kvp)
 		diags.Extend(odiags...)
 

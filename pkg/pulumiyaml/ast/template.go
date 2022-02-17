@@ -85,13 +85,6 @@ func (d *ConfigMapDecl) defaultValue() interface{} {
 	return &ConfigMapDecl{}
 }
 
-func (d *ConfigMapDecl) GetEntries() []ConfigMapEntry {
-	if d == nil {
-		return nil
-	}
-	return d.Entries
-}
-
 func (d *ConfigMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
 	obj, ok := node.(*syntax.ObjectNode)
 	if !ok {
@@ -136,13 +129,6 @@ func (d *VariablesMapDecl) defaultValue() interface{} {
 	return &VariablesMapDecl{}
 }
 
-func (d *VariablesMapDecl) GetEntries() []VariablesMapEntry {
-	if d == nil {
-		return nil
-	}
-	return d.Entries
-}
-
 func (d *VariablesMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
 	obj, ok := node.(*syntax.ObjectNode)
 	if !ok {
@@ -183,13 +169,6 @@ type ResourcesMapDecl struct {
 
 func (d *ResourcesMapDecl) defaultValue() interface{} {
 	return &ResourcesMapDecl{}
-}
-
-func (d *ResourcesMapDecl) GetEntries() []ResourcesMapEntry {
-	if d == nil {
-		return nil
-	}
-	return d.Entries
 }
 
 func (d *ResourcesMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
@@ -234,13 +213,6 @@ type PropertyMapDecl struct {
 
 func (d *PropertyMapDecl) defaultValue() interface{} {
 	return &PropertyMapDecl{}
-}
-
-func (d *PropertyMapDecl) GetEntries() []PropertyMapEntry {
-	if d == nil {
-		return nil
-	}
-	return d.Entries
 }
 
 func (d *PropertyMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
