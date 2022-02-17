@@ -407,6 +407,9 @@ func (r *runner) registerResources() syntax.Diagnostics {
 			if v.Options.PluginDownloadURL != nil {
 				opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
 			}
+			if v.Options.ReplaceOnChanges != nil {
+				opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
+			}
 		}
 
 		// Create either a latebound custom resource or latebound provider resource depending on

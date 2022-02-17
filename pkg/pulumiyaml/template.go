@@ -92,6 +92,8 @@ type ResourceOptions struct {
 	Provider string `json:",omitempty" yaml:",omitempty"`
 	// Version specifies a provider plugin version that should be used when operating on a resource
 	Version string `json:",omitempty" yaml:",omitempty"`
+	// ReplaceOnChanges forces a resource to be replaced when the targeted property is changed.
+	ReplaceOnChanges []string `json:",omitempty" yaml:",omitempty"`
 }
 
 // Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,
