@@ -55,15 +55,14 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 		return nil, diags
 	}
 
-	pkgs := pulumiyaml.GetReferencedPackages(tmpl)
+	pkgs := pulumiyaml.GetReferencedPlugins(tmpl)
 	var plugins []*pulumirpc.PluginDependency
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{
 			Kind:    string(workspace.ResourcePlugin),
 			Name:    pkg.Package,
 			Version: pkg.Version,
-			// TODO: Offer a way to specify this either globally or on a per-resource basis
-			Server: "",
+			Server:  pkg.PluginDownloadURL,
 		})
 	}
 	return &pulumirpc.GetRequiredPluginsResponse{

@@ -233,12 +233,9 @@ func ConfigParam(typ *StringExpr, defaultValue Expr, secret *BooleanExpr) *Confi
 	return ConfigParamSyntax(nil, typ, defaultValue, secret)
 }
 
-type ResourceDecl struct {
+type ResourceOptionsDecl struct {
 	declNode
 
-	Type                    *StringExpr
-	Component               *BooleanExpr
-	Properties              *PropertyMapDecl
 	AdditionalSecretOutputs *StringListDecl
 	Aliases                 *StringListDecl
 	CustomTimeouts          *CustomTimeoutsDecl
@@ -250,22 +247,20 @@ type ResourceDecl struct {
 	Protect                 *BooleanExpr
 	Provider                *StringExpr
 	Version                 *StringExpr
+	PluginDownloadURL       *StringExpr
 }
 
-func (d *ResourceDecl) recordSyntax() *syntax.Node {
+func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl,
+func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr,
-	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr) *ResourceDecl {
+	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceOptionsDecl {
 
-	return &ResourceDecl{
+	return &ResourceOptionsDecl{
 		declNode:                decl(node),
-		Type:                    typ,
-		Component:               component,
-		Properties:              properties,
 		AdditionalSecretOutputs: additionalSecretOutputs,
 		Aliases:                 aliases,
 		CustomTimeouts:          customTimeouts,
@@ -277,15 +272,52 @@ func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *Boolean
 		Protect:                 protect,
 		Provider:                provider,
 		Version:                 version,
+		PluginDownloadURL:       pluginDownloadURL,
 	}
 }
 
-func Resource(typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl, additionalSecretOutputs,
-	aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
+func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
+	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr, parent *StringExpr,
-	protect *BooleanExpr, provider *StringExpr, version *StringExpr) *ResourceDecl {
+	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceOptionsDecl {
 
-	return ResourceSyntax(nil, typ, component, properties, additionalSecretOutputs, aliases, customTimeouts, deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, version)
+	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts, deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, version, pluginDownloadURL)
+}
+
+type ResourceDecl struct {
+	declNode
+
+	Type       *StringExpr
+	Component  *BooleanExpr
+	Properties *PropertyMapDecl
+	Options    *ResourceOptionsDecl
+}
+
+func (d *ResourceDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
+func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *BooleanExpr,
+	properties *PropertyMapDecl, options *ResourceOptionsDecl) *ResourceDecl {
+	if options == nil {
+		options = &ResourceOptionsDecl{}
+	}
+
+	return &ResourceDecl{
+		declNode:   decl(node),
+		Type:       typ,
+		Component:  component,
+		Properties: properties,
+		Options:    options,
+	}
+}
+
+func Resource(typ *StringExpr, component *BooleanExpr, properties *PropertyMapDecl, options *ResourceOptionsDecl) *ResourceDecl {
+	if options == nil {
+		options = &ResourceOptionsDecl{}
+	}
+
+	return ResourceSyntax(nil, typ, component, properties, options)
 }
 
 type CustomTimeoutsDecl struct {
