@@ -104,7 +104,7 @@ type Resource struct {
 	// Properties contains the primary resource-specific keys and values to initialize the resource state.
 	Properties map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Options contains all Pulumi resource options used to register the resource.
-	ResourceOptions *ResourceOptions
+	ResourceOptions *ResourceOptions `json:",omitempty" yaml:",omitempty"`
 
 	// TODO: Condition, Metadata
 
