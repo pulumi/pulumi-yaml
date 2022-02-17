@@ -61,48 +61,46 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	// Precompute dependencies for each resource
 	intermediates := map[string]graphNode{}
 	dependencies := map[string][]*ast.StringExpr{}
-	for _, kvp := range t.Resources.Entries {
-		rname, r := kvp.Key.Value, kvp.Value
-		if _, has := intermediates[rname]; has {
-			diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("duplicate resource name '%s'", rname), ""))
-			continue
-		}
-		temp := kvp
-		//nolint:govet // safety: we control this composite type
-		intermediates[rname] = resourceNode(temp)
-		dependencies[rname] = GetResourceDependencies(r)
-	}
 	if t.Configuration != nil {
 		for _, kvp := range t.Configuration.Entries {
 			cname := kvp.Key.Value
-			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
-			temp := kvp
-			//nolint:govet // safety: we control this composite type
-			node := configNode(temp)
+			node := configNode(kvp)
 			intermediates[cname] = node
-			dependencies[cname] = make([]*ast.StringExpr, 0)
+			dependencies[cname] = nil
 
 			// Special case: configuration goes first
 			visited[cname] = true
 			sorted = append(sorted, node)
 		}
 	}
+	for _, kvp := range t.Resources.Entries {
+		rname, r := kvp.Key.Value, kvp.Value
+		node := resourceNode(kvp)
+		if other, found := intermediates[rname]; found {
+			if node.valueKind() == other.valueKind() {
+				diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), rname), ""))
+			} else {
+				diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("%s %s cannot have the same name as %s %s", node.valueKind(), rname, other.valueKind(), rname), ""))
+			}
+			return nil, diags
+		}
+		intermediates[rname] = node
+		dependencies[rname] = GetResourceDependencies(r)
+	}
 	if t.Variables != nil {
 		for _, kvp := range t.Variables.Entries {
 			vname := kvp.Key.Value
-			if _, has := intermediates[vname]; has {
-				diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("duplicate resource name '%s'", vname), ""))
-				continue
-			}
-			if _, found := intermediates[vname]; found {
-				diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("variable %s cannot have the same name as a resource", vname), ""))
+			node := variableNode(kvp)
+			if other, found := intermediates[vname]; found {
+				if node.valueKind() == other.valueKind() {
+					diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), vname), ""))
+				} else {
+					diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("%s %s cannot have the same name as %s %s", node.valueKind(), vname, other.valueKind(), vname), ""))
+				}
 				return nil, diags
 			}
-			// Prevent aliasing, see: http://blogs.msdn.com/b/ericlippert/archive/tags/closures/
-			temp := kvp
-			//nolint:govet // safety: we control this composite type
-			intermediates[vname] = variableNode(temp)
-			dependencies[vname] = GetVariableDependencies(&temp)
+			intermediates[vname] = node
+			dependencies[vname] = GetVariableDependencies(kvp)
 		}
 	}
 

@@ -30,7 +30,7 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 }
 
 // GetVariableDependencies gets the full set of implicit and explicit dependencies for a Variable.
-func GetVariableDependencies(e *ast.VariablesMapEntry) []*ast.StringExpr {
+func GetVariableDependencies(e ast.VariablesMapEntry) []*ast.StringExpr {
 	var deps []*ast.StringExpr
 	getExpressionDependencies(&deps, e.Value)
 	return deps
