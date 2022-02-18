@@ -53,6 +53,17 @@ func (o noParallel) apply(options *testOptions) {
 	})
 }
 
+type expectRefreshChanges struct{}
+
+var ExpectRefreshChanges = expectRefreshChanges{}
+
+func (o expectRefreshChanges) apply(options *testOptions) {
+	options.programTestOptions = options.programTestOptions.With(integration.ProgramTestOptions{
+		ExpectRefreshChanges:   true,
+		SkipEmptyPreviewUpdate: true,
+	})
+}
+
 type StackConfig struct{ config map[string]string }
 
 func (o StackConfig) apply(options *testOptions) {

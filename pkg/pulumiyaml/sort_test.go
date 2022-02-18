@@ -127,10 +127,10 @@ func TestSortErrorCycle(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func sortedNames(rs []ast.ResourcesMapEntry) []string {
+func sortedNames(rs []graphNode) []string {
 	names := make([]string, len(rs))
 	for i, kvp := range rs {
-		names[i] = kvp.Key.Value
+		names[i] = kvp.key().Value
 	}
 	return names
 }

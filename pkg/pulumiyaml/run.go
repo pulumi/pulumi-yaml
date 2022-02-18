@@ -151,6 +151,7 @@ type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
 	config    map[string]interface{}
+	variables map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 }
@@ -233,6 +234,7 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 		ctx:       ctx,
 		t:         t,
 		config:    make(map[string]interface{}),
+		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 	}
@@ -241,18 +243,38 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 func (r *runner) Evaluate() syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
-	cdiags := r.registerConfig()
-	diags.Extend(cdiags...)
-	if cdiags.HasErrors() {
-		return diags
+	// Topologically sort the intermediates based on implicit and explicit dependencies
+	intermediates, rdiags := topologicallySortedResources(r.t)
+	if rdiags.HasErrors() {
+		return rdiags
 	}
 
-	// TODO: Conditions
-
-	rdiags := r.registerResources()
-	diags.Extend(rdiags...)
-	if rdiags.HasErrors() {
-		return diags
+	for _, kvp := range intermediates {
+		switch kvp := kvp.(type) {
+		case configNode:
+			r.ctx.Log.Debug(fmt.Sprintf("Registering configuration [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.registerConfig(kvp, diags)
+			if err != nil {
+				r.ctx.Log.Debug(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, err), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				continue
+			}
+		case variableNode:
+			r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			value, diags := r.evaluateExpr(kvp.Value)
+			diags.Extend(diags...)
+			if diags.HasErrors() {
+				r.ctx.Log.Debug(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, diags.Error()), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				continue
+			}
+			r.variables[kvp.Key.Value] = value
+		case resourceNode:
+			r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.registerResource(kvp, diags)
+			if err != nil {
+				r.ctx.Log.Debug(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, err), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				continue
+			}
+		}
 	}
 
 	odiags := r.registerOutputs()
@@ -260,202 +282,179 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	return diags
 }
 
-func (r *runner) registerConfig() syntax.Diagnostics {
-	if r.t.Configuration == nil {
-		return nil
+func (r *runner) registerConfig(intm configNode, diags syntax.Diagnostics) error {
+	k, c := intm.Key.Value, intm.Value
+
+	var defaultValue interface{}
+	if c.Default != nil {
+		d, ddiags := r.evaluateExpr(c.Default)
+		diags.Extend(ddiags...)
+		if ddiags.HasErrors() {
+			return nil
+		}
+		defaultValue = d
 	}
 
-	var diags syntax.Diagnostics
-	for _, kvp := range r.t.Configuration.Entries {
-		k, c := kvp.Key.Value, kvp.Value
-
-		var defaultValue interface{}
-		if c.Default != nil {
-			d, ddiags := r.evaluateExpr(c.Default)
-			diags.Extend(ddiags...)
-			if ddiags.HasErrors() {
-				continue
-			}
-			defaultValue = d
-		}
-
-		var v interface{}
-		var err error
-		switch c.Type.Value {
-		case "String":
-			v, err = config.Try(r.ctx, k)
-		case "Number":
-			v, err = config.TryFloat64(r.ctx, k)
-		case "List<Number>":
-			v, err = config.Try(r.ctx, k)
-			if err == nil {
-				var arr []float64
-				for _, nstr := range strings.Split(v.(string), ",") {
-					f, err := cast.ToFloat64E(nstr)
-					if err != nil {
-						diags.Extend(ast.ExprError(kvp.Key, err.Error(), ""))
-						continue
-					}
-					arr = append(arr, f)
+	var v interface{}
+	var err error
+	switch c.Type.Value {
+	case "String":
+		v, err = config.Try(r.ctx, k)
+	case "Number":
+		v, err = config.TryFloat64(r.ctx, k)
+	case "List<Number>":
+		v, err = config.Try(r.ctx, k)
+		if err == nil {
+			var arr []float64
+			for _, nstr := range strings.Split(v.(string), ",") {
+				f, err := cast.ToFloat64E(nstr)
+				if err != nil {
+					diags.Extend(ast.ExprError(intm.Key, err.Error(), ""))
+					continue
 				}
-				v = arr
+				arr = append(arr, f)
 			}
-		case "CommaDelimitedList":
-			v, err = config.Try(r.ctx, k)
-			if err == nil {
-				v = strings.Split(v.(string), ",")
-			}
+			v = arr
 		}
-		if err != nil {
-			v = defaultValue
+	case "CommaDelimitedList":
+		v, err = config.Try(r.ctx, k)
+		if err == nil {
+			v = strings.Split(v.(string), ",")
 		}
-		// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-		if c.Secret != nil && c.Secret.Value {
-			v = pulumi.ToSecret(v)
-		}
-		r.config[k] = v
 	}
+	if err != nil {
+		v = defaultValue
+	}
+	// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
+	if c.Secret != nil && c.Secret.Value {
+		v = pulumi.ToSecret(v)
+	}
+	r.config[k] = v
+
 	return nil
 }
 
-func (r *runner) registerResources() syntax.Diagnostics {
-	// Topologically sort the resources based on implicit and explicit dependencies
-	resources, rdiags := topologicallySortedResources(r.t)
-	if rdiags.HasErrors() {
-		return rdiags
+func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) error {
+	k, v := kvp.Key.Value, kvp.Value
+
+	// Read the properties and then evaluate them in case there are expressions contained inside.
+	props := make(map[string]interface{})
+	if v.Properties != nil {
+		for _, kvp := range v.Properties.Entries {
+			vv, vdiags := r.evaluateExpr(kvp.Value)
+			diags.Extend(vdiags...)
+			if vdiags.HasErrors() {
+				return fmt.Errorf("internal error: %w", vdiags)
+			}
+			props[kvp.Key.Value] = vv
+		}
+	} else {
+		// TODO: Make this a diagnostic warning?
+		// diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("resource %v passed has an empty properties value", kvp.Key.Value), ""))
 	}
 
-	var diags syntax.Diagnostics
-	for _, kvp := range resources {
-		k, v := kvp.Key.Value, kvp.Value
-
-		// Read the properties and then evaluate them in case there are expressions contained inside.
-		props := make(map[string]interface{})
-		if v.Properties != nil {
-			for _, kvp := range v.Properties.Entries {
-				vv, vdiags := r.evaluateExpr(kvp.Value)
-				diags.Extend(vdiags...)
-				if vdiags.HasErrors() {
-					return diags
-				}
-				props[kvp.Key.Value] = vv
-			}
-		} else {
-			// TODO: Make this a diagnostic warning?
-			// diags.Extend(ast.ExprError(kvp.Key, fmt.Sprintf("resource %v passed has an empty properties value", kvp.Key.Value), ""))
+	var opts []pulumi.ResourceOption
+	if v.Options != nil {
+		if v.Options.AdditionalSecretOutputs != nil {
+			opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
 		}
-
-		var opts []pulumi.ResourceOption
-		if v.Options != nil {
-			if v.Options.AdditionalSecretOutputs != nil {
-				opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
-			}
-			if v.Options.Aliases != nil {
-				var aliases []pulumi.Alias
-				for _, s := range v.Options.Aliases.Elements {
-					alias := pulumi.Alias{
-						URN: pulumi.URN(s.Value),
-					}
-					aliases = append(aliases, alias)
+		if v.Options.Aliases != nil {
+			var aliases []pulumi.Alias
+			for _, s := range v.Options.Aliases.Elements {
+				alias := pulumi.Alias{
+					URN: pulumi.URN(s.Value),
 				}
-				opts = append(opts, pulumi.Aliases(aliases))
+				aliases = append(aliases, alias)
 			}
-			if v.Options.CustomTimeouts != nil {
-				var cts pulumi.CustomTimeouts
-				if v.Options.CustomTimeouts.Create != nil {
-					cts.Create = v.Options.CustomTimeouts.Create.Value
-				}
-				if v.Options.CustomTimeouts.Update != nil {
-					cts.Update = v.Options.CustomTimeouts.Update.Value
-				}
-				if v.Options.CustomTimeouts.Delete != nil {
-					cts.Delete = v.Options.CustomTimeouts.Delete.Value
-				}
-
-				opts = append(opts, pulumi.Timeouts(&cts))
-			}
-			if v.Options.DeleteBeforeReplace != nil {
-				opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
-			}
-			if v.Options.DependsOn != nil {
-				var dependsOn []pulumi.Resource
-				for _, s := range v.Options.DependsOn.Elements {
-					dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
-				}
-				opts = append(opts, pulumi.DependsOn(dependsOn))
-			}
-			if v.Options.IgnoreChanges != nil {
-				opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
-			}
-			if v.Options.Parent != nil && v.Options.Parent.Value != "" {
-				opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
-			}
-			if v.Options.Protect != nil {
-				opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
-			}
-			if v.Options.Provider != nil && v.Options.Provider.Value != "" {
-				provider := r.resources[v.Options.Provider.Value].ProviderResource()
-				if provider == nil {
-					diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
-					return diags
-				}
-				opts = append(opts, pulumi.Provider(provider))
-			}
-			if v.Options.Version != nil {
-				opts = append(opts, pulumi.Version(v.Options.Version.Value))
-			}
-			if v.Options.PluginDownloadURL != nil {
-				opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
-			}
-			if v.Options.ReplaceOnChanges != nil {
-				opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
-			}
+			opts = append(opts, pulumi.Aliases(aliases))
 		}
+		if v.Options.CustomTimeouts != nil {
+			var cts pulumi.CustomTimeouts
+			if v.Options.CustomTimeouts.Create != nil {
+				cts.Create = v.Options.CustomTimeouts.Create.Value
+			}
+			if v.Options.CustomTimeouts.Update != nil {
+				cts.Update = v.Options.CustomTimeouts.Update.Value
+			}
+			if v.Options.CustomTimeouts.Delete != nil {
+				cts.Delete = v.Options.CustomTimeouts.Delete.Value
+			}
 
-		// Create either a latebound custom resource or latebound provider resource depending on
-		// whether the type token indicates a special provider type.
-		var state lateboundResource
-		var res pulumi.Resource
-		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-			r := lateboundProviderResourceState{name: k}
-			state = &r
-			res = &r
-		} else {
-			r := lateboundCustomResourceState{name: k}
-			state = &r
-			res = &r
+			opts = append(opts, pulumi.Timeouts(&cts))
 		}
-
-		// If the provided type token is `pkg:type`, expand it to `pkd:index:type` automatically.  We may
-		// well want to handle this more fundamentally in Pulumi itself to avoid the need for `:index:`
-		// ceremony quite generally.
-		typ := v.Type.Value
-		typParts := strings.Split(typ, ":")
-		if len(typParts) < 2 || len(typParts) > 3 {
-			diags.Extend(ast.ExprError(v.Type, fmt.Sprintf("invalid type token %q for resource %q", v.Type.Value, k), ""))
-			return diags
-		} else if len(typParts) == 2 {
-			typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
+		if v.Options.DeleteBeforeReplace != nil {
+			opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 		}
-
-		// Now register the resulting resource with the engine.
-		var err error
-		if v.Component != nil && v.Component.Value {
-			err = r.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
-		} else {
-			err = r.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)
+		if v.Options.DependsOn != nil {
+			var dependsOn []pulumi.Resource
+			for _, s := range v.Options.DependsOn.Elements {
+				dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
 		}
-		if err != nil {
-			diags.Extend(ast.ExprError(kvp.Key, err.Error(), ""))
-			return diags
+		if v.Options.IgnoreChanges != nil {
+			opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 		}
-		r.resources[k] = state
+		if v.Options.Parent != nil && v.Options.Parent.Value != "" {
+			opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
+		}
+		if v.Options.Protect != nil {
+			opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
+		}
+		if v.Options.Provider != nil && v.Options.Provider.Value != "" {
+			provider := r.resources[v.Options.Provider.Value].ProviderResource()
+			if provider == nil {
+				diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
+				return diags
+			}
+			opts = append(opts, pulumi.Provider(provider))
+		}
+		if v.Options.Version != nil {
+			opts = append(opts, pulumi.Version(v.Options.Version.Value))
+		}
+		if v.Options.PluginDownloadURL != nil {
+			opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
+		}
 	}
 
-	if diags.HasErrors() {
+	// Create either a latebound custom resource or latebound provider resource depending on
+	// whether the type token indicates a special provider type.
+	var state lateboundResource
+	var res pulumi.Resource
+	if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
+		r := lateboundProviderResourceState{name: k}
+		state = &r
+		res = &r
+	} else {
+		r := lateboundCustomResourceState{name: k}
+		state = &r
+		res = &r
+	}
+
+	// If the provided type token is `pkg:type`, expand it to `pkd:index:type` automatically.  We may
+	// well want to handle this more fundamentally in Pulumi itself to avoid the need for `:index:`
+	// ceremony quite generally.
+	typ := v.Type.Value
+	typParts := strings.Split(typ, ":")
+	if len(typParts) < 2 || len(typParts) > 3 {
+		diags.Extend(ast.ExprError(v.Type, fmt.Sprintf("invalid type token %q for resource %q", v.Type.Value, k), ""))
+		return diags
+	} else if len(typParts) == 2 {
+		typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
+	}
+
+	// Now register the resulting resource with the engine.
+	var err error
+	if v.Component != nil && v.Component.Value {
+		err = r.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
+	} else {
+		err = r.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)
+	}
+	if err != nil {
+		diags.Extend(ast.ExprError(kvp.Key, err.Error(), ""))
 		return diags
 	}
-
+	r.resources[k] = state
 	return nil
 }
 
@@ -620,6 +619,8 @@ func (r *runner) evaluateInterpolations(x *ast.InterpolateExpr, diags syntax.Dia
 func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, subs map[string]interface{}) (interface{}, syntax.Diagnostics) {
 	resourceName := access.Accessors[0].(*ast.PropertyName).Name
 
+	var diags syntax.Diagnostics
+
 	var receiver interface{}
 	if res, ok := r.resources[resourceName]; ok {
 		if len(access.Accessors) == 1 {
@@ -628,15 +629,18 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 		receiver = res.GetOutputs()
 	} else if p, ok := r.config[resourceName]; ok {
 		receiver = p
+	} else if v, ok := r.variables[resourceName]; ok {
+		receiver = v
 	} else if s, ok := subs[resourceName]; ok {
 		receiver = s
 	} else {
-		return nil, syntax.Diagnostics{ast.ExprError(x, fmt.Sprintf("resource named %s could not be found", resourceName), "")}
+		return nil, syntax.Diagnostics{ast.ExprError(x, fmt.Sprintf("resource or variable named %s could not be found", resourceName), "")}
 	}
 
 	v, err := r.evaluateAccess(receiver, access.Accessors[1:])
 	if err != nil {
-		return nil, syntax.Diagnostics{ast.ExprError(x, err.Error(), "")}
+		diags.Extend(ast.ExprError(x, err.Error(), ""))
+		return nil, diags
 	}
 	return v, nil
 }
@@ -687,6 +691,10 @@ func (r *runner) evaluateBuiltinRef(v *ast.RefExpr) (interface{}, syntax.Diagnos
 	res, ok := r.resources[v.ResourceName.Value]
 	if ok {
 		return res.CustomResource().ID().ToStringOutput(), nil
+	}
+	x, ok := r.variables[v.ResourceName.Value]
+	if ok {
+		return x, nil
 	}
 	p, ok := r.config[v.ResourceName.Value]
 	if ok {

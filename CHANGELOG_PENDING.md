@@ -9,4 +9,7 @@
 
 - [features] Fn::Asset supports FileArchive, RemoteArchive modes
 
+- [features] variables top level item implemented, can use variables to store intermediates to
+  simplify invokes or re-use values
+
 ### Bug Fixes
