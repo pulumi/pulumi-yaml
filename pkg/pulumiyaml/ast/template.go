@@ -293,6 +293,7 @@ type ResourceOptionsDecl struct {
 	Provider                *StringExpr
 	Version                 *StringExpr
 	PluginDownloadURL       *StringExpr
+	ReplaceOnChanges        *StringListDecl
 }
 
 func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
@@ -302,7 +303,8 @@ func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr,
-	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceOptionsDecl {
+	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr,
+	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl) *ResourceOptionsDecl {
 
 	return &ResourceOptionsDecl{
 		declNode:                decl(node),
@@ -318,15 +320,19 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 		Provider:                provider,
 		Version:                 version,
 		PluginDownloadURL:       pluginDownloadURL,
+		ReplaceOnChanges:        replaceOnChanges,
 	}
 }
 
 func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr, parent *StringExpr,
-	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr) *ResourceOptionsDecl {
+	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr,
+	replaceOnChanges *StringListDecl) *ResourceOptionsDecl {
 
-	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts, deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, version, pluginDownloadURL)
+	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
+		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider,
+		version, pluginDownloadURL, replaceOnChanges)
 }
 
 type ResourceDecl struct {
