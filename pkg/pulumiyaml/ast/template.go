@@ -112,6 +112,51 @@ func (d *ConfigMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics 
 	return diags
 }
 
+type VariablesMapEntry struct {
+	syntax syntax.ObjectPropertyDef
+	Key    *StringExpr
+	Value  Expr
+}
+
+type VariablesMapDecl struct {
+	declNode
+
+	Entries []VariablesMapEntry
+}
+
+func (d *VariablesMapDecl) GetEntries() []VariablesMapEntry {
+	if d == nil {
+		return nil
+	}
+	return d.Entries
+}
+
+func (d *VariablesMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
+	obj, ok := node.(*syntax.ObjectNode)
+	if !ok {
+		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", name), "")}
+	}
+
+	var diags syntax.Diagnostics
+
+	entries := make([]VariablesMapEntry, obj.Len(), obj.Len())
+	for i := range entries {
+		kvp := obj.Index(i)
+
+		v, vdiags := ParseExpr(kvp.Value)
+		diags.Extend(vdiags...)
+
+		entries[i] = VariablesMapEntry{
+			syntax: kvp,
+			Key:    StringSyntax(kvp.Key),
+			Value:  v,
+		}
+	}
+	d.Entries = entries
+
+	return diags
+}
+
 type ResourcesMapEntry struct {
 	syntax syntax.ObjectPropertyDef
 	Key    *StringExpr
@@ -353,6 +398,7 @@ type TemplateDecl struct {
 
 	Description   *StringExpr
 	Configuration *ConfigMapDecl
+	Variables     *VariablesMapDecl
 	Resources     *ResourcesMapDecl
 	Outputs       *PropertyMapDecl
 }
@@ -378,21 +424,22 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 }
 
 func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration *ConfigMapDecl,
-	resources *ResourcesMapDecl, outputs *PropertyMapDecl) *TemplateDecl {
+	variables *VariablesMapDecl, resources *ResourcesMapDecl, outputs *PropertyMapDecl) *TemplateDecl {
 
 	return &TemplateDecl{
 		syntax:        node,
 		Description:   description,
 		Configuration: configuration,
+		Variables:     variables,
 		Resources:     resources,
 		Outputs:       outputs,
 	}
 }
 
-func Template(description *StringExpr, configuration *ConfigMapDecl, resources *ResourcesMapDecl,
+func Template(description *StringExpr, configuration *ConfigMapDecl, variables *VariablesMapDecl, resources *ResourcesMapDecl,
 	outputs *PropertyMapDecl) *TemplateDecl {
 
-	return TemplateSyntax(nil, description, configuration, resources, outputs)
+	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
 
 // ParseTemplate parses a template from the given syntax node. The source text is optional, and is only used to print

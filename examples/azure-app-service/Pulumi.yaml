@@ -5,6 +5,24 @@ configuration:
   sqlAdmin:
     type: String
     default: pulumi
+variables:
+  blobAccessToken:
+    Fn::Invoke:
+      Function: azure-native:storage:listStorageAccountServiceSAS
+      Arguments:
+        accountName: ${sa.name}
+        protocols: https
+        sharedAccessStartTime: '2022-01-01'
+        sharedAccessExpiryTime: '2030-01-01'
+        resource: c
+        resourceGroupName: ${appservicegroup.name}
+        permissions: r
+        canonicalizedResource: /blob/${sa.name}/${container.name}
+        contentType: application/json
+        cacheControl: max-age=5
+        contentDisposition: inline
+        contentEncoding: deflate
+      Return: serviceSasToken
 resources:
   appservicegroup:
     type: azure-native:resources:ResourceGroup
@@ -71,26 +89,7 @@ resources:
       siteConfig:
         appSettings:
           - name: WEBSITE_RUN_FROM_PACKAGE
-            value:
-              Fn::Join:
-                - ''
-                - - https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?
-                  - Fn::Invoke:
-                      Function: azure-native:storage:listStorageAccountServiceSAS
-                      Arguments:
-                        accountName: ${sa.name}
-                        protocols: https
-                        sharedAccessStartTime: '2022-01-01'
-                        sharedAccessExpiryTime: '2030-01-01'
-                        resource: c
-                        resourceGroupName: ${appservicegroup.name}
-                        permissions: r
-                        canonicalizedResource: /blob/${sa.name}/${container.name}
-                        contentType: application/json
-                        cacheControl: max-age=5
-                        contentDisposition: inline
-                        contentEncoding: deflate
-                      Return: serviceSasToken
+            value: https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}
           - name: APPINSIGHTS_INSTRUMENTATIONKEY
             value: ${appInsights.instrumentationKey}
           - name: APPLICATIONINSIGHTS_CONNECTION_STRING
