@@ -243,6 +243,16 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 func (r *runner) Evaluate() syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+	}
+	r.variables["pulumi"] = map[string]interface{}{
+		"cwd":     cwd,
+		"project": r.ctx.Project(),
+		"stack":   r.ctx.Stack(),
+	}
+
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t)
 	if rdiags.HasErrors() {

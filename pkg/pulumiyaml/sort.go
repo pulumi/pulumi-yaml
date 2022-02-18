@@ -166,6 +166,10 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 	key := node.key()
 	name := key.Value
+	if name == "pulumi" {
+		return syntax.Diagnostics{ast.ExprError(key, fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
+	}
+
 	if other, found := intermediates[name]; found {
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))
