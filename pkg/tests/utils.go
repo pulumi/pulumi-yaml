@@ -59,7 +59,8 @@ var ExpectRefreshChanges = expectRefreshChanges{}
 
 func (o expectRefreshChanges) apply(options *testOptions) {
 	options.programTestOptions = options.programTestOptions.With(integration.ProgramTestOptions{
-		ExpectRefreshChanges: true,
+		ExpectRefreshChanges:   true,
+		SkipEmptyPreviewUpdate: true,
 	})
 }
 
