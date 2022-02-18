@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,6 +14,54 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
 )
+
+// Test that we can evaluate the Pulumi built-in variable.
+func TestVariablePulumi(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+outputs:
+  cwd: ${pulumi.cwd}
+  project: ${pulumi.project}
+  stack: ${pulumi.stack}
+`
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{}
+	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(ctx, template)
+		diags := runner.Evaluate()
+		requireNoErrors(t, diags)
+		cwdOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("${pulumi.cwd}"),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, cwd, cwdOutput)
+
+		projectOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("${pulumi.project}"),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, "projectFoo", projectOutput)
+
+		stackOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("${pulumi.stack}"),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, "stackDev", stackOutput)
+
+		requireNoErrors(t, diags)
+
+		return nil
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, diags)
+	}
+	assert.NoError(t, err)
+}
 
 // Test that a variable can be prior to any resource in the topological sort:
 //

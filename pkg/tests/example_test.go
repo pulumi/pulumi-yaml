@@ -133,3 +133,22 @@ func TestExampleWebserver(t *testing.T) {
 func TestExampleWebserverJson(t *testing.T) {
 	testWrapper(t, exampleDir("webserver-json"), ExpectRefreshChanges, RequireLiveRun, awsConfig)
 }
+
+func TestExamplePulumiVariable(t *testing.T) {
+	testWrapper(t, exampleDir("pulumi-variable"),
+		RequireLiveRun,
+		Validator{func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+			cwdOutput, isString := stack.Outputs["cwd"].(string)
+			assert.True(t, isString)
+			assert.True(t, strings.HasSuffix(cwdOutput, "working-dir"))
+
+			stackOutput, isString := stack.Outputs["stack"].(string)
+			assert.True(t, isString)
+			assert.Equal(t, string(stack.StackName), stackOutput)
+
+			projectOutput, isString := stack.Outputs["project"].(string)
+			assert.True(t, isString)
+			assert.Equal(t, "pulumi-reserved-variable", projectOutput)
+		}},
+	)
+}
