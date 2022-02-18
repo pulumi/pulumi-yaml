@@ -32,9 +32,14 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 		g.genNode(n)
 	}
 
+	if g.diags.HasErrors() {
+		return nil, nil, g.diags
+	}
+
 	w := &bytes.Buffer{}
 
-	diags := encoding.EncodeYAML(yaml.NewEncoder(w), g.UnifyOutput())
+	out := g.UnifyOutput()
+	diags := encoding.EncodeYAML(yaml.NewEncoder(w), out)
 
 	var err error
 	if diags.HasErrors() {
@@ -83,7 +88,7 @@ type InvokeCall struct {
 
 // Maps names to known invoke usages.
 func (g *generator) InvokeNameMap() map[string]*InvokeCall {
-	m := make(map[string]*InvokeCall, len(g.invokeResults))
+	m := map[string]*InvokeCall{}
 	for _, v := range g.invokeResults {
 		m[v.name] = v
 	}
@@ -162,9 +167,6 @@ func (y yamlLimitationKind) Summary() string {
 }
 
 func (g *generator) yamlLimitation(kind yamlLimitationKind) {
-	if g.diags == nil {
-		g.diags = hcl.Diagnostics{}
-	}
 	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagError,
 		Summary:  kind.Summary(),
@@ -252,7 +254,8 @@ func (g *generator) genResource(n *pcl.Resource) {
 			additionalSecrets = append(additionalSecrets, syn.String(input.Name))
 			value = f.Args[0]
 		}
-		properties[i] = syn.ObjectProperty(syn.String(input.Name), g.expr(value))
+		v := g.expr(value)
+		properties[i] = syn.ObjectProperty(syn.String(input.Name), v)
 	}
 	if n.Schema == nil {
 		g.missingSchema()
@@ -304,6 +307,11 @@ func (g *generator) expr(e model.Expression) syn.Node {
 
 	case *model.FunctionCallExpression:
 		return g.function(e)
+	case *model.RelativeTraversalExpression:
+		// This generally means a lookup scoped to a for loop. Since we don't do
+		// those, we don't process RelativeTraversalExpressions.
+		g.yamlLimitation("RelativeTraversalExpression")
+		return syn.String("Unimplemented RelativeTraversalExpression")
 	case *model.ScopeTraversalExpression:
 		s := e.RootName
 		for _, t := range e.Traversal.SimpleSplit().Rel {
@@ -378,7 +386,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 
 	case *model.SplatExpression:
 		g.yamlLimitation(Splat)
-		return nil
+		return syn.String("Splat not implemented")
 	default:
 		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
 		panic(nil)
@@ -426,10 +434,10 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 		return fn("Join", syn.List(args...))
 	case "toJSON":
 		g.yamlLimitation(ToJSON)
-		return nil
+		return fn("toJSON", syn.Null())
 	case "toBase64":
 		g.yamlLimitation(toBase64)
-		return nil
+		return fn("toBase64", syn.Null())
 	default:
 		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
 	}
