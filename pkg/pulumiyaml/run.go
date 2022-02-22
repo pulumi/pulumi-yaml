@@ -240,6 +240,8 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 	}
 }
 
+const PulumiVarName = "pulumi"
+
 func (r *runner) Evaluate() syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
@@ -247,7 +249,7 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	if err != nil {
 		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 	}
-	r.variables["pulumi"] = map[string]interface{}{
+	r.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
 		"project": r.ctx.Project(),
 		"stack":   r.ctx.Stack(),

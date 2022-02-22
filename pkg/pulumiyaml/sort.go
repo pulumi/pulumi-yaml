@@ -164,7 +164,7 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 	key := node.key()
 	name := key.Value
-	if name == "pulumi" {
+	if name == PulumiVarName {
 		return syntax.Diagnostics{ast.ExprError(key, fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
 	}
 
