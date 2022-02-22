@@ -39,6 +39,54 @@ resources:
 	requireNoErrors(t, diags)
 }
 
+func TestInvokeVariable(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  foo:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: tuo
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: ${foo.retval}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
+func TestInvokeOutputVariable(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  foo:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: ${res-a.out}
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  res-b:
+    type: test:resource:type
+    properties:
+      foo: ${foo.retval}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(token string, args resource.PropertyMap, provider string) (resource.PropertyMap, error) {

@@ -737,6 +737,11 @@ func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.D
 			diags.Extend(ast.ExprError(t, err.Error(), ""))
 			return nil, diags
 		}
+
+		if t.Return.GetValue() == "" {
+			return result, diags
+		}
+
 		retv, ok := result[t.Return.Value]
 		if !ok {
 			diags.Extend(ast.ExprError(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value), ""))
