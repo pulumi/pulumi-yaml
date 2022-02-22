@@ -111,7 +111,6 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 		case *pcl.ConfigVariable:
 
 		}
-		// Pre should collect a list of references to invokes
 		calls := g.InvokeNameMap()
 		onTraversal := func(f func(*model.ScopeTraversalExpression) *model.ScopeTraversalExpression) func(n model.Expression) (model.Expression, hcl.Diagnostics) {
 			return func(n model.Expression) (model.Expression, hcl.Diagnostics) {
@@ -121,6 +120,8 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 				return n, nil
 			}
 		}
+
+		// Pre should collect a list of references to invokes
 		pre := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
 			if call, ok := calls[t.RootName]; ok {
 				path := strings.Split(g.expr(t).(*syn.StringNode).Value(), ".")
@@ -133,19 +134,15 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 			}
 			return t
 		})
-		// Post rewrites invoke variable access:
-		// If only a single variable was accessed, just use the original name
-		// If multiple variables were accessed, create a new named variable for each of them.
+		// Post rewrites invoke variable access if a single variable was accessed.
 		post := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
-			// This is an invoke
-			if call, ok := calls[t.RootName]; ok {
+			// This is an invoke, and it is only used once: rewrite it to use a
+			// return statement
+			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
 				// Keep the root, but remove the first term of the traversal
-				if len(call.usedValues) > 1 {
-					panic("Multiple function calls unimplemented")
-				}
 				t.Parts = t.Parts[1:]
-				t.Traversal = t.Traversal[1:]
 				// remove the second term, which is handled by the return statement
+				t.Traversal = t.Traversal[1:]
 			}
 			return t
 		})
@@ -460,20 +457,19 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 		arguments = g.expr(f.Args[1])
 	}
 
-	// Calculate the return value
-	fnInfo := g.invokeResults[f]
-	contract.Assertf(len(fnInfo.usedValues) > 0,
-		"Invoke assigned to %s has no used values. Dumping known invokes: %#v",
-		fnInfo.name, g.invokeResults)
-	var retValue *syn.StringNode
-	if len(fnInfo.usedValues) == 1 {
-		retValue = syn.String(fnInfo.usedValues.SortedValues()[0])
-	} else {
-		panic("unimplemented")
-	}
-	return syn.Object(
+	properties := []syn.ObjectPropertyDef{
 		syn.ObjectProperty(syn.String("Function"), name),
 		syn.ObjectProperty(syn.String("Arguments"), arguments),
-		syn.ObjectProperty(syn.String("Return"), retValue),
-	)
+	}
+
+	// Calculate the return value
+	if fnInfo := g.invokeResults[f]; len(fnInfo.usedValues) == 1 {
+		properties = append(properties,
+			syn.ObjectProperty(
+				syn.String("Return"),
+				syn.String(fnInfo.usedValues.SortedValues()[0]),
+			))
+	}
+
+	return syn.Object(properties...)
 }
