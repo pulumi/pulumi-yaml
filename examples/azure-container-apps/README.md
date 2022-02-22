@@ -16,14 +16,8 @@ Starting point for building web application hosted in Azure Container Apps.
     $ az login
     ```
 
-1.  Restore NPM dependencies:
-
-    ```
-    $ npm install
-    ```
-    
 1. Set the Azure region location to use:
-    
+
     ```
     $ pulumi config set azure-native:location westus2
     ```
