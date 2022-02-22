@@ -15,4 +15,6 @@
 - [features] built-in variable "pulumi", which is a map with a "cwd", "stack", and "project" to
   obtain the current working directory, stack name, and project name respectively.
 
+- [features] optional `Return` from `Fn::Invoke`
+
 ### Bug Fixes
