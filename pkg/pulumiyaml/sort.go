@@ -105,6 +105,12 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	// Depth-first visit each node
 	var visit func(name *ast.StringExpr) bool
 	visit = func(name *ast.StringExpr) bool {
+		// Special case: pulumi variable has no dependencies.
+		if name.Value == "pulumi" {
+			visited["pulumi"] = true
+			return true
+		}
+
 		e, ok := intermediates[name.Value]
 		if !ok {
 			diags.Extend(ast.ExprError(name, fmt.Sprintf("dependency %s not found", name.Value), ""))
