@@ -1,0 +1,29 @@
+name: aws-eks
+runtime: yaml
+description: An EKS cluster
+variables:
+  vpcId:
+    Fn::Invoke:
+      Function: aws:ec2/getVpc:getVpc
+      Arguments:
+        default: true
+      Return: id
+  subnetIds:
+    Fn::Invoke:
+      Function: aws:ec2/getSubnetIds:getSubnetIds
+      Arguments:
+        vpcId: ${vpcId}
+      Return: ids
+resources:
+  cluster:
+    type: eks:Cluster
+    component: true
+    properties:
+      vpcId: ${vpcId}
+      subnetIds: ${subnetIds}
+      instanceType: "t2.medium"
+      desiredCapacity: 2
+      minSize: 1
+      maxSize: 2
+outputs:
+  kubeconfig: ${cluster.kubeconfig}
