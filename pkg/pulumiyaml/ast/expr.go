@@ -679,12 +679,8 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	}
 
 	ret, ok := returnExpr.(*StringExpr)
-	if !ok {
-		if returnExpr == nil {
-			diags.Extend(ExprError(obj, "missing return directive ('Return')", ""))
-		} else {
-			diags.Extend(ExprError(returnExpr, "return directive must be a string literal", ""))
-		}
+	if !ok && returnExpr != nil {
+		diags.Extend(ExprError(returnExpr, "return directive must be a string literal", ""))
 	}
 
 	if diags.HasErrors() {

@@ -1,0 +1,4 @@
+outputs:
+  cwd: "${pulumi.cwd}"
+  stack: "${pulumi.stack}"
+  project: "${pulumi.project}"

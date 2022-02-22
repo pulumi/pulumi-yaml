@@ -48,10 +48,6 @@ func (e configNode) key() *ast.StringExpr {
 }
 
 func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diagnostics) {
-	if t.Resources == nil {
-		return nil, nil
-	}
-
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -61,22 +57,20 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	// Precompute dependencies for each resource
 	intermediates := map[string]graphNode{}
 	dependencies := map[string][]*ast.StringExpr{}
-	if t.Configuration != nil {
-		for _, kvp := range t.Configuration.Entries {
-			cname := kvp.Key.Value
-			node := configNode(kvp)
+	for _, kvp := range t.Configuration.Entries {
+		cname := kvp.Key.Value
+		node := configNode(kvp)
 
-			cdiags := checkUniqueNode(intermediates, node)
-			diags = append(diags, cdiags...)
+		cdiags := checkUniqueNode(intermediates, node)
+		diags = append(diags, cdiags...)
 
-			if !cdiags.HasErrors() {
-				intermediates[cname] = node
-				dependencies[cname] = nil
+		if !cdiags.HasErrors() {
+			intermediates[cname] = node
+			dependencies[cname] = nil
 
-				// Special case: configuration goes first
-				visited[cname] = true
-				sorted = append(sorted, node)
-			}
+			// Special case: configuration goes first
+			visited[cname] = true
+			sorted = append(sorted, node)
 		}
 	}
 	for _, kvp := range t.Resources.Entries {
@@ -91,18 +85,16 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 			dependencies[rname] = GetResourceDependencies(r)
 		}
 	}
-	if t.Variables != nil {
-		for _, kvp := range t.Variables.Entries {
-			vname := kvp.Key.Value
-			node := variableNode(kvp)
+	for _, kvp := range t.Variables.Entries {
+		vname := kvp.Key.Value
+		node := variableNode(kvp)
 
-			cdiags := checkUniqueNode(intermediates, node)
-			diags = append(diags, cdiags...)
+		cdiags := checkUniqueNode(intermediates, node)
+		diags = append(diags, cdiags...)
 
-			if !cdiags.HasErrors() {
-				intermediates[vname] = node
-				dependencies[vname] = GetVariableDependencies(kvp)
-			}
+		if !cdiags.HasErrors() {
+			intermediates[vname] = node
+			dependencies[vname] = GetVariableDependencies(kvp)
 		}
 	}
 
@@ -166,6 +158,10 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 	key := node.key()
 	name := key.Value
+	if name == "pulumi" {
+		return syntax.Diagnostics{ast.ExprError(key, fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
+	}
+
 	if other, found := intermediates[name]; found {
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))

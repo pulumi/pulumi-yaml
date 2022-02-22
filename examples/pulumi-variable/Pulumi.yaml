@@ -1,0 +1,3 @@
+name: pulumi-reserved-variable
+runtime: yaml
+main: ./working-dir
