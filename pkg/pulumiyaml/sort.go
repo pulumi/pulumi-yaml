@@ -106,8 +106,8 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	var visit func(name *ast.StringExpr) bool
 	visit = func(name *ast.StringExpr) bool {
 		// Special case: pulumi variable has no dependencies.
-		if name.Value == "pulumi" {
-			visited["pulumi"] = true
+		if name.Value == PulumiVarName {
+			visited[PulumiVarName] = true
 			return true
 		}
 
