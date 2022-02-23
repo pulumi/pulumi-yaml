@@ -11,10 +11,10 @@ variables:
             Function: aws:iam:getPolicyDocument
             Arguments:
                 statements:
-                    - actions:
+                    - sid: 1
+                      actions:
                         - s3:ListAllMyBuckets
                         - s3:GetBucketLocation
                       resources:
                         - arn:aws:s3:::*
-                      sid: "1"
             Return: json

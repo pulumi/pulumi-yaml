@@ -13,7 +13,6 @@ import (
 
 	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
-	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -83,7 +82,7 @@ func (g *generator) UnifyOutput() syn.Node {
 
 type InvokeCall struct {
 	name       string
-	usedValues codegen.StringSet
+	usedValues TraversalList
 }
 
 // Maps names to known invoke usages.
@@ -106,7 +105,7 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 		case *pcl.LocalVariable:
 			if fn, ok := t.Definition.Value.(*model.FunctionCallExpression); ok && fn.Name == pcl.Invoke {
 				// An empty list is different then nil
-				g.invokeResults[fn] = &InvokeCall{t.Name(), codegen.NewStringSet()}
+				g.invokeResults[fn] = &InvokeCall{t.Name(), NewTraversalList()}
 			}
 		case *pcl.ConfigVariable:
 
@@ -124,13 +123,9 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 		// Pre should collect a list of references to invokes
 		pre := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
 			if call, ok := calls[t.RootName]; ok {
-				path := strings.Split(g.expr(t).(*syn.StringNode).Value(), ".")
-				contract.Assertf(len(path) > 1,
-					"Invokes must use a field. They cannot just use the result of the invoke")
 				// So note the referenced field
-				immediateField := path[1]
-				contract.Assertf(immediateField != "", "Empty path on %.v", t)
-				call.usedValues.Add(path[1])
+				traversal := g.Traversal(t)
+				call.usedValues = AppendTraversal(call.usedValues, traversal)
 			}
 			return t
 		})
@@ -139,10 +134,10 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 			// This is an invoke, and it is only used once: rewrite it to use a
 			// return statement
 			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
-				// Keep the root, but remove the first term of the traversal
-				t.Parts = t.Parts[1:]
-				// remove the second term, which is handled by the return statement
-				t.Traversal = t.Traversal[1:]
+				call.usedValues[0] = call.usedValues[0].OmitFirst()
+			}
+			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
+				fmt.Printf("Call: '%#v'", call)
 			}
 			return t
 		})
@@ -281,6 +276,123 @@ func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
 	g.outputs = append(g.outputs, syn.ObjectProperty(k, v))
 }
 
+// A segment of `Traversal`
+type TraversalSegment struct {
+	segment string
+	joinFmt string
+
+	// Omit this segment when displaying
+	omit bool
+}
+
+// A `ScopedTraversalExpression` ready to display.
+type Traversal struct {
+	root     string
+	segments []TraversalSegment
+}
+
+func (t Traversal) Equal(o Traversal) bool {
+	if t.root != o.root || len(t.segments) != len(o.segments) {
+		return false
+	}
+	for i := range t.segments {
+		if t.segments[i].segment != o.segments[i].segment ||
+			t.segments[i].joinFmt != o.segments[i].joinFmt {
+			return false
+		}
+	}
+	return true
+}
+
+type TraversalList = []Traversal
+
+func NewTraversalList() TraversalList {
+	return make([]Traversal, 0)
+}
+
+func AppendTraversal(tl TraversalList, t Traversal) TraversalList {
+	for _, o := range tl {
+		if t.Equal(o) {
+			return tl
+		}
+	}
+	return append(tl, t)
+}
+
+func (g *generator) Traversal(t *model.ScopeTraversalExpression) Traversal {
+
+	var segments []TraversalSegment
+	traversal := t.Traversal
+	if !traversal.IsRelative() {
+		traversal = traversal.SimpleSplit().Rel
+	}
+	for _, t := range traversal {
+		segments = append(segments, g.TraversalSegment(t))
+	}
+	tr := Traversal{t.RootName, segments}
+
+	for _, call := range g.invokeResults {
+		for _, instance := range call.usedValues {
+			if instance.Equal(tr) {
+				return instance
+			}
+		}
+	}
+
+	return tr
+}
+
+func (t Traversal) String() string {
+	s := t.root
+	for _, ts := range t.segments {
+		if ts.omit {
+			continue
+		}
+		s += fmt.Sprintf(ts.joinFmt, ts.segment)
+	}
+	return s
+}
+
+func (t Traversal) OmitFirst() Traversal {
+	t.segments[0].omit = true
+	return t
+}
+
+func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
+	var key cty.Value
+	switch t := t.(type) {
+	case hcl.TraverseAttr:
+		key = cty.StringVal(t.Name)
+	case hcl.TraverseIndex:
+		key = t.Key
+	default:
+		contract.Failf("Unexpected traverser of type %T: '%v'", t, t.SourceRange())
+	}
+
+	switch key.Type() {
+	case cty.String:
+		keyVal := key.AsString()
+		return TraversalSegment{
+			segment: keyVal,
+			joinFmt: ".%s",
+		}
+	case cty.Number:
+		idx, _ := key.AsBigFloat().Int64()
+		return TraversalSegment{
+			segment: fmt.Sprintf("%d", idx),
+			joinFmt: "[%s]",
+		}
+	default:
+		keyExpr := &model.LiteralValueExpression{Value: key}
+		diags := keyExpr.Typecheck(false)
+		contract.Ignore(diags)
+		return TraversalSegment{
+			segment: fmt.Sprintf("%v", keyExpr),
+			joinFmt: "%s[%s]",
+		}
+	}
+}
+
 func (g *generator) expr(e model.Expression) syn.Node {
 	switch e := e.(type) {
 	case *model.LiteralValueExpression:
@@ -309,35 +421,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		// those, we don't process RelativeTraversalExpressions.
 		g.yamlLimitation("RelativeTraversalExpression")
 		return syn.String("Unimplemented RelativeTraversalExpression")
+
 	case *model.ScopeTraversalExpression:
-		s := e.RootName
-		for _, t := range e.Traversal.SimpleSplit().Rel {
-			var key cty.Value
-			switch t := t.(type) {
-			case hcl.TraverseAttr:
-				key = cty.StringVal(t.Name)
-			case hcl.TraverseIndex:
-				key = t.Key
-			default:
-				contract.Failf("Unexpected traverser of type %T: '%v'", t, t.SourceRange())
-			}
-
-			switch key.Type() {
-			case cty.String:
-				keyVal := key.AsString()
-				s = fmt.Sprintf("%s.%s", s, keyVal)
-			case cty.Number:
-				idx, _ := key.AsBigFloat().Int64()
-				s = fmt.Sprintf("%s[%d]", s, idx)
-			default:
-				keyExpr := &model.LiteralValueExpression{Value: key}
-				diags := keyExpr.Typecheck(false)
-				contract.Ignore(diags)
-
-				s = fmt.Sprintf("%s[%v]", s, keyExpr)
-			}
-		}
-		s = fmt.Sprintf("${%s}", s)
+		traversal := g.Traversal(e)
+		s := fmt.Sprintf("${%s}", traversal)
 		return syn.String(s)
 
 	case *model.TemplateExpression:
@@ -464,10 +551,14 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 
 	// Calculate the return value
 	if fnInfo := g.invokeResults[f]; len(fnInfo.usedValues) == 1 {
+		fmt.Println(">>>")
+		fmt.Printf("Got return on value: %#v\n", f)
+		fmt.Printf("Known value: %#v\n", *fnInfo)
+		fmt.Println("<<<")
 		properties = append(properties,
 			syn.ObjectProperty(
 				syn.String("Return"),
-				syn.String(fnInfo.usedValues.SortedValues()[0]),
+				syn.String(fnInfo.usedValues[0].segments[0].segment),
 			))
 	}
 
