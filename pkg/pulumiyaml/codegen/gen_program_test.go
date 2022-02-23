@@ -3,6 +3,8 @@
 package codegen
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -20,8 +22,8 @@ func TestGenerateProgram(t *testing.T) {
 		l := []test.ProgramTest{}
 		for _, tt := range tests {
 			switch tt.Directory {
-			case "azure-sa", "aws-webserver":
-				// Waiting on variables merging
+			case "azure-sa":
+				// Reason: has dependencies between config variables
 			case "aws-s3-folder", "aws-fargate":
 				// Reason: need toJSON function
 			case "aws-eks":
@@ -52,6 +54,18 @@ func TestGenerateProgram(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	c := struct {
+		StorageAccountNameParam string `json:"project:storageAccountNameParam"`
+		ResourceGroupNameParam  string `json:"project:resourceGroupNameParam"`
+	}{
+		"storageAccountNameParam",
+		"resourceGroupNameParam",
+	}
+	config, err := json.Marshal(c)
+	assert.NoError(t, err, "Failed to marshal fake config")
+	t.Setenv("PULUMI_CONFIG", string(config))
+	fmt.Printf("config: '%s'\n", string(config))
+
 	test.TestProgramCodegen(t,
 		test.ProgramCodegenOptions{
 			Language:   "yaml",
@@ -67,6 +81,19 @@ func TestGenerateProgram(t *testing.T) {
 type testMonitor struct{}
 
 func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+	switch args.Token {
+	case "aws:index/getAmi:getAmi":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"id": "1234",
+		}), nil
+
+	// For azure-sa-pp
+	case "azure:core/getResourceGroup:getResourceGroup":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"location": "just-a-location",
+		}), nil
+
+	}
 	return resource.PropertyMap{}, nil
 }
 
@@ -84,6 +111,22 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
 			"bucket": "foo",
 		}), nil
+	case "server":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"publicIp":  "some-public-ip",
+			"publicDns": "some-public-dns",
+		}), nil
+	case "securityGroup":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"name": "some-name",
+		}), nil
+
+	// For azure-sa-pp
+	case "storageAccountResource":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"name": "some-name",
+		}), nil
+
 	}
 
 	return args.Name, resource.PropertyMap{}, nil

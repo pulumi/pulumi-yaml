@@ -66,7 +66,7 @@ type generator struct {
 func (g *generator) UnifyOutput() syn.Node {
 	entries := []syn.ObjectPropertyDef{}
 	if len(g.config) > 0 {
-		entries = append(entries, syn.ObjectProperty(syn.String("config"), syn.Object(g.config...)))
+		entries = append(entries, syn.ObjectProperty(syn.String("configuration"), syn.Object(g.config...)))
 	}
 	if len(g.resources) > 0 {
 		entries = append(entries, syn.ObjectProperty(syn.String("resources"), syn.Object(g.resources...)))
@@ -540,6 +540,17 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 	contract.Assert(f.Name == pcl.Invoke)
 	contract.Assert(len(f.Args) > 0)
 	name := g.expr(f.Args[0])
+	if segments := strings.Split(name.(*syn.StringNode).Value(), ":"); len(segments) == 3 && !strings.Contains(segments[1], "/") {
+		if segments[1] == "" {
+			segments[1] = "index"
+		}
+		t := segments[2]
+		if len(t) > 0 {
+			t = strings.ToLower(t[:1]) + t[1:]
+		}
+		segments[1] = segments[1] + "/" + t
+		name = syn.String(strings.Join(segments, ":"))
+	}
 	var arguments syn.Node
 	if len(f.Args) > 1 {
 		_, ok := f.Args[1].(*model.ObjectConsExpression)

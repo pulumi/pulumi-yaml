@@ -8,7 +8,7 @@ resources:
 variables:
     policyDocument:
         Fn::Invoke:
-            Function: aws:iam:getPolicyDocument
+            Function: aws:iam/getPolicyDocument:getPolicyDocument
             Arguments:
                 statements:
                     - sid: 1

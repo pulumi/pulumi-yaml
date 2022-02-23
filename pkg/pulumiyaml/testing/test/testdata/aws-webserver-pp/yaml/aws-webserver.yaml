@@ -24,7 +24,7 @@ resources:
 variables:
     ami:
         Fn::Invoke:
-            Function: aws::getAmi
+            Function: aws:index/getAmi:getAmi
             Arguments:
                 filters:
                     - name: name

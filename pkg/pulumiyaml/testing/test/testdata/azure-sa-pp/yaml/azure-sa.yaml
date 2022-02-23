@@ -1,11 +1,11 @@
 configuration:
-    locationParam:
-        type: string
-        default: ${resourceGroupVar}
-    resourceGroupNameParam:
-        type: string
     storageAccountNameParam:
         type: string
+    resourceGroupNameParam:
+        type: string
+    locationParam:
+        type: string
+        default: foo
     storageAccountTierParam:
         type: string
         default: Standard
@@ -14,20 +14,19 @@ configuration:
         default: LRS
 resources:
     storageAccountResource:
-        type: azure:storage:Account
+        type: azure:storage/account:Account
         properties:
-            accountKind: StorageV2
-            accountReplicationType: ${storageAccountTypeReplicationParam}
-            accountTier: ${storageAccountTierParam}
-            location: ${locationParam}
             name: ${storageAccountNameParam}
+            accountKind: StorageV2
+            location: ${locationParam}
             resourceGroupName: ${resourceGroupNameParam}
-outputs:
-    storageAccountNameOut: ${storageAccountResource.name}
+            accountTier: ${storageAccountTierParam}
+            accountReplicationType: ${storageAccountTypeReplicationParam}
 variables:
     resourceGroupVar:
         Fn::Invoke:
-            Function: azure:core:getResourceGroup
+            Function: azure:core/getResourceGroup:getResourceGroup
             Arguments:
                 name: ${resourceGroupNameParam}
-            Return: location
+outputs:
+    storageAccountNameOut: ${storageAccountResource.name}
