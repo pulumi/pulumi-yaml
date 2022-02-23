@@ -136,9 +136,6 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
 				call.usedValues[0] = call.usedValues[0].OmitFirst()
 			}
-			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
-				fmt.Printf("Call: '%#v'", call)
-			}
 			return t
 		})
 		diags := n.VisitExpressions(pre, post)
@@ -331,6 +328,8 @@ func (g *generator) Traversal(t *model.ScopeTraversalExpression) Traversal {
 	}
 	tr := Traversal{t.RootName, segments}
 
+	// In theory, this is quite slow. Inserting n references would run in O(n^3)
+	// time. In practice our examples are quite small, so it doesn't matter.
 	for _, call := range g.invokeResults {
 		for _, instance := range call.usedValues {
 			if instance.Equal(tr) {
@@ -551,10 +550,6 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 
 	// Calculate the return value
 	if fnInfo := g.invokeResults[f]; len(fnInfo.usedValues) == 1 {
-		fmt.Println(">>>")
-		fmt.Printf("Got return on value: %#v\n", f)
-		fmt.Printf("Known value: %#v\n", *fnInfo)
-		fmt.Println("<<<")
 		properties = append(properties,
 			syn.ObjectProperty(
 				syn.String("Return"),
