@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
@@ -35,12 +36,21 @@ func main() {
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
 	var root string
+	var run string
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
 	flag.StringVar(&root, "root", "", "Root of the program execition")
+	flag.StringVar(&run, "run", "", "Run the given template (must contain mocks)")
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
 	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
+
+	if run != "" {
+		if err := runTemplate(run); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	// Fetch the engine address if available so we can do logging, etc.
 	var engineAddress string
