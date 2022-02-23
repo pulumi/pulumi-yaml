@@ -4,7 +4,7 @@ resources:
         properties:
             region: us-west-2
     bucket1:
-        type: aws:s3:Bucket
+        type: aws:s3/bucket:Bucket
         options:
             provider: provider
             dependson:

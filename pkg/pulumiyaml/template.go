@@ -12,8 +12,6 @@ type Template struct {
 	Resources map[string]*Resource `json:",omitempty" yaml:",omitempty"`
 	// Outputs declares a set of output values that will be exported from the stack and usable from other stacks.
 	Outputs map[string]interface{} `json:",omitempty" yaml:",omitempty"`
-	// Variables declared to simplify the program.
-	Variables map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 
 	// TODO: Mappings and Conditions
 

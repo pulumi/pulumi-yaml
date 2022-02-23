@@ -250,8 +250,12 @@ func (g *generator) genResource(n *pcl.Resource) {
 		g.missingSchema()
 		n.Schema = &schema.Resource{}
 	}
+	typ := n.Token
+	if n.Schema != nil && n.Schema.Token != "" {
+		typ = n.Schema.Token
+	}
 	entries := []syn.ObjectPropertyDef{
-		syn.ObjectProperty(syn.String("type"), syn.String(n.Token)),
+		g.TypeProperty(typ),
 	}
 	if n.Schema.IsComponent {
 		entries = append(entries, syn.ObjectProperty(syn.String("component"), syn.Boolean(true)))
@@ -478,7 +482,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 
 func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
 	entries := []syn.ObjectPropertyDef{
-		syn.ObjectProperty(syn.String("type"), syn.String(n.Type().String())),
+		g.TypeProperty(n.Type().String()),
 	}
 	if n.DefaultValue != nil {
 		prop := syn.ObjectProperty(syn.String("default"), g.expr(n.DefaultValue))
@@ -558,4 +562,8 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 	}
 
 	return syn.Object(properties...)
+}
+
+func (g *generator) TypeProperty(s string) syn.ObjectPropertyDef {
+	return syn.ObjectProperty(syn.String("type"), syn.String(s))
 }

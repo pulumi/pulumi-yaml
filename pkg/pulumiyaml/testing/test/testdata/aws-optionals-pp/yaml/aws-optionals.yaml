@@ -1,6 +1,6 @@
 resources:
     example:
-        type: aws:iam:Policy
+        type: aws:iam/policy:Policy
         properties:
             name: example_policy
             path: /
