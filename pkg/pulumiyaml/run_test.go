@@ -423,23 +423,56 @@ func TestSelect(t *testing.T) {
 }
 
 func TestToBase64(t *testing.T) {
-	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{},
-	})
-	const str string = "this is a test"
-	testTemplate(t, tmpl, func(r *runner) {
-		v, diags := r.evaluateBuiltinToBase64(&ast.ToBase64Expr{
-			Value: ast.String(str),
+	tests := []struct {
+		input    *ast.ToBase64Expr
+		expected string // Will be encoded to base64
+		isOutput bool
+	}{
+		{
+			input: &ast.ToBase64Expr{
+				Value: ast.String("this is a test"),
+			},
+			expected: "this is a test",
+		},
+		{
+			input: &ast.ToBase64Expr{
+				Value: &ast.JoinExpr{
+					Delimiter: ast.String("."),
+					Values: ast.List(
+						ast.String("3"),
+						ast.String("141592"),
+					),
+				}},
+			expected: "3.141592",
+			isOutput: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinToBase64(tt.input)
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						s, err := b64.StdEncoding.DecodeString(x.(string))
+						assert.NoError(t, err)
+						assert.Equal(t, tt.expected, string(s))
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					s, err := b64.StdEncoding.DecodeString(v.(string))
+					assert.NoError(t, err)
+					assert.Equal(t, tt.expected, string(s))
+				}
+			})
 		})
-		requireNoErrors(t, diags)
-		out := v.(pulumi.StringOutput).ApplyT(func(x interface{}) (interface{}, error) {
-			s, err := b64.StdEncoding.DecodeString(x.(string))
-			assert.NoError(t, err)
-			assert.Equal(t, str, string(s))
-			return nil, nil
-		})
-		r.ctx.Export("out", out)
-	})
+	}
+
 }
 
 func TestSub(t *testing.T) {

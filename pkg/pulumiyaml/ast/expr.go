@@ -507,18 +507,14 @@ func Sub(interpolate *InterpolateExpr, substitutions *ObjectExpr) *SubExpr {
 type ToBase64Expr struct {
 	builtinNode
 
-	Value *StringExpr
+	Value Expr
 }
 
-func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value *StringExpr) *ToBase64Expr {
+func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value Expr) *ToBase64Expr {
 	return &ToBase64Expr{
 		builtinNode: builtin(node, name, args),
 		Value:       value,
 	}
-}
-
-func ToBase64(value string) *ToBase64Expr {
-	return ToBase64Syntax(nil, nil, nil, String(value))
 }
 
 // AssetExpr references a file either on disk ("File"), created in memory ("String") or accessed remotely ("Remote").

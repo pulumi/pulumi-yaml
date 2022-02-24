@@ -839,12 +839,12 @@ func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, synt
 		return b64.StdEncoding.EncodeToString([]byte(str)), nil
 	}
 	switch str := str.(type) {
-	case pulumi.StringOutput:
+	case pulumi.Output:
 		return str.ApplyT(toBase64), diags
 	case string:
 		s, err := toBase64(str)
 		contract.AssertNoErrorf(err, "Types must match since we know we have a string")
-		return pulumi.String(s.(string)).ToStringOutput(), diags
+		return s.(string), diags
 	default:
 		return nil, syntax.Diagnostics{ast.ExprError(v, "ToBase64 must encode into a string", "")}
 	}
