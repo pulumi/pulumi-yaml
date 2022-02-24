@@ -813,16 +813,17 @@ func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.D
 		if err != nil {
 			return "", err
 		}
+		// We don't include diags because it will be passed promptly
 		return string(b), nil
 	}
 	if output, ok := result.(pulumi.Output); ok {
-		return output.ApplyT(toJSON), nil
+		return output.ApplyT(toJSON), diags
 	}
 	b, err := toJSON(result)
 	if err != nil {
 		diags.Extend(ast.ExprError(v, "Failed to encode json", err.Error()))
 	}
-	return b, nil
+	return b, diags
 }
 
 func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
