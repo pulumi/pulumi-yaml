@@ -7,12 +7,6 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-func GetConfigDependencies(c ast.ConfigMapEntry) []*ast.StringExpr {
-	var deps []*ast.StringExpr
-	getExpressionDependencies(&deps, c.Value.Default)
-	return deps
-}
-
 // GetResourceDependencies gets the full set of implicit and explicit dependencies for a Resource.
 func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 	var deps []*ast.StringExpr
