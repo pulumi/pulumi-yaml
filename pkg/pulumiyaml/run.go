@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
@@ -821,25 +822,32 @@ func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.D
 	if err != nil {
 		diags.Extend(ast.ExprError(v, "Failed to encode json", err.Error()))
 	}
-	return pulumi.String(b), nil
+	return b, nil
 }
 
 func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 	switch v := v.(type) {
 	case *ast.ListExpr:
-		toAwait := make([]interface{}, len(v.Elements))
+		isPrompt := true
+		elements := make([]interface{}, len(v.Elements))
 		for i, e := range v.Elements {
 			val, localDiags := evaluateToJSON(r, e)
 			diags.Extend(localDiags...)
 			if diags.HasErrors() {
 				return nil, diags
 			}
-			toAwait[i] = val
+			elements[i] = val
+			if _, ok := val.(pulumi.Output); ok {
+				isPrompt = false
+			}
 		}
-		return pulumi.All(toAwait...), nil
+		if isPrompt {
+			return elements, nil
+		}
+		return pulumi.All(elements...), nil
 	case *ast.ObjectExpr:
-		toAwait := make([]interface{}, len(v.Entries)*2)
+		kvMap := make([]interface{}, len(v.Entries)*2)
 		for i, entry := range v.Entries {
 			k, localDiags := r.evaluateExpr(entry.Key)
 			diags.Extend(localDiags...)
@@ -851,17 +859,28 @@ func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
 			if diags.HasErrors() {
 				return nil, diags
 			}
-			toAwait[i*2] = k
-			toAwait[i*2+1] = val
+			kvMap[i*2] = k
+			kvMap[i*2+1] = val
 		}
-		return pulumi.All(toAwait...).ApplyT(func(interfaceArray interface{}) (interface{}, error) {
+		isPrompt := true
+		for _, v := range kvMap {
+			if _, ok := v.(pulumi.Output); ok {
+				isPrompt = false
+			}
+		}
+		toMap := func(array []interface{}) (interface{}, error) {
 			o := make(map[string]interface{}, len(v.Entries))
-			array := interfaceArray.([]interface{})
 			for i := 0; i < len(v.Entries); i++ {
 				o[array[i*2].(string)] = array[i*2+1]
 			}
 			return o, nil
-		}), diags
+		}
+		if isPrompt {
+			m, err := toMap(kvMap)
+			contract.AssertNoErrorf(err, "toMap cannot return an error")
+			return m, diags
+		}
+		return pulumi.All(kvMap...).ApplyT(toMap), diags
 
 	default:
 		return r.evaluateExpr(v)

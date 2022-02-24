@@ -391,20 +391,21 @@ func TestJoin(t *testing.T) {
 
 func TestToJSON(t *testing.T) {
 	tests := []struct {
-		input  *ast.ToJSONExpr
-		output string
+		input    *ast.ToJSONExpr
+		expected string
+		isOutput bool
 	}{
 		{
-			&ast.ToJSONExpr{
+			input: &ast.ToJSONExpr{
 				Value: ast.List(
 					ast.String("a"),
 					ast.String("b"),
 				),
 			},
-			`["a","b"]`,
+			expected: `["a","b"]`,
 		},
 		{
-			&ast.ToJSONExpr{
+			input: &ast.ToJSONExpr{
 				Value: ast.Object(
 					ast.ObjectProperty{
 						Key:   ast.String("one"),
@@ -416,10 +417,10 @@ func TestToJSON(t *testing.T) {
 					},
 				),
 			},
-			`{"one":1,"two":[1,2]}`,
+			expected: `{"one":1,"two":[1,2]}`,
 		},
 		{
-			&ast.ToJSONExpr{
+			input: &ast.ToJSONExpr{
 				Value: ast.List(
 					&ast.JoinExpr{
 						Delimiter: ast.String("-"),
@@ -430,23 +431,28 @@ func TestToJSON(t *testing.T) {
 						),
 					}),
 			},
-			`["a-b-c"]`,
+			expected: `["a-b-c"]`,
+			isOutput: true,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.output, func(t *testing.T) {
+		t.Run(tt.expected, func(t *testing.T) {
 
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{},
 			})
 			testTemplate(t, tmpl, func(r *runner) {
 				v, diags := r.evaluateBuiltinToJSON(tt.input)
-				out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
-					assert.Equal(t, tt.output, x)
-					return nil, nil
-				})
 				requireNoErrors(t, diags)
-				r.ctx.Export("out", out)
+				if tt.isOutput {
+					out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
+						assert.Equal(t, tt.expected, x)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
 			})
 		})
 	}
