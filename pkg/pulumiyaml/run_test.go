@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	b64 "encoding/base64"
 	"fmt"
 	"testing"
 
@@ -415,6 +416,26 @@ func TestSelect(t *testing.T) {
 		requireNoErrors(t, diags)
 		out := pulumi.ToOutput(v).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "second", x.(string))
+			return nil, nil
+		})
+		r.ctx.Export("out", out)
+	})
+}
+
+func TestToBase64(t *testing.T) {
+	tmpl := template(t, &Template{
+		Resources: map[string]*Resource{},
+	})
+	const str string = "this is a test"
+	testTemplate(t, tmpl, func(r *runner) {
+		v, diags := r.evaluateBuiltinToBase64(&ast.ToBase64Expr{
+			Value: ast.String(str),
+		})
+		requireNoErrors(t, diags)
+		out := v.(pulumi.StringOutput).ApplyT(func(x interface{}) (interface{}, error) {
+			s, err := b64.StdEncoding.DecodeString(x.(string))
+			assert.NoError(t, err)
+			assert.Equal(t, str, string(s))
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
