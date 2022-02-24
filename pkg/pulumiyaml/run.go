@@ -799,7 +799,7 @@ func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.D
 	switch v := v.Value.(type) {
 	case *ast.ListExpr, *ast.ObjectExpr:
 	default:
-		diags.Extend(ast.ExprError(v, "Fn::toJSON must take either a list or object as it's argument.", ""))
+		diags.Extend(ast.ExprError(v, "Fn::ToJSON must take either a list or object as it's argument.", ""))
 		return nil, diags
 	}
 	result, d := evaluateToJSON(r, v.Value)

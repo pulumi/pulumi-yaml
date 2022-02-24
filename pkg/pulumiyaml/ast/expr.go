@@ -433,7 +433,7 @@ func ToJSONSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *ToJSONE
 }
 
 func ToJSON(value Expr) *ToJSONExpr {
-	name := String("Fn::toJSON")
+	name := String("Fn::ToJSON")
 	return ToJSONSyntax(nil, name, value)
 }
 
@@ -592,7 +592,7 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseInvoke
 	case "Fn::Join":
 		parse = parseJoin
-	case "Fn::toJSON":
+	case "Fn::ToJSON":
 		parse = parseToJSON
 	case "Fn::Sub":
 		parse = parseSub
