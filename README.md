@@ -76,7 +76,7 @@ resources:
           echo 'Hello, World from ${WebSecGrp.arn}!' > index.html
           nohup python -m SimpleHTTPServer 80 &
       vpcSecurityGroupIds:
-        - ${WebSecGrp}
+        - ${WebSecGrp.id}
   UsEast2Provider:
     type: pulumi:providers:aws
     properties:
@@ -86,7 +86,7 @@ resources:
     options:
       provider: UsEast2Provider
 outputs:
-  InstanceId: ${WebServer}
+  InstanceId: ${WebServer.id}
   PublicIp: ${WebServer.publicIp}
   PublicHostName: ${WebServer.publicDns}
 ```
