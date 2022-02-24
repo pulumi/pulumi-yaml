@@ -488,7 +488,7 @@ func TestSub(t *testing.T) {
 	})
 	testTemplate(t, tmpl, func(r *runner) {
 		v, diags := r.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA}!!"),
+			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"),
 		})
 		requireNoErrors(t, diags)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {

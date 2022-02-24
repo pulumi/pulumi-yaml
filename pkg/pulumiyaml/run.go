@@ -201,6 +201,10 @@ func (st *lateboundCustomResourceState) ProviderResource() *pulumi.ProviderResou
 	return nil
 }
 
+func (*lateboundCustomResourceState) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
 	name    string
@@ -229,6 +233,10 @@ func (st *lateboundProviderResourceState) CustomResource() *pulumi.CustomResourc
 
 func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderResourceState {
 	return &st.ProviderResourceState
+}
+
+func (*lateboundProviderResourceState) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
 }
 
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
@@ -476,7 +484,14 @@ func (r *runner) registerOutputs() syntax.Diagnostics {
 		if odiags.HasErrors() {
 			return diags
 		}
-		r.ctx.Export(kvp.Key.Value, pulumi.Any(out))
+		switch res := out.(type) {
+		case *lateboundCustomResourceState:
+			r.ctx.Export(kvp.Key.Value, res)
+		case *lateboundProviderResourceState:
+			r.ctx.Export(kvp.Key.Value, res)
+		default:
+			r.ctx.Export(kvp.Key.Value, pulumi.Any(out))
+		}
 	}
 	return diags
 }
@@ -631,10 +646,7 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 
 	var receiver interface{}
 	if res, ok := r.resources[resourceName]; ok {
-		if len(access.Accessors) == 1 {
-			return res.CustomResource().ID().ToStringOutput(), nil
-		}
-		receiver = res.GetOutputs()
+		receiver = res
 	} else if p, ok := r.config[resourceName]; ok {
 		receiver = p
 	} else if v, ok := r.variables[resourceName]; ok {
@@ -656,6 +668,19 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 func (r *runner) evaluateAccess(receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, error) {
 	for ; len(accessors) > 0; accessors = accessors[1:] {
 		switch x := receiver.(type) {
+		case lateboundResource:
+			// Peak ahead at the next accessor to implement .urn and .id:
+			if len(accessors) >= 1 {
+				sub, ok := accessors[0].(*ast.PropertyName)
+				if ok && sub.Name == "id" {
+					return x.CustomResource().ID().ToStringOutput(), nil
+				} else if ok && sub.Name == "urn" {
+					return x.CustomResource().URN().ToStringOutput(), nil
+				}
+			}
+			return x.GetOutputs().ApplyT(func(v interface{}) (interface{}, error) {
+				return r.evaluateAccess(v, accessors)
+			}), nil
 		case pulumi.Output:
 			return x.ApplyT(func(v interface{}) (interface{}, error) {
 				return r.evaluateAccess(v, accessors)
