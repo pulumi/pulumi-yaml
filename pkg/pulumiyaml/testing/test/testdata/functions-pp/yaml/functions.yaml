@@ -1,0 +1,8 @@
+variables:
+    encoded:
+        Fn::ToBase64: haha business
+    joined:
+        Fn::Join:
+            - '-'
+            - - haha
+              - business

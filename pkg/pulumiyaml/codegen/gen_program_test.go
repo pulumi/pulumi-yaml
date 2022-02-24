@@ -28,13 +28,6 @@ func TestGenerateProgram(t *testing.T) {
 				// Reason: need toJSON function
 			case "aws-eks":
 				// Reason: missing splat
-			case "functions":
-				// Reason: missing toBase64
-			case "output-funcs-aws":
-				// Calls invoke without assigning the result
-				// Right now this fails a contract. For the future, we can either:
-				// 1. Construct an arbitrary return value
-				// 2. Not generate the invoke at all
 			default:
 				l = append(l, tt)
 			}
@@ -91,6 +84,12 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 	case "azure:core/getResourceGroup:getResourceGroup":
 		return resource.NewPropertyMapFromMap(map[string]interface{}{
 			"location": "just-a-location",
+		}), nil
+
+	// For output-funcs-aws
+	case "aws:ec2/getPrefixList:getPrefixList":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"cidrBlocks": []string{"some-list"},
 		}), nil
 
 	}
