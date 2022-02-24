@@ -66,11 +66,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 
 		if !cdiags.HasErrors() {
 			intermediates[cname] = node
-			dependencies[cname] = nil
-
-			// Special case: configuration goes first
-			visited[cname] = true
-			sorted = append(sorted, node)
+			dependencies[cname] = GetConfigDependencies(kvp)
 		}
 	}
 	for _, kvp := range t.Resources.Entries {
