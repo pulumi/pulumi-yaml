@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	b64 "encoding/base64"
 	"fmt"
 	"testing"
 
@@ -488,6 +489,59 @@ func TestSelect(t *testing.T) {
 		})
 		r.ctx.Export("out", out)
 	})
+}
+
+func TestToBase64(t *testing.T) {
+	tests := []struct {
+		input    *ast.ToBase64Expr
+		expected string
+		isOutput bool
+	}{
+		{
+			input: &ast.ToBase64Expr{
+				Value: ast.String("this is a test"),
+			},
+			expected: "this is a test",
+		},
+		{
+			input: &ast.ToBase64Expr{
+				Value: &ast.JoinExpr{
+					Delimiter: ast.String("."),
+					Values: ast.List(
+						ast.String("3"),
+						ast.String("141592"),
+					),
+				}},
+			expected: "3.141592",
+			isOutput: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinToBase64(tt.input)
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						s, err := b64.StdEncoding.DecodeString(x.(string))
+						assert.NoError(t, err)
+						assert.Equal(t, tt.expected, string(s))
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					s, err := b64.StdEncoding.DecodeString(v.(string))
+					assert.NoError(t, err)
+					assert.Equal(t, tt.expected, string(s))
+				}
+			})
+		})
+	}
+
 }
 
 func TestSub(t *testing.T) {

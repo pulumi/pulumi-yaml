@@ -523,6 +523,19 @@ func Sub(interpolate *InterpolateExpr, substitutions *ObjectExpr) *SubExpr {
 	}
 }
 
+type ToBase64Expr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value Expr) *ToBase64Expr {
+	return &ToBase64Expr{
+		builtinNode: builtin(node, name, args),
+		Value:       value,
+	}
+}
+
 // AssetExpr references a file either on disk ("File"), created in memory ("String") or accessed remotely ("Remote").
 type AssetExpr struct {
 	builtinNode
@@ -596,6 +609,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseToJSON
 	case "Fn::Sub":
 		parse = parseSub
+	case "Fn::ToBase64":
+		parse = parseToBase64
 	case "Fn::Select":
 		parse = parseSelect
 	case "Fn::Asset":
@@ -798,6 +813,14 @@ func parseSub(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, synta
 	}
 
 	return SubSyntax(node, name, args, interpolate, substitutions), diags
+}
+
+func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	str, ok := args.(*StringExpr)
+	if !ok {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::ToBase64 must be a string", "")}
+	}
+	return ToBase64Syntax(node, name, args, str), nil
 }
 
 func parseAsset(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -242,6 +243,8 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 	}
 }
 
+const PulumiVarName = "pulumi"
+
 func (r *runner) Evaluate() syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
@@ -249,7 +252,7 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	if err != nil {
 		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 	}
-	r.variables["pulumi"] = map[string]interface{}{
+	r.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
 		"project": r.ctx.Project(),
 		"stack":   r.ctx.Stack(),
@@ -521,6 +524,8 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinSub(x)
 	case *ast.SelectExpr:
 		return r.evaluateBuiltinSelect(x)
+	case *ast.ToBase64Expr:
+		return r.evaluateBuiltinToBase64(x)
 	case *ast.AssetExpr:
 		return r.evaluateBuiltinAsset(x)
 	case *ast.StackReferenceExpr:
@@ -920,6 +925,27 @@ func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.D
 		return elems[index], nil
 	})
 	return out, nil
+}
+
+func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, syntax.Diagnostics) {
+	str, diags := r.evaluateExpr(v.Value)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	toBase64 := func(s interface{}) (interface{}, error) {
+		str := s.(string)
+		return b64.StdEncoding.EncodeToString([]byte(str)), nil
+	}
+	switch str := str.(type) {
+	case pulumi.Output:
+		return str.ApplyT(toBase64), diags
+	case string:
+		s, err := toBase64(str)
+		contract.AssertNoErrorf(err, "Types must match since we know we have a string")
+		return s.(string), diags
+	default:
+		return nil, syntax.Diagnostics{ast.ExprError(v, "ToBase64 must encode into a string", "")}
+	}
 }
 
 func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnostics) {
