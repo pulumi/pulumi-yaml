@@ -143,22 +143,11 @@ func (g *generator) PrepareForInvokes(program *pcl.Program) {
 	}
 }
 
-type yamlLimitationKind string
-
-var (
-	Splat    yamlLimitationKind = "splat"
-	ToJSON   yamlLimitationKind = "toJSON"
-	toBase64 yamlLimitationKind = "toBase64"
-)
-
-func (y yamlLimitationKind) Summary() string {
-	return fmt.Sprintf("Failed to generate YAML program. Missing %s", string(y))
-}
-
-func (g *generator) yamlLimitation(kind yamlLimitationKind) {
+func (g *generator) yamlLimitation(kind string) {
 	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagError,
-		Summary:  kind.Summary(),
+		Summary:  kind,
+		Detail:   fmt.Sprintf("Failed to generate YAML program. Missing function %s", kind),
 	})
 }
 
@@ -472,7 +461,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		return syn.Object(entries...)
 
 	case *model.SplatExpression:
-		g.yamlLimitation(Splat)
+		g.yamlLimitation("Splat")
 		return syn.String("Splat not implemented")
 	default:
 		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
@@ -519,11 +508,10 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			args[i] = g.expr(arg)
 		}
 		return fn("Join", syn.List(args...))
-	case "toJSON":
-		g.yamlLimitation(ToJSON)
-		return fn("toJSON", syn.Null())
 	case "toBase64":
-		g.yamlLimitation(toBase64)
+		return fn("ToBase64", g.expr(f.Args[0]))
+	case "toJSON", "filebase64", "readFile":
+		g.yamlLimitation(f.Name)
 		return fn("toBase64", syn.Null())
 	default:
 		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
