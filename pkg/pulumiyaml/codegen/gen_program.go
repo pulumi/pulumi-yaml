@@ -165,7 +165,7 @@ func (g *generator) yamlLimitation(kind yamlLimitationKind) {
 func (g *generator) missingSchema() {
 	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagWarning,
-		Summary:  "Could not get schema. This might lead to inacurate generation",
+		Summary:  "Could not get schema. This might lead to inaccurate generation",
 	})
 }
 
