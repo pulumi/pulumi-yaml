@@ -425,7 +425,7 @@ func TestSelect(t *testing.T) {
 func TestToBase64(t *testing.T) {
 	tests := []struct {
 		input    *ast.ToBase64Expr
-		expected string // Will be encoded to base64
+		expected string
 		isOutput bool
 	}{
 		{
