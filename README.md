@@ -76,7 +76,7 @@ resources:
           echo 'Hello, World from ${WebSecGrp.arn}!' > index.html
           nohup python -m SimpleHTTPServer 80 &
       vpcSecurityGroupIds:
-        - ${WebSecGrp.id}
+        - ${WebSecGrp}
   UsEast2Provider:
     type: pulumi:providers:aws
     properties:

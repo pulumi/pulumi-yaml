@@ -678,9 +678,7 @@ func (r *runner) evaluateAccess(receiver interface{}, accessors []ast.PropertyAc
 					return x.CustomResource().URN().ToStringOutput(), nil
 				}
 			}
-			return x.GetOutputs().ApplyT(func(v interface{}) (interface{}, error) {
-				return r.evaluateAccess(v, accessors)
-			}), nil
+			return r.evaluateAccess(x.GetOutputs(), accessors)
 		case pulumi.Output:
 			return x.ApplyT(func(v interface{}) (interface{}, error) {
 				return r.evaluateAccess(v, accessors)
