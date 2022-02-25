@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	"bytes"
 	b64 "encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -532,6 +533,8 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
 		return r.evaluateBuiltinJoin(x)
+	case *ast.ToJSONExpr:
+		return r.evaluateBuiltinToJSON(x)
 	case *ast.SubExpr:
 		return r.evaluateBuiltinSub(x)
 	case *ast.SelectExpr:
@@ -818,6 +821,99 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 		parts = append(parts, part)
 	}
 	return joinStringOutputs(parts), diags
+}
+
+func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	switch v := v.Value.(type) {
+	case *ast.ListExpr, *ast.ObjectExpr:
+	default:
+		diags.Extend(ast.ExprError(v, "Fn::ToJSON must take either a list or object as it's argument.", ""))
+		return nil, diags
+	}
+	result, d := evaluateToJSON(r, v.Value)
+	diags.Extend(d...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	toJSON := func(data interface{}) (string, error) {
+		b, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+		// We don't include diags because it will be passed promptly
+		return string(b), nil
+	}
+	if output, ok := result.(pulumi.Output); ok {
+		return output.ApplyT(toJSON), diags
+	}
+	b, err := toJSON(result)
+	if err != nil {
+		diags.Extend(ast.ExprError(v, "Failed to encode json", err.Error()))
+	}
+	return b, diags
+}
+
+func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	switch v := v.(type) {
+	case *ast.ListExpr:
+		isPrompt := true
+		elements := make([]interface{}, len(v.Elements))
+		for i, e := range v.Elements {
+			val, localDiags := evaluateToJSON(r, e)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			elements[i] = val
+			if _, ok := val.(pulumi.Output); ok {
+				isPrompt = false
+			}
+		}
+		if isPrompt {
+			return elements, nil
+		}
+		return pulumi.All(elements...), nil
+	case *ast.ObjectExpr:
+		kvMap := make([]interface{}, len(v.Entries)*2)
+		for i, entry := range v.Entries {
+			k, localDiags := r.evaluateExpr(entry.Key)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			val, localDiags := evaluateToJSON(r, entry.Value)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			kvMap[i*2] = k
+			kvMap[i*2+1] = val
+		}
+		isPrompt := true
+		for _, v := range kvMap {
+			if _, ok := v.(pulumi.Output); ok {
+				isPrompt = false
+			}
+		}
+		toMap := func(array []interface{}) (interface{}, error) {
+			o := make(map[string]interface{}, len(v.Entries))
+			for i := 0; i < len(v.Entries); i++ {
+				o[array[i*2].(string)] = array[i*2+1]
+			}
+			return o, nil
+		}
+		if isPrompt {
+			m, err := toMap(kvMap)
+			contract.AssertNoErrorf(err, "toMap cannot return an error")
+			return m, diags
+		}
+		return pulumi.All(kvMap...).ApplyT(toMap), diags
+
+	default:
+		return r.evaluateExpr(v)
+	}
 }
 
 func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.Diagnostics) {

@@ -418,6 +418,25 @@ func Invoke(token string, callArgs *ObjectExpr, ret string) *InvokeExpr {
 	}
 }
 
+// ToJSON returns the underlying structure as a json string.
+type ToJSONExpr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func ToJSONSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *ToJSONExpr {
+	return &ToJSONExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
+func ToJSON(value Expr) *ToJSONExpr {
+	name := String("Fn::ToJSON")
+	return ToJSONSyntax(nil, name, value)
+}
+
 // JoinExpr appends a set of values into a single value, separated by the specified delimiter.
 // If a delimiter is the empty string, the set of values are concatenated with no delimiter.
 type JoinExpr struct {
@@ -586,6 +605,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseInvoke
 	case "Fn::Join":
 		parse = parseJoin
+	case "Fn::ToJSON":
+		parse = parseToJSON
 	case "Fn::Sub":
 		parse = parseSub
 	case "Fn::ToBase64":
@@ -717,6 +738,10 @@ func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, synt
 	}
 
 	return JoinSyntax(node, name, list, list.Elements[0], values), nil
+}
+
+func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return ToJSONSyntax(node, name, args), nil
 }
 
 func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
