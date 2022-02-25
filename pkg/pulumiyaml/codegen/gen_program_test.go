@@ -24,10 +24,12 @@ func TestGenerateProgram(t *testing.T) {
 			switch tt.Directory {
 			case "azure-sa":
 				// Reason: has dependencies between config variables
-			case "aws-s3-folder", "aws-fargate":
-				// Reason: need toJSON function
-			case "aws-eks":
+			case "aws-eks", "aws-s3-folder":
 				// Reason: missing splat
+				//
+				// Note: aws-s3-folder errors with
+				// 14,27-52: the asset parameter must be a string literal; the asset parameter must be a string literal
+				// But the actual error is that it is using a Splat operator.
 			default:
 				l = append(l, tt)
 			}

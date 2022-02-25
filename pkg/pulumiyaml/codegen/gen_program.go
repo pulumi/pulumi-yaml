@@ -510,9 +510,11 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 		return fn("Join", syn.List(args...))
 	case "toBase64":
 		return fn("ToBase64", g.expr(f.Args[0]))
-	case "toJSON", "filebase64", "readFile":
+	case "toJSON":
+		return fn("ToJSON", g.expr(f.Args[0]))
+	case "filebase64", "readFile":
 		g.yamlLimitation(f.Name)
-		return fn("toBase64", syn.Null())
+		return fn(f.Name, syn.Null())
 	default:
 		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
 	}
