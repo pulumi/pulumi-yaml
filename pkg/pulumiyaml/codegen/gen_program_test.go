@@ -148,3 +148,23 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 
 	return args.Name, resource.PropertyMap{}, nil
 }
+
+func TestIsEscapedString(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`"foobar"`, true},
+		{`"foo\nbar"`, true},
+		{`"foo\"bar"`, true},
+		{`"foo\\\"bar"`, true},
+		{`"foo`, false},
+		{`"foo"bar"`, false},
+		{`"goo\\"bar"`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isEscapedString(tt.input))
+		})
+	}
+}

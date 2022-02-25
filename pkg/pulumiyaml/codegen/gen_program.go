@@ -11,6 +11,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
@@ -147,7 +148,7 @@ func (g *generator) yamlLimitation(kind string) {
 	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagError,
 		Summary:  kind,
-		Detail:   fmt.Sprintf("Failed to generate YAML program. Missing function %s", kind),
+		Detail:   fmt.Sprintf("Failed to generate YAML program. Missing function '%s'", kind),
 	})
 }
 
@@ -309,6 +310,48 @@ func AppendTraversal(tl TraversalList, t Traversal) TraversalList {
 	return append(tl, t)
 }
 
+// isEscapedString checks is a string is properly escaped. This means that it
+// starts and ends with a '"', and that any '"' in the middle of the string is
+// itself escaped: '\"'.
+//
+// Valid:
+// - "foobar"
+// - "foo\"bar"
+// - "foo\\\"bar"
+// Invalid:
+// - "foo
+// - "foo"bar"
+// - "foo\\"bar"
+func isEscapedString(s string) bool {
+
+	if !strings.HasPrefix(s, `"`) {
+		return false
+	}
+	s = s[1:]
+	if !strings.HasSuffix(s, `"`) {
+		return false
+	}
+	s = strings.TrimSuffix(s, `"`)
+
+	// We should encounter only escaped '"' at this point
+	isEscaped := false
+	for len(s) > 0 {
+		switch s[0] {
+		case '\\':
+			isEscaped = !isEscaped
+		case '"':
+			if !isEscaped {
+				return false
+			}
+			fallthrough
+		default:
+			isEscaped = false
+		}
+		s = s[1:]
+	}
+	return true
+}
+
 func (g *generator) Traversal(t *model.ScopeTraversalExpression) Traversal {
 
 	var segments []TraversalSegment
@@ -316,6 +359,7 @@ func (g *generator) Traversal(t *model.ScopeTraversalExpression) Traversal {
 	if !traversal.IsRelative() {
 		traversal = traversal.SimpleSplit().Rel
 	}
+	g.checkPropertyName(t.RootName, t.Tokens.Root.Range().Ptr())
 	for _, t := range traversal {
 		segments = append(segments, g.TraversalSegment(t))
 	}
@@ -350,6 +394,28 @@ func (t Traversal) OmitFirst() Traversal {
 	return t
 }
 
+func (g *generator) checkPropertyName(n string, subject *hcl.Range) {
+	if !ast.PropertyNameRegexp.Match([]byte(n)) {
+		g.diags = append(g.diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid property name access",
+			Detail:   fmt.Sprintf("'%s' is not a valid property name access", n),
+			Subject:  subject,
+		})
+	}
+}
+
+func (g *generator) checkPropertyKeyIndex(n string, subject *hcl.Range) {
+	if !isEscapedString(n) {
+		g.diags = append(g.diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Invalid property key access",
+			Detail:   fmt.Sprintf("'%s' is not a valid property key access", n),
+			Subject:  subject,
+		})
+	}
+}
+
 func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 	var key cty.Value
 	switch t := t.(type) {
@@ -364,6 +430,7 @@ func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 	switch key.Type() {
 	case cty.String:
 		keyVal := key.AsString()
+		g.checkPropertyName(keyVal, t.SourceRange().Ptr())
 		return TraversalSegment{
 			segment: keyVal,
 			joinFmt: ".%s",
@@ -378,8 +445,10 @@ func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 		keyExpr := &model.LiteralValueExpression{Value: key}
 		diags := keyExpr.Typecheck(false)
 		contract.Ignore(diags)
+		segment := fmt.Sprintf("%v", keyExpr)
+		g.checkPropertyKeyIndex(segment, t.SourceRange().Ptr())
 		return TraversalSegment{
-			segment: fmt.Sprintf("%v", keyExpr),
+			segment: segment,
 			joinFmt: "%s[%s]",
 		}
 	}
@@ -512,11 +581,9 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 		return fn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":
 		return fn("ToJSON", g.expr(f.Args[0]))
-	case "filebase64", "readFile":
+	default:
 		g.yamlLimitation(f.Name)
 		return fn(f.Name, syn.Null())
-	default:
-		panic(fmt.Sprintf("function '%s' has not been implemented", f.Name))
 	}
 }
 
