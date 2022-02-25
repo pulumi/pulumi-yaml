@@ -1,0 +1,34 @@
+resources:
+    siteBucket:
+        type: aws:s3/bucket:Bucket
+        properties:
+            website:
+                indexDocument: index.html
+    files:
+        type: aws:s3/bucketObject:BucketObject
+        properties:
+            bucket: ${siteBucket.id}
+            key: ${range.value}
+            source:
+                Fn::Asset:
+                    File: ${siteDir}/${range.value}
+            contentType: ${range.value}
+    bucketPolicy:
+        type: aws:s3/bucketPolicy:BucketPolicy
+        properties:
+            bucket: ${siteBucket.id}
+            policy:
+                Fn::ToJSON:
+                    Version: 2012-10-17
+                    Statement:
+                        - Effect: Allow
+                          Principal: '*'
+                          Action:
+                            - s3:GetObject
+                          Resource:
+                            - arn:aws:s3:::${siteBucket.id}/*
+variables:
+    siteDir: www
+outputs:
+    bucketName: ${siteBucket.bucket}
+    websiteUrl: ${siteBucket.websiteEndpoint}

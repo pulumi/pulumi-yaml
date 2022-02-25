@@ -94,6 +94,16 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 			"cidrBlocks": []string{"some-list"},
 		}), nil
 
+	// For aws-fargate
+	case "aws:ec2/getSubnetIds:getSubnetIds":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"ids": []string{"some-ids"},
+		}), nil
+	case "aws:ec2/getVpc:getVpc":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"id": "some-id",
+		}), nil
+
 	}
 	return resource.PropertyMap{}, nil
 }
@@ -126,6 +136,12 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 	case "storageAccountResource":
 		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
 			"name": "some-name",
+		}), nil
+
+	// For aws-fargate
+	case "webSecurityGroup":
+		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
+			"id": "some-id",
 		}), nil
 
 	}
