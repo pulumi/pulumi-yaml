@@ -2,7 +2,7 @@
 
 - [ci] Enable CI suite, testing.
 
-- [feature] Resources may specify "pluginDownloadURL" to exercise the common API signature used
+- [features] Resources may specify "pluginDownloadURL" to exercise the common API signature used
   across providers for dynamic plugin acquisition.
 
 - [features] Fn::Invoke arguments may contain outputs from other resources
@@ -16,5 +16,11 @@
   obtain the current working directory, stack name, and project name respectively.
 
 - [features] optional `Return` from `Fn::Invoke`
+
+- [features] an expression referring to a resource by name, such as `${resource}` returns the
+  resource object instead of an individual resource. Resource IDs are now obtained via `id` property
+  in expressions. Example: use `${resource.id}` instead of `${resource}`, implements
+  [#73](https://github.com/pulumi/pulumi-yaml/issues/73). Also adds a `urn` property to obtain the
+  resource's URN.
 
 ### Bug Fixes

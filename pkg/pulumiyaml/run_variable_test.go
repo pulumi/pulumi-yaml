@@ -63,6 +63,30 @@ outputs:
 	assert.NoError(t, err)
 }
 
+func TestVariablePulumiInDependencies(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  someVar:
+    Fn::Invoke:
+      Function: test:invoke:type
+      Arguments:
+        quux: tuo
+      Return: retval
+resources:
+  resFinal:
+    type: test:resource:type
+    properties:
+      cwd: ${pulumi.cwd}
+      foo: oof
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, diags)
+}
+
 // Test that a variable can be prior to any resource in the topological sort:
 //
 //  1. Resource `res-a` depends on variable `someVar`
@@ -271,9 +295,7 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			switch typeToken {
 			case testResourceToken:
 				assert.Equal(t, testResourceToken, typeToken)
-				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
-					"foo": "oof",
-				}), state, "expected resource test:resource:type to have property foo: oof")
+				assert.Equal(t, resource.NewStringProperty("oof"), state["foo"], "expected resource test:resource:type to have property foo: oof")
 				assert.Equal(t, "", provider)
 				assert.Equal(t, "", id)
 

@@ -4,6 +4,8 @@ package pulumiyaml
 
 import (
 	"bytes"
+	b64 "encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
@@ -199,6 +202,10 @@ func (st *lateboundCustomResourceState) ProviderResource() *pulumi.ProviderResou
 	return nil
 }
 
+func (*lateboundCustomResourceState) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
 	name    string
@@ -229,6 +236,10 @@ func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderRes
 	return &st.ProviderResourceState
 }
 
+func (*lateboundProviderResourceState) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 	return &runner{
 		ctx:       ctx,
@@ -240,6 +251,8 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
 	}
 }
 
+const PulumiVarName = "pulumi"
+
 func (r *runner) Evaluate() syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
@@ -247,7 +260,7 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	if err != nil {
 		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 	}
-	r.variables["pulumi"] = map[string]interface{}{
+	r.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
 		"project": r.ctx.Project(),
 		"stack":   r.ctx.Stack(),
@@ -472,7 +485,14 @@ func (r *runner) registerOutputs() syntax.Diagnostics {
 		if odiags.HasErrors() {
 			return diags
 		}
-		r.ctx.Export(kvp.Key.Value, pulumi.Any(out))
+		switch res := out.(type) {
+		case *lateboundCustomResourceState:
+			r.ctx.Export(kvp.Key.Value, res)
+		case *lateboundProviderResourceState:
+			r.ctx.Export(kvp.Key.Value, res)
+		default:
+			r.ctx.Export(kvp.Key.Value, pulumi.Any(out))
+		}
 	}
 	return diags
 }
@@ -513,10 +533,14 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
 		return r.evaluateBuiltinJoin(x)
+	case *ast.ToJSONExpr:
+		return r.evaluateBuiltinToJSON(x)
 	case *ast.SubExpr:
 		return r.evaluateBuiltinSub(x)
 	case *ast.SelectExpr:
 		return r.evaluateBuiltinSelect(x)
+	case *ast.ToBase64Expr:
+		return r.evaluateBuiltinToBase64(x)
 	case *ast.AssetExpr:
 		return r.evaluateBuiltinAsset(x)
 	case *ast.StackReferenceExpr:
@@ -625,10 +649,7 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 
 	var receiver interface{}
 	if res, ok := r.resources[resourceName]; ok {
-		if len(access.Accessors) == 1 {
-			return res.CustomResource().ID().ToStringOutput(), nil
-		}
-		receiver = res.GetOutputs()
+		receiver = res
 	} else if p, ok := r.config[resourceName]; ok {
 		receiver = p
 	} else if v, ok := r.variables[resourceName]; ok {
@@ -650,6 +671,17 @@ func (r *runner) evaluatePropertyAccess(x ast.Expr, access *ast.PropertyAccess, 
 func (r *runner) evaluateAccess(receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, error) {
 	for ; len(accessors) > 0; accessors = accessors[1:] {
 		switch x := receiver.(type) {
+		case lateboundResource:
+			// Peak ahead at the next accessor to implement .urn and .id:
+			if len(accessors) >= 1 {
+				sub, ok := accessors[0].(*ast.PropertyName)
+				if ok && sub.Name == "id" {
+					return x.CustomResource().ID().ToStringOutput(), nil
+				} else if ok && sub.Name == "urn" {
+					return x.CustomResource().URN().ToStringOutput(), nil
+				}
+			}
+			return r.evaluateAccess(x.GetOutputs(), accessors)
 		case pulumi.Output:
 			return x.ApplyT(func(v interface{}) (interface{}, error) {
 				return r.evaluateAccess(v, accessors)
@@ -791,6 +823,99 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 	return joinStringOutputs(parts), diags
 }
 
+func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	switch v := v.Value.(type) {
+	case *ast.ListExpr, *ast.ObjectExpr:
+	default:
+		diags.Extend(ast.ExprError(v, "Fn::ToJSON must take either a list or object as it's argument.", ""))
+		return nil, diags
+	}
+	result, d := evaluateToJSON(r, v.Value)
+	diags.Extend(d...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	toJSON := func(data interface{}) (string, error) {
+		b, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+		// We don't include diags because it will be passed promptly
+		return string(b), nil
+	}
+	if output, ok := result.(pulumi.Output); ok {
+		return output.ApplyT(toJSON), diags
+	}
+	b, err := toJSON(result)
+	if err != nil {
+		diags.Extend(ast.ExprError(v, "Failed to encode json", err.Error()))
+	}
+	return b, diags
+}
+
+func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	switch v := v.(type) {
+	case *ast.ListExpr:
+		isPrompt := true
+		elements := make([]interface{}, len(v.Elements))
+		for i, e := range v.Elements {
+			val, localDiags := evaluateToJSON(r, e)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			elements[i] = val
+			if _, ok := val.(pulumi.Output); ok {
+				isPrompt = false
+			}
+		}
+		if isPrompt {
+			return elements, nil
+		}
+		return pulumi.All(elements...), nil
+	case *ast.ObjectExpr:
+		kvMap := make([]interface{}, len(v.Entries)*2)
+		for i, entry := range v.Entries {
+			k, localDiags := r.evaluateExpr(entry.Key)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			val, localDiags := evaluateToJSON(r, entry.Value)
+			diags.Extend(localDiags...)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			kvMap[i*2] = k
+			kvMap[i*2+1] = val
+		}
+		isPrompt := true
+		for _, v := range kvMap {
+			if _, ok := v.(pulumi.Output); ok {
+				isPrompt = false
+			}
+		}
+		toMap := func(array []interface{}) (interface{}, error) {
+			o := make(map[string]interface{}, len(v.Entries))
+			for i := 0; i < len(v.Entries); i++ {
+				o[array[i*2].(string)] = array[i*2+1]
+			}
+			return o, nil
+		}
+		if isPrompt {
+			m, err := toMap(kvMap)
+			contract.AssertNoErrorf(err, "toMap cannot return an error")
+			return m, diags
+		}
+		return pulumi.All(kvMap...).ApplyT(toMap), diags
+
+	default:
+		return r.evaluateExpr(v)
+	}
+}
+
 func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 	index, idiags := r.evaluateExpr(v.Index)
@@ -823,6 +948,27 @@ func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.D
 		return elems[index], nil
 	})
 	return out, nil
+}
+
+func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, syntax.Diagnostics) {
+	str, diags := r.evaluateExpr(v.Value)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	toBase64 := func(s interface{}) (interface{}, error) {
+		str := s.(string)
+		return b64.StdEncoding.EncodeToString([]byte(str)), nil
+	}
+	switch str := str.(type) {
+	case pulumi.Output:
+		return str.ApplyT(toBase64), diags
+	case string:
+		s, err := toBase64(str)
+		contract.AssertNoErrorf(err, "Types must match since we know we have a string")
+		return s.(string), diags
+	default:
+		return nil, syntax.Diagnostics{ast.ExprError(v, "ToBase64 must encode into a string", "")}
+	}
 }
 
 func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnostics) {

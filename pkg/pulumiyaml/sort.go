@@ -105,6 +105,12 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	// Depth-first visit each node
 	var visit func(name *ast.StringExpr) bool
 	visit = func(name *ast.StringExpr) bool {
+		// Special case: pulumi variable has no dependencies.
+		if name.Value == PulumiVarName {
+			visited[PulumiVarName] = true
+			return true
+		}
+
 		e, ok := intermediates[name.Value]
 		if !ok {
 			diags.Extend(ast.ExprError(name, fmt.Sprintf("dependency %s not found", name.Value), ""))
@@ -158,7 +164,7 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 	key := node.key()
 	name := key.Value
-	if name == "pulumi" {
+	if name == PulumiVarName {
 		return syntax.Diagnostics{ast.ExprError(key, fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
 	}
 

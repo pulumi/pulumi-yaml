@@ -86,7 +86,7 @@ resources:
     options:
       provider: UsEast2Provider
 outputs:
-  InstanceId: ${WebServer}
+  InstanceId: ${WebServer.id}
   PublicIp: ${WebServer.publicIp}
   PublicHostName: ${WebServer.publicDns}
 ```
