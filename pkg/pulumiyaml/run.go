@@ -16,7 +16,6 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
@@ -762,10 +761,10 @@ func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.D
 		return nil, diags
 	}
 
-	performInvoke := func(args interface{}) (interface{}, syntax.Diagnostics) {
+	performInvoke := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		if err := r.ctx.Invoke(t.Token.Value, args, &result); err != nil {
+		if err := r.ctx.Invoke(t.Token.Value, args[0], &result); err != nil {
 			diags.Extend(ast.ExprError(t, err.Error(), ""))
 			return nil, diags
 		}
@@ -780,24 +779,7 @@ func (r *runner) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, syntax.D
 			return nil, diags
 		}
 		return retv, diags
-	}
-
-	// TODO[pulumi/pulumi-yaml#14]: Use dynamic Output-or-not information to decide whether the lift the invoke
-	var deps []*ast.StringExpr
-	getExpressionDependencies(&deps, t.CallArgs)
-
-	if len(deps) > 0 {
-		return pulumi.ToOutput(args).ApplyT(func(args interface{}) (interface{}, error) {
-			result, diags := performInvoke(args)
-			if diags.HasErrors() {
-				// TODO: this could leak warnings
-				// Note for reviewer: will need to plumb through a context to providing non-error diagnostics outside of ApplyT
-				return nil, diags
-			}
-			return result, nil
-		}), nil
-	}
-
+	})
 	return performInvoke(args)
 }
 
@@ -808,112 +790,60 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 	if ddiags.HasErrors() {
 		return nil, ddiags
 	}
-	var parts []interface{}
+
+	parts := make([]interface{}, len(v.Values.Elements))
 	for i, e := range v.Values.Elements {
-		if i != 0 {
-			parts = append(parts, delim)
-		}
 		part, pdiags := r.evaluateExpr(e)
 		diags.Extend(pdiags...)
 		if pdiags.HasErrors() {
 			return nil, diags
 		}
-		parts = append(parts, part)
+		parts[i] = part
 	}
-	return joinStringOutputs(parts), diags
+
+	join := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		delim, parts := args[0], args[1].([]interface{})
+
+		delimStr, ok := delim.(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(delimStr)), ""))
+		}
+
+		strs := make([]string, len(parts))
+		for i, p := range parts {
+			str, ok := p.(string)
+			if !ok {
+				diags.Extend(ast.ExprError(v.Values.Elements[i], fmt.Sprintf("element must be a string, not %v", typeString(p)), ""))
+			} else {
+				strs[i] = str
+			}
+		}
+
+		if diags.HasErrors() {
+			return "", diags
+		}
+		return strings.Join(strs, delimStr), nil
+	})
+	return join(delim, parts)
 }
 
 func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
-	switch v := v.Value.(type) {
-	case *ast.ListExpr, *ast.ObjectExpr:
-	default:
-		diags.Extend(ast.ExprError(v, "Fn::ToJSON must take either a list or object as it's argument.", ""))
-		return nil, diags
-	}
-	result, d := evaluateToJSON(r, v.Value)
-	diags.Extend(d...)
+	value, vdiags := r.evaluateExpr(v.Value)
+	diags.Extend(vdiags...)
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	toJSON := func(data interface{}) (string, error) {
-		b, err := json.Marshal(data)
+
+	toJSON := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		b, err := json.Marshal(args[0])
 		if err != nil {
-			return "", err
+			diags.Extend(ast.ExprError(v, fmt.Sprintf("failed to encode JSON: %v", err), ""))
+			return "", diags
 		}
-		// We don't include diags because it will be passed promptly
-		return string(b), nil
-	}
-	if output, ok := result.(pulumi.Output); ok {
-		return output.ApplyT(toJSON), diags
-	}
-	b, err := toJSON(result)
-	if err != nil {
-		diags.Extend(ast.ExprError(v, "Failed to encode json", err.Error()))
-	}
-	return b, diags
-}
-
-func evaluateToJSON(r *runner, v ast.Expr) (interface{}, syntax.Diagnostics) {
-	var diags syntax.Diagnostics
-	switch v := v.(type) {
-	case *ast.ListExpr:
-		isPrompt := true
-		elements := make([]interface{}, len(v.Elements))
-		for i, e := range v.Elements {
-			val, localDiags := evaluateToJSON(r, e)
-			diags.Extend(localDiags...)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-			elements[i] = val
-			if _, ok := val.(pulumi.Output); ok {
-				isPrompt = false
-			}
-		}
-		if isPrompt {
-			return elements, nil
-		}
-		return pulumi.All(elements...), nil
-	case *ast.ObjectExpr:
-		kvMap := make([]interface{}, len(v.Entries)*2)
-		for i, entry := range v.Entries {
-			k, localDiags := r.evaluateExpr(entry.Key)
-			diags.Extend(localDiags...)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-			val, localDiags := evaluateToJSON(r, entry.Value)
-			diags.Extend(localDiags...)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-			kvMap[i*2] = k
-			kvMap[i*2+1] = val
-		}
-		isPrompt := true
-		for _, v := range kvMap {
-			if _, ok := v.(pulumi.Output); ok {
-				isPrompt = false
-			}
-		}
-		toMap := func(array []interface{}) (interface{}, error) {
-			o := make(map[string]interface{}, len(v.Entries))
-			for i := 0; i < len(v.Entries); i++ {
-				o[array[i*2].(string)] = array[i*2+1]
-			}
-			return o, nil
-		}
-		if isPrompt {
-			m, err := toMap(kvMap)
-			contract.AssertNoErrorf(err, "toMap cannot return an error")
-			return m, diags
-		}
-		return pulumi.All(kvMap...).ApplyT(toMap), diags
-
-	default:
-		return r.evaluateExpr(v)
-	}
+		return string(b), diags
+	})
+	return toJSON(value)
 }
 
 func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.Diagnostics) {
@@ -932,22 +862,16 @@ func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.D
 		}
 		elems = append(elems, ev)
 	}
-	args := append([]interface{}{index}, elems...)
-	out := pulumi.All(args...).ApplyT(func(args []interface{}) (interface{}, error) {
-		indexV := args[0]
-		index, err := cast.ToIntE(indexV)
-		if err != nil {
-			diags.Extend(ast.ExprError(v.Index, err.Error(), ""))
+
+	selectf := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		index, ok := args[0].(float64)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Index, fmt.Sprintf("index must be a string, not %v", typeString(args[0])), ""))
 			return nil, diags
 		}
-		elems := args[1:]
-		// TODO: this could leak warnings
-		if diags.HasErrors() {
-			return nil, diags
-		}
-		return elems[index], nil
+		return elems[int(index)], diags
 	})
-	return out, nil
+	return selectf(index)
 }
 
 func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, syntax.Diagnostics) {
@@ -955,20 +879,15 @@ func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, synt
 	if diags.HasErrors() {
 		return nil, diags
 	}
-	toBase64 := func(s interface{}) (interface{}, error) {
-		str := s.(string)
-		return b64.StdEncoding.EncodeToString([]byte(str)), nil
-	}
-	switch str := str.(type) {
-	case pulumi.Output:
-		return str.ApplyT(toBase64), diags
-	case string:
-		s, err := toBase64(str)
-		contract.AssertNoErrorf(err, "Types must match since we know we have a string")
-		return s.(string), diags
-	default:
-		return nil, syntax.Diagnostics{ast.ExprError(v, "ToBase64 must encode into a string", "")}
-	}
+	toBase64 := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		s, ok := args[0].(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Value, fmt.Sprintf("argument must be a string, not %v", typeString(args[0])), ""))
+			return nil, diags
+		}
+		return b64.StdEncoding.EncodeToString([]byte(s)), diags
+	})
+	return toBase64(str)
 }
 
 func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnostics) {
@@ -1048,18 +967,37 @@ func (r *runner) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (inter
 	return stackRef.GetOutput(propertyStringOutput), nil
 }
 
-func joinStringOutputs(parts []interface{}) pulumi.StringOutput {
-	return pulumi.All(parts...).ApplyT(func(arr []interface{}) (string, error) {
-		s := ""
-		for _, x := range arr {
-			xs, ok := x.(string)
-			if !ok {
-				return "", fmt.Errorf("expected expression in Fn::Join or Fn::Sub to produce a string, got %v", reflect.TypeOf(x))
+func hasOutputs(v interface{}) bool {
+	switch v := v.(type) {
+	case pulumi.Output:
+		return true
+	case []interface{}:
+		for _, e := range v {
+			if hasOutputs(e) {
+				return true
 			}
-			s += xs
 		}
-		return s, nil
-	}).(pulumi.StringOutput)
+	case map[string]interface{}:
+		for _, e := range v {
+			if hasOutputs(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// lift wraps a function s.t. the function is called inside an Apply if any of its arguments contain Outputs.
+// If none of the function's arguments contain Outputs, the function is called directly.
+func lift(fn func(args ...interface{}) (interface{}, syntax.Diagnostics)) func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+	return func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		if hasOutputs(args) {
+			return pulumi.All(args...).ApplyT(func(resolved []interface{}) (interface{}, error) {
+				return fn(resolved...)
+			}), nil
+		}
+		return fn(args...)
+	}
 }
 
 // untypedArgs is an untyped interface for a bag of properties.
