@@ -469,7 +469,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	case *model.FunctionCallExpression:
 		return g.function(e)
 	case *model.RelativeTraversalExpression:
-		// Direct use a function
+		// Direct use of a function
 		if f, ok := e.Source.(*model.FunctionCallExpression); ok {
 			// Invokes can process a return type
 			if f.Name == pcl.Invoke {
