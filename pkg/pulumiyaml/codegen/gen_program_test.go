@@ -149,22 +149,27 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 	return args.Name, resource.PropertyMap{}, nil
 }
 
-func TestIsEscapedString(t *testing.T) {
+// Tests both isEscapedString and asEscapedString.
+func TestEscapedString(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected bool
+		input     string
+		isEscaped bool   // If input is escaped
+		asEscaped string // What input would look like when escaped
 	}{
-		{`"foobar"`, true},
-		{`"foo\nbar"`, true},
-		{`"foo\"bar"`, true},
-		{`"foo\\\"bar"`, true},
-		{`"foo`, false},
-		{`"foo"bar"`, false},
-		{`"goo\\"bar"`, false},
+		{`"foobar"`, true, `"foobar"`},
+		{`"foo\nbar"`, true, `"foo\nbar"`},
+		{`"foo\"bar"`, true, `"foo\"bar"`},
+		{`"foo\\\"bar"`, true, `"foo\\\"bar"`},
+		{`"foo`, false, `"foo"`},
+		{`"foo"bar"`, false, `"foo\"bar"`},
+		{`"goo\\"bar"`, false, `"goo\\\"bar"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			assert.Equal(t, tt.expected, isEscapedString(tt.input))
+			assert.Equal(t, tt.isEscaped, isEscapedString(tt.input))
+			s := asEscapedString(tt.input)
+			assert.Equal(t, tt.asEscaped, s)
+			assert.True(t, isEscapedString(s), "A string should always be escaped after we escape it")
 		})
 	}
 }

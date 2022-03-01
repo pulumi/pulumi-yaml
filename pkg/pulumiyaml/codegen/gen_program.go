@@ -394,26 +394,68 @@ func (t Traversal) OmitFirst() Traversal {
 	return t
 }
 
-func (g *generator) checkPropertyName(n string, subject *hcl.Range) {
+// checkPropertyName checks if a property name is valid. If invalid, an escaped
+// quoted string is returned to be used as a property map access. Otherwise, the
+// empty string is returned.
+func (g *generator) checkPropertyName(n string, subject *hcl.Range) string {
 	if !ast.PropertyNameRegexp.Match([]byte(n)) {
 		g.diags = append(g.diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
+			Severity: hcl.DiagWarning,
 			Summary:  "Invalid property name access",
-			Detail:   fmt.Sprintf("'%s' is not a valid property name access", n),
+			Detail:   fmt.Sprintf("'%s' is not a valid property name access. It has been changed to a quoted key access.", n),
 			Subject:  subject,
 		})
+		return asEscapedString(n)
 	}
+	return ""
 }
 
-func (g *generator) checkPropertyKeyIndex(n string, subject *hcl.Range) {
+// checkPropertyKeyIndex checks if a property key is valid. If not valid, a
+// valid property key string is returned. Otherwise the empty string is
+// returned.
+func (g *generator) checkPropertyKeyIndex(n string, subject *hcl.Range) string {
 	if !isEscapedString(n) {
 		g.diags = append(g.diags, &hcl.Diagnostic{
-			Severity: hcl.DiagError,
+			Severity: hcl.DiagWarning,
 			Summary:  "Invalid property key access",
-			Detail:   fmt.Sprintf("'%s' is not a valid property key access", n),
+			Detail:   fmt.Sprintf("'%s' is not a valid property key access. It has been appropriately quoted.", n),
 			Subject:  subject,
 		})
+
+		return asEscapedString(n)
 	}
+	return ""
+}
+
+// asEscapedString returns s where all `"` in a string are escaped. It ensures
+// that quotations are applied around the string.
+//
+// For example:
+//     `foo` -> `"foo"`
+//    `bar"` -> `"bar"`
+// `foo"bar` -> `"foo\"bar"`
+func asEscapedString(s string) string {
+	s = strings.TrimSuffix(s, `"`)
+	s = strings.TrimPrefix(s, `"`)
+	var out strings.Builder
+	out.WriteRune('"')
+	var escaped bool
+	for _, c := range s {
+		switch c {
+		case '\\':
+			escaped = !escaped
+		case '"':
+			if !escaped {
+				out.WriteRune('\\')
+			}
+			fallthrough
+		default:
+			escaped = false
+		}
+		out.WriteRune(c)
+	}
+	out.WriteRune('"')
+	return out.String()
 }
 
 func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
@@ -430,7 +472,13 @@ func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 	switch key.Type() {
 	case cty.String:
 		keyVal := key.AsString()
-		g.checkPropertyName(keyVal, t.SourceRange().Ptr())
+		if s := g.checkPropertyName(keyVal, t.SourceRange().Ptr()); s != "" {
+			// We convert invalid property names to property accesses.
+			return TraversalSegment{
+				segment: s,
+				joinFmt: "%s[%s]",
+			}
+		}
 		return TraversalSegment{
 			segment: keyVal,
 			joinFmt: ".%s",
@@ -446,7 +494,9 @@ func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 		diags := keyExpr.Typecheck(false)
 		contract.Ignore(diags)
 		segment := fmt.Sprintf("%v", keyExpr)
-		g.checkPropertyKeyIndex(segment, t.SourceRange().Ptr())
+		if s := g.checkPropertyKeyIndex(segment, t.SourceRange().Ptr()); s != "" {
+			segment = s
+		}
 		return TraversalSegment{
 			segment: segment,
 			joinFmt: "%s[%s]",
