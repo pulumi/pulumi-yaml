@@ -16,7 +16,7 @@ resources:
             instanceType: t2.micro
             securityGroups:
                 - ${securityGroup.name}
-            ami: ${ami}
+            ami: ${ami.id}
             userData: |
                 #!/bin/bash
                 echo "Hello, World!" > index.html
@@ -33,7 +33,6 @@ variables:
                 owners:
                     - 137112412989
                 mostRecent: true
-            Return: id
 outputs:
     publicIp: ${server.publicIp}
     publicHostName: ${server.publicDns}

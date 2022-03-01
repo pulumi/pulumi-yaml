@@ -489,7 +489,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		// those, we don't process this type of RelativeTraversalExpressions.
 		YAMLError{
 			kind: "Unsupported Expression",
-			detail: "This use of a RelativeTraversalExpression is not supported.\n" +
+			detail: "This use of a RelativeTraversalExpression is not supported in YAML.\n" +
 				"YAML may not be expressive enough to support this expression.\n" +
 				"It is also possible that the expression could be supported, but has not been implemented.",
 			rng: e.Syntax.Range(),

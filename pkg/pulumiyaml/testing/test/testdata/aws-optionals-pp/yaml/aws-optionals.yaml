@@ -4,7 +4,7 @@ resources:
         properties:
             name: example_policy
             path: /
-            policy: ${policyDocument}
+            policy: ${policyDocument.json}
 variables:
     policyDocument:
         Fn::Invoke:
@@ -17,4 +17,3 @@ variables:
                         - s3:GetBucketLocation
                       resources:
                         - arn:aws:s3:::*
-            Return: json

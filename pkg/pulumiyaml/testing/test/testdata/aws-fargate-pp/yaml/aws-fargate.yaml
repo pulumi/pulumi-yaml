@@ -2,7 +2,7 @@ resources:
     webSecurityGroup:
         type: aws:ec2/securityGroup:SecurityGroup
         properties:
-            vpcId: ${vpc}
+            vpcId: ${vpc.id}
             egress:
                 - protocol: -1
                   fromPort: 0
@@ -37,7 +37,7 @@ resources:
     webLoadBalancer:
         type: aws:elasticloadbalancingv2/loadBalancer:LoadBalancer
         properties:
-            subnets: ${subnets}
+            subnets: ${subnets.ids}
             securityGroups:
                 - ${webSecurityGroup.id}
     webTargetGroup:
@@ -46,7 +46,7 @@ resources:
             port: 80
             protocol: HTTP
             targetType: ip
-            vpcId: ${vpc}
+            vpcId: ${vpc.id}
     webListener:
         type: aws:elasticloadbalancingv2/listener:Listener
         properties:
@@ -82,7 +82,7 @@ resources:
             taskDefinition: ${appTask.arn}
             networkConfiguration:
                 assignPublicIp: true
-                subnets: ${subnets}
+                subnets: ${subnets.ids}
                 securityGroups:
                     - ${webSecurityGroup.id}
             loadBalancers:
@@ -98,12 +98,10 @@ variables:
             Function: aws:ec2/getVpc:getVpc
             Arguments:
                 default: true
-            Return: id
     subnets:
         Fn::Invoke:
             Function: aws:ec2/getSubnetIds:getSubnetIds
             Arguments:
-                vpcId: ${vpc}
-            Return: ids
+                vpcId: ${vpc.id}
 outputs:
     url: ${webLoadBalancer.dnsName}

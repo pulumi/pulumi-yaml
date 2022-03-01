@@ -21,7 +21,7 @@ resources:
             egress: false
             protocol: tcp
             ruleAction: allow
-            cidrBlock: ${privateS3PrefixList[0]}
+            cidrBlock: ${privateS3PrefixList.cidrBlocks[0]}
             fromPort: 443
             toPort: 443
 variables:
@@ -30,7 +30,6 @@ variables:
             Function: aws:ec2/getPrefixList:getPrefixList
             Arguments:
                 prefixListId: ${privateS3VpcEndpoint.prefixListId}
-            Return: cidrBlocks
     amis:
         Fn::Invoke:
             Function: aws:ec2/getAmiIds:getAmiIds
