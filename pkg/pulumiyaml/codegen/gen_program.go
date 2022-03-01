@@ -22,11 +22,7 @@ import (
 
 // Generate a serializable YAML template.
 func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
-	g := generator{
-		invokeResults: map[*model.FunctionCallExpression]*InvokeCall{},
-	}
-
-	g.PrepareForInvokes(program)
+	g := generator{}
 
 	for _, n := range program.Nodes {
 		g.genNode(n)
@@ -54,8 +50,6 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 
 type generator struct {
 	diags hcl.Diagnostics
-	// Because we need a return statement, we might need to call a invoke multiple times.
-	invokeResults map[*model.FunctionCallExpression]*InvokeCall
 
 	// These values can be assembled into a template
 	config    []syn.ObjectPropertyDef
@@ -81,74 +75,23 @@ func (g *generator) UnifyOutput() syn.Node {
 	return syn.Object(entries...)
 }
 
-type InvokeCall struct {
-	name       string
-	usedValues TraversalList
+// A user-facing yaml error
+type YAMLError struct {
+	kind   string
+	detail string
+	rng    hcl.Range
 }
 
-// Maps names to known invoke usages.
-func (g *generator) InvokeNameMap() map[string]*InvokeCall {
-	m := map[string]*InvokeCall{}
-	for _, v := range g.invokeResults {
-		m[v.name] = v
+func (l YAMLError) AppendTo(g *generator) {
+	var summary string
+	if l.kind != "" {
+		summary = "Failed to generate YAML program: " + l.kind
 	}
-	return m
-}
-
-// Prepares both the program and the generator for invokes.
-// For the program:
-//   Invokes are rewritten to handle that a return type must be used.
-// For the generator:
-//   We memoize what invokes are used so we can correctly give the Return value.
-func (g *generator) PrepareForInvokes(program *pcl.Program) {
-	for _, n := range program.Nodes {
-		switch t := n.(type) {
-		case *pcl.LocalVariable:
-			if fn, ok := t.Definition.Value.(*model.FunctionCallExpression); ok && fn.Name == pcl.Invoke {
-				// An empty list is different then nil
-				g.invokeResults[fn] = &InvokeCall{t.Name(), NewTraversalList()}
-			}
-		case *pcl.ConfigVariable:
-
-		}
-		calls := g.InvokeNameMap()
-		onTraversal := func(f func(*model.ScopeTraversalExpression) *model.ScopeTraversalExpression) func(n model.Expression) (model.Expression, hcl.Diagnostics) {
-			return func(n model.Expression) (model.Expression, hcl.Diagnostics) {
-				if t, ok := n.(*model.ScopeTraversalExpression); ok {
-					return f(t), nil
-				}
-				return n, nil
-			}
-		}
-
-		// Pre should collect a list of references to invokes
-		pre := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
-			if call, ok := calls[t.RootName]; ok {
-				// So note the referenced field
-				traversal := g.Traversal(t)
-				call.usedValues = AppendTraversal(call.usedValues, traversal)
-			}
-			return t
-		})
-		// Post rewrites invoke variable access if a single variable was accessed.
-		post := onTraversal(func(t *model.ScopeTraversalExpression) *model.ScopeTraversalExpression {
-			// This is an invoke, and it is only used once: rewrite it to use a
-			// return statement
-			if call, ok := calls[t.RootName]; ok && len(call.usedValues) == 1 {
-				call.usedValues[0] = call.usedValues[0].OmitFirst()
-			}
-			return t
-		})
-		diags := n.VisitExpressions(pre, post)
-		g.diags = g.diags.Extend(diags)
-	}
-}
-
-func (g *generator) yamlLimitation(kind string) {
 	g.diags = g.diags.Append(&hcl.Diagnostic{
 		Severity: hcl.DiagError,
-		Summary:  kind,
-		Detail:   fmt.Sprintf("Failed to generate YAML program. Missing function '%s'", kind),
+		Summary:  summary,
+		Detail:   l.detail,
+		Subject:  &l.rng,
 	})
 }
 
@@ -280,6 +223,7 @@ type TraversalSegment struct {
 type Traversal struct {
 	root     string
 	segments []TraversalSegment
+	g        *generator
 }
 
 func (t Traversal) Equal(o Traversal) bool {
@@ -352,30 +296,16 @@ func isEscapedString(s string) bool {
 	return true
 }
 
-func (g *generator) Traversal(t *model.ScopeTraversalExpression) Traversal {
+func (g *generator) Traversal(traversal hcl.Traversal) Traversal {
 
 	var segments []TraversalSegment
-	traversal := t.Traversal
 	if !traversal.IsRelative() {
 		traversal = traversal.SimpleSplit().Rel
 	}
-	g.checkPropertyName(t.RootName, t.Tokens.Root.Range().Ptr())
 	for _, t := range traversal {
 		segments = append(segments, g.TraversalSegment(t))
 	}
-	tr := Traversal{t.RootName, segments}
-
-	// In theory, this is quite slow. Inserting n references would run in O(n^3)
-	// time. In practice our examples are quite small, so it doesn't matter.
-	for _, call := range g.invokeResults {
-		for _, instance := range call.usedValues {
-			if instance.Equal(tr) {
-				return instance
-			}
-		}
-	}
-
-	return tr
+	return Traversal{"", segments, g}
 }
 
 func (t Traversal) String() string {
@@ -386,7 +316,18 @@ func (t Traversal) String() string {
 		}
 		s += fmt.Sprintf(ts.joinFmt, ts.segment)
 	}
+	if t.root == "" {
+		return strings.TrimPrefix(s, ".")
+	}
 	return s
+}
+
+func (t Traversal) WithRoot(s string, hclRange *hcl.Range) Traversal {
+	if checked := t.g.checkPropertyName(s, hclRange); checked != "" {
+		s = checked
+	}
+	t.root = s
+	return t
 }
 
 func (t Traversal) OmitFirst() Traversal {
@@ -528,13 +469,35 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	case *model.FunctionCallExpression:
 		return g.function(e)
 	case *model.RelativeTraversalExpression:
+		// Direct use a function
+		if f, ok := e.Source.(*model.FunctionCallExpression); ok {
+			// Invokes can process a return type
+			if f.Name == pcl.Invoke {
+				return g.MustInvoke(f, g.Traversal(e.Traversal).String())
+			}
+			// But normal functions cannot
+			if len(e.Traversal) > 0 {
+				YAMLError{
+					kind:   "Traversal not allowed on function result",
+					detail: "Cannot traverse the return value of Fn::" + f.Name,
+					rng:    f.Syntax.Range(),
+				}.AppendTo(g)
+			}
+			return g.function(f)
+		}
 		// This generally means a lookup scoped to a for loop. Since we don't do
-		// those, we don't process RelativeTraversalExpressions.
-		g.yamlLimitation("RelativeTraversalExpression")
-		return syn.String("Unimplemented RelativeTraversalExpression")
+		// those, we don't process this type of RelativeTraversalExpressions.
+		YAMLError{
+			kind: "Unsupported Expression",
+			detail: "This use of a RelativeTraversalExpression is not supported.\n" +
+				"YAML may not be expressive enough to support this expression.\n" +
+				"It is also possible that the expression could be supported, but has not been implemented.",
+			rng: e.Syntax.Range(),
+		}.AppendTo(g)
+		return syn.String("Unimplemented Expression")
 
 	case *model.ScopeTraversalExpression:
-		traversal := g.Traversal(e)
+		traversal := g.Traversal(e.Traversal).WithRoot(e.RootName, e.Tokens.Root.Range().Ptr())
 		s := fmt.Sprintf("${%s}", traversal)
 		return syn.String(s)
 
@@ -580,7 +543,13 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		return syn.Object(entries...)
 
 	case *model.SplatExpression:
-		g.yamlLimitation("Splat")
+		YAMLError{
+			kind: "Splat",
+			detail: "A 'Splat' expression is equivalent in expressive power to a 'for loop', and is not representable in YAML.\n" +
+				"If the values of the function are known, you can manually unroll the loop," +
+				" otherwise it is necessary to switch to a more expressive language.",
+			rng: e.Syntax.Range(),
+		}.AppendTo(g)
 		return syn.String("Splat not implemented")
 	default:
 		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
@@ -610,15 +579,11 @@ func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
 }
 
 func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
-	fn := func(name string, body syn.Node) *syn.ObjectNode {
-		entry := syn.ObjectProperty(syn.String("Fn::"+name), body)
-		return syn.Object(entry)
-	}
 	switch f.Name {
 	case pcl.Invoke:
-		return fn("Invoke", g.MustInvoke(f))
+		return g.MustInvoke(f, "")
 	case "fileAsset":
-		return fn("Asset", syn.Object(
+		return wrapFn("Asset", syn.Object(
 			syn.ObjectProperty(syn.String("File"), g.expr(f.Args[0])),
 		))
 	case "join":
@@ -626,15 +591,24 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 		for i, arg := range f.Args {
 			args[i] = g.expr(arg)
 		}
-		return fn("Join", syn.List(args...))
+		return wrapFn("Join", syn.List(args...))
 	case "toBase64":
-		return fn("ToBase64", g.expr(f.Args[0]))
+		return wrapFn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":
-		return fn("ToJSON", g.expr(f.Args[0]))
+		return wrapFn("ToJSON", g.expr(f.Args[0]))
 	default:
-		g.yamlLimitation(f.Name)
-		return fn(f.Name, syn.Null())
+		YAMLError{
+			kind:   "Unknown Function",
+			detail: fmt.Sprintf("YAML does not support Fn::%s.", f.Name),
+			rng:    f.Syntax.Range(),
+		}.AppendTo(g)
+		return wrapFn(f.Name, syn.Null())
 	}
+}
+
+func wrapFn(name string, body syn.Node) *syn.ObjectNode {
+	entry := syn.ObjectProperty(syn.String("Fn::"+name), body)
+	return syn.Object(entry)
 }
 
 type Invoke struct {
@@ -643,7 +617,7 @@ type Invoke struct {
 	Return    string      `yaml:"Return" json:"Return"`
 }
 
-func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode {
+func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn.ObjectNode {
 	contract.Assert(f.Name == pcl.Invoke)
 	contract.Assert(len(f.Args) > 0)
 	name := g.expr(f.Args[0])
@@ -671,15 +645,15 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression) *syn.ObjectNode 
 	}
 
 	// Calculate the return value
-	if fnInfo := g.invokeResults[f]; len(fnInfo.usedValues) == 1 {
+	if ret != "" {
 		properties = append(properties,
 			syn.ObjectProperty(
 				syn.String("Return"),
-				syn.String(fnInfo.usedValues[0].segments[0].segment),
+				syn.String(ret),
 			))
 	}
 
-	return syn.Object(properties...)
+	return wrapFn("Invoke", syn.Object(properties...))
 }
 
 func (g *generator) TypeProperty(s string) syn.ObjectPropertyDef {

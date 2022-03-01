@@ -4,7 +4,6 @@ package codegen
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 
@@ -19,7 +18,12 @@ import (
 func TestGenerateProgram(t *testing.T) {
 
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
-		l := []test.ProgramTest{}
+		l := []test.ProgramTest{
+			{
+				Directory:   "direct-invoke",
+				Description: "Use an invoke directly",
+			},
+		}
 		for _, tt := range tests {
 			switch tt.Directory {
 			case "azure-sa":
@@ -59,7 +63,6 @@ func TestGenerateProgram(t *testing.T) {
 	config, err := json.Marshal(c)
 	assert.NoError(t, err, "Failed to marshal fake config")
 	t.Setenv("PULUMI_CONFIG", string(config))
-	fmt.Printf("config: '%s'\n", string(config))
 
 	test.TestProgramCodegen(t,
 		test.ProgramCodegenOptions{
