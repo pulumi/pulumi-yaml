@@ -370,7 +370,14 @@ func TestPropertyAccess(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{},
+		Resources: map[string]*Resource{
+			"resA": {
+				Type: "test:resource:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+		},
 	})
 	testTemplate(t, tmpl, func(r *runner) {
 		v, diags := r.evaluateBuiltinJoin(&ast.JoinExpr{
@@ -382,11 +389,35 @@ func TestJoin(t *testing.T) {
 			),
 		})
 		requireNoErrors(t, diags)
-		out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
-			assert.Equal(t, "a,b,c", x)
+		assert.Equal(t, "a,b,c", v)
+
+		x, diags := ast.Interpolate("${resA.out}")
+		requireNoErrors(t, diags)
+
+		v, diags = r.evaluateBuiltinJoin(&ast.JoinExpr{
+			Delimiter: x,
+			Values: ast.List(
+				ast.String("["),
+				ast.String("]"),
+			),
+		})
+		requireNoErrors(t, diags)
+		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "[tuo]", x)
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
+
+		v, diags = r.evaluateBuiltinJoin(&ast.JoinExpr{
+			Delimiter: ast.String(","),
+			Values:    ast.List(x, x),
+		})
+		requireNoErrors(t, diags)
+		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "tuo,tuo", x)
+			return nil, nil
+		})
+		r.ctx.Export("out2", out)
 	})
 }
 
@@ -433,20 +464,47 @@ func TestToJSON(t *testing.T) {
 					}),
 			},
 			expected: `["a-b-c"]`,
+		},
+		{
+			input: &ast.ToJSONExpr{
+				Value: ast.Object(
+					ast.ObjectProperty{
+						Key:   ast.String("foo"),
+						Value: ast.String("bar"),
+					},
+					ast.ObjectProperty{
+						Key: ast.String("out"),
+						Value: &ast.SymbolExpr{
+							Property: &ast.PropertyAccess{
+								Accessors: []ast.PropertyAccessor{
+									&ast.PropertyName{Name: "resA"},
+									&ast.PropertyName{Name: "out"},
+								},
+							},
+						},
+					}),
+			},
+			expected: `{"foo":"bar","out":"tuo"}`,
 			isOutput: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-
 			tmpl := template(t, &Template{
-				Resources: map[string]*Resource{},
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
 			})
 			testTemplate(t, tmpl, func(r *runner) {
 				v, diags := r.evaluateBuiltinToJSON(tt.input)
 				requireNoErrors(t, diags)
 				if tt.isOutput {
-					out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)
 						return nil, nil
 					})
@@ -472,6 +530,19 @@ func TestSelect(t *testing.T) {
 	})
 	testTemplate(t, tmpl, func(r *runner) {
 		v, diags := r.evaluateBuiltinSelect(&ast.SelectExpr{
+			Index: ast.Number(1),
+			Values: ast.List(
+				&ast.GetAttExpr{
+					ResourceName: ast.String("resA"),
+					PropertyName: ast.String("outNum"),
+				},
+				ast.String("second"),
+			),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, "second", v)
+
+		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
 			Index: &ast.GetAttExpr{
 				ResourceName: ast.String("resA"),
 				PropertyName: ast.String("outNum"),
@@ -483,7 +554,7 @@ func TestSelect(t *testing.T) {
 			),
 		})
 		requireNoErrors(t, diags)
-		out := pulumi.ToOutput(v).ApplyT(func(x interface{}) (interface{}, error) {
+		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "second", x.(string))
 			return nil, nil
 		})
@@ -513,6 +584,19 @@ func TestToBase64(t *testing.T) {
 					),
 				}},
 			expected: "3.141592",
+		},
+		{
+			input: &ast.ToBase64Expr{
+				Value: &ast.SymbolExpr{
+					Property: &ast.PropertyAccess{
+						Accessors: []ast.PropertyAccessor{
+							&ast.PropertyName{Name: "resA"},
+							&ast.PropertyName{Name: "out"},
+						},
+					},
+				},
+			},
+			expected: "tuo",
 			isOutput: true,
 		},
 	}
@@ -520,7 +604,14 @@ func TestToBase64(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			tmpl := template(t, &Template{
-				Resources: map[string]*Resource{},
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
 			})
 			testTemplate(t, tmpl, func(r *runner) {
 				v, diags := r.evaluateBuiltinToBase64(tt.input)
@@ -546,6 +637,9 @@ func TestToBase64(t *testing.T) {
 
 func TestSub(t *testing.T) {
 	tmpl := template(t, &Template{
+		Variables: map[string]interface{}{
+			"foo": "oof",
+		},
 		Resources: map[string]*Resource{
 			"resA": {
 				Type: testResourceToken,
@@ -557,6 +651,12 @@ func TestSub(t *testing.T) {
 	})
 	testTemplate(t, tmpl, func(r *runner) {
 		v, diags := r.evaluateBuiltinSub(&ast.SubExpr{
+			Interpolate: ast.MustInterpolate("Hello ${foo}!"),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, "Hello oof!", v)
+
+		v, diags = r.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"),
 		})
 		requireNoErrors(t, diags)
