@@ -993,7 +993,12 @@ func lift(fn func(args ...interface{}) (interface{}, syntax.Diagnostics)) func(a
 	return func(args ...interface{}) (interface{}, syntax.Diagnostics) {
 		if hasOutputs(args) {
 			return pulumi.All(args...).ApplyT(func(resolved []interface{}) (interface{}, error) {
-				return fn(resolved...)
+				v, diags := fn(resolved...)
+				if !diags.HasErrors() {
+					// TODO: this may leak warnings.
+					return v, nil
+				}
+				return v, diags
 			}), nil
 		}
 		return fn(args...)

@@ -120,7 +120,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 			if err != nil {
 				return nil, err
 			}
-			return &pulumirpc.RunResponse{Error: "failed to evaluate template"}, nil
+			if diags.HasErrors() {
+				return &pulumirpc.RunResponse{Error: "failed to evaluate template"}, nil
+			}
+			return &pulumirpc.RunResponse{}, nil
 		}
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
