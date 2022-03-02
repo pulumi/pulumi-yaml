@@ -4,6 +4,7 @@ package ast
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -48,6 +49,9 @@ func (p *PropertyName) isAccessor() {}
 type PropertySubscript struct {
 	Index interface{}
 }
+
+// RootTraversalValidation validates a root property access in global scope to avoid recompiling.
+var PropertyNameRegexp = regexp.MustCompile("^[a-zA-Z_$][a-zA-Z0-9_$]*$")
 
 func (p *PropertySubscript) isAccessor() {}
 

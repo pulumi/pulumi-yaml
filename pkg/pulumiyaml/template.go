@@ -2,7 +2,7 @@
 
 package pulumiyaml
 
-// Template is a YAML or JSON sttructure which defines a Pulumi stack containing cloud infrastructure resources.
+// Template is a YAML or JSON structure which defines a Pulumi stack containing cloud infrastructure resources.
 type Template struct {
 	// Description is an informational bit of metadata about this template.
 	Description string `json:",omitempty" yaml:",omitempty"`
@@ -81,7 +81,7 @@ type ResourceOptions struct {
 	// be created before the dependent finishes being created (and the reverse for destruction). Normally,
 	// Pulumi automatically tracks implicit dependencies through inputs/outputs, but this can be used when
 	// dependencies aren't captured purely from input/output edges.
-	DependsOn []string `json:",omitempty" yaml:":omitempty"`
+	DependsOn []string `json:",omitempty" yaml:",omitempty"`
 	// IgnoreChangs declares that changes to certain properties should be ignored during diffing
 	IgnoreChanges []string `json:",omitempty" yaml:",omitempty"`
 	// Import adopts an existing resource from your cloud account under the control of Pulumi

@@ -1,0 +1,9 @@
+resources:
+    Other:
+        type: other:index:Thing
+        properties:
+            idea: Support Third Party
+    Question:
+        type: other:module:Object
+        properties:
+            answer: 42

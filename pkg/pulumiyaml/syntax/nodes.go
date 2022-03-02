@@ -2,6 +2,8 @@
 
 package syntax
 
+import "github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+
 // A Node represents a single node in an object tree.
 type Node interface {
 	Syntax() Syntax
@@ -162,11 +164,13 @@ func ObjectPropertySyntax(syntax Syntax, key *StringNode, value Node) ObjectProp
 
 // ObjectProperty creates a new object property definition with the given key and value.
 func ObjectProperty(key *StringNode, value Node) ObjectPropertyDef {
+	value.isNode() // This is a check for a non-nil interface to a nil value.
 	return ObjectPropertySyntax(NoSyntax, key, value)
 }
 
 // ObjectSyntax creates a new object node with the given properties and associated syntax.
 func ObjectSyntax(syntax Syntax, entries ...ObjectPropertyDef) *ObjectNode {
+	contract.Assertf(syntax != nil, "Syntax cannot be nil, use NoSyntax instead")
 	return &ObjectNode{node: node{syntax: syntax}, entries: entries}
 }
 

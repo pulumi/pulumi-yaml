@@ -1,0 +1,10 @@
+resources:
+    logs:
+        type: aws:s3/bucket:Bucket
+    bucket:
+        type: aws:s3/bucket:Bucket
+        properties:
+            loggings:
+                - targetBucket: ${logs.bucket}
+outputs:
+    targetBucket: ${bucket.loggings[0].targetBucket}
