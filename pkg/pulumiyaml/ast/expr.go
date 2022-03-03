@@ -493,12 +493,11 @@ func Split(delimiter, source Expr) *SplitExpr {
 type SelectExpr struct {
 	builtinNode
 
-	Index Expr
-	// TODO: CloudFormation allows nested functions to produce the Values - so this should be an Expr
-	Values *ListExpr
+	Index  Expr
+	Values Expr
 }
 
-func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, index Expr, values *ListExpr) *SelectExpr {
+func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, index Expr, values Expr) *SelectExpr {
 	return &SelectExpr{
 		builtinNode: builtin(node, name, args),
 		Index:       index,
@@ -506,7 +505,7 @@ func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, ind
 	}
 }
 
-func Select(index Expr, values *ListExpr) *SelectExpr {
+func Select(index Expr, values Expr) *SelectExpr {
 	name := String("Fn::Select")
 	return &SelectExpr{
 		builtinNode: builtin(nil, name, List(index, values)),

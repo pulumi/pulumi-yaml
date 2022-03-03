@@ -606,10 +606,7 @@ func TestSelect(t *testing.T) {
 		v, diags := r.evaluateBuiltinSelect(&ast.SelectExpr{
 			Index: ast.Number(1),
 			Values: ast.List(
-				&ast.GetAttExpr{
-					ResourceName: ast.String("resA"),
-					PropertyName: ast.String("outNum"),
-				},
+				ast.Number(1),
 				ast.String("second"),
 			),
 		})
@@ -633,6 +630,36 @@ func TestSelect(t *testing.T) {
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
+		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
+			Index: ast.Number(1.5),
+			Values: ast.List(
+				ast.String("first"),
+				ast.String("second"),
+				ast.String("third"),
+			),
+		})
+		assert.Nil(t, v)
+		assert.True(t, diags.HasErrors())
+		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
+			Index: ast.Number(3),
+			Values: ast.List(
+				ast.String("first"),
+				ast.String("second"),
+				ast.String("third"),
+			),
+		})
+		assert.Nil(t, v)
+		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
+			Index: ast.Number(-182),
+			Values: ast.List(
+				ast.String("first"),
+				ast.String("second"),
+				ast.String("third"),
+			),
+		})
+		assert.Nil(t, v)
+		assert.True(t, diags.HasErrors())
+		assert.True(t, diags.HasErrors())
 	})
 }
 
