@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	b64 "encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -56,6 +57,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
+					"outSep": resource.NewStringProperty("1-2-3-4"),
 					"outNum": resource.NewNumberProperty(1),
 					"outList": resource.NewPropertyValue([]interface{}{
 						map[string]interface{}{
@@ -419,6 +421,78 @@ func TestJoin(t *testing.T) {
 		})
 		r.ctx.Export("out2", out)
 	})
+}
+
+func TestSplit(t *testing.T) {
+	tests := []struct {
+		input    *ast.SplitExpr
+		expected []string
+		isOutput bool
+	}{
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String("a,b"),
+			},
+			expected: []string{"a", "b"},
+		},
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String("a"),
+			},
+			expected: []string{"a"},
+		},
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String(""),
+			},
+			expected: []string{""},
+		},
+		{
+			input: &ast.SplitExpr{
+				Source: &ast.SymbolExpr{
+					Property: &ast.PropertyAccess{
+						Accessors: []ast.PropertyAccessor{
+							&ast.PropertyName{Name: "resA"},
+							&ast.PropertyName{Name: "outSep"},
+						},
+					},
+				},
+				Delimiter: ast.String("-"),
+			},
+			expected: []string{"1", "2", "3", "4"},
+			isOutput: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinSplit(tt.input)
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						assert.Equal(t, tt.expected, x)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
+			})
+		})
+	}
 }
 
 func TestToJSON(t *testing.T) {

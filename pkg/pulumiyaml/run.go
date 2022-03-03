@@ -532,6 +532,8 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
 		return r.evaluateBuiltinJoin(x)
+	case *ast.SplitExpr:
+		return r.evaluateBuiltinSplit(x)
 	case *ast.ToJSONExpr:
 		return r.evaluateBuiltinToJSON(x)
 	case *ast.SubExpr:
@@ -825,6 +827,35 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 		return strings.Join(strs, delimStr), nil
 	})
 	return join(delim, parts)
+}
+
+func (r *runner) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	delimiter, ddiags := r.evaluateExpr(v.Delimiter)
+	diags.Extend(ddiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	source, sdiags := r.evaluateExpr(v.Source)
+	diags.Extend(sdiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	split := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		d, ok := args[0].(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Delimiter, "Must be a string, not %v", typeString(d)))
+			return []string{}, diags
+		}
+		s, ok := args[1].(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Source, "Must be a string, not %v", typeString(s)))
+			return []string{}, diags
+		}
+		return strings.Split(s, d), diags
+	})
+	return split(delimiter, source)
 }
 
 func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {

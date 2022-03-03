@@ -464,6 +464,31 @@ func Join(delimiter Expr, values *ListExpr) *JoinExpr {
 	}
 }
 
+// Splits a string into a list by a delimiter
+type SplitExpr struct {
+	builtinNode
+
+	Delimiter Expr
+	Source    Expr
+}
+
+func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delimiter, source Expr) *SplitExpr {
+	return &SplitExpr{
+		builtinNode: builtin(node, name, args),
+		Delimiter:   delimiter,
+		Source:      source,
+	}
+}
+
+func Split(delimiter, source Expr) *SplitExpr {
+	name := String("Fn::Split")
+	return &SplitExpr{
+		builtinNode: builtin(nil, name, List(delimiter, source)),
+		Delimiter:   delimiter,
+		Source:      source,
+	}
+}
+
 // SelectExpr returns a single object from a list of objects by index.
 type SelectExpr struct {
 	builtinNode
