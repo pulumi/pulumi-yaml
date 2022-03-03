@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"unicode"
 
 	"github.com/hashicorp/hcl/v2"
@@ -390,6 +391,8 @@ type TemplateDecl struct {
 
 	syntax syntax.Node
 
+	Name          *StringExpr
+	Runtime       *StringExpr
 	Description   *StringExpr
 	Configuration ConfigMapDecl
 	Variables     VariablesMapDecl
@@ -506,10 +509,10 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 	return diags
 }
 
-func parseRecord(name string, dest recordDecl, node syntax.Node) syntax.Diagnostics {
+func parseRecord(objName string, dest recordDecl, node syntax.Node) syntax.Diagnostics {
 	obj, ok := node.(*syntax.ObjectNode)
 	if !ok {
-		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", name), "")}
+		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", objName), "")}
 	}
 	*dest.recordSyntax() = obj
 
@@ -521,13 +524,33 @@ func parseRecord(name string, dest recordDecl, node syntax.Node) syntax.Diagnost
 		kvp := obj.Index(i)
 
 		key := kvp.Key.Value()
+		var hasMatch bool
 		for _, name := range []string{key, title(key)} {
 			if f, ok := t.FieldByName(name); ok && f.IsExported() {
 				fdiags := parseField(key, v.FieldByIndex(f.Index), kvp.Value)
 				diags.Extend(fdiags...)
+				hasMatch = true
 				break
 			}
 		}
+		if !hasMatch {
+			msg := fmt.Sprintf("Object '%s' has no field named '%s'", objName, key)
+			detail := "note: "
+			var fieldNames []string
+			for i := 0; i < t.NumField(); i++ {
+				fieldNames = append(fieldNames, fmt.Sprintf("'%s'", t.Field(i).Name))
+			}
+			if len(fieldNames) == 0 {
+				detail += fmt.Sprintf("'%s' has no fields", objName)
+			} else {
+				detail += fmt.Sprintf("available fields are: %s", strings.Join(fieldNames, ", "))
+			}
+
+			nodeError := syntax.NodeError(kvp.Key, msg, detail)
+			nodeError.Severity = hcl.DiagWarning
+			diags = append(diags, nodeError)
+		}
+
 	}
 
 	return diags
