@@ -538,7 +538,12 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node) syntax.Diagn
 			detail := "note: "
 			var fieldNames []string
 			for i := 0; i < t.NumField(); i++ {
-				fieldNames = append(fieldNames, fmt.Sprintf("'%s'", t.Field(i).Name))
+				f := t.Field(i)
+				if f.IsExported() {
+					name := []rune(f.Name)
+					name[0] = unicode.ToLower(name[0])
+					fieldNames = append(fieldNames, fmt.Sprintf("'%s'", string(name)))
+				}
 			}
 			if len(fieldNames) == 0 {
 				detail += fmt.Sprintf("'%s' has no fields", objName)
