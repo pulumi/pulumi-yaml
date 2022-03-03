@@ -55,6 +55,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),
+					"comma":  resource.NewStringProperty(","),
 					"out":    resource.NewStringProperty("tuo"),
 					"outNum": resource.NewNumberProperty(1),
 					"outList": resource.NewPropertyValue([]interface{}{
@@ -415,6 +416,51 @@ func TestJoin(t *testing.T) {
 		requireNoErrors(t, diags)
 		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo,tuo", x)
+			return nil, nil
+		})
+		r.ctx.Export("out2", out)
+	})
+}
+
+func TestSplit(t *testing.T) {
+	tmpl := template(t, &Template{
+		Resources: map[string]*Resource{
+			"resA": {
+				Type: "test:resource:type",
+				Properties: map[string]interface{}{
+					"foo": "oof",
+				},
+			},
+		},
+	})
+	testTemplate(t, tmpl, func(r *runner) {
+		v, diags := r.evaluateBuiltinSplit(&ast.SplitExpr{
+			Delimiter: ast.String(","),
+			Value:     ast.String("a,b,c"),
+		})
+		requireNoErrors(t, diags)
+		assert.Equal(t, []interface{}{"a", "b", "c"}, v)
+
+		x, diags := ast.Interpolate("${resA.comma}")
+		requireNoErrors(t, diags)
+
+		v, diags = r.evaluateBuiltinSplit(&ast.SplitExpr{
+			Delimiter: x,
+			Value:     ast.String("a,b,c"),
+		})
+		requireNoErrors(t, diags)
+		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, []interface{}{"a", "b", "c"}, x)
+			return nil, nil
+		})
+		r.ctx.Export("out", out)
+
+		v, diags = r.evaluateBuiltinSplit(&ast.SplitExpr{
+			Delimiter: ast.String(","),
+			Value:     ast.Join(x, ast.List(ast.String("a"), ast.String("b"), ast.String("c"))),
+		})
+		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, []interface{}{"a", "b", "c"}, x)
 			return nil, nil
 		})
 		r.ctx.Export("out2", out)

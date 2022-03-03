@@ -62,6 +62,5 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		*deps = append(*deps, x.ResourceName)
 	case ast.BuiltinExpr:
 		getExpressionDependencies(deps, x.Args())
-
 	}
 }

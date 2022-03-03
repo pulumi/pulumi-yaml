@@ -504,6 +504,8 @@ func (r *runner) registerOutputs() syntax.Diagnostics {
 // - float64
 // - []interface{}
 // - map[string]interface{}
+// - pulumi.Asset
+// - pulumi.Archive
 // - pulumi.Output, where the element type is one of the above
 //
 func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
@@ -532,6 +534,8 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
 		return r.evaluateBuiltinJoin(x)
+	case *ast.SplitExpr:
+		return r.evaluateBuiltinSplit(x)
 	case *ast.ToJSONExpr:
 		return r.evaluateBuiltinToJSON(x)
 	case *ast.SubExpr:
@@ -822,9 +826,50 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 		if diags.HasErrors() {
 			return "", diags
 		}
-		return strings.Join(strs, delimStr), nil
+		return strings.Join(strs, delimStr), diags
 	})
 	return join(delim, parts)
+}
+
+func (r *runner) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	delim, ddiags := r.evaluateExpr(v.Delimiter)
+	diags.Extend(ddiags...)
+	if ddiags.HasErrors() {
+		return nil, ddiags
+	}
+
+	value, vdiags := r.evaluateExpr(v.Value)
+	diags.Extend(vdiags...)
+	if vdiags.HasErrors() {
+		return nil, vdiags
+	}
+
+	split := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		delim, value := args[0], args[1]
+
+		delimStr, ok := delim.(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(delimStr)), ""))
+		}
+
+		valueStr, ok := value.(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Delimiter, fmt.Sprintf("value must be a string, not %v", typeString(valueStr)), ""))
+		}
+
+		if diags.HasErrors() {
+			return "", diags
+		}
+
+		strs := strings.Split(valueStr, delimStr)
+		result := make([]interface{}, len(strs))
+		for i, s := range strs {
+			result[i] = s
+		}
+		return result, diags
+	})
+	return split(delim, value)
 }
 
 func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {

@@ -16,6 +16,11 @@ import (
 const example = `
 name: simple-yaml
 runtime: yaml
+variables:
+  join:
+    Fn::Join: [ ",", [ "a", "b", "c" ] ]
+  split:
+    Fn::Split: [ ",", "${join}" ]
 resources:
   my-bucket:
     type: aws:s3/bucket:Bucket

@@ -464,6 +464,30 @@ func Join(delimiter Expr, values *ListExpr) *JoinExpr {
 	}
 }
 
+type SplitExpr struct {
+	builtinNode
+
+	Delimiter Expr
+	Value     Expr
+}
+
+func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delimiter, value Expr) *SplitExpr {
+	return &SplitExpr{
+		builtinNode: builtin(node, name, args),
+		Delimiter:   delimiter,
+		Value:       value,
+	}
+}
+
+func Split(delimiter, value Expr) *SplitExpr {
+	name := String("Fn::Split")
+	return &SplitExpr{
+		builtinNode: builtin(nil, name, List(delimiter, value)),
+		Delimiter:   delimiter,
+		Value:       value,
+	}
+}
+
 // SelectExpr returns a single object from a list of objects by index.
 type SelectExpr struct {
 	builtinNode
@@ -605,6 +629,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseInvoke
 	case "Fn::Join":
 		parse = parseJoin
+	case "Fn::Split":
+		parse = parseSplit
 	case "Fn::ToJSON":
 		parse = parseToJSON
 	case "Fn::Sub":
@@ -738,6 +764,14 @@ func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, synt
 	}
 
 	return JoinSyntax(node, name, list, list.Elements[0], values), nil
+}
+
+func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	list, ok := args.(*ListExpr)
+	if !ok || len(list.Elements) != 2 {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Split must be a two-valued list", "")}
+	}
+	return SplitSyntax(node, name, list, list.Elements[0], list.Elements[1]), nil
 }
 
 func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
