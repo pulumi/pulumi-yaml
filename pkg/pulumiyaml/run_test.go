@@ -592,75 +592,116 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{
-			"resA": {
-				Type: testResourceToken,
-				Properties: map[string]interface{}{
-					"foo": "oof",
+	tests := []struct {
+		input    *ast.SelectExpr
+		expected interface{}
+		isOutput bool
+		isError  bool
+	}{
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(1),
+				Values: ast.List(
+					ast.Number(1),
+					ast.String("second"),
+				),
+			},
+			expected: "second",
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(0),
+				Values: &ast.GetAttExpr{
+					ResourceName: ast.String("resA"),
+					PropertyName: ast.String("outList"),
 				},
 			},
+			expected: map[string]interface{}{"value": 42.0},
+			isOutput: true,
 		},
-	})
-	testTemplate(t, tmpl, func(r *runner) {
-		v, diags := r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: ast.Number(1),
-			Values: ast.List(
-				ast.Number(1),
-				ast.String("second"),
-			),
-		})
-		requireNoErrors(t, diags)
-		assert.Equal(t, "second", v)
-
-		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: &ast.GetAttExpr{
-				ResourceName: ast.String("resA"),
-				PropertyName: ast.String("outNum"),
+		{
+			input: &ast.SelectExpr{
+				Index: &ast.GetAttExpr{
+					ResourceName: ast.String("resA"),
+					PropertyName: ast.String("outNum"),
+				},
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
 			},
-			Values: ast.List(
-				ast.String("first"),
-				ast.String("second"),
-				ast.String("third"),
-			),
+			expected: "second",
+			isOutput: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(1.5),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(3),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(-182),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: testResourceToken,
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinSelect(tt.input)
+				if tt.isError {
+					assert.True(t, diags.HasErrors())
+					assert.Nil(t, v)
+					return
+				}
+
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
+						assert.Equal(t, tt.expected, x)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
+
+			})
 		})
-		requireNoErrors(t, diags)
-		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
-			assert.Equal(t, "second", x.(string))
-			return nil, nil
-		})
-		r.ctx.Export("out", out)
-		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: ast.Number(1.5),
-			Values: ast.List(
-				ast.String("first"),
-				ast.String("second"),
-				ast.String("third"),
-			),
-		})
-		assert.Nil(t, v)
-		assert.True(t, diags.HasErrors())
-		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: ast.Number(3),
-			Values: ast.List(
-				ast.String("first"),
-				ast.String("second"),
-				ast.String("third"),
-			),
-		})
-		assert.Nil(t, v)
-		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: ast.Number(-182),
-			Values: ast.List(
-				ast.String("first"),
-				ast.String("second"),
-				ast.String("third"),
-			),
-		})
-		assert.Nil(t, v)
-		assert.True(t, diags.HasErrors())
-		assert.True(t, diags.HasErrors())
-	})
+	}
 }
 
 func TestToBase64(t *testing.T) {
