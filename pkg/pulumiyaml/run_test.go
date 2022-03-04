@@ -157,9 +157,39 @@ outputs:
   foo: !GetAtt res-a.foo
   bar: !Ref res-a
 `
-
 	tmpl := yamlTemplate(t, text)
 	testTemplate(t, tmpl, func(r *runner) {})
+}
+
+func TestAssetOrArchive(t *testing.T) {
+	const text = `name: test-yaml
+variables:
+  dir:
+    Fn::AssetArchive:
+      str:
+        Fn::StringAsset: this is home
+      away:
+        Fn::RemoteAsset: example.org/asset
+      local:
+        Fn::FileAsset: ./asset
+      folder:
+        Fn::AssetArchive:
+          docs:
+            Fn::RemoteArchive: example.org/docs
+`
+	tmpl := yamlTemplate(t, text)
+	testTemplate(t, tmpl, func(r *runner) {
+		dir, ok := r.variables["dir"]
+		require.True(t, ok, "must have found dir")
+		assetArchive, ok := dir.(pulumi.Archive)
+		require.True(t, ok)
+
+		assets := assetArchive.Assets()
+		assert.Equal(t, assets["str"].(pulumi.Asset).Text(), "this is home")
+		assert.Equal(t, assets["away"].(pulumi.Asset).URI(), "example.org/asset")
+		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), "./asset")
+		assert.Equal(t, assets["folder"].(pulumi.Archive).Assets()["docs"].(pulumi.Archive).URI(), "example.org/docs")
+	})
 }
 
 func TestPropertiesAbsent(t *testing.T) {

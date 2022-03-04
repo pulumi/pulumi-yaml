@@ -180,6 +180,25 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "remoteAsset",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.FileArchiveExpr:
+		path, pdiags := imp.importExpr(node.Source)
+		return &model.FunctionCallExpression{
+			Name: "fileArchive",
+			Args: []model.Expression{path},
+		}, pdiags
+	case *ast.RemoteArchiveExpr:
+		path, pdiags := imp.importExpr(node.Source)
+		return &model.FunctionCallExpression{
+			Name: "remoteArchive",
+			Args: []model.Expression{path},
+		}, pdiags
+	// TODO: assetArchive
+	// case *ast.AssetArchiveExpr:
+	// 	path, pdiags := imp.importExpr(node.Source)
+	// 	return &model.FunctionCallExpression{
+	// 		Name: "stringArchive",
+	// 		Args: []model.Expression{path},
+	// 	}, pdiags
 	case *ast.GetAttExpr:
 		resourceName, propertyName := node.ResourceName.Value, node.PropertyName.Value
 

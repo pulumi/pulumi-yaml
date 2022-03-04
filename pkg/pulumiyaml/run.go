@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -546,6 +547,12 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return pulumi.NewStringAsset(x.Source.Value), nil
 	case *ast.RemoteAssetExpr:
 		return pulumi.NewRemoteAsset(x.Source.Value), nil
+	case *ast.FileArchiveExpr:
+		return pulumi.NewFileArchive(x.Source.Value), nil
+	case *ast.RemoteArchiveExpr:
+		return pulumi.NewRemoteArchive(x.Source.Value), nil
+	case *ast.AssetArchiveExpr:
+		return r.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
 		return r.evaluateBuiltinStackReference(x)
 	default:
@@ -912,6 +919,30 @@ func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnos
 		}
 	}
 	return r.evaluateInterpolate(v.Interpolate, substitutions)
+}
+
+func (r *runner) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	m := map[string]interface{}{}
+	keys := make([]string, len(v.AssetOrArchives))
+	i := 0
+	for k := range v.AssetOrArchives {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := v.AssetOrArchives[k]
+		assetOrArchive, vdiags := r.evaluateExpr(v)
+		if !vdiags.HasErrors() {
+			m[k] = assetOrArchive
+		}
+		diags.Extend(vdiags...)
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	return pulumi.NewAssetArchive(m), diags
 }
 
 func (r *runner) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, syntax.Diagnostics) {
