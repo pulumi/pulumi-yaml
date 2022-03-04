@@ -391,8 +391,6 @@ type TemplateDecl struct {
 
 	syntax syntax.Node
 
-	Name          *StringExpr
-	Runtime       *StringExpr
 	Description   *StringExpr
 	Configuration ConfigMapDecl
 	Variables     VariablesMapDecl
@@ -444,7 +442,7 @@ func Template(description *StringExpr, configuration ConfigMapDecl, variables Va
 func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagnostics) {
 	template := TemplateDecl{source: source}
 
-	diags := parseRecord("template", &template, node)
+	diags := parseRecord("template", &template, node, false)
 	return &template, diags
 }
 
@@ -470,7 +468,7 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 			diags.Extend(pdiags...)
 			v = reflect.ValueOf(defaultValue).Elem().Convert(dest.Type())
 		case recordDecl:
-			pdiags := parseRecord(name, x, node)
+			pdiags := parseRecord(name, x, node, true)
 			diags.Extend(pdiags...)
 			v = reflect.ValueOf(defaultValue).Elem().Convert(dest.Type())
 		}
@@ -487,7 +485,7 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 	case dest.Type().AssignableTo(recordDeclType):
 		// assume that dest is *T
 		v = reflect.New(dest.Type().Elem())
-		rdiags := parseRecord(name, v.Interface().(recordDecl), node)
+		rdiags := parseRecord(name, v.Interface().(recordDecl), node, true)
 		diags.Extend(rdiags...)
 	case dest.Type().AssignableTo(exprType):
 		x, xdiags := ParseExpr(node)
@@ -509,7 +507,7 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 	return diags
 }
 
-func parseRecord(objName string, dest recordDecl, node syntax.Node) syntax.Diagnostics {
+func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarning bool) syntax.Diagnostics {
 	obj, ok := node.(*syntax.ObjectNode)
 	if !ok {
 		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", objName), "")}
@@ -533,7 +531,7 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node) syntax.Diagn
 				break
 			}
 		}
-		if !hasMatch {
+		if !hasMatch && noMatchWarning {
 			msg := fmt.Sprintf("Object '%s' has no field named '%s'", objName, key)
 			detail := "note: "
 			var fieldNames []string
