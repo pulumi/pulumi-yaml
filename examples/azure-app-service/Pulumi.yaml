@@ -54,8 +54,7 @@ resources:
       containerName: ${container.name}
       type: 'Block'
       source:
-        Fn::Asset:
-          FileArchive: ./www
+        Fn::FileArchive: ./www
   appInsights:
     type: azure-native:insights:Component
     properties:

@@ -12,8 +12,7 @@ resources:
     properties:
       bucket: ${site-bucket}
       source:
-        Fn::Asset:
-          File: ./www/index.html
+        Fn::FileAsset: ./www/index.html
       acl: public-read
       contentType: text/html
   favicon.png:
@@ -21,8 +20,7 @@ resources:
     properties:
       bucket: ${site-bucket}
       source:
-        Fn::Asset:
-          File: ./www/favicon.png
+        Fn::FileAsset: ./www/favicon.png
       acl: public-read
       contentType: image/png
   bucketPolicy:

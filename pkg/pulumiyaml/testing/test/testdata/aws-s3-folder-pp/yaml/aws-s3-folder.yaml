@@ -10,8 +10,7 @@ resources:
             bucket: ${siteBucket.id}
             key: ${range.value}
             source:
-                Fn::Asset:
-                    File: ${siteDir}/${range.value}
+                Fn::FileAsset: ${siteDir}/${range.value}
             contentType: ${range.value}
     bucketPolicy:
         type: aws:s3/bucketPolicy:BucketPolicy

@@ -242,8 +242,8 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //   accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 // - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
 //   that key names a builtin function ("Ref", "Fn::GetAtt", "Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select",
-//   "Fn::Asset", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr. Otherwise, the
-//   object is parsed as a *syntax.ObjectNode.
+//   "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
+//   Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *syntax.NullNode:
