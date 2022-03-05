@@ -17,11 +17,17 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
+
+	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 
 	"github.com/pkg/errors"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
@@ -33,14 +39,54 @@ import (
 // LanguageRuntimeServer RPC endpoint.
 func main() {
 	// Parse the flags and initialize some boilerplate.
-	var tracing string
-	var root string
+	var (
+		tracing string
+		root    string
+		convert string
+	)
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
 	flag.StringVar(&root, "root", "", "Root of the program execition")
+	flag.StringVar(&convert, "convert", "", "The file to convert pcl -> YAML")
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
 	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
+
+	if convert != "" {
+		f, err := ioutil.ReadFile(convert)
+		if err != nil {
+			cmdutil.Exit(err)
+		}
+		parser := syntax.NewParser()
+		err = parser.ParseFile(bytes.NewReader(f), convert)
+		if err != nil {
+			cmdutil.Exit(fmt.Errorf("Failed to parse pcl: %w", err))
+		}
+		if parser.Diagnostics.HasErrors() {
+			cmdutil.Exit(parser.Diagnostics)
+		}
+
+		program, diags, err := pcl.BindProgram(parser.Files, pcl.AllowMissingProperties, pcl.AllowMissingVariables, pcl.SkipResourceTypechecking)
+		if err != nil {
+			cmdutil.Exit(fmt.Errorf("could not bind program: %w", err))
+		}
+		if diags.HasErrors() {
+			cmdutil.Exit(fmt.Errorf("failed to bind program: %w", diags))
+		}
+
+		yaml, diags, err := codegen.GenerateProgram(program)
+		if err != nil {
+			cmdutil.Exit(fmt.Errorf("could not generate program: %w", err))
+		}
+		if diags.HasErrors() {
+			cmdutil.Exit(fmt.Errorf("failed to generate program: %w", diags))
+		}
+		for k, v := range yaml {
+			fmt.Printf("File: %s\n---\n%s\n...\n", k, string(v))
+		}
+
+		return
+	}
 
 	// Fetch the engine address if available so we can do logging, etc.
 	var engineAddress string

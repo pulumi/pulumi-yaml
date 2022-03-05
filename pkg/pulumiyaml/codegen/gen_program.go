@@ -552,8 +552,11 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		}.AppendTo(g)
 		return syn.String("Splat not implemented")
 	default:
-		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
-		panic(nil)
+		YAMLError{
+			kind:   fmt.Sprintf("%T", e),
+			detail: fmt.Sprintf("Unimplimented! Needed for %v", e),
+		}.AppendTo(g)
+		return syn.String("Unimplimented")
 	}
 }
 
