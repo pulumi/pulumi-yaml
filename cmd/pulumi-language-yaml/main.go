@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 
 	"github.com/pkg/errors"
@@ -66,7 +67,10 @@ func main() {
 			cmdutil.Exit(parser.Diagnostics)
 		}
 
-		program, diags, err := pcl.BindProgram(parser.Files, pcl.AllowMissingProperties, pcl.AllowMissingVariables, pcl.SkipResourceTypechecking)
+		program, diags, err := pcl.BindProgram(parser.Files,
+			pcl.AllowMissingProperties,
+			pcl.AllowMissingVariables,
+			pcl.SkipResourceTypechecking)
 		if err != nil {
 			cmdutil.Exit(fmt.Errorf("could not bind program: %w", err))
 		}
@@ -79,7 +83,11 @@ func main() {
 			cmdutil.Exit(fmt.Errorf("could not generate program: %w", err))
 		}
 		if diags.HasErrors() {
-			cmdutil.Exit(fmt.Errorf("failed to generate program: %w", diags))
+			diagErrors := hcl.Diagnostics{}
+			for _, e := range diags.Errs() {
+				diagErrors = diagErrors.Append(e.(*hcl.Diagnostic))
+			}
+			cmdutil.Exit(fmt.Errorf("failed to generate program: %w", diagErrors))
 		}
 		for k, v := range yaml {
 			fmt.Printf("File: %s\n---\n%s\n...\n", k, string(v))
