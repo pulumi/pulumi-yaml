@@ -29,7 +29,7 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	}
 
 	if g.diags.HasErrors() {
-		return nil, nil, g.diags
+		return nil, g.diags, nil
 	}
 
 	w := &bytes.Buffer{}
@@ -42,9 +42,6 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 		err = diags
 	}
 
-	if err != nil {
-		return nil, nil, err
-	}
 	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
 }
 
@@ -551,9 +548,22 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			rng: e.Syntax.Range(),
 		}.AppendTo(g)
 		return syn.String("Splat not implemented")
+	case *model.ForExpression:
+		YAMLError{
+			kind: "For",
+			detail: "Pulumi YAML cannot represent for loops." +
+				"If the values of the for lop are known, you can manually unroll the loop," +
+				" otherwise it is necessary to switch to a more expressive language.",
+			rng: e.Syntax.Range(),
+		}.AppendTo(g)
+		return syn.String("For not implemented")
 	default:
-		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
-		panic(nil)
+		YAMLError{
+			kind:   fmt.Sprintf("%T", e),
+			detail: fmt.Sprintf("Unimplimented! Needed for %v", e),
+			rng:    e.SyntaxNode().Range(),
+		}.AppendTo(g)
+		return syn.String("Unimplimented")
 	}
 }
 
