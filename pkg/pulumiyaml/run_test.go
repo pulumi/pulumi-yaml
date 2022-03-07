@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	b64 "encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -56,6 +57,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),
 					"out":    resource.NewStringProperty("tuo"),
+					"outSep": resource.NewStringProperty("1-2-3-4"),
 					"outNum": resource.NewNumberProperty(1),
 					"outList": resource.NewPropertyValue([]interface{}{
 						map[string]interface{}{
@@ -421,6 +423,78 @@ func TestJoin(t *testing.T) {
 	})
 }
 
+func TestSplit(t *testing.T) {
+	tests := []struct {
+		input    *ast.SplitExpr
+		expected []string
+		isOutput bool
+	}{
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String("a,b"),
+			},
+			expected: []string{"a", "b"},
+		},
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String("a"),
+			},
+			expected: []string{"a"},
+		},
+		{
+			input: &ast.SplitExpr{
+				Delimiter: ast.String(","),
+				Source:    ast.String(""),
+			},
+			expected: []string{""},
+		},
+		{
+			input: &ast.SplitExpr{
+				Source: &ast.SymbolExpr{
+					Property: &ast.PropertyAccess{
+						Accessors: []ast.PropertyAccessor{
+							&ast.PropertyName{Name: "resA"},
+							&ast.PropertyName{Name: "outSep"},
+						},
+					},
+				},
+				Delimiter: ast.String("-"),
+			},
+			expected: []string{"1", "2", "3", "4"},
+			isOutput: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinSplit(tt.input)
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						assert.Equal(t, tt.expected, x)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
+			})
+		})
+	}
+}
+
 func TestToJSON(t *testing.T) {
 	tests := []struct {
 		input    *ast.ToJSONExpr
@@ -518,48 +592,116 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{
-			"resA": {
-				Type: testResourceToken,
-				Properties: map[string]interface{}{
-					"foo": "oof",
+	tests := []struct {
+		input    *ast.SelectExpr
+		expected interface{}
+		isOutput bool
+		isError  bool
+	}{
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(1),
+				Values: ast.List(
+					ast.Number(1),
+					ast.String("second"),
+				),
+			},
+			expected: "second",
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(0),
+				Values: &ast.GetAttExpr{
+					ResourceName: ast.String("resA"),
+					PropertyName: ast.String("outList"),
 				},
 			},
+			expected: map[string]interface{}{"value": 42.0},
+			isOutput: true,
 		},
-	})
-	testTemplate(t, tmpl, func(r *runner) {
-		v, diags := r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: ast.Number(1),
-			Values: ast.List(
-				&ast.GetAttExpr{
+		{
+			input: &ast.SelectExpr{
+				Index: &ast.GetAttExpr{
 					ResourceName: ast.String("resA"),
 					PropertyName: ast.String("outNum"),
 				},
-				ast.String("second"),
-			),
-		})
-		requireNoErrors(t, diags)
-		assert.Equal(t, "second", v)
-
-		v, diags = r.evaluateBuiltinSelect(&ast.SelectExpr{
-			Index: &ast.GetAttExpr{
-				ResourceName: ast.String("resA"),
-				PropertyName: ast.String("outNum"),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
 			},
-			Values: ast.List(
-				ast.String("first"),
-				ast.String("second"),
-				ast.String("third"),
-			),
+			expected: "second",
+			isOutput: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(1.5),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(3),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+		{
+			input: &ast.SelectExpr{
+				Index: ast.Number(-182),
+				Values: ast.List(
+					ast.String("first"),
+					ast.String("second"),
+					ast.String("third"),
+				),
+			},
+			isError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: testResourceToken,
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *runner) {
+				v, diags := r.evaluateBuiltinSelect(tt.input)
+				if tt.isError {
+					assert.True(t, diags.HasErrors())
+					assert.Nil(t, v)
+					return
+				}
+
+				requireNoErrors(t, diags)
+				if tt.isOutput {
+					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
+						assert.Equal(t, tt.expected, x)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
+
+			})
 		})
-		requireNoErrors(t, diags)
-		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
-			assert.Equal(t, "second", x.(string))
-			return nil, nil
-		})
-		r.ctx.Export("out", out)
-	})
+	}
 }
 
 func TestToBase64(t *testing.T) {
