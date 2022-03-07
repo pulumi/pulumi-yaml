@@ -489,6 +489,9 @@ func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagno
 	case dest.Type().AssignableTo(exprType):
 		x, xdiags := ParseExpr(node)
 		diags.Extend(xdiags...)
+		if diags.HasErrors() {
+			return diags
+		}
 
 		xv := reflect.ValueOf(x)
 		if !xv.Type().AssignableTo(dest.Type()) {

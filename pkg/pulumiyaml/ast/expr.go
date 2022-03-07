@@ -243,8 +243,8 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //   accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 // - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
 //   that key names a builtin function ("Ref", "Fn::GetAtt", "Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select",
-//   "Fn::Asset", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr. Otherwise, the
-//   object is parsed as a *syntax.ObjectNode.
+//   "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
+//   Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *syntax.NullNode:
@@ -301,11 +301,75 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 			v, vdiags := ParseExpr(kvp.Value)
 			diags.Extend(vdiags...)
 
+			assetOrArchive, adiags, ok := tryParseAssetOrArchive(k, v)
+			diags.Extend(adiags...)
+			if ok {
+				if node.Len() != 1 {
+					diags.Extend(syntax.NodeError(node, k.(*StringExpr).Value+" must have it's own object", ""))
+					return nil, diags
+				}
+				// Not really an object, so we return early
+				return assetOrArchive, diags
+			}
 			kvps[i] = ObjectProperty{syntax: kvp, Key: k, Value: v}
 		}
 		return ObjectSyntax(node, kvps...), diags
 	default:
 		return nil, syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("unexpected syntax node of type %T", node), "")}
+	}
+}
+
+// Attempts to parse an asset or archive. These are not normal `Fn::*` objects
+// because they are parsed as part of an `ObjectProperty` instead of an object.
+// Note: because of the difference in parsing, this function does not identify
+// AssetArchive.
+func tryParseAssetOrArchive(k, v Expr) (Expr, syntax.Diagnostics, bool) {
+	diags := syntax.Diagnostics{}
+	checkStringExpr := func(kind string, v Expr) (*StringExpr, bool) {
+		if s, ok := v.(*StringExpr); ok {
+			return s, true
+		}
+		diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("The argument to %s must be a string literal", kind), ""))
+		return nil, false
+	}
+	fnName, ok := k.(*StringExpr)
+	if !ok {
+		return nil, nil, false
+	}
+	switch fnName.Value {
+	case "Fn::StringAsset":
+		s, ok := checkStringExpr(fnName.Value, v)
+		if !ok {
+			return nil, diags, true
+		}
+		return StringAssetSyntax(k.Syntax(), fnName, s), diags, true
+	case "Fn::FileAsset":
+		s, ok := checkStringExpr(fnName.Value, v)
+		if !ok {
+			return nil, diags, true
+		}
+		return FileAssetSyntax(k.Syntax(), fnName, s), diags, true
+	case "Fn::RemoteAsset":
+		s, ok := checkStringExpr(fnName.Value, v)
+		if !ok {
+			return nil, diags, true
+		}
+		return RemoteAssetSyntax(k.Syntax(), fnName, s), diags, true
+	case "Fn::FileArchive":
+		s, ok := checkStringExpr(fnName.Value, v)
+		if !ok {
+			return nil, diags, true
+		}
+		return FileArchiveSyntax(k.Syntax(), fnName, s), diags, true
+	case "Fn::RemoteArchive":
+		s, ok := checkStringExpr(fnName.Value, v)
+		if !ok {
+			return nil, diags, true
+		}
+		return RemoteArchiveSyntax(k.Syntax(), fnName, s), diags, true
+	default:
+		// Not a asset or archive
+		return nil, nil, false
 	}
 }
 
@@ -563,29 +627,92 @@ func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value 
 	}
 }
 
-// AssetExpr references a file either on disk ("File"), created in memory ("String") or accessed remotely ("Remote").
-type AssetExpr struct {
-	builtinNode
-
-	Kind *StringExpr
-	Path *StringExpr
+type AssetOrArchiveExpr interface {
+	Expr
+	isAssetOrArchive()
 }
 
-func AssetSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, kind *StringExpr, path *StringExpr) *AssetExpr {
-	return &AssetExpr{
-		builtinNode: builtin(node, name, args),
-		Kind:        kind,
-		Path:        path,
+type StringAssetExpr struct {
+	builtinNode
+	Source *StringExpr
+}
+
+func (*StringAssetExpr) isAssetOrArchive() {}
+
+func StringAssetSyntax(node syntax.Node, name, source *StringExpr) *StringAssetExpr {
+	return &StringAssetExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
+		Source:      source,
 	}
 }
 
-func Asset(kind string, path string) *AssetExpr {
-	name, kindX, pathX := String("Fn::Asset"), String(kind), String(path)
+type FileAssetExpr struct {
+	builtinNode
+	Source *StringExpr
+}
 
-	return &AssetExpr{
-		builtinNode: builtin(nil, name, Object(ObjectProperty{Key: kindX, Value: pathX})),
-		Kind:        kindX,
-		Path:        pathX,
+func (*FileAssetExpr) isAssetOrArchive() {}
+
+func FileAssetSyntax(node syntax.Node, name, source *StringExpr) *FileAssetExpr {
+	return &FileAssetExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
+		Source:      source,
+	}
+}
+
+type RemoteAssetExpr struct {
+	builtinNode
+	Source *StringExpr
+}
+
+func (*RemoteAssetExpr) isAssetOrArchive() {}
+
+func RemoteAssetSyntax(node syntax.Node, name, source *StringExpr) *RemoteAssetExpr {
+	return &RemoteAssetExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
+		Source:      source,
+	}
+}
+
+type FileArchiveExpr struct {
+	builtinNode
+	Source *StringExpr
+}
+
+func (*FileArchiveExpr) isAssetOrArchive() {}
+
+func FileArchiveSyntax(node syntax.Node, name, source *StringExpr) *FileArchiveExpr {
+	return &FileArchiveExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
+		Source:      source,
+	}
+}
+
+type RemoteArchiveExpr struct {
+	builtinNode
+	Source *StringExpr
+}
+
+func (*RemoteArchiveExpr) isAssetOrArchive() {}
+
+func RemoteArchiveSyntax(node syntax.Node, name, source *StringExpr) *RemoteArchiveExpr {
+	return &RemoteArchiveExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
+		Source:      source,
+	}
+}
+
+type AssetArchiveExpr struct {
+	builtinNode
+	AssetOrArchives map[string]Expr
+}
+
+func (*AssetArchiveExpr) isAssetOrArchive() {}
+
+func AssetArchiveSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, assetsOrArchives map[string]Expr) *AssetArchiveExpr {
+	return &AssetArchiveExpr{
+		builtinNode:     builtin(node, name, args),
+		AssetOrArchives: assetsOrArchives,
 	}
 }
 
@@ -642,10 +769,10 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseSelect
 	case "Fn::Split":
 		parse = parseSplit
-	case "Fn::Asset":
-		parse = parseAsset
 	case "Fn::StackReference":
 		parse = parseStackReference
+	case "Fn::AssetArchive":
+		parse = parseAssetArchive
 	default:
 		return nil, nil, false
 	}
@@ -861,34 +988,6 @@ func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, 
 	return ToBase64Syntax(node, name, args, str), nil
 }
 
-func parseAsset(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	obj, ok := args.(*ObjectExpr)
-	if !ok || len(obj.Entries) != 1 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Asset must be an object containing one of 'File', 'String', or 'Remote'", "")}
-	}
-
-	var diags syntax.Diagnostics
-
-	kvp := obj.Entries[0]
-	kind, ok := kvp.Key.(*StringExpr)
-	if !ok {
-		diags.Extend(ExprError(kvp.Key, "the asset kind must be a string literal", ""))
-	} else if kind.Value != "File" && kind.Value != "String" && kind.Value != "Remote" && kind.Value != "FileArchive" && kind.Value != "RemoteArchive" {
-		diags.Extend(ExprError(kvp.Key, "the asset kind must be one of 'File', 'String', 'Remote', 'FileArchive', or 'RemoteArchive'", ""))
-	}
-
-	path, ok := kvp.Value.(*StringExpr)
-	if !ok {
-		diags.Extend(ExprError(kvp.Value, "the asset parameter must be a string literal", ""))
-	}
-
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return AssetSyntax(node, name, obj, kind, path), diags
-}
-
 func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
@@ -901,4 +1000,37 @@ func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (
 	}
 
 	return StackReferenceSyntax(node, name, list, stackName, list.Elements[1]), nil
+}
+
+// We expect the following format
+// Fn::AssetArchive:
+//   path:
+//     AssetOrArchive
+//
+// Where `AssetOrArchive` is an object.
+func parseAssetArchive(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	const mustObjectMsg string = "the argument to Fn::AssetArchive must be an object"
+	const mustStringMsg string = "keys in Fn::AssetArchive arguments must be string literals"
+	obj, ok := args.(*ObjectExpr)
+	if !ok {
+		return nil, syntax.Diagnostics{ExprError(args, mustObjectMsg, "")}
+	}
+	var diags syntax.Diagnostics
+	assetOrArchives := map[string]Expr{}
+	for _, kv := range obj.Entries {
+		var tdiags syntax.Diagnostics // Diags local to this iteration
+		k, ok := kv.Key.(*StringExpr) // the path for this entry
+		if !ok {
+			tdiags.Extend(ExprError(kv.Key, mustStringMsg, ""))
+		}
+		v, ok := kv.Value.(AssetOrArchiveExpr)
+		if !ok {
+			tdiags.Extend(ExprError(kv.Value, fmt.Sprintf("value must be an asset or an archive, not a %T", kv.Value), ""))
+		}
+		if !tdiags.HasErrors() {
+			assetOrArchives[k.Value] = v
+		}
+		diags.Extend(tdiags...)
+	}
+	return AssetArchiveSyntax(node, name, obj, assetOrArchives), diags
 }

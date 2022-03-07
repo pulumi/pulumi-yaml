@@ -162,28 +162,12 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 //
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
-	case *ast.AssetExpr:
-		path, pdiags := imp.importExpr(node.Path)
-		switch node.Kind.Value {
-		case "File":
-			return &model.FunctionCallExpression{
-				Name: "fileAsset",
-				Args: []model.Expression{path},
-			}, pdiags
-		case "String":
-			return &model.FunctionCallExpression{
-				Name: "stringAsset",
-				Args: []model.Expression{path},
-			}, pdiags
-		case "Remote":
-			return &model.FunctionCallExpression{
-				Name: "remoteAsset",
-				Args: []model.Expression{path},
-			}, pdiags
-		default:
-			contract.Failf("unrecognized asset kind %v", node.Kind.Value)
-			return nil, nil
-		}
+	case *ast.FileAssetExpr:
+		path, pdiags := imp.importExpr(node.Source)
+		return &model.FunctionCallExpression{
+			Name: "fileAsset",
+			Args: []model.Expression{path},
+		}, pdiags
 	case *ast.GetAttExpr:
 		resourceName, propertyName := node.ResourceName.Value, node.PropertyName.Value
 

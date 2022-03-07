@@ -22,8 +22,7 @@ resources:
     properties:
       bucket: !Ref my-bucket
       source:
-        Fn::Asset:
-          String: <h1>Hello, world!</h1>
+        Fn::StringAsset: <h1>Hello, world!</h1>
       acl: public-read
       contentType: text/html
 outputs:
@@ -203,7 +202,11 @@ TODO
 
 TODO
 
-##### `Fn::Asset`
+##### `Fn::*Asset`
+
+TODO
+
+##### `Fn::*Archive`
 
 TODO
 

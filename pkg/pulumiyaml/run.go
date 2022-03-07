@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -543,8 +544,18 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinSelect(x)
 	case *ast.ToBase64Expr:
 		return r.evaluateBuiltinToBase64(x)
-	case *ast.AssetExpr:
-		return r.evaluateBuiltinAsset(x)
+	case *ast.FileAssetExpr:
+		return pulumi.NewFileAsset(x.Source.Value), nil
+	case *ast.StringAssetExpr:
+		return pulumi.NewStringAsset(x.Source.Value), nil
+	case *ast.RemoteAssetExpr:
+		return pulumi.NewRemoteAsset(x.Source.Value), nil
+	case *ast.FileArchiveExpr:
+		return pulumi.NewFileArchive(x.Source.Value), nil
+	case *ast.RemoteArchiveExpr:
+		return pulumi.NewRemoteArchive(x.Source.Value), nil
+	case *ast.AssetArchiveExpr:
+		return r.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
 		return r.evaluateBuiltinStackReference(x)
 	default:
@@ -956,24 +967,28 @@ func (r *runner) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, syntax.Diagnos
 	return r.evaluateInterpolate(v.Interpolate, substitutions)
 }
 
-func (r *runner) evaluateBuiltinAsset(v *ast.AssetExpr) (interface{}, syntax.Diagnostics) {
-	switch v.Kind.Value {
-	case "File":
-		return pulumi.NewFileAsset(v.Path.Value), nil
-	case "String":
-		return pulumi.NewStringAsset(v.Path.Value), nil
-	case "Remote":
-		return pulumi.NewRemoteAsset(v.Path.Value), nil
-	case "FileArchive":
-		return pulumi.NewFileArchive(v.Path.Value), nil
-	case "RemoteArchive":
-		return pulumi.NewRemoteArchive(v.Path.Value), nil
-	case "AssetArchive":
-		// TODO[pulumi/pulumi-yaml#53]: Implement Fn::Archive or support all variants as args to Fn::Asset
-		panic(fmt.Errorf("%s unimplemented", v.Kind.Value))
-	default:
-		panic(fmt.Errorf("unexpected Asset kind '%s'", v.Kind.Value))
+func (r *runner) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	m := map[string]interface{}{}
+	keys := make([]string, len(v.AssetOrArchives))
+	i := 0
+	for k := range v.AssetOrArchives {
+		keys[i] = k
+		i++
 	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := v.AssetOrArchives[k]
+		assetOrArchive, vdiags := r.evaluateExpr(v)
+		if !vdiags.HasErrors() {
+			m[k] = assetOrArchive
+		}
+		diags.Extend(vdiags...)
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	return pulumi.NewAssetArchive(m), diags
 }
 
 func (r *runner) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, syntax.Diagnostics) {
