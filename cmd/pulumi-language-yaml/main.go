@@ -21,8 +21,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 
 	"github.com/pkg/errors"
@@ -83,11 +83,11 @@ func main() {
 			cmdutil.Exit(fmt.Errorf("could not generate program: %w", err))
 		}
 		if diags.HasErrors() {
-			diagErrors := hcl.Diagnostics{}
-			for _, e := range diags.Errs() {
-				diagErrors = diagErrors.Append(e.(*hcl.Diagnostic))
+			stderr := os.Stderr
+			for _, e := range diags {
+				fmt.Fprintf(stderr, "%s\n", e.Error())
 			}
-			cmdutil.Exit(fmt.Errorf("failed to generate program: %w", diagErrors))
+			cmdutil.Exit(fmt.Errorf("failed to generate program"))
 		}
 		for k, v := range yaml {
 			fmt.Printf("File: %s\n---\n%s\n...\n", k, string(v))
