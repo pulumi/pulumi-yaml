@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -533,6 +534,8 @@ func (r *runner) evaluateExpr(x ast.Expr) (interface{}, syntax.Diagnostics) {
 		return r.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
 		return r.evaluateBuiltinJoin(x)
+	case *ast.SplitExpr:
+		return r.evaluateBuiltinSplit(x)
 	case *ast.ToJSONExpr:
 		return r.evaluateBuiltinToJSON(x)
 	case *ast.SubExpr:
@@ -838,6 +841,35 @@ func (r *runner) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, syntax.Diagn
 	return join(delim, parts)
 }
 
+func (r *runner) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	delimiter, ddiags := r.evaluateExpr(v.Delimiter)
+	diags.Extend(ddiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	source, sdiags := r.evaluateExpr(v.Source)
+	diags.Extend(sdiags...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	split := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
+		d, ok := args[0].(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Delimiter, "Must be a string, not %v", typeString(d)))
+			return []string{}, diags
+		}
+		s, ok := args[1].(string)
+		if !ok {
+			diags.Extend(ast.ExprError(v.Source, "Must be a string, not %v", typeString(s)))
+			return []string{}, diags
+		}
+		return strings.Split(s, d), diags
+	})
+	return split(delimiter, source)
+}
+
 func (r *runner) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 	value, vdiags := r.evaluateExpr(v.Value)
@@ -864,25 +896,39 @@ func (r *runner) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, syntax.D
 	if idiags.HasErrors() {
 		return nil, idiags
 	}
-	var elems []interface{}
-	for _, e := range v.Values.Elements {
-		ev, ediags := r.evaluateExpr(e)
-		diags.Extend(ediags...)
-		if ediags.HasErrors() {
-			return nil, diags
-		}
-		elems = append(elems, ev)
+	values, vdiags := r.evaluateExpr(v.Values)
+	diags.Extend(vdiags...)
+	if vdiags.HasErrors() {
+		return nil, vdiags
 	}
 
 	selectf := lift(func(args ...interface{}) (interface{}, syntax.Diagnostics) {
 		index, ok := args[0].(float64)
 		if !ok {
-			diags.Extend(ast.ExprError(v.Index, fmt.Sprintf("index must be a string, not %v", typeString(args[0])), ""))
+			diags.Extend(ast.ExprError(v.Index, fmt.Sprintf("index must be a number, not %v", typeString(args[0])), ""))
 			return nil, diags
 		}
+		if float64(int(index)) != index || int(index) < 0 {
+			// Cannot be a valid index, so we error
+			f := strconv.FormatFloat(index, 'f', -1, 64) // Manual formatting is so -3 does not get formatted as -3.0
+			diags.Extend(ast.ExprError(v.Index, fmt.Sprintf("index must be a positive integral, not %s", f), ""))
+			return nil, diags
+		}
+
+		elems, ok := args[1].([]interface{})
+		if !ok {
+			diags.Extend(ast.ExprError(v.Values, fmt.Sprintf("values must be a list, not %v", typeString(args[1])), ""))
+			return nil, diags
+		}
+
+		if int(index) >= len(elems) {
+			diags.Extend(ast.ExprError(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)), ""))
+			return nil, diags
+		}
+
 		return elems[int(index)], diags
 	})
-	return selectf(index)
+	return selectf(index, values)
 }
 
 func (r *runner) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, syntax.Diagnostics) {
