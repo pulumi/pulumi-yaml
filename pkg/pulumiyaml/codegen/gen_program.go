@@ -509,11 +509,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			}
 		}
 
-		// Inline implies we can construct the string directly, using string interpolation for traversals.
-		// Not inline means we need to use a Fn::Join statement.
+		// useJoin implies we need to use "Fn::Join" to construct the desired
+		// string.
 		if useJoin {
-			contract.Failf("Non-inline expressions are not implemented yet")
-			panic(nil)
+			return wrapFn("Join", syn.List(syn.String(""), syn.List(nodes...)))
 		}
 
 		s := ""
@@ -606,6 +605,12 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":
 		return wrapFn("ToJSON", g.expr(f.Args[0]))
+	case "element":
+		args := make([]syn.Node, len(f.Args))
+		for i, arg := range f.Args {
+			args[i] = g.expr(arg)
+		}
+		return wrapFn("Select", syn.List(args[1], args[0]))
 	default:
 		YAMLError{
 			kind:   "Unknown Function",

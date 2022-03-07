@@ -1,0 +1,13 @@
+resources:
+    example:
+        type: aws:iam/policy:Policy
+        properties:
+            name:
+                Fn::Join:
+                    -
+                    - - Fn::Select:
+                            - 0
+                            - - foo
+                              - bar
+                      - -policy
+            path: /
