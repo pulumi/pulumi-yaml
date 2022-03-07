@@ -11,3 +11,9 @@ resources:
                               - bar
                       - -policy
             path: /
+            policy:
+                Fn::Select:
+                    - 0
+                    - Fn::Split:
+                        - '-'
+                        - '{}-foo'

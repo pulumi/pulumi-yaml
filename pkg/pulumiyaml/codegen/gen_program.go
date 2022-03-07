@@ -601,6 +601,8 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			args[i] = g.expr(arg)
 		}
 		return wrapFn("Join", syn.List(args...))
+	case "split":
+		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":
