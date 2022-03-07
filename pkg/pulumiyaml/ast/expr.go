@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
 // Expr represents a Pulumi YAML expression. Expressions may be literals, interpolated strings, symbols, or builtin
@@ -464,16 +465,42 @@ func Join(delimiter Expr, values *ListExpr) *JoinExpr {
 	}
 }
 
+// Splits a string into a list by a delimiter
+type SplitExpr struct {
+	builtinNode
+
+	Delimiter Expr
+	Source    Expr
+}
+
+func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr) *SplitExpr {
+	elems := args.Elements
+	contract.Assertf(len(elems) == 2, "Must have exactly 2 elements")
+	return &SplitExpr{
+		builtinNode: builtin(node, name, args),
+		Delimiter:   elems[0],
+		Source:      elems[1],
+	}
+}
+
+func Split(delimiter, source Expr) *SplitExpr {
+	name := String("Fn::Split")
+	return &SplitExpr{
+		builtinNode: builtin(nil, name, List(delimiter, source)),
+		Delimiter:   delimiter,
+		Source:      source,
+	}
+}
+
 // SelectExpr returns a single object from a list of objects by index.
 type SelectExpr struct {
 	builtinNode
 
-	Index Expr
-	// TODO: CloudFormation allows nested functions to produce the Values - so this should be an Expr
-	Values *ListExpr
+	Index  Expr
+	Values Expr
 }
 
-func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, index Expr, values *ListExpr) *SelectExpr {
+func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, index Expr, values Expr) *SelectExpr {
 	return &SelectExpr{
 		builtinNode: builtin(node, name, args),
 		Index:       index,
@@ -481,7 +508,7 @@ func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, ind
 	}
 }
 
-func Select(index Expr, values *ListExpr) *SelectExpr {
+func Select(index Expr, values Expr) *SelectExpr {
 	name := String("Fn::Select")
 	return &SelectExpr{
 		builtinNode: builtin(nil, name, List(index, values)),
@@ -613,6 +640,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseToBase64
 	case "Fn::Select":
 		parse = parseSelect
+	case "Fn::Split":
+		parse = parseSplit
 	case "Fn::Asset":
 		parse = parseAsset
 	case "Fn::StackReference":
@@ -756,6 +785,15 @@ func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	}
 
 	return SelectSyntax(node, name, list, list.Elements[0], values), nil
+}
+
+func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	list, ok := args.(*ListExpr)
+	if !ok || len(list.Elements) != 2 {
+		return nil, syntax.Diagnostics{ExprError(args, "The argument to Fn::Select must be a two-values list", "")}
+	}
+
+	return SplitSyntax(node, name, list), nil
 }
 
 func parseSub(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
