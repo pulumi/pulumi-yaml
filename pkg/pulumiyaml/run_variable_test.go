@@ -273,31 +273,30 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	testInvokeCalls := 0
 
 	mocks := &testMonitor{
-		CallF: func(token string, args resource.PropertyMap, provider string) (resource.PropertyMap, error) {
-			switch token {
+		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+			switch args.Token {
 			case "test:invoke-passthrough:type":
 				// returns the same shape as the arguments
-				return args, nil
+				return args.Args, nil
 			case "test:invoke:type":
 				testInvokeCalls++
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"quux": "tuo",
-				}), args)
+				}), args.Args)
 				return resource.PropertyMap{
 					"retval": resource.NewStringProperty("oof"),
 				}, nil
 			}
-			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", token)
+			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
-		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
-			provider, id string) (string, resource.PropertyMap, error) {
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 
-			switch typeToken {
+			switch args.TypeToken {
 			case testResourceToken:
-				assert.Equal(t, testResourceToken, typeToken)
-				assert.Equal(t, resource.NewStringProperty("oof"), state["foo"], "expected resource test:resource:type to have property foo: oof")
-				assert.Equal(t, "", provider)
-				assert.Equal(t, "", id)
+				assert.Equal(t, testResourceToken, args.TypeToken)
+				assert.Equal(t, resource.NewStringProperty("oof"), args.Inputs["foo"], "expected resource test:resource:type to have property foo: oof")
+				assert.Equal(t, "", args.Provider)
+				assert.Equal(t, "", args.ID)
 
 				return "not-tested-here", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
@@ -306,16 +305,16 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"outNum": resource.NewNumberProperty(1),
 				}, nil
 			case testComponentToken:
-				assert.Equal(t, testComponentToken, typeToken)
-				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
+				assert.Equal(t, testComponentToken, args.TypeToken)
+				assert.True(t, args.Inputs.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				})))
-				assert.Equal(t, "", provider)
-				assert.Equal(t, "", id)
+				assert.Equal(t, "", args.Provider)
+				assert.Equal(t, "", args.ID)
 
 				return "", resource.PropertyMap{}, nil
 			}
-			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {

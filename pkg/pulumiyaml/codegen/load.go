@@ -4,6 +4,7 @@ package codegen
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/hashicorp/hcl/v2"
@@ -375,6 +376,46 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	return configDef, nil
 }
 
+func (imp *importer) getResourceRefList(optionField ast.Expr, name string, field string) ([]model.Expression, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+
+	elems, ok := optionField.(*ast.ListExpr)
+	var resourceNames []string
+	if !ok {
+		diags.Extend(ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a list of resource expressions, got '%v'", field, name, reflect.TypeOf(elems)), ""))
+	}
+	var refs []model.Expression
+	for _, e := range elems.Elements {
+		sym, ok := e.(*ast.SymbolExpr)
+		if !ok {
+			diags.Extend(ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a list of resource expressions, got '%v'", field, name, reflect.TypeOf(e)), ""))
+			continue
+		}
+		resourceName := sym.Property.Accessors[0].(*ast.PropertyName).Name
+		resourceNames = append(resourceNames, resourceName)
+		if resourceVar, ok := imp.resources[resourceName]; ok {
+			refs = append(refs, model.VariableReference(resourceVar))
+		} else {
+			diags.Extend(ast.ExprError(e, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+		}
+	}
+
+	return refs, diags
+}
+
+func (imp *importer) getResourceRefItem(optionField ast.Expr, name string, field string) (model.Expression, *syntax.Diagnostic) {
+	sym, ok := optionField.(*ast.SymbolExpr)
+	if !ok {
+		return nil, ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a resource, got '%v'", field, name, reflect.TypeOf(sym)), "")
+	}
+	resourceName := sym.Property.Accessors[0].(*ast.PropertyName).Name
+	if resourceVar, ok := imp.resources[resourceName]; ok {
+		return model.VariableReference(resourceVar), nil
+	} else {
+		return nil, ast.ExprError(optionField, fmt.Sprintf("unknown resource '%v'", resourceName), "")
+	}
+}
+
 // importResource imports a YAML resource as a PCL resource.
 func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, syntax.Diagnostics) {
 	name, resource := kvp.Key.Value, kvp.Value
@@ -398,62 +439,76 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 
 	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, import, version
 
-	var optionItems []model.BodyItem
-	if len(resource.Options.DependsOn.GetElements()) != 0 {
-		var refs []model.Expression
-		for _, v := range resource.Options.DependsOn.Elements {
-			resourceName := v.Value
-			if resourceVar, ok := imp.resources[resourceName]; ok {
-				refs = append(refs, model.VariableReference(resourceVar))
-			} else {
-				diags.Extend(ast.ExprError(v, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
-			}
+	resourceOptions := &model.Block{
+		Type: "options",
+		Body: &model.Body{},
+	}
+	if resource.Options.DependsOn != nil {
+		refs, rdiags := imp.getResourceRefList(resource.Options.DependsOn, name, "dependsOn")
+		diags.Extend(rdiags...)
+		if len(refs) > 0 {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name: "dependsOn",
+				Value: &model.TupleConsExpression{
+					Expressions: refs,
+				},
+			})
 		}
-		optionItems = append(optionItems, &model.Attribute{
-			Name: "dependsOn",
-			Value: &model.TupleConsExpression{
-				Expressions: refs,
-			},
-		})
 	}
 	if len(resource.Options.IgnoreChanges.GetElements()) != 0 {
 		var paths []model.Expression
 		for _, v := range resource.Options.IgnoreChanges.Elements {
 			paths = append(paths, plainLit(v.Value))
 		}
-		optionItems = append(optionItems, &model.Attribute{
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "ignoreChanges",
 			Value: &model.TupleConsExpression{Expressions: paths},
 		})
 	}
-	if resource.Options.Parent != nil && resource.Options.Parent.Value != "" {
-		resourceName := resource.Options.Parent.Value
-		if resourceVar, ok := imp.resources[resourceName]; ok {
-			optionItems = append(optionItems, &model.Attribute{
-				Name:  "parent",
-				Value: model.VariableReference(resourceVar),
-			})
+	if resource.Options.Parent != nil {
+		ref, err := imp.getResourceRefItem(resource.Options.Parent, name, "parent")
+		if err != nil {
+			diags.Extend(err)
 		} else {
-			diags.Extend(ast.ExprError(resource.Options.Parent, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "parent",
+				Value: ref,
+			})
 		}
 	}
 	if resource.Options.Protect != nil && resource.Options.Protect.Value {
-		optionItems = append(optionItems, &model.Attribute{
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
 		})
 	}
-	if resource.Options.Provider != nil && resource.Options.Provider.Value != "" {
-		resourceName := resource.Options.Provider.Value
-		if resourceVar, ok := imp.resources[resourceName]; ok {
-			//nolint:ineffassign // TODO
-			optionItems = append(optionItems, &model.Attribute{
-				Name:  "provider",
-				Value: model.VariableReference(resourceVar),
-			})
+	if resource.Options.Provider != nil {
+		ref, err := imp.getResourceRefItem(resource.Options.Provider, name, "provider")
+		if err != nil {
+			diags.Extend(err)
 		} else {
-			diags.Extend(ast.ExprError(resource.Options.Provider, fmt.Sprintf("unknown resource '%v'", resourceName), ""))
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "provider",
+				Value: ref,
+			})
 		}
+	}
+
+	if resource.Options.Providers != nil {
+		refs, rdiags := imp.getResourceRefList(resource.Options.Providers, name, "providers")
+		diags.Extend(rdiags...)
+		if len(refs) > 0 {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name: "providers",
+				Value: &model.TupleConsExpression{
+					Expressions: refs,
+				},
+			})
+		}
+	}
+
+	if len(resourceOptions.Body.Items) > 0 {
+		items = append(items, resourceOptions)
 	}
 
 	r := &model.Block{
