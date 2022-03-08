@@ -109,6 +109,10 @@ func (o Validator) apply(options *testOptions) {
 func boolRef(val bool) *bool { return &val }
 
 func testWrapper(t *testing.T, dir string, opts ...TestOption) {
+	if testing.Short() {
+		t.Skip("skipping program test in short mode")
+	}
+
 	dryrun := getDryRun()
 
 	var testOptions testOptions
