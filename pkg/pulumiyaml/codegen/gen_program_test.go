@@ -16,7 +16,6 @@ import (
 )
 
 func TestGenerateProgram(t *testing.T) {
-
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
 			{

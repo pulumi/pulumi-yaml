@@ -277,12 +277,13 @@ type ResourceOptionsDecl struct {
 	Aliases                 *StringListDecl
 	CustomTimeouts          *CustomTimeoutsDecl
 	DeleteBeforeReplace     *BooleanExpr
-	DependsOn               *StringListDecl
+	DependsOn               Expr
 	IgnoreChanges           *StringListDecl
 	Import                  *StringExpr
-	Parent                  *StringExpr
+	Parent                  Expr
 	Protect                 *BooleanExpr
-	Provider                *StringExpr
+	Provider                Expr
+	Providers               Expr
 	Version                 *StringExpr
 	PluginDownloadURL       *StringExpr
 	ReplaceOnChanges        *StringListDecl
@@ -298,8 +299,8 @@ func (d ResourceOptionsDecl) recordSyntax() *syntax.Node {
 
 func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
-	deleteBeforeReplace *BooleanExpr, dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr,
-	parent *StringExpr, protect *BooleanExpr, provider *StringExpr, version *StringExpr,
+	deleteBeforeReplace *BooleanExpr, dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr,
+	parent Expr, protect *BooleanExpr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl) ResourceOptionsDecl {
 
 	return ResourceOptionsDecl{
@@ -322,12 +323,12 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 
 func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
-	dependsOn *StringListDecl, ignoreChanges *StringListDecl, importID *StringExpr, parent *StringExpr,
-	protect *BooleanExpr, provider *StringExpr, version *StringExpr, pluginDownloadURL *StringExpr,
+	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
+	protect *BooleanExpr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
 	replaceOnChanges *StringListDecl) ResourceOptionsDecl {
 
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
-		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider,
+		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, providers,
 		version, pluginDownloadURL, replaceOnChanges)
 }
 

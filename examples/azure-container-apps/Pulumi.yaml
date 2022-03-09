@@ -68,7 +68,7 @@ resources:
       build:
         context: ${pulumi.cwd}/node-app
     options:
-      provider: provider
+      provider: ${provider}
   containerapp:
     type: azure-native:web:ContainerApp
     properties:

@@ -83,7 +83,7 @@ resources:
   MyBucket:
     type: aws:s3/bucket:Bucket
     options:
-      provider: UsEast2Provider
+      provider: ${UsEast2Provider}
 outputs:
   InstanceId: ${WebServer.id}
   PublicIp: ${WebServer.publicIp}
