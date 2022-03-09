@@ -409,11 +409,12 @@ func (imp *importer) getResourceRefItem(optionField ast.Expr, name string, field
 		return nil, ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a resource, got '%v'", field, name, reflect.TypeOf(sym)), "")
 	}
 	resourceName := sym.Property.Accessors[0].(*ast.PropertyName).Name
-	if resourceVar, ok := imp.resources[resourceName]; ok {
-		return model.VariableReference(resourceVar), nil
-	} else {
+	resourceVar, ok := imp.resources[resourceName]
+	if !ok {
 		return nil, ast.ExprError(optionField, fmt.Sprintf("unknown resource '%v'", resourceName), "")
 	}
+
+	return model.VariableReference(resourceVar), nil
 }
 
 // importResource imports a YAML resource as a PCL resource.
