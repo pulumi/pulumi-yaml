@@ -52,6 +52,9 @@ test:: build get_plugins get_schemas
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
 	  go test -v --timeout 30m -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
+test_short::
+	go test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./pkg/...
+
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test
 

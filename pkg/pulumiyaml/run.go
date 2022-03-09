@@ -404,28 +404,56 @@ func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) er
 		opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 	}
 	if v.Options.DependsOn != nil {
-		var dependsOn []pulumi.Resource
-		for _, s := range v.Options.DependsOn.Elements {
-			dependsOn = append(dependsOn, r.resources[s.Value].CustomResource())
+		dependOnOpt, vdiags := r.evaluateResourceListValuedOption(v.Options.DependsOn, "dependsOn")
+		diags.Extend(vdiags...)
+		if !vdiags.HasErrors() {
+			var dependsOn []pulumi.Resource
+			for _, r := range dependOnOpt {
+				dependsOn = append(dependsOn, r.CustomResource())
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
 		}
-		opts = append(opts, pulumi.DependsOn(dependsOn))
 	}
 	if v.Options.IgnoreChanges != nil {
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
-	if v.Options.Parent != nil && v.Options.Parent.Value != "" {
-		opts = append(opts, pulumi.Parent(r.resources[v.Options.Parent.Value].CustomResource()))
+	if v.Options.Parent != nil {
+		parentOpt, vdiags := r.evaluateResourceValuedOption(v.Options.Parent, "parent")
+		diags.Extend(vdiags...)
+		if !vdiags.HasErrors() {
+			opts = append(opts, pulumi.Parent(parentOpt.CustomResource()))
+		}
 	}
 	if v.Options.Protect != nil {
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
-	if v.Options.Provider != nil && v.Options.Provider.Value != "" {
-		provider := r.resources[v.Options.Provider.Value].ProviderResource()
-		if provider == nil {
-			diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", v.Options.Provider.Value), ""))
-			return diags
+	if v.Options.Provider != nil {
+		providerOpt, vdiags := r.evaluateResourceValuedOption(v.Options.Provider, "provider")
+		diags.Extend(vdiags...)
+		if !vdiags.HasErrors() {
+			provider := providerOpt.ProviderResource()
+			if provider == nil {
+				diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt), ""))
+				return diags
+			}
+			opts = append(opts, pulumi.Provider(provider))
 		}
-		opts = append(opts, pulumi.Provider(provider))
+	}
+	if v.Options.Providers != nil {
+		dependOnOpt, vdiags := r.evaluateResourceListValuedOption(v.Options.Providers, "providers")
+		diags.Extend(vdiags...)
+		if !vdiags.HasErrors() {
+			var providers []pulumi.ProviderResource
+			for _, r := range dependOnOpt {
+				provider := r.ProviderResource()
+				if provider == nil {
+					diags.Extend(ast.ExprError(v.Options.Provider, fmt.Sprintf("resource passed as provider was not a provider resource '%s'", r), ""))
+				} else {
+					providers = append(providers, provider)
+				}
+			}
+			opts = append(opts, pulumi.Providers(providers...))
+		}
 	}
 	if v.Options.Version != nil {
 		opts = append(opts, pulumi.Version(v.Options.Version.Value))
@@ -476,6 +504,57 @@ func (r *runner) registerResource(kvp resourceNode, diags syntax.Diagnostics) er
 	}
 	r.resources[k] = state
 	return nil
+}
+
+func (r *runner) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, syntax.Diagnostics) {
+	value, diags := r.evaluateExpr(optionExpr)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	if hasOutputs(value) {
+		return nil, syntax.Diagnostics{ast.ExprError(optionExpr, fmt.Sprintf("resource option %v value must be a list of resource, not an output", key), "")}
+	}
+	dependencies, ok := value.([]interface{})
+	if !ok {
+		return nil, syntax.Diagnostics{ast.ExprError(optionExpr, fmt.Sprintf("resource option %v value must be a list of resources", key), "")}
+	}
+	var resources []lateboundResource
+	for _, dep := range dependencies {
+		res, err := asResource(dep)
+		if err != nil {
+			diags.Extend(ast.ExprError(optionExpr, err.Error(), ""))
+			continue
+		}
+		resources = append(resources, res)
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	return resources, nil
+}
+
+func (r *runner) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, syntax.Diagnostics) {
+	value, diags := r.evaluateExpr(optionExpr)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	if hasOutputs(value) {
+		return nil, syntax.Diagnostics{ast.ExprError(optionExpr, "resource cannot be an output", "")}
+	}
+	res, err := asResource(value)
+	if err != nil {
+		return nil, syntax.Diagnostics{ast.ExprError(optionExpr, err.Error(), "")}
+	}
+	return res, nil
+}
+
+func asResource(value interface{}) (lateboundResource, error) {
+	switch d := value.(type) {
+	case lateboundResource:
+		return d, nil
+	default:
+		return nil, fmt.Errorf("expected resource, got %v", reflect.TypeOf(value))
+	}
 }
 
 func (r *runner) registerOutputs() syntax.Diagnostics {

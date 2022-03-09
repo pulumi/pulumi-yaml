@@ -21,37 +21,35 @@ const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
 
 type testMonitor struct {
-	CallF        func(tok string, args resource.PropertyMap, provider string) (resource.PropertyMap, error)
-	NewResourceF func(typeToken, name string, inputs resource.PropertyMap,
-		provider, id string) (string, resource.PropertyMap, error)
+	CallF        func(args pulumi.MockCallArgs) (resource.PropertyMap, error)
+	NewResourceF func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error)
 }
 
 func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 	if m.CallF == nil {
 		return resource.PropertyMap{}, nil
 	}
-	return m.CallF(args.Token, args.Args, args.Provider)
+	return m.CallF(args)
 }
 
 func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 	if m.NewResourceF == nil {
 		return args.Name, resource.PropertyMap{}, nil
 	}
-	return m.NewResourceF(args.TypeToken, args.Name, args.Inputs, args.Provider, args.ID)
+	return m.NewResourceF(args)
 }
 
 func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
-		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
-			provider, id string) (string, resource.PropertyMap, error) {
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 
-			switch typeToken {
+			switch args.TypeToken {
 			case testResourceToken:
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
-				}), state, "expected resource test:resource:type to have property foo: oof")
-				assert.Equal(t, "", provider)
-				assert.Equal(t, "", id)
+				}), args.Inputs, "expected resource test:resource:type to have property foo: oof")
+				assert.Equal(t, "", args.Provider)
+				assert.Equal(t, "", args.ID)
 
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
@@ -69,16 +67,16 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					}),
 				}, nil
 			case testComponentToken:
-				assert.Equal(t, testComponentToken, typeToken)
-				assert.True(t, state.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
+				assert.Equal(t, testComponentToken, args.TypeToken)
+				assert.True(t, args.Inputs.DeepEquals(resource.NewPropertyMapFromMap(map[string]interface{}{
 					"foo": "oof",
 				})))
-				assert.Equal(t, "", provider)
-				assert.Equal(t, "", id)
+				assert.Equal(t, "", args.Provider)
+				assert.Equal(t, "", args.ID)
 
 				return "", resource.PropertyMap{}, nil
 			}
-			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
@@ -102,10 +100,9 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	// Same mocks as in testTemplateDiags but without assertions, just pure syntax checking.
 	mocks := &testMonitor{
-		NewResourceF: func(typeToken, name string, state resource.PropertyMap,
-			provider, id string) (string, resource.PropertyMap, error) {
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 
-			switch typeToken {
+			switch args.TypeToken {
 			case testResourceToken:
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
@@ -116,7 +113,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 			case testComponentToken:
 				return "", resource.PropertyMap{}, nil
 			}
-			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", typeToken)
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
