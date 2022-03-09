@@ -4,19 +4,70 @@ package codegen
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/pulumi/pulumi/pkg/v3/codegen/dotnet"
+	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/python"
 )
 
-func TestGenerateProgram(t *testing.T) {
+type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
 
+func convertTo(name string, generator GenerateFunc) ConvertFunc {
+	return func(t *testing.T, template *ast.TemplateDecl, dir string) {
+		t.Run(name, func(t *testing.T) {
+			files, diags, err := ConvertTemplate(template, generator)
+			require.NoError(t, err, "Failed to convert")
+			assert.False(t, diags.HasErrors(), diags.Error())
+			for path, bytes := range files {
+				path = filepath.Join(dir, name, filepath.FromSlash(path))
+				err = os.MkdirAll(filepath.Dir(path), 0700)
+				require.NoError(t, err)
+				err = os.WriteFile(path, bytes, 0600)
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+var convertNodeJS = convertTo("nodejs", nodejs.GenerateProgram)
+var convertPython = convertTo("python", python.GenerateProgram)
+var convertGolang = convertTo("go", gogen.GenerateProgram)
+var convertDotnet = convertTo("dotnet", dotnet.GenerateProgram)
+
+func TestGenerateExamples(t *testing.T) {
+	examplesPath := filepath.Join("..", "..", "..", "examples")
+	examples, err := ioutil.ReadDir(examplesPath)
+	require.NoError(t, err)
+	for _, dir := range examples {
+		t.Run(dir.Name(), func(t *testing.T) {
+			main := filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")
+			template, diags, err := pulumiyaml.LoadFile(main)
+			require.NoError(t, err, "Loading file: %s", main)
+			assert.False(t, diags.HasErrors(), diags.Error())
+			outDir := filepath.Join("..", "testing", "test", "testdata", "examples."+dir.Name())
+			convertDotnet(t, template, outDir)
+			convertPython(t, template, outDir)
+			convertNodeJS(t, template, outDir)
+			convertGolang(t, template, outDir)
+		})
+	}
+}
+
+func TestGenerateProgram(t *testing.T) {
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
 			{

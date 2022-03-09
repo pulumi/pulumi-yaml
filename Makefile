@@ -33,6 +33,7 @@ install::
 clean::
 	rm -f ./bin/*
 	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random}.json
+	rm -r pkg/pulumiyaml/testing/test/testdata/examples.*
 
 ensure::
 	go mod download
