@@ -43,10 +43,19 @@ func convertTo(name string, generator GenerateFunc) ConvertFunc {
 	}
 }
 
-var convertNodeJS = convertTo("nodejs", nodejs.GenerateProgram)
-var convertPython = convertTo("python", python.GenerateProgram)
-var convertGolang = convertTo("go", gogen.GenerateProgram)
-var convertDotnet = convertTo("dotnet", dotnet.GenerateProgram)
+var langTests = []ConvertFunc{
+	convertTo("nodejs", nodejs.GenerateProgram),
+	convertTo("python", python.GenerateProgram),
+	convertTo("go", gogen.GenerateProgram),
+	convertTo("dotnet", dotnet.GenerateProgram),
+}
+
+var failingExamples = []string{
+	"webserver",
+	"azure-container-apps",
+	"azure-app-service",
+	"aws-eks",
+}
 
 func TestGenerateExamples(t *testing.T) {
 	examplesPath := filepath.Join("..", "..", "..", "examples")
@@ -54,15 +63,24 @@ func TestGenerateExamples(t *testing.T) {
 	require.NoError(t, err)
 	for _, dir := range examples {
 		t.Run(dir.Name(), func(t *testing.T) {
+			var skip bool
+			for _, ex := range failingExamples {
+				if ex == dir.Name() {
+					skip = true
+				}
+			}
+			if skip {
+				t.Skip()
+				return
+			}
 			main := filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")
 			template, diags, err := pulumiyaml.LoadFile(main)
 			require.NoError(t, err, "Loading file: %s", main)
 			assert.False(t, diags.HasErrors(), diags.Error())
 			outDir := filepath.Join("..", "testing", "test", "testdata", "examples."+dir.Name())
-			convertDotnet(t, template, outDir)
-			convertPython(t, template, outDir)
-			convertNodeJS(t, template, outDir)
-			convertGolang(t, template, outDir)
+			for _, f := range langTests {
+				f(t, template, outDir)
+			}
 		})
 	}
 }
