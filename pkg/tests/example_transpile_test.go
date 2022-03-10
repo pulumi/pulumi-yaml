@@ -16,10 +16,13 @@ import (
 	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/python"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 )
 
 var (
-	examplesPath    = filepath.Join("..", "..", "examples")
+	examplesPath = filepath.Join("..", "..", "examples")
+
+	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
 		"webserver",
 		"azure-container-apps",
@@ -27,6 +30,8 @@ var (
 		"aws-eks",
 	}
 
+	// failingCompile examples are known to produce valid PCL, but produce
+	// invalid transpiled code.
 	failingCompile = map[string]LanguageList{
 		"stackreference-producer": Dotnet.And(Golang),
 		"stackreference-consumer": AllLanguages().Except(Python),
@@ -35,6 +40,7 @@ var (
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
 	}
+
 	langTests = []ConvertFunc{
 		convertTo("nodejs", nodejs.GenerateProgram, func(t *testing.T, dir string) {
 			nodejs.Check(t, filepath.Join(dir, "index.ts"), nil, false)
@@ -51,33 +57,24 @@ var (
 	}
 )
 
-type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
-type CheckFunc = func(t *testing.T, dir string)
-
-func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
-	return func(t *testing.T, template *ast.TemplateDecl, name string) {
-		dir := filepath.Join(examplesPath, name, ".test")
-		t.Run(lang, func(t *testing.T) {
-			files, diags, err := codegen.ConvertTemplate(template, generator)
-			require.NoError(t, err, "Failed to convert")
-			assert.False(t, diags.HasErrors(), diags.Error())
-			dir := filepath.Join(dir, lang)
-			for path, bytes := range files {
-				path = filepath.Join(dir, filepath.FromSlash(path))
-				err = os.MkdirAll(filepath.Dir(path), 0700)
-				require.NoError(t, err)
-				err = os.WriteFile(path, bytes, 0600)
-				require.NoError(t, err)
-			}
-			if failingCompile[name].Has(lang) {
-				t.Skipf("%s/%s is known to not compile", dir, lang)
-				return
-			}
-			check(t, dir)
-		})
-	}
-}
-
+// TestGenerateExamples transpiles and and checks all tests in the examples
+// folder.
+//
+// This test expects the examples folder to have the following structure
+// examples/
+//   ${test-name}/
+//     Pulumi.yaml
+//
+// A folder without Pulumi.yaml will signal an error. Other files are ignored.
+//
+// The same PULUMI_ACCEPT idiom is used for example tests. After adding a new
+// test, run:
+//
+// ```sh
+// PULUMI_ACCEPT=true go test --run=TestGenerateExamples ./...
+// ```
+//
+// This will add the current transpile result to the known results.
 func TestGenerateExamples(t *testing.T) {
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
@@ -96,10 +93,48 @@ func TestGenerateExamples(t *testing.T) {
 			main := filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")
 			template, diags, err := pulumiyaml.LoadFile(main)
 			require.NoError(t, err, "Loading file: %s", main)
-			assert.False(t, diags.HasErrors(), diags.Error())
+			require.False(t, diags.HasErrors(), diags.Error())
+			assert.Len(t, diags, 0, "Should have neither warnings nor errors")
+			if t.Failed() {
+				return
+			}
 			for _, f := range langTests {
 				f(t, template, dir.Name())
 			}
+		})
+	}
+}
+
+type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
+type CheckFunc = func(t *testing.T, dir string)
+
+func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
+	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
+	return func(t *testing.T, template *ast.TemplateDecl, name string) {
+		dir := filepath.Join(examplesPath, name, ".test")
+		t.Run(lang, func(t *testing.T) {
+			files, diags, err := codegen.ConvertTemplate(template, generator)
+			require.NoError(t, err, "Failed to convert")
+			require.False(t, diags.HasErrors(), diags.Error())
+			dir := filepath.Join(dir, lang)
+			for path, bytes := range files {
+				path = filepath.Join(dir, filepath.FromSlash(path))
+				if pulumiAccept {
+					err = os.MkdirAll(filepath.Dir(path), 0700)
+					require.NoError(t, err)
+					err = os.WriteFile(path, bytes, 0600)
+					require.NoError(t, err)
+				} else {
+					expected, err := os.ReadFile(path)
+					require.NoError(t, err)
+					assert.Equal(t, string(expected), string(bytes), "File mismatch")
+				}
+			}
+			if failingCompile[name].Has(lang) {
+				t.Skipf("%s/%s is known to not compile", dir, lang)
+				return
+			}
+			check(t, dir)
 		})
 	}
 }

@@ -14,3 +14,7 @@ command-output/
 obj/
 __pycache__/
 node_modules/
+examples/**/package.json
+examples/**/yarn.lock
+examples/**/go.sum
+examples/**/go.mod
