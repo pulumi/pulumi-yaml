@@ -40,7 +40,8 @@ ensure::
 .phony: lint
 lint::
 	golangci-lint run
-	pulumictl copyright
+	# Generated examples don't have the copyright notice.
+	pulumictl copyright -x 'examples/*/.test/**'
 
 build:: ensure
 	mkdir -p ./bin
