@@ -79,7 +79,9 @@ func TestGenerateExamples(t *testing.T) {
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
 	for _, dir := range examples {
+		dir := dir
 		t.Run(dir.Name(), func(t *testing.T) {
+			t.Parallel()
 			var skip bool
 			for _, ex := range failingExamples {
 				if ex == dir.Name() {
