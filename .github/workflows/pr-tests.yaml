@@ -8,9 +8,9 @@ on:
 
 jobs:
   lint:
-    uses: ./stage-lint.yml
+    uses: ./stage-lint.yml/@${{ env.PR_COMMIT_SHA }}
   test:
-    uses: ./stage-test.yml
+    uses: ./stage-test.yml/@${{ env.PR_COMMIT_SHA }}
     with:
       live-test: true
     secrets:
