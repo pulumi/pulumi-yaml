@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ inputs.node-version }}
       - name: Install yarn
         run: |
-          npm install -g yarn
+          npm install -g yarn@1.22
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         # Skip on dry-run
