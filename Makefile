@@ -38,9 +38,11 @@ ensure::
 	go mod download
 
 .phony: lint
-lint::
+lint:: lint-copyright lint-golang
+lint-golang:
 	golangci-lint run
-	# Generated examples don't have the copyright notice.
+lint-copyright:
+    # Generated examples don't have the copyright notice.
 	pulumictl copyright -x 'examples/*/.test/**'
 
 build:: ensure
