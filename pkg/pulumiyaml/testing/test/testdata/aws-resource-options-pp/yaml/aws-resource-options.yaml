@@ -6,7 +6,7 @@ resources:
     bucket1:
         type: aws:s3/bucket:Bucket
         options:
-            provider: provider
+            provider: ${provider}
             dependson:
                 - ${provider}
             ignorechanges:

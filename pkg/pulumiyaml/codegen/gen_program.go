@@ -138,11 +138,11 @@ func (g *generator) genResource(n *pcl.Resource) {
 	if opts := n.Options; opts != nil {
 		if opts.Provider != nil {
 			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				unquoteInterpolation(g.expr(opts.Provider))))
+				g.expr(opts.Provider)))
 		}
 		if opts.Parent != nil {
 			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				unquoteInterpolation(g.expr(opts.Parent))))
+				g.expr(opts.Parent)))
 		}
 		if opts.DependsOn != nil {
 			elems := g.expr(opts.DependsOn)
