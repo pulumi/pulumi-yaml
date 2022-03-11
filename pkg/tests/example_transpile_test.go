@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
+	pcodegen "github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/dotnet"
 	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
@@ -44,17 +45,17 @@ var (
 	}
 
 	langTests = []ConvertFunc{
-		convertTo("nodejs", nodejs.GenerateProgram, func(t *testing.T, dir string) {
-			nodejs.Check(t, filepath.Join(dir, "index.ts"), nil, false)
+		convertTo("nodejs", nodejs.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			nodejs.Check(t, filepath.Join(dir, "index.ts"), deps, false)
 		}),
-		convertTo("python", python.GenerateProgram, func(t *testing.T, dir string) {
-			python.Check(t, filepath.Join(dir, "__main__.py"), nil)
+		convertTo("python", python.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			python.Check(t, filepath.Join(dir, "__main__.py"), deps)
 		}),
-		convertTo("go", gogen.GenerateProgram, func(t *testing.T, dir string) {
-			gogen.Check(t, filepath.Join(dir, "main.go"), nil, "")
+		convertTo("go", gogen.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			gogen.Check(t, filepath.Join(dir, "main.go"), deps, "")
 		}),
-		convertTo("dotnet", dotnet.GenerateProgram, func(t *testing.T, dir string) {
-			dotnet.Check(t, filepath.Join(dir, "Program.cs"), nil, "")
+		convertTo("dotnet", dotnet.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			dotnet.Check(t, filepath.Join(dir, "Program.cs"), deps, "")
 		}),
 	}
 )
@@ -110,7 +111,7 @@ func TestGenerateExamples(t *testing.T) {
 }
 
 type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
-type CheckFunc = func(t *testing.T, dir string)
+type CheckFunc = func(t *testing.T, dir string, deps pcodegen.StringSet)
 
 func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
 	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
@@ -138,7 +139,13 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 				t.Skipf("%s/%s is known to not compile", dir, lang)
 				return
 			}
-			check(t, dir)
+			deps := pcodegen.NewStringSet()
+			for _, d := range template.Resources.Entries {
+				// This will not handle invokes correctly
+				deps.Add(d.Value.Type.Value)
+			}
+
+			check(t, dir, deps)
 		})
 	}
 }
