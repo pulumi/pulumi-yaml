@@ -36,7 +36,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestInvokeVariable(t *testing.T) {
@@ -58,7 +58,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestInvokeOutputVariable(t *testing.T) {
@@ -84,7 +84,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
