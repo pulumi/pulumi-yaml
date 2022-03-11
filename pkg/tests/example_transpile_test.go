@@ -112,11 +112,19 @@ func TestGenerateExamples(t *testing.T) {
 type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
 type CheckFunc = func(t *testing.T, dir string, deps pcodegen.StringSet)
 
+func shouldBeParallel() bool {
+	v := os.Getenv("PULUMI_TEST_PARALLEL")
+	return v == "" || cmdutil.IsTruthy(v)
+}
+
 func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
 	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
 	return func(t *testing.T, template *ast.TemplateDecl, name string) {
 		dir := filepath.Join(examplesPath, name, ".test")
 		t.Run(lang, func(t *testing.T) {
+			if shouldBeParallel() {
+				t.Parallel()
+			}
 			files, diags, err := codegen.ConvertTemplate(template, generator)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
