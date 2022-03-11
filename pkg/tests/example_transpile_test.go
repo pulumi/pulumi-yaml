@@ -3,11 +3,13 @@
 package tests
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -102,11 +104,25 @@ func TestGenerateExamples(t *testing.T) {
 			if t.Failed() {
 				return
 			}
+
+			pcl, tdiags := getPCLFile(template)
+			require.False(t, tdiags.HasErrors())
+			writeOrCompare(t, filepath.Join(examplesPath, dir.Name(), ".test"), map[string][]byte{"program.pp": pcl})
 			for _, f := range langTests {
 				f(t, template, dir.Name())
 			}
 		})
 	}
+}
+
+func getPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics) {
+	templateBody, tdiags := codegen.ImportTemplate(file)
+	diags := hcl.Diagnostics(tdiags)
+	if tdiags.HasErrors() {
+		return nil, diags
+	}
+	return []byte(fmt.Sprintf("%v", templateBody)), diags
+
 }
 
 type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
@@ -117,8 +133,24 @@ func shouldBeParallel() bool {
 	return v == "" || cmdutil.IsTruthy(v)
 }
 
-func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
+func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
+	for path, bytes := range files {
+		path = filepath.Join(dir, filepath.FromSlash(path))
+		if pulumiAccept {
+			err := os.MkdirAll(filepath.Dir(path), 0700)
+			require.NoError(t, err)
+			err = os.WriteFile(path, bytes, 0600)
+			require.NoError(t, err)
+		} else {
+			expected, err := os.ReadFile(path)
+			require.NoError(t, err)
+			assert.Equal(t, string(expected), string(bytes), "File mismatch")
+		}
+	}
+}
+
+func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
 	return func(t *testing.T, template *ast.TemplateDecl, name string) {
 		dir := filepath.Join(examplesPath, name, ".test")
 		t.Run(lang, func(t *testing.T) {
@@ -129,19 +161,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			dir := filepath.Join(dir, lang)
-			for path, bytes := range files {
-				path = filepath.Join(dir, filepath.FromSlash(path))
-				if pulumiAccept {
-					err = os.MkdirAll(filepath.Dir(path), 0700)
-					require.NoError(t, err)
-					err = os.WriteFile(path, bytes, 0600)
-					require.NoError(t, err)
-				} else {
-					expected, err := os.ReadFile(path)
-					require.NoError(t, err)
-					assert.Equal(t, string(expected), string(bytes), "File mismatch")
-				}
-			}
+			writeOrCompare(t, dir, files)
 			if failingCompile[name].Has(lang) {
 				t.Skipf("%s/%s is known to not compile", dir, lang)
 				return

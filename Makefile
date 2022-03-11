@@ -11,6 +11,7 @@ PLUGIN_VERSION_AWS          := 4.37.3
 PLUGIN_VERSION_AWS_NATIVE   := 0.11.0
 PLUGIN_VERSION_AZURE_NATIVE := 1.56.0
 PLUGIN_VERSION_RANDOM       := 4.3.1
+GO                          := go
 
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
@@ -28,14 +29,14 @@ update_plugin_docs::
 	./scripts/update_plugin_docs.sh azure-native ${PLUGIN_VERSION_AZURE_NATIVE}
 
 install::
-	go install ./cmd/...
+	${GO} install ./cmd/...
 
 clean::
 	rm -f ./bin/*
 	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random}.json
 
 ensure::
-	go mod download
+	${GO} mod download
 
 .phony: lint
 lint:: lint-copyright lint-golang
@@ -47,15 +48,15 @@ lint-copyright:
 
 build:: ensure
 	mkdir -p ./bin
-	go build -o ./bin -p ${CONCURRENCY} ./cmd/...
+	${GO} build -o ./bin -p ${CONCURRENCY} ./cmd/...
 
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins get_schemas
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  go test -v --timeout 30m -count 1 -parallel ${CONCURRENCY} ./pkg/...
+	  ${GO} test -v --timeout 30m -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
 test_short::
-	go test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./pkg/...
+	${GO} test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./pkg/...
 
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test
@@ -68,7 +69,7 @@ endif
 .phony: test_gen
 # We don't include other.json because it is not a real schema
 test_gen: get_schemas
-	go test --run=TestGenerate ./...
+	${GO} test --run=TestGenerate ./...
 
 name=$(subst schema-,,$(word 1,$(subst !, ,$@)))
 version=$(word 2,$(subst !, ,$@))
