@@ -313,29 +313,47 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	for _, kvp := range intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			if err != nil {
+				return r.diags
+			}
 			ctx := r.newContext(kvp)
 			c, ok := ctx.registerConfig(kvp)
 			if !ok {
-				r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{}) //nolint:errcheck
+				if err != nil {
+					return r.diags
+				}
 				continue
 			}
 			r.config[kvp.Key.Value] = c
 		case variableNode:
-			r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			if err != nil {
+				return r.diags
+			}
 			ctx := r.newContext(kvp)
 			value, ok := ctx.evaluateExpr(kvp.Value)
 			if !ok {
-				r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{})
+				if err != nil {
+					return r.diags
+				}
 				continue
 			}
 			r.variables[kvp.Key.Value] = value
 		case resourceNode:
-			r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			if err != nil {
+				return r.diags
+			}
 			ctx := r.newContext(kvp)
 			res, ok := ctx.registerResource(kvp)
 			if !ok {
-				r.ctx.Log.Error(fmt.Sprintf("Error registering resource %v", kvp.Key.Value), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering resource %v", kvp.Key.Value), &pulumi.LogArgs{})
+				if err != nil {
+					return r.diags
+				}
 				continue
 			}
 			r.resources[kvp.Key.Value] = res
@@ -346,7 +364,10 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 		ctx := r.newContext(kvp)
 		out, ok := ctx.registerOutput(kvp)
 		if !ok {
-			r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, r.diags), &pulumi.LogArgs{}) //nolint:errcheck // see pulumi/pulumi-yaml#59
+			err := r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, r.diags), &pulumi.LogArgs{})
+			if err != nil {
+				return r.diags
+			}
 			continue
 		}
 		r.ctx.Export(kvp.Key.Value, out)
@@ -1156,24 +1177,6 @@ func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) f
 				}
 				return v, nil
 			}), true
-		}
-		return fn(args...)
-	}
-}
-
-// lift wraps a function s.t. the function is called inside an Apply if any of its arguments contain Outputs.
-// If none of the function's arguments contain Outputs, the function is called directly.
-func lift(fn func(args ...interface{}) (interface{}, syntax.Diagnostics)) func(args ...interface{}) (interface{}, syntax.Diagnostics) {
-	return func(args ...interface{}) (interface{}, syntax.Diagnostics) {
-		if hasOutputs(args) {
-			return pulumi.All(args...).ApplyT(func(resolved []interface{}) (interface{}, error) {
-				v, diags := fn(resolved...)
-				if !diags.HasErrors() {
-					// TODO: this may leak warnings.
-					return v, nil
-				}
-				return v, diags
-			}), nil
 		}
 		return fn(args...)
 	}
