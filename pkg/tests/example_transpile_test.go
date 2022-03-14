@@ -18,9 +18,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	pcodegen "github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/dotnet"
-	// Go programgen seems to exhibit UB, causing a difference in output between
-	// go1.17 and go1.18.
-	// gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
+	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/python"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
@@ -43,7 +41,7 @@ var (
 		"stackreference-producer": Dotnet.And(Golang),
 		"stackreference-consumer": AllLanguages().Except(Python),
 		"random":                  Dotnet.And(Nodejs),
-		"getting-started":         AllLanguages().Except(Golang),
+		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
 	}
@@ -55,9 +53,9 @@ var (
 		convertTo("python", python.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
 			python.Check(t, filepath.Join(dir, "__main__.py"), deps)
 		}),
-		// convertTo("go", gogen.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-		// 	gogen.Check(t, filepath.Join(dir, "main.go"), deps, "")
-		// }),
+		convertTo("go", gogen.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			gogen.Check(t, filepath.Join(dir, "main.go"), deps, "")
+		}),
 		convertTo("dotnet", dotnet.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
 			dotnet.Check(t, filepath.Join(dir, "Program.cs"), deps, "")
 		}),
@@ -163,11 +161,11 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			dir := filepath.Join(dir, lang)
-			writeOrCompare(t, dir, files)
 			if failingCompile[name].Has(lang) {
-				t.Skipf("%s/%s is known to not compile", dir, lang)
+				t.Skipf("%s/%s is known to not produce valid code", dir, lang)
 				return
 			}
+			writeOrCompare(t, dir, files)
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
 				// This will not handle invokes correctly
