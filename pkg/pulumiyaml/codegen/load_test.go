@@ -50,11 +50,11 @@ resource bar "test:mod:typ" {
 			t.Parallel()
 			decl, diags, err := pulumiyaml.LoadYAML(tt.name+".yaml", strings.NewReader(tt.input))
 			require.NoError(t, err)
-			require.False(t, diags.HasErrors())
+			require.False(t, diags.HasErrors(), diags)
 			assert.Empty(t, diags)
 
 			result, diags := ImportTemplate(decl)
-			require.False(t, diags.HasErrors())
+			require.False(t, diags.HasErrors(), diags)
 			assert.Equal(t, tt.expected, fmt.Sprintf("%v", result))
 			assert.Empty(t, diags)
 		})
