@@ -711,12 +711,12 @@ func TestSelect(t *testing.T) {
 				v, ok := ctx.evaluateBuiltinSelect(tt.input)
 				if tt.isError {
 					assert.False(t, ok)
-					assert.True(t, ctx.diags.HasErrors())
+					assert.True(t, ctx.sdiags.HasErrors())
 					assert.Nil(t, v)
 					return
 				}
 
-				requireNoErrors(t, tmpl, ctx.diags)
+				requireNoErrors(t, tmpl, ctx.sdiags.diags)
 				if tt.isOutput {
 					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)

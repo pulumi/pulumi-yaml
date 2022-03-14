@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -151,6 +152,29 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl) error {
 	return nil
 }
 
+type syncDiags struct {
+	diags syntax.Diagnostics
+	mutex sync.Mutex
+}
+
+func (d *syncDiags) Extend(diags ...*syntax.Diagnostic) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	d.diags.Extend(diags...)
+}
+
+func (d *syncDiags) Error() string {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.diags.Error()
+}
+
+func (d *syncDiags) HasErrors() bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.diags.HasErrors()
+}
+
 type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
@@ -159,20 +183,20 @@ type runner struct {
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 
-	diags syntax.Diagnostics
+	sdiags syncDiags
 }
 
 type evalContext struct {
 	*runner
 
-	root  interface{}
-	diags syntax.Diagnostics
+	root   interface{}
+	sdiags syncDiags
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
 	diag := ast.ExprError(expr, summary, "")
-	ctx.diags = append(ctx.diags, diag)
-	ctx.runner.diags = append(ctx.runner.diags, diag)
+	ctx.sdiags.Extend(diag)
+	ctx.runner.sdiags.Extend(diag)
 
 	var buf bytes.Buffer
 	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
@@ -193,7 +217,7 @@ func (r *runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
 		runner: r,
 		root:   root,
-		diags:  nil,
+		sdiags: syncDiags{},
 	}
 
 	return ctx
@@ -315,14 +339,14 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 		case configNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.diags
+				return r.sdiags.diags
 			}
 			ctx := r.newContext(kvp)
 			c, ok := ctx.registerConfig(kvp)
 			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{}) //nolint:errcheck
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{}) //nolint:errcheck
 				if err != nil {
-					return r.diags
+					return r.sdiags.diags
 				}
 				continue
 			}
@@ -330,14 +354,14 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 		case variableNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.diags
+				return r.sdiags.diags
 			}
 			ctx := r.newContext(kvp)
 			value, ok := ctx.evaluateExpr(kvp.Value)
 			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.diags.Error()), &pulumi.LogArgs{})
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
 				if err != nil {
-					return r.diags
+					return r.sdiags.diags
 				}
 				continue
 			}
@@ -345,14 +369,14 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 		case resourceNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.diags
+				return r.sdiags.diags
 			}
 			ctx := r.newContext(kvp)
 			res, ok := ctx.registerResource(kvp)
 			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering resource %v", kvp.Key.Value), &pulumi.LogArgs{})
+				err := r.ctx.Log.Error(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
 				if err != nil {
-					return r.diags
+					return r.sdiags.diags
 				}
 				continue
 			}
@@ -364,16 +388,16 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 		ctx := r.newContext(kvp)
 		out, ok := ctx.registerOutput(kvp)
 		if !ok {
-			err := r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, r.diags), &pulumi.LogArgs{})
+			err := r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
 			if err != nil {
-				return r.diags
+				return r.sdiags.diags
 			}
 			continue
 		}
 		r.ctx.Export(kvp.Key.Value, out)
 	}
 
-	return r.diags
+	return r.sdiags.diags
 }
 
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
@@ -562,7 +586,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
 	}
 
-	if !overallOk || ctx.diags.HasErrors() {
+	if !overallOk || ctx.sdiags.HasErrors() {
 		return nil, false
 	}
 
@@ -742,7 +766,7 @@ func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, m map[string]interface
 		return o.ApplyT(func(kv interface{}) (interface{}, error) {
 			v, ok := ctx.continueObject(x, m, kvp, kv, entries)
 			if !ok {
-				return nil, ctx.diags
+				return nil, fmt.Errorf("runtime error")
 			}
 			return v, nil
 		}), true
@@ -786,7 +810,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 					fmt.Fprintf(b, "%v", v)
 					v, ok := ctx.evaluateInterpolations(x, b, parts[1:], subs)
 					if !ok {
-						return nil, ctx.diags
+						return nil, fmt.Errorf("runtime error")
 					}
 					return v, nil
 				}), true
