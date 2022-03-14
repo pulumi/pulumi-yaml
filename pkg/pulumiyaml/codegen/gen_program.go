@@ -551,7 +551,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		YAMLError{
 			kind: "For",
 			detail: "Pulumi YAML cannot represent for loops." +
-				"If the values of the for lop are known, you can manually unroll the loop," +
+				"If the values of the for loop are known, you can manually unroll the loop," +
 				" otherwise it is necessary to switch to a more expressive language.",
 			rng: e.Syntax.Range(),
 		}.AppendTo(g)
@@ -559,10 +559,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	default:
 		YAMLError{
 			kind:   fmt.Sprintf("%T", e),
-			detail: fmt.Sprintf("Unimplimented! Needed for %v", e),
+			detail: fmt.Sprintf("Unimplemented! Needed for %v", e),
 			rng:    e.SyntaxNode().Range(),
 		}.AppendTo(g)
-		return syn.String("Unimplimented")
+		return syn.String("Unimplemented")
 	}
 }
 
