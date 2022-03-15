@@ -975,6 +975,9 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 	join := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		delim, parts := args[0], args[1].([]interface{})
 
+		if delim == nil {
+			delim = ""
+		}
 		delimStr, ok := delim.(string)
 		if !ok {
 			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(delimStr)))
@@ -1054,9 +1057,12 @@ func (ctx *evalContext) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, b
 	}
 
 	selectFn := ctx.lift(func(args ...interface{}) (interface{}, bool) {
-		index, ok := args[0].(float64)
+		indexArg := args[0]
+		elemsArg := args[1]
+
+		index, ok := indexArg.(float64)
 		if !ok {
-			return ctx.error(v.Index, fmt.Sprintf("index must be a number, not %v", typeString(args[0])))
+			return ctx.error(v.Index, fmt.Sprintf("index must be a number, not %v", typeString(indexArg)))
 		}
 		if float64(int(index)) != index || int(index) < 0 {
 			// Cannot be a valid index, so we error
@@ -1064,16 +1070,21 @@ func (ctx *evalContext) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, b
 			return ctx.error(v.Index, fmt.Sprintf("index must be a positive integral, not %s", f))
 		}
 
-		elems, ok := args[1].([]interface{})
-		if !ok {
-			return ctx.error(v.Values, fmt.Sprintf("values must be a list, not %v", typeString(args[1])))
+		// TODO: thread values through with types and simplify
+		switch elems := elemsArg.(type) {
+		case []interface{}:
+			if int(index) >= len(elems) {
+				return ctx.error(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)))
+			}
+			return elems[int(index)], true
+		case []string:
+			if int(index) >= len(elems) {
+				return ctx.error(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)))
+			}
+			return elems[int(index)], true
+		default:
+			return ctx.error(v.Values, fmt.Sprintf("values must be a list, not %v", typeString(elemsArg)))
 		}
-
-		if int(index) >= len(elems) {
-			return ctx.error(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)))
-		}
-
-		return elems[int(index)], true
 	})
 	return selectFn(index, values)
 }
