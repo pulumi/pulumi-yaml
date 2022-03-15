@@ -34,6 +34,7 @@ var (
 		"azure-container-apps",
 		"azure-app-service",
 		"aws-eks",
+		"webserver-json",
 	}
 
 	// failingCompile examples are known to produce valid PCL, but produce
@@ -45,7 +46,6 @@ var (
 		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
-		"webserver-json":          AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{
