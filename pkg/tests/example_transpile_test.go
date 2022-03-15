@@ -240,6 +240,13 @@ func (ll LanguageList) Except(other LanguageList) LanguageList {
 // To accomplish this, we introduce the concept of soft failures. Soft failures
 // only occur in CI, and do not cause a test to fail. Instead, they post a
 // comment that indicates what the failure was.
+
+func SoftAssertf(t *testing.T, cond bool, message string, messageArgs ...interface{}) {
+	if cond {
+		SoftFailf(t, message, messageArgs...)
+	}
+}
+
 func SoftFailf(t *testing.T, message string, messageArgs ...interface{}) {
 	SoftFail(t, fmt.Sprintf(message, messageArgs...))
 }
@@ -258,8 +265,8 @@ func SoftFail(t *testing.T, message string) {
 	body += "\n```"
 	body += string(debug.Stack())
 	body += "```\n\n</p>\n</details>"
-	_, response, err := client.PullRequests.CreateComment(ctx, owner, repo, number,
-		&github.PullRequestComment{Body: &body})
+	_, response, err := client.Issues.CreateComment(ctx, owner, repo, number,
+		&github.IssueComment{Body: &body})
 	if err != nil {
 		panic(err)
 	}
