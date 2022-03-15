@@ -34,31 +34,32 @@ outputs:
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template)
 		diags := runner.Evaluate()
-		requireNoErrors(t, diags)
-		cwdOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+		requireNoErrors(t, template, diags)
+		ectx := runner.newContext(nil)
+		cwdOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("${pulumi.cwd}"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		assert.Equal(t, cwd, cwdOutput)
 
-		projectOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+		projectOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("${pulumi.project}"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		assert.Equal(t, "projectFoo", projectOutput)
 
-		stackOutput, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+		stackOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("${pulumi.stack}"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		assert.Equal(t, "stackDev", stackOutput)
 
-		requireNoErrors(t, diags)
+		requireNoErrors(t, template, diags)
 
 		return nil
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	if diags, ok := HasDiagnostics(err); ok {
-		requireNoErrors(t, diags)
+		requireNoErrors(t, template, diags)
 	}
 	assert.NoError(t, err)
 }
@@ -84,7 +85,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 // Test that a variable can be prior to any resource in the topological sort:
@@ -111,7 +112,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 // Test that a variable can be between two resources in the topological sort:
@@ -143,7 +144,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 // Test that a variable can be between two resources in the topological sort:
@@ -182,7 +183,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 // Test that a variable with can be after every resource in the topological sort:
@@ -211,7 +212,7 @@ outputs:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVariableMemozied(t *testing.T) {
@@ -242,7 +243,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 // Tests that the invoke is still called even when it is not referenced by any resource.
@@ -266,7 +267,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testVariableDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
@@ -327,10 +328,11 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			callback(runner)
 		}
 
-		v, diags := runner.evaluateBuiltinSub(&ast.SubExpr{
+		ectx := runner.newContext(nil)
+		v, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("${resFinal.out}"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo", x)
 			return nil, nil

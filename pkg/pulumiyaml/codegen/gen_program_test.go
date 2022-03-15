@@ -109,6 +109,10 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 		return resource.NewPropertyMapFromMap(map[string]interface{}{
 			"id": "some-id",
 		}), nil
+	case "aws:iam/getPolicyDocument:getPolicyDocument":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"json": `"some json"`,
+		}), nil
 
 	}
 	return resource.PropertyMap{}, nil

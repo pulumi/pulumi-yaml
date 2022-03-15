@@ -32,7 +32,7 @@ resources:
 	want.Equal(t, got)
 
 	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionValuePatched(t *testing.T) {
@@ -58,7 +58,7 @@ resources:
 	want.Equal(t, got)
 
 	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionValueMajorMinor(t *testing.T) {
@@ -84,7 +84,7 @@ resources:
 	want.Equal(t, got)
 
 	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionOnExample(t *testing.T) {
@@ -160,5 +160,5 @@ outputs:
 	wantPlugins.Equal(t, gotPlugins)
 
 	_, diags := topologicallySortedResources(tmpl)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 }
