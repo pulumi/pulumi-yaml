@@ -44,7 +44,7 @@ lint-golang:
 	golangci-lint run
 lint-copyright:
     # Generated examples don't have the copyright notice.
-	pulumictl copyright -x 'pkg/tests/examples_transpile/**'
+	pulumictl copyright -x 'pkg/tests/transpiled_examples/**'
 
 build:: ensure
 	mkdir -p ./bin

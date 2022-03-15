@@ -26,7 +26,7 @@ import (
 
 var (
 	examplesPath = filepath.Join("..", "..", "examples")
-	outDir       = filepath.Join("examples_transpile")
+	outDir       = "transpiled_examples"
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
@@ -171,10 +171,10 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 
 func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
 	return func(t *testing.T, template *ast.TemplateDecl, name string) {
-		dir := filepath.Join(examplesPath, name, ".test")
+		writeTo := filepath.Join(outDir, name, lang)
 		t.Run(lang, func(t *testing.T) {
 			if failingCompile[name].Has(lang) {
-				t.Skipf("%s/%s is known to not produce valid code", dir, lang)
+				t.Skipf("%s/%s is known to not produce valid code", name, lang)
 				return
 			}
 			if shouldBeParallel() {
@@ -183,15 +183,14 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			files, diags, err := codegen.ConvertTemplate(template, generator)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
-			dir := filepath.Join(dir, lang)
-			writeOrCompare(t, filepath.Join(outDir, name), files)
+			writeOrCompare(t, writeTo, files)
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
 				// This will not handle invokes correctly
 				deps.Add(d.Value.Type.Value)
 			}
 
-			check(t, dir, deps)
+			check(t, writeTo, deps)
 		})
 	}
 }
