@@ -26,6 +26,7 @@ import (
 
 var (
 	examplesPath = filepath.Join("..", "..", "examples")
+	outDir       = filepath.Join("examples_transpile")
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
@@ -44,6 +45,7 @@ var (
 		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
+		"webserver-json":          AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{
@@ -96,8 +98,12 @@ func TestGenerateExamples(t *testing.T) {
 				t.Skip()
 				return
 			}
-			main := filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")
+			main, err := getMain(filepath.Join(examplesPath, dir.Name()))
+			require.NoError(t, err, "Could not get file path")
 			template, diags, err := pulumiyaml.LoadFile(main)
+			if err == os.ErrNotExist {
+				template, diags, err = pulumiyaml.LoadFile(main)
+			}
 			require.NoError(t, err, "Loading file: %s", main)
 			require.False(t, diags.HasErrors(), diags.Error())
 			assert.Len(t, diags, 0, "Should have neither warnings nor errors")
@@ -107,12 +113,25 @@ func TestGenerateExamples(t *testing.T) {
 
 			pcl, tdiags := getPCLFile(template)
 			require.False(t, tdiags.HasErrors())
-			writeOrCompare(t, filepath.Join(examplesPath, dir.Name(), ".test"), map[string][]byte{"program.pp": pcl})
+			writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
 			for _, f := range langTests {
 				f(t, template, dir.Name())
 			}
 		})
 	}
+}
+
+func getMain(dir string) (string, error) {
+	attempts := []string{"Main.yaml", "Main.json", "Pulumi.yaml"}
+	for _, base := range attempts {
+		path := filepath.Join(dir, base)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("getMain: %w", err)
+		}
+	}
+	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
 func getPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics) {
@@ -154,6 +173,10 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 	return func(t *testing.T, template *ast.TemplateDecl, name string) {
 		dir := filepath.Join(examplesPath, name, ".test")
 		t.Run(lang, func(t *testing.T) {
+			if failingCompile[name].Has(lang) {
+				t.Skipf("%s/%s is known to not produce valid code", dir, lang)
+				return
+			}
 			if shouldBeParallel() {
 				t.Parallel()
 			}
@@ -161,11 +184,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			dir := filepath.Join(dir, lang)
-			if failingCompile[name].Has(lang) {
-				t.Skipf("%s/%s is known to not produce valid code", dir, lang)
-				return
-			}
-			writeOrCompare(t, dir, files)
+			writeOrCompare(t, filepath.Join(outDir, name), files)
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
 				// This will not handle invokes correctly
