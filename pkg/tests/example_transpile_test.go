@@ -3,21 +3,15 @@
 package tests
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime/debug"
-	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/google/go-github/v43/github"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
