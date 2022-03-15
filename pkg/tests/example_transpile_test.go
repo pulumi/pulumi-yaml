@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -242,7 +241,7 @@ func (ll LanguageList) Except(other LanguageList) LanguageList {
 // only occur in CI, and do not cause a test to fail. Instead, they post a
 // comment that indicates what the failure was.
 func SoftFailf(t *testing.T, message string, messageArgs ...interface{}) {
-	SoftFail(t, fmt.Sprintf(message, messageArgs))
+	SoftFail(t, fmt.Sprintf(message, messageArgs...))
 }
 
 func SoftFail(t *testing.T, message string) {
