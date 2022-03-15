@@ -61,6 +61,49 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 	}, syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf("unknown config, variable, or resource '%v'", name), "")}
 }
 
+// Handles the special object `pulumi` injected into the global namespace of YAML programs.
+func (imp *importer) pulumiPropertyAccess(symbol *ast.SymbolExpr) (model.Expression, bool, syntax.Diagnostics) {
+	l := symbol.Property.Accessors
+	wrapDiag := func(msg string, args ...interface{}) syntax.Diagnostics {
+		return syntax.Diagnostics{ast.ExprError(symbol, fmt.Sprintf(msg, args...), "")}
+	}
+	if len(l) == 0 {
+		// Invalid SymbolExpr
+		return nil, false, wrapDiag("Cannot have empty variables")
+	}
+	if name, ok := l[0].(*ast.PropertyName); !ok || name.Name != "pulumi" {
+		// Not the `pulumi` symbol, so return
+		return nil, false, nil
+	}
+	if len(l) == 1 {
+		return nil, false, wrapDiag("`pulumi` is a special variable, and cannot be passed around in transpiled code.")
+	}
+	prop, ok := l[1].(*ast.PropertyName)
+	if !ok {
+		return nil, true, wrapDiag("cannot index into the `pulumi` variable: %v", symbol)
+	}
+	simple := model.StaticFunctionSignature{ReturnType: model.StringType}
+	switch prop.Name {
+	case "cwd":
+		return &model.FunctionCallExpression{
+			Name:      "cwd",
+			Signature: simple,
+		}, true, nil
+	case "project":
+		return &model.FunctionCallExpression{
+			Name:      "project",
+			Signature: simple,
+		}, true, nil
+	case "stack":
+		return &model.FunctionCallExpression{
+			Name:      "stack",
+			Signature: simple,
+		}, true, nil
+	default:
+		return nil, true, wrapDiag("Unknown property of the `pulumi` variable: '%s'", prop.Name)
+	}
+}
+
 func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAccess, environment map[string]model.Expression) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
@@ -314,6 +357,12 @@ func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnos
 	case *ast.InterpolateExpr:
 		return imp.importInterpolate(node, nil)
 	case *ast.SymbolExpr:
+		if f, ok, diags := imp.pulumiPropertyAccess(node); ok {
+			if diags.HasErrors() {
+				return nil, diags
+			}
+			return f, diags
+		}
 		return imp.importPropertyAccess(node, node.Property, nil)
 	case ast.BuiltinExpr:
 		return imp.importBuiltin(node)
