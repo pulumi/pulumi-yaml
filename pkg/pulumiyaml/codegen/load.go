@@ -426,8 +426,39 @@ func (imp *importer) getResourceRefItem(optionField ast.Expr, name string, field
 	if !ok {
 		return nil, ast.ExprError(optionField, fmt.Sprintf("unknown resource '%v'", resourceName), "")
 	}
+	scoped := model.VariableReference(resourceVar)
 
-	return model.VariableReference(resourceVar), nil
+	if len(sym.Property.Accessors) > 1 {
+		// This is a complex expression, so we cannot verify at compile time
+		// that it results in a resource at run time.
+		//
+		// TODO: Once we have a format for type checking, we could add a check
+		// here when type information is present. We will never be able to rely
+		// on type information, since we want to be able to eject out of YAML as
+		// easily as possible.
+		for _, prop := range sym.Property.Accessors[1:] {
+			switch prop := prop.(type) {
+			case *ast.PropertyName:
+				scoped.Parts = append(scoped.Parts, model.StringType)
+				scoped.Traversal = append(scoped.Traversal, hcl.TraverseAttr{Name: prop.Name})
+			case *ast.PropertySubscript:
+				switch i := prop.Index.(type) {
+				case int:
+					scoped.Parts = append(scoped.Parts, model.IntType)
+					scoped.Traversal = append(scoped.Traversal, hcl.TraverseIndex{Key: cty.NumberIntVal(int64(i))})
+				case string:
+					scoped.Parts = append(scoped.Parts, model.StringType)
+					scoped.Traversal = append(scoped.Traversal, hcl.TraverseAttr{Name: i})
+				default:
+					return nil, ast.ExprError(sym, fmt.Sprintf("unknown access type: %T", i), "")
+				}
+			default:
+				return nil, ast.ExprError(sym, fmt.Sprintf("unknown property component: '%[1]s' of type %[1]T", prop), "")
+			}
+		}
+	}
+
+	return scoped, nil
 }
 
 // importResource imports a YAML resource as a PCL resource.

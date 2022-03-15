@@ -64,11 +64,11 @@ resources:
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template)
 		diags := runner.Evaluate()
-		requireNoErrors(t, diags)
+		requireNoErrors(t, template, diags)
 		return nil
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	if diags, ok := HasDiagnostics(err); ok {
-		requireNoErrors(t, diags)
+		requireNoErrors(t, template, diags)
 	}
 	assert.NoError(t, err)
 }

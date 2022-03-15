@@ -55,7 +55,10 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 		return nil, diags
 	}
 
-	pkgs := pulumiyaml.GetReferencedPlugins(tmpl)
+	pkgs, diags := pulumiyaml.GetReferencedPlugins(tmpl)
+	if diags.HasErrors() {
+		return nil, diags
+	}
 	var plugins []*pulumirpc.PluginDependency
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{

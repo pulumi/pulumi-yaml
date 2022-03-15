@@ -23,6 +23,10 @@ func TestGenerateProgram(t *testing.T) {
 				Directory:   "direct-invoke",
 				Description: "Use an invoke directly",
 			},
+			{
+				Directory:   "join-template",
+				Description: "Converting a template expression into a join invoke",
+			},
 		}
 		for _, tt := range tests {
 			switch tt.Directory {
@@ -105,6 +109,10 @@ func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, erro
 	case "aws:ec2/getVpc:getVpc":
 		return resource.NewPropertyMapFromMap(map[string]interface{}{
 			"id": "some-id",
+		}), nil
+	case "aws:iam/getPolicyDocument:getPolicyDocument":
+		return resource.NewPropertyMapFromMap(map[string]interface{}{
+			"json": `"some json"`,
 		}), nil
 
 	}

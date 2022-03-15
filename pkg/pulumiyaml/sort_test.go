@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -24,10 +25,18 @@ func diagString(d *hcl.Diagnostic) string {
 	}
 }
 
-func requireNoErrors(t *testing.T, diags syntax.Diagnostics) {
+func requireNoErrors(t *testing.T, tmpl *ast.TemplateDecl, diags syntax.Diagnostics) {
 	if diags.HasErrors() {
 		for _, d := range diags {
-			t.Log(diagString(d))
+			if tmpl != nil {
+				var buf bytes.Buffer
+				w := tmpl.NewDiagnosticWriter(&buf, 0, true)
+				err := w.WriteDiagnostic(d)
+				assert.NoError(t, err)
+				t.Log(buf.String())
+			} else {
+				t.Log(diagString(d))
+			}
 		}
 		t.FailNow()
 	}
@@ -36,13 +45,13 @@ func requireNoErrors(t *testing.T, diags syntax.Diagnostics) {
 func yamlTemplate(t *testing.T, source string) *ast.TemplateDecl {
 	pt, diags, err := LoadYAMLBytes("<stdin>", []byte(source))
 	require.NoError(t, err)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, pt, diags)
 	return pt
 }
 
 func template(t *testing.T, tm *Template) *ast.TemplateDecl {
 	pt, diags := LoadTemplate(tm)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, pt, diags)
 	return pt
 }
 
@@ -66,7 +75,7 @@ func TestSortOrdered(t *testing.T) {
 		},
 	})
 	resources, diags := topologicallySortedResources(tmpl)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
 	assert.Equal(t, "my-bucket", names[0])
@@ -93,7 +102,7 @@ func TestSortUnordered(t *testing.T) {
 		},
 	})
 	resources, diags := topologicallySortedResources(tmpl)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
 	assert.Equal(t, "my-bucket", names[0])

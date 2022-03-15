@@ -29,7 +29,7 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	}
 
 	if g.diags.HasErrors() {
-		return nil, nil, g.diags
+		return nil, g.diags, nil
 	}
 
 	w := &bytes.Buffer{}
@@ -42,9 +42,6 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 		err = diags
 	}
 
-	if err != nil {
-		return nil, nil, err
-	}
 	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
 }
 
@@ -141,11 +138,11 @@ func (g *generator) genResource(n *pcl.Resource) {
 	if opts := n.Options; opts != nil {
 		if opts.Provider != nil {
 			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				unquoteInterpolation(g.expr(opts.Provider))))
+				g.expr(opts.Provider)))
 		}
 		if opts.Parent != nil {
 			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				unquoteInterpolation(g.expr(opts.Parent))))
+				g.expr(opts.Parent)))
 		}
 		if opts.DependsOn != nil {
 			elems := g.expr(opts.DependsOn)
@@ -512,11 +509,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			}
 		}
 
-		// Inline implies we can construct the string directly, using string interpolation for traversals.
-		// Not inline means we need to use a Fn::Join statement.
+		// useJoin implies we need to use "Fn::Join" to construct the desired
+		// string.
 		if useJoin {
-			contract.Failf("Non-inline expressions are not implemented yet")
-			panic(nil)
+			return wrapFn("Join", syn.List(syn.String(""), syn.List(nodes...)))
 		}
 
 		s := ""
@@ -551,9 +547,22 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			rng: e.Syntax.Range(),
 		}.AppendTo(g)
 		return syn.String("Splat not implemented")
+	case *model.ForExpression:
+		YAMLError{
+			kind: "For",
+			detail: "Pulumi YAML cannot represent for loops." +
+				"If the values of the for loop are known, you can manually unroll the loop," +
+				" otherwise it is necessary to switch to a more expressive language.",
+			rng: e.Syntax.Range(),
+		}.AppendTo(g)
+		return syn.String("For not implemented")
 	default:
-		contract.Failf("Unimplimented: %[1]T. Needed for %[1]v", e)
-		panic(nil)
+		YAMLError{
+			kind:   fmt.Sprintf("%T", e),
+			detail: fmt.Sprintf("Unimplemented! Needed for %v", e),
+			rng:    e.SyntaxNode().Range(),
+		}.AppendTo(g)
+		return syn.String("Unimplemented")
 	}
 }
 
@@ -592,10 +601,18 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			args[i] = g.expr(arg)
 		}
 		return wrapFn("Join", syn.List(args...))
+	case "split":
+		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":
 		return wrapFn("ToJSON", g.expr(f.Args[0]))
+	case "element":
+		args := make([]syn.Node, len(f.Args))
+		for i, arg := range f.Args {
+			args[i] = g.expr(arg)
+		}
+		return wrapFn("Select", syn.List(args[1], args[0]))
 	default:
 		YAMLError{
 			kind:   "Unknown Function",

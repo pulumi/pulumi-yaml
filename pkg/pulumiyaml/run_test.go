@@ -39,7 +39,7 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 	return m.NewResourceF(args)
 }
 
-func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
+func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 
@@ -86,7 +86,8 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			return err
 		}
 		if callback != nil {
-			callback(runner)
+			ctx := runner.newContext(nil)
+			callback(ctx)
 		}
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))
@@ -134,9 +135,9 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 	return nil
 }
 
-func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) {
+func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) {
 	diags := testTemplateDiags(t, template, callback)
-	requireNoErrors(t, diags)
+	requireNoErrors(t, template, diags)
 }
 
 func TestYAML(t *testing.T) {
@@ -157,7 +158,7 @@ outputs:
   bar: !Ref res-a
 `
 	tmpl := yamlTemplate(t, text)
-	testTemplate(t, tmpl, func(r *runner) {})
+	testTemplate(t, tmpl, func(r *evalContext) {})
 }
 
 func TestAssetOrArchive(t *testing.T) {
@@ -177,8 +178,8 @@ variables:
             Fn::RemoteArchive: example.org/docs
 `
 	tmpl := yamlTemplate(t, text)
-	testTemplate(t, tmpl, func(r *runner) {
-		dir, ok := r.variables["dir"]
+	testTemplate(t, tmpl, func(ctx *evalContext) {
+		dir, ok := ctx.variables["dir"]
 		require.True(t, ok, "must have found dir")
 		assetArchive, ok := dir.(pulumi.Archive)
 		require.True(t, ok)
@@ -220,9 +221,8 @@ outputs:
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
-	require.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:9:8: resource Ref named res-b could not be found", diagString(diags[0]))
 }
 
@@ -249,7 +249,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	var diagStrings []string
 	for _, v := range diags {
 		diagStrings = append(diagStrings, diagString(v))
@@ -277,7 +277,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	var diagStrings []string
 	for _, v := range diags {
 		diagStrings = append(diagStrings, diagString(v))
@@ -302,7 +302,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	var diagStrings []string
 	for _, v := range diags {
 		diagStrings = append(diagStrings, diagString(v))
@@ -346,7 +346,7 @@ func TestJSON(t *testing.T) {
 }`
 
 	tmpl := yamlTemplate(t, text)
-	testTemplate(t, tmpl, func(r *runner) {})
+	testTemplate(t, tmpl, func(r *evalContext) {})
 }
 
 func TestJSONDiags(t *testing.T) {
@@ -370,7 +370,7 @@ func TestJSONDiags(t *testing.T) {
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	require.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:13:10: resource Ref named res-b could not be found", diagString(diags[0]))
@@ -387,12 +387,12 @@ func TestPropertyAccess(t *testing.T) {
 			},
 		},
 	})
-	testTemplate(t, tmpl, func(r *runner) {
+	testTemplate(t, tmpl, func(r *evalContext) {
 		x, diags := ast.Interpolate("${resA.outList[0].value}")
-		requireNoErrors(t, diags)
+		requireNoErrors(t, tmpl, diags)
 
-		v, diags := r.evaluatePropertyAccess(x, x.Parts[0].Value, nil)
-		requireNoErrors(t, diags)
+		v, ok := r.evaluatePropertyAccess(x, x.Parts[0].Value, nil)
+		assert.True(t, ok)
 		r.ctx.Export("out", pulumi.Any(v))
 	})
 }
@@ -408,8 +408,8 @@ func TestJoin(t *testing.T) {
 			},
 		},
 	})
-	testTemplate(t, tmpl, func(r *runner) {
-		v, diags := r.evaluateBuiltinJoin(&ast.JoinExpr{
+	testTemplate(t, tmpl, func(r *evalContext) {
+		v, ok := r.evaluateBuiltinJoin(&ast.JoinExpr{
 			Delimiter: ast.String(","),
 			Values: ast.List(
 				ast.String("a"),
@@ -417,31 +417,31 @@ func TestJoin(t *testing.T) {
 				ast.String("c"),
 			),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		assert.Equal(t, "a,b,c", v)
 
 		x, diags := ast.Interpolate("${resA.out}")
-		requireNoErrors(t, diags)
+		requireNoErrors(t, tmpl, diags)
 
-		v, diags = r.evaluateBuiltinJoin(&ast.JoinExpr{
+		v, ok = r.evaluateBuiltinJoin(&ast.JoinExpr{
 			Delimiter: x,
 			Values: ast.List(
 				ast.String("["),
 				ast.String("]"),
 			),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "[tuo]", x)
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
 
-		v, diags = r.evaluateBuiltinJoin(&ast.JoinExpr{
+		v, ok = r.evaluateBuiltinJoin(&ast.JoinExpr{
 			Delimiter: ast.String(","),
 			Values:    ast.List(x, x),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo,tuo", x)
 			return nil, nil
@@ -505,15 +505,15 @@ func TestSplit(t *testing.T) {
 					},
 				},
 			})
-			testTemplate(t, tmpl, func(r *runner) {
-				v, diags := r.evaluateBuiltinSplit(tt.input)
-				requireNoErrors(t, diags)
+			testTemplate(t, tmpl, func(ctx *evalContext) {
+				v, ok := ctx.evaluateBuiltinSplit(tt.input)
+				assert.True(t, ok)
 				if tt.isOutput {
 					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)
 						return nil, nil
 					})
-					r.ctx.Export("out", out)
+					ctx.ctx.Export("out", out)
 				} else {
 					assert.Equal(t, tt.expected, v)
 				}
@@ -601,9 +601,9 @@ func TestToJSON(t *testing.T) {
 					},
 				},
 			})
-			testTemplate(t, tmpl, func(r *runner) {
-				v, diags := r.evaluateBuiltinToJSON(tt.input)
-				requireNoErrors(t, diags)
+			testTemplate(t, tmpl, func(r *evalContext) {
+				v, ok := r.evaluateBuiltinToJSON(tt.input)
+				assert.True(t, ok)
 				if tt.isOutput {
 					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)
@@ -707,21 +707,22 @@ func TestSelect(t *testing.T) {
 					},
 				},
 			})
-			testTemplate(t, tmpl, func(r *runner) {
-				v, diags := r.evaluateBuiltinSelect(tt.input)
+			testTemplate(t, tmpl, func(ctx *evalContext) {
+				v, ok := ctx.evaluateBuiltinSelect(tt.input)
 				if tt.isError {
-					assert.True(t, diags.HasErrors())
+					assert.False(t, ok)
+					assert.True(t, ctx.sdiags.HasErrors())
 					assert.Nil(t, v)
 					return
 				}
 
-				requireNoErrors(t, diags)
+				requireNoErrors(t, tmpl, ctx.sdiags.diags)
 				if tt.isOutput {
 					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)
 						return nil, nil
 					})
-					r.ctx.Export("out", out)
+					ctx.ctx.Export("out", out)
 				} else {
 					assert.Equal(t, tt.expected, v)
 				}
@@ -782,9 +783,9 @@ func TestToBase64(t *testing.T) {
 					},
 				},
 			})
-			testTemplate(t, tmpl, func(r *runner) {
-				v, diags := r.evaluateBuiltinToBase64(tt.input)
-				requireNoErrors(t, diags)
+			testTemplate(t, tmpl, func(r *evalContext) {
+				v, ok := r.evaluateBuiltinToBase64(tt.input)
+				assert.True(t, ok)
 				if tt.isOutput {
 					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 						s, err := b64.StdEncoding.DecodeString(x.(string))
@@ -818,17 +819,17 @@ func TestSub(t *testing.T) {
 			},
 		},
 	})
-	testTemplate(t, tmpl, func(r *runner) {
-		v, diags := r.evaluateBuiltinSub(&ast.SubExpr{
+	testTemplate(t, tmpl, func(r *evalContext) {
+		v, ok := r.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("Hello ${foo}!"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		assert.Equal(t, "Hello oof!", v)
 
-		v, diags = r.evaluateBuiltinSub(&ast.SubExpr{
+		v, ok = r.evaluateBuiltinSub(&ast.SubExpr{
 			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"),
 		})
-		requireNoErrors(t, diags)
+		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "Hello tuo - someID!!", x)
 			return nil, nil
@@ -854,10 +855,11 @@ func TestRef(t *testing.T) {
 			},
 		},
 	})
-	testTemplate(t, tmpl, func(r *runner) {
+	testTemplate(t, tmpl, func(r *evalContext) {
 		{
-			v, diags := r.evaluateBuiltinRef(ast.Ref("resA"))
-			requireNoErrors(t, diags)
+			v, ok := r.evaluateBuiltinRef(ast.Ref("resA"))
+
+			assert.True(t, ok)
 			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 				assert.Equal(t, "someID", x)
 				return nil, nil
@@ -865,8 +867,8 @@ func TestRef(t *testing.T) {
 			r.ctx.Export("out", out)
 		}
 		{
-			v, diags := r.evaluateBuiltinRef(ast.Ref("compA"))
-			requireNoErrors(t, diags)
+			v, ok := r.evaluateBuiltinRef(ast.Ref("compA"))
+			assert.True(t, ok)
 			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
 				assert.Equal(t, "", x)
 				return nil, nil

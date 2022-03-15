@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hexops/autogold"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestVersionValueComplex(t *testing.T) {
@@ -22,7 +23,8 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.False(t, diags.HasErrors())
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
@@ -31,8 +33,8 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionValuePatched(t *testing.T) {
@@ -48,7 +50,8 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.False(t, diags.HasErrors())
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
@@ -57,8 +60,8 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionValueMajorMinor(t *testing.T) {
@@ -74,7 +77,8 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.False(t, diags.HasErrors())
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
@@ -83,8 +87,8 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
-	requireNoErrors(t, diags)
+	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestVersionOnExample(t *testing.T) {
@@ -145,7 +149,8 @@ outputs:
   `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.False(t, diags.HasErrors())
 
 	gotPlugins := plugins
 	wantPlugins := autogold.Want("test-plugins", []Plugin{
@@ -153,12 +158,70 @@ outputs:
 			Package: "aws",
 			Version: "4.37.1",
 		},
-		{Package: "aws"},
-		{Package: "aws"},
-		{Package: "aws"},
 	})
 	wantPlugins.Equal(t, gotPlugins)
 
-	_, diags := topologicallySortedResources(tmpl)
-	requireNoErrors(t, diags)
+	_, diags = topologicallySortedResources(tmpl)
+	requireNoErrors(t, tmpl, diags)
+}
+
+func TestVersionDuplicate(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  res-a:
+    type: test:resource:type
+    options:
+      version: 1.23.425-beta.6
+      pluginDownloadURL: https://example.com
+    properties: {}
+  res-b:
+    type: test:resource:type
+    options:
+      version: 1.23.425-beta.6
+      pluginDownloadURL: https://example.com
+    properties: {}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.False(t, diags.HasErrors())
+
+	got := plugins
+	want := autogold.Want("test-plugins", []Plugin{{
+		Package:           "test",
+		Version:           "1.23.425-beta.6",
+		PluginDownloadURL: "https://example.com",
+	}})
+	want.Equal(t, got)
+
+	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
+func TestVersionConflicts(t *testing.T) {
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  res-a:
+    type: test:resource:type
+    options:
+      version: 1.23.425-beta.6
+      pluginDownloadURL: https://example.com
+    properties: {}
+  res-b:
+    type: test:resource:type
+    options:
+      version: '2.0'
+      pluginDownloadURL: https://example.com/v2
+    properties: {}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	plugins, diags := GetReferencedPlugins(tmpl)
+	assert.Contains(t, diagString(diags[0]), "<stdin>:13:16: Provider test already declared with a conflicting version: 1.23.425-beta.6")
+	assert.Contains(t, diagString(diags[1]), "<stdin>:14:26: Provider test already declared with a conflicting plugin download URL: https://example.com")
+	assert.Empty(t, plugins)
 }
