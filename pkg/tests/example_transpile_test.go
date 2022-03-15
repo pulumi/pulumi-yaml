@@ -3,15 +3,22 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/google/go-github/v43/github"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -95,6 +102,9 @@ func TestGenerateExamples(t *testing.T) {
 			if skip {
 				t.Skip()
 				return
+			}
+			if dir.Name() == "random" {
+				SoftFailf(t, "this is a test")
 			}
 			main := filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")
 			template, diags, err := pulumiyaml.LoadFile(main)
@@ -219,4 +229,64 @@ func (ll LanguageList) Except(other LanguageList) LanguageList {
 		}
 	}
 	return out
+}
+
+// Because we depend on upstream code for yaml2pulumi to work, we want to
+// accomplish 3 things:
+//
+// 1. Test the full pipeline: YAML -> $LANG.
+// 2. Only merge when tests are green.
+// 3. Not stop development when upstream breaks.
+//
+// To accomplish this, we introduce the concept of soft failures. Soft failures
+// only occur in CI, and do not cause a test to fail. Instead, they post a
+// comment that indicates what the failure was.
+func SoftFailf(t *testing.T, message string, messageArgs ...interface{}) {
+	SoftFail(t, fmt.Sprintf(message, messageArgs))
+}
+
+func SoftFail(t *testing.T, message string) {
+	if os.Getenv("CI") != "true" {
+		// Not in CI => do nothing
+		return
+	}
+	ctx := context.Background()
+	client, owner, repo, number := ghClient()
+	t.Logf("Soft failure for %s: %s", t.Name(), message)
+	body := fmt.Sprintf("###%s failed\n%s", t.Name(), message)
+	// Stack trace
+	body += "\n<details><summary>Stacktrace</summary>\n<p>\n"
+	body += "\n```"
+	body += string(debug.Stack())
+	body += "```\n\n</p>\n</details>"
+	_, response, err := client.PullRequests.CreateComment(ctx, owner, repo, number,
+		&github.PullRequestComment{Body: &body})
+	if err != nil {
+		panic(err)
+	}
+	if response.StatusCode != 201 {
+		panic(fmt.Errorf("Unexpected response: %d %s", response.StatusCode, response.Status))
+	}
+}
+
+// Returns an authenticated client, owner, repo, issue_number for the current github CI job.
+func ghClient() (github.Client, string, string, int) {
+	ghToken := os.Getenv("GITHUB_TOKEN")
+	client := github.NewClient(oauth2.NewClient(context.Background(),
+		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: ghToken})))
+	repoAndOwner := strings.Split(os.Getenv("GITHUB_REPOSITORY"), "/")
+	if len(repoAndOwner) != 2 {
+		panic("Failed to get owner and repo")
+	}
+	owner, repo := repoAndOwner[0], repoAndOwner[1]
+	rawGHRef := os.Getenv("GITHUB_REF")
+	ghRef := strings.Split(rawGHRef, "/")
+	if len(ghRef) != 4 {
+		panic(fmt.Sprintf("Invalid github REF: '%s'", rawGHRef))
+	}
+	num, err := strconv.ParseInt(ghRef[2], 10, 64)
+	if err != nil {
+		panic(fmt.Errorf("Could not parse PR number: %w", err))
+	}
+	return *client, owner, repo, int(num)
 }
