@@ -269,7 +269,7 @@ func SoftFail(t *testing.T, message string) {
 }
 
 // Returns an authenticated client, owner, repo, issue_number for the current github CI job.
-func ghClient() (github.Client, string, string, int) {
+func ghClient() (*github.Client, string, string, int) {
 	ghToken := os.Getenv("GITHUB_TOKEN")
 	client := github.NewClient(oauth2.NewClient(context.Background(),
 		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: ghToken})))
@@ -287,5 +287,5 @@ func ghClient() (github.Client, string, string, int) {
 	if err != nil {
 		panic(fmt.Errorf("Could not parse PR number: %w", err))
 	}
-	return *client, owner, repo, int(num)
+	return client, owner, repo, int(num)
 }
