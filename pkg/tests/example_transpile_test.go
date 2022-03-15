@@ -30,7 +30,6 @@ var (
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
-		"webserver",
 		"azure-container-apps",
 		"azure-app-service",
 		"aws-eks",
@@ -46,6 +45,7 @@ var (
 		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
+		"webserver":               AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{
@@ -112,7 +112,7 @@ func TestGenerateExamples(t *testing.T) {
 			}
 
 			pcl, tdiags := getPCLFile(template)
-			require.False(t, tdiags.HasErrors())
+			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
 			for _, f := range langTests {
 				f(t, template, dir.Name())

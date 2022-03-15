@@ -675,6 +675,9 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 		}
 		imp.resources[kvp.Key.Value] = nil
 	}
+	for _, kvp := range file.Variables.Entries {
+		imp.variables[kvp.Key.Value] = nil
+	}
 	for _, kvp := range file.Outputs.Entries {
 		imp.findStackReferences(kvp.Value)
 		imp.outputs[kvp.Key.Value] = nil
