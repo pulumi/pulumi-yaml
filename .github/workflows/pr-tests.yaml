@@ -8,9 +8,9 @@ on:
 
 jobs:
   lint:
-    uses: pulumi/pulumi-yaml/.github/workflows/stage-lint.yml@main
+    uses: ./.github/workflows/stage-lint.yml
   test:
-    uses: pulumi/pulumi-yaml/.github/workflows/stage-test.yml@main
+    uses: ./.github/workflows/stage-test.yml
     with:
       live-test: true
     secrets:

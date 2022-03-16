@@ -212,6 +212,19 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "fileAsset",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.FileArchiveExpr:
+		path, pdiags := imp.importExpr(node.Source)
+		return &model.FunctionCallExpression{
+			Name: "fileArchive",
+			Args: []model.Expression{path},
+		}, pdiags
+	case *ast.StringAssetExpr:
+		path, pdiags := imp.importExpr(node.Source)
+		return &model.FunctionCallExpression{
+			Name: "fileArchive",
+			Args: []model.Expression{path},
+		}, pdiags
+
 	case *ast.GetAttExpr:
 		resourceName, propertyName := node.ResourceName.Value, node.PropertyName.Value
 
@@ -710,6 +723,9 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 			imp.findStackReferences(kvp.Value)
 		}
 		imp.resources[kvp.Key.Value] = nil
+	}
+	for _, kvp := range file.Variables.Entries {
+		imp.variables[kvp.Key.Value] = nil
 	}
 	for _, kvp := range file.Outputs.Entries {
 		imp.findStackReferences(kvp.Value)

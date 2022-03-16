@@ -29,7 +29,7 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[str
 	programText := fmt.Sprintf("%v", templateBody)
 
 	parser := hclsyntax.NewParser()
-	if err := parser.ParseFile(strings.NewReader(programText), "prorgram.pp"); err != nil {
+	if err := parser.ParseFile(strings.NewReader(programText), "program.pp"); err != nil {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)

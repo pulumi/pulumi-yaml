@@ -250,6 +250,19 @@ type ConfigParamDecl struct {
 	Type    *StringExpr
 	Default *StringExpr
 	Secret  *BooleanExpr
+
+	// TODO:
+
+	// List copied from template.go. While these fields are not currently used,
+	// they are necessary to avoid invalid field errors.
+	AllowedPattern        *StringExpr
+	AllowedValues         *ListExpr
+	ConstraintDescription *StringExpr
+	Description           *StringExpr
+	MaxLength             *NumberExpr
+	MaxValue              *NumberExpr
+	MinLength             *NumberExpr
+	MinValue              *NumberExpr
 }
 
 func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
