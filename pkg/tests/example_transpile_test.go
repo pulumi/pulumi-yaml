@@ -7,9 +7,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/hcl/v2"
+	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +36,9 @@ var (
 		"azure-container-apps",
 		"azure-app-service",
 		"aws-eks",
+		"webserver",
 		"webserver-json",
+		"stackreference-consumer",
 	}
 
 	// failingCompile examples are known to produce valid PCL, but produce
@@ -45,7 +50,6 @@ var (
 		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
-		"webserver":               AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{
@@ -111,7 +115,8 @@ func TestGenerateExamples(t *testing.T) {
 				return
 			}
 
-			pcl, tdiags := getPCLFile(template)
+			pcl, tdiags, err := getValidPCLFile(template)
+			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
 			for _, f := range langTests {
@@ -134,13 +139,27 @@ func getMain(dir string) (string, error) {
 	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
-func getPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics) {
+func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file)
 	diags := hcl.Diagnostics(tdiags)
 	if tdiags.HasErrors() {
-		return nil, diags
+		return nil, diags, nil
 	}
-	return []byte(fmt.Sprintf("%v", templateBody)), diags
+	program := fmt.Sprintf("%v", templateBody)
+	parser := hclsyntax.NewParser()
+	if err := parser.ParseFile(strings.NewReader(program), "program.pp"); err != nil {
+		return nil, diags, err
+	}
+	diags = diags.Extend(parser.Diagnostics)
+	_, pdiags, err := pcl.BindProgram(parser.Files)
+	if err != nil {
+		return nil, diags, err
+	}
+	diags = diags.Extend(pdiags)
+	if diags.HasErrors() {
+		return nil, diags, nil
+	}
+	return []byte(program), diags, nil
 
 }
 
