@@ -10,7 +10,6 @@
   "Resources": {
     "WebSecGrp": {
       "Type": "aws:ec2/securityGroup:SecurityGroup",
-      "Version": "4.37.1",
       "Properties": {
         "ingress": [
           {
@@ -20,6 +19,9 @@
             "cidrBlocks": ["0.0.0.0/0"]
           }
         ]
+      },
+      "Options": {
+        "Version": "4.37.1"
       }
     },
     "WebServer": {

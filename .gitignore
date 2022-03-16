@@ -1,3 +1,4 @@
+.DS_Store
 .idea
 *.swp
 Pulumi.*.yaml
@@ -8,3 +9,8 @@ bin/*
 # Other cannot be downloaded, as it does not correspond to a real package.
 !pkg/pulumiyaml/testing/test/testdata/other.json
 pkg/pulumiyaml/testing/test/testdata/*.json
+
+command-output/
+obj/
+__pycache__/
+node_modules/

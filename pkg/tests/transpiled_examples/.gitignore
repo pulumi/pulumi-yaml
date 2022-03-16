@@ -1,0 +1,11 @@
+.DS_Store
+.idea
+*.log
+tmp/
+
+Program.cs
+dotnet.csproj
+go.mod
+go.sum
+package.json
+yarn.lock

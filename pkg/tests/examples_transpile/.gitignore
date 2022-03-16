@@ -1,0 +1,6 @@
+examples/**/package.json
+examples/**/yarn.lock
+examples/**/go.sum
+examples/**/go.mod
+examples/**/Program.cs
+examples/**/dotnet.csproj
