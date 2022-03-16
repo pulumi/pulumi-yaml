@@ -371,9 +371,6 @@ func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnos
 		return imp.importInterpolate(node, nil)
 	case *ast.SymbolExpr:
 		if f, ok, diags := imp.pulumiPropertyAccess(node); ok {
-			if diags.HasErrors() {
-				return nil, diags
-			}
 			return f, diags
 		}
 		return imp.importPropertyAccess(node, node.Property, nil)

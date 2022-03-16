@@ -119,8 +119,10 @@ func (f *formatter) formatTupleCons(x *model.TupleConsExpression) {
 // formatExpression formats an expression. Extraneous leading and trailing whitespace is eliminated, and single spaces
 // are inserted around specific tokens.
 func (f *formatter) formatExpression(x model.Expression) model.Expression {
-	x.SetLeadingTrivia(nil)
-	x.SetTrailingTrivia(nil)
+	if x != nil {
+		x.SetLeadingTrivia(nil)
+		x.SetTrailingTrivia(nil)
+	}
 
 	switch x := x.(type) {
 	case *model.AnonymousFunctionExpression:
@@ -263,8 +265,10 @@ func (f *formatter) formatAttribute(attr *model.Attribute, afterBlock bool) {
 
 	f.formatExpression(attr.Value)
 
-	attr.Value.SetLeadingTrivia(f.space())
-	attr.Value.SetTrailingTrivia(f.newline())
+	if attr.Value != nil {
+		attr.Value.SetLeadingTrivia(f.space())
+		attr.Value.SetTrailingTrivia(f.newline())
+	}
 }
 
 // formatBody formats a PCL body.
