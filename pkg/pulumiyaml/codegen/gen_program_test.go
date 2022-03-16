@@ -52,7 +52,7 @@ func TestGenerateProgram(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
 		err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-			return pulumiyaml.RunTemplate(ctx, templateDecl)
+			return pulumiyaml.RunTemplate(ctx, templateDecl, pulumiyaml.PackageMap{})
 		}, pulumi.WithMocks("test", "gen", &testMonitor{}))
 		assert.NoError(t, err)
 	}

@@ -3,6 +3,7 @@ module github.com/pulumi/pulumi-yaml
 go 1.17
 
 require (
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github/v43 v43.0.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -44,7 +45,6 @@ require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.38.35 // indirect
-	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cheggaaa/pb v1.0.29 // indirect
