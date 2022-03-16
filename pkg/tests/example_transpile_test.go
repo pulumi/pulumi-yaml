@@ -36,7 +36,6 @@ var (
 		"azure-container-apps",
 		"azure-app-service",
 		"aws-eks",
-		"webserver",
 		"webserver-json",
 		"stackreference-consumer",
 	}
@@ -50,6 +49,7 @@ var (
 		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
+		"webserver":               AllLanguages().Except(Nodejs),
 	}
 
 	langTests = []ConvertFunc{
@@ -117,8 +117,9 @@ func TestGenerateExamples(t *testing.T) {
 
 			pcl, tdiags, err := getValidPCLFile(template)
 			require.NoError(t, err)
-			require.False(t, tdiags.HasErrors(), tdiags.Error())
+			// If there wasn't an error, we write out the program file, even if it is invalid PCL.
 			writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
+			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			for _, f := range langTests {
 				f(t, template, dir.Name())
 			}
@@ -157,7 +158,7 @@ func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	}
 	diags = diags.Extend(pdiags)
 	if diags.HasErrors() {
-		return nil, diags, nil
+		return []byte(program), diags, nil
 	}
 	return []byte(program), diags, nil
 
@@ -206,7 +207,12 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
 				// This will not handle invokes correctly
-				deps.Add(d.Value.Type.Value)
+				urn := strings.Split(d.Value.Type.Value, ":")
+				if urn[0] == "pulumi" && urn[1] == "providers" {
+					deps.Add(urn[2])
+				} else {
+					deps.Add(urn[0])
+				}
 			}
 
 			check(t, writeTo, deps)

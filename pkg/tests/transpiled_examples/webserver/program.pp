@@ -2,6 +2,15 @@ config instanceType string {
 	default = "t3.micro"
 }
 
+ec2ami = invoke("aws:index/getAmi:getAmi", {
+	"filters" = [{
+		"name" = "name",
+		"values" = ["amzn-ami-hvm-*-x86_64-ebs"]
+	}],
+	"owners" = ["137112412989"],
+	"mostRecent" = true
+}).id
+
 resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 	ingress = [{
 		"protocol" = "tcp",
