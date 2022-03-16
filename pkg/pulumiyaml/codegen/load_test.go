@@ -43,6 +43,27 @@ resource bar "test:mod:typ" {
 }
 `,
 		},
+		{
+			name: "recursive function bindings",
+			input: `
+outputs:
+  cwd: "${pulumi.cwd}"
+  stack: "${pulumi.stack}"
+  project: "${pulumi.project}"
+`,
+			expected: `output cwd0 {
+	value = cwd()
+}
+
+output stack0 {
+	value = stack()
+}
+
+output project0 {
+	value = project()
+}
+`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt

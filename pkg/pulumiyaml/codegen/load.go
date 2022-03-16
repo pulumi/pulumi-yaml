@@ -664,7 +664,31 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 // assignNames assigns names to the variables used to represent template configuration, outputs, and resources.
 // Care is taken to keep configuration and output names as close to their original names as possible.
 func (imp *importer) assignNames() {
-	assigned := codegen.StringSet{}
+	// PCL has only one namspace with respect to binding, so we can't use any of
+	// these as names.
+	assigned := codegen.NewStringSet(
+		"element",
+		"entries",
+		"fileArchive",
+		"fileAsset",
+		"filebase64",
+		"filebase64sha256",
+		"invoke",
+		"join",
+		"length",
+		"lookup",
+		"range",
+		"readFile",
+		"readDir",
+		"secret",
+		"split",
+		"toBase64",
+		"toJSON",
+		"sha1",
+		"stack",
+		"project",
+		"cwd",
+	)
 
 	assign := func(name, suffix string) *model.Variable {
 		assignName := func(name, suffix string) string {
