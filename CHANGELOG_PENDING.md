@@ -23,4 +23,7 @@
   [#73](https://github.com/pulumi/pulumi-yaml/issues/73). Also adds a `urn` property to obtain the
   resource's URN.
 
+- [features] no longer need to specify `component` property on resources, instead this is determined
+  by discovering the package schema and using the value declared there.
+
 ### Bug Fixes
