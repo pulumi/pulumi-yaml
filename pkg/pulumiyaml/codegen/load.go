@@ -510,6 +510,24 @@ func (imp *importer) getResourceRefItem(optionField ast.Expr, name string, field
 	return scoped, nil
 }
 
+// importVariable imports a YAML variable as a PCL variable.
+func (imp *importer) importVariable(kvp ast.VariablesMapEntry) (model.BodyItem, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+	name, value := kvp.Key.Value, kvp.Value
+	_, ok := imp.variables[name]
+	contract.Assert(ok)
+
+	v, vdiags := imp.importExpr(value)
+	diags.Extend(vdiags...)
+	if vdiags.HasErrors() {
+		return nil, diags
+	}
+	return &model.Attribute{
+		Name:  name,
+		Value: v,
+	}, diags
+}
+
 // importResource imports a YAML resource as a PCL resource.
 func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, syntax.Diagnostics) {
 	name, resource := kvp.Key.Value, kvp.Value
@@ -742,6 +760,16 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 		if config != nil {
 			items = append(items, config)
+		}
+	}
+
+	// Import variables
+	for _, kvp := range file.Variables.Entries {
+		output, vdiags := imp.importVariable(kvp)
+		diags.Extend(vdiags...)
+
+		if output != nil {
+			items = append(items, output)
 		}
 	}
 
