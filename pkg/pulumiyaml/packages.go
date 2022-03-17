@@ -146,22 +146,22 @@ func (p resourcePackage) IsComponent(typeName string) (bool, error) {
 	return false, fmt.Errorf("unable to find resource type %v in resource provider %v", typeName, p.Name)
 }
 
-func NewResourcePackageMap(template *ast.TemplateDecl) (PackageMap, error) {
+func NewResourcePackageMap(template *ast.TemplateDecl) (*plugin.Context, PackageMap, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{})
 	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	pulumiLoader := schema.NewPluginLoader(pluginCtx.Host)
 
 	plugins, diags := GetReferencedPlugins(template)
 	if diags.HasErrors() {
-		return nil, diags
+		return nil, nil, diags
 	}
 
 	packages := map[string]Package{}
@@ -170,16 +170,16 @@ func NewResourcePackageMap(template *ast.TemplateDecl) (PackageMap, error) {
 		if p.Version != "" {
 			parsedVersion, err := semver.ParseTolerant(p.Version)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			version = &parsedVersion
 		}
 		pkg, err := pulumiLoader.LoadPackage(p.Package, version)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		packages[p.Package] = resourcePackage{pkg}
 	}
 
-	return packages, nil
+	return pluginCtx, packages, nil
 }

@@ -138,10 +138,11 @@ func Run(ctx *pulumi.Context) error {
 		return multierror.Append(err, diags)
 	}
 
-	packages, err := NewResourcePackageMap(t)
+	pluginCtx, packages, err := NewResourcePackageMap(t)
 	if err != nil {
 		return err
 	}
+	defer pluginCtx.Close()
 
 	// Now "evaluate" the template.
 	return RunTemplate(ctx, t, packages)
