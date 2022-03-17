@@ -9,8 +9,8 @@ require (
 	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hexops/autogold v1.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.26.2-0.20220317160842-5f00e6dfa68c
-	github.com/pulumi/pulumi/sdk/v3 v3.26.2-0.20220317160842-5f00e6dfa68c
+	github.com/pulumi/pulumi/pkg/v3 v3.26.2-0.20220317195537-8068d56957ac
+	github.com/pulumi/pulumi/sdk/v3 v3.26.2-0.20220317195537-8068d56957ac
 	github.com/spf13/cast v1.4.1
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
