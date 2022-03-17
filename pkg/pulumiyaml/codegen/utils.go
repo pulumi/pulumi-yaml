@@ -3,6 +3,7 @@
 package codegen
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -93,7 +94,7 @@ func relativeTraversal(source model.Expression, attr string) *model.RelativeTrav
 func resourceToken(typ string) string {
 	components := strings.Split(typ, "::")
 	if len(components) != 3 {
-		return typ
+		return normalizeType(typ)
 	}
 	moduleName, resourceName := components[1], components[2]
 
@@ -102,4 +103,11 @@ func resourceToken(typ string) string {
 		moduleName = "Configuration"
 	}
 	return "cloudformation:" + moduleName + ":" + resourceName
+}
+
+func normalizeType(typ string) string {
+	if parts := strings.Split(typ, ":"); len(parts) == 2 {
+		typ = fmt.Sprintf("%s:index:%s", parts[0], parts[1])
+	}
+	return typ
 }

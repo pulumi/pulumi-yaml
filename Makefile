@@ -33,7 +33,7 @@ install::
 
 clean::
 	rm -f ./bin/*
-	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random}.json
+	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random,eks,aws-native}.json
 
 ensure::
 	${GO} mod download
@@ -78,4 +78,7 @@ schema-%:
 	@[ -f pkg/pulumiyaml/testing/test/testdata/${name}.json ] || \
 		curl "https://raw.githubusercontent.com/pulumi/pulumi-${name}/v${version}/provider/cmd/pulumi-resource-${name}/schema.json" \
 	 	| jq '.version = "${version}"' >  pkg/pulumiyaml/testing/test/testdata/${name}.json
-get_schemas: schema-aws!4.26.0 schema-azure-native!1.29.0 schema-azure!4.18.0 schema-kubernetes!3.7.2 schema-random!4.2.0
+get_schemas: schema-aws!4.26.0 schema-azure-native!1.29.0 \
+			 schema-azure!4.18.0 schema-kubernetes!3.7.2  \
+			 schema-random!4.2.0 schema-eks!0.37.1        \
+			 schema-aws-native!0.13.0
