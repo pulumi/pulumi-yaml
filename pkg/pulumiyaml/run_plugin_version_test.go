@@ -120,7 +120,7 @@ resources:
       instanceType: ${InstanceType}
       ami:
         Fn::Invoke:
-          Function: aws:index/getAmi:getAmi
+          Function: aws:getAmi
           Arguments:
             filters:
               - name: name
@@ -141,7 +141,7 @@ resources:
   MyBucket:
     type: aws:s3/bucket:Bucket
     options:
-      provider: UsEast2Provider
+      provider: ${UsEast2Provider}
 outputs:
   InstanceId: ${WebServer}
   PublicIp: ${WebServer.publicIp}

@@ -21,6 +21,7 @@ import (
 type importer struct {
 	referencedStacks []string
 
+	packages        pulumiyaml.PackageMap
 	configuration   map[string]*model.Variable
 	variables       map[string]*model.Variable
 	stackReferences map[string]*model.Variable
@@ -231,8 +232,11 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		function, fdiags := imp.importExpr(node.Token)
-		diags.Extend(fdiags...)
+		functionName, err := pulumiyaml.ResolveFunction(node.Token.Value, imp.packages)
+		if err != nil {
+			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
+		}
+		function := quotedLit(string(functionName))
 
 		invokeArgs := []model.Expression{function}
 
@@ -513,7 +517,11 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	token := resourceToken(resource.Type.Value)
+	resInfo, err := pulumiyaml.ResolveResource(resource.Type.Value, imp.packages)
+	if err != nil {
+		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
+	}
+	token := resInfo.TypeName
 
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
@@ -603,7 +611,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 
 	r := &model.Block{
 		Type:   "resource",
-		Labels: []string{resourceVar.Name, token},
+		Labels: []string{resourceVar.Name, string(token)},
 		Body:   &model.Body{Items: items},
 	}
 
@@ -816,8 +824,9 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 }
 
 // ImportTemplate converts a YAML template to a PCL definition.
-func ImportTemplate(file *ast.TemplateDecl) (*model.Body, syntax.Diagnostics) {
+func ImportTemplate(file *ast.TemplateDecl, packages pulumiyaml.PackageMap) (*model.Body, syntax.Diagnostics) {
 	imp := importer{
+		packages:        packages,
 		configuration:   map[string]*model.Variable{},
 		variables:       map[string]*model.Variable{},
 		stackReferences: map[string]*model.Variable{},

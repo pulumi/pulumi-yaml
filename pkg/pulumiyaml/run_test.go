@@ -20,21 +20,28 @@ import (
 const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
 
-type MockPackageLoader struct {
-	packages PackageMap
-	err      error
-}
-
-func (l MockPackageLoader) getPackages() (PackageMap, error) {
-	return l.packages, l.err
-}
-
 type MockPackage struct {
-	isComponent func(typeName string) (bool, error)
+	isComponent     func(typeName string) (bool, error)
+	resolveResource func(typeName string) (CanonicalTypeToken, error)
+	resolveFunction func(typeName string) (CanonicalTypeToken, error)
 }
 
-func (m MockPackage) IsComponent(typeName string) (bool, error) {
-	return m.isComponent(typeName)
+func (m MockPackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
+	if m.resolveResource != nil {
+		return m.resolveResource(typeName)
+	}
+	return CanonicalTypeToken(typeName), nil
+}
+
+func (m MockPackage) ResolveFunction(typeName string) (CanonicalTypeToken, error) {
+	if m.resolveFunction != nil {
+		return m.resolveFunction(typeName)
+	}
+	return CanonicalTypeToken(typeName), nil
+}
+
+func (m MockPackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
+	return m.isComponent(string(typeName))
 }
 
 func NewMockPackageMap() PackageMap {
@@ -115,7 +122,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, NewMockPackageMap())
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -153,7 +160,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, NewMockPackageMap())
 		err := runner.Evaluate()
 		if err != nil {
 			return err

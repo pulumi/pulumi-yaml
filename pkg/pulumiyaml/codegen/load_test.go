@@ -111,7 +111,7 @@ outputs:
 			require.False(t, diags.HasErrors(), diags)
 			assert.Empty(t, diags)
 
-			result, diags := ImportTemplate(decl)
+			result, diags := ImportTemplate(decl, newFakePackageMap(t))
 			if tt.diagErrors == nil {
 				require.False(t, diags.HasErrors(), diags)
 				assert.Equal(t, tt.expected, fmt.Sprintf("%v", result))

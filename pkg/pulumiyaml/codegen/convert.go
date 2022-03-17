@@ -10,6 +10,7 @@ import (
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 )
@@ -24,7 +25,18 @@ type GenerateFunc func(program *pcl.Program) (map[string][]byte, hcl.Diagnostics
 func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, host plugin.Host) (map[string][]byte, hcl.Diagnostics, error) {
 	var diags hcl.Diagnostics
 
-	templateBody, tdiags := ImportTemplate(template)
+	plugins, plgdiags := pulumiyaml.GetReferencedPlugins(template)
+	diags = diags.Extend(hcl.Diagnostics(plgdiags))
+	if diags.HasErrors() {
+		return nil, diags, fmt.Errorf("internal error enumerating resource packages")
+	}
+	pluginCtx, packages, err := pulumiyaml.NewResourcePackageMap(plugins)
+	if err != nil {
+		return nil, diags, fmt.Errorf("internal error loading resource packages: %v", err)
+	}
+	defer pluginCtx.Close()
+
+	templateBody, tdiags := ImportTemplate(template, packages)
 	diags = diags.Extend(hcl.Diagnostics(tdiags))
 	if diags.HasErrors() {
 		return nil, diags, nil
@@ -40,7 +52,8 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, host plu
 		return nil, diags, nil
 	}
 	bindOpts := []pcl.BindOption{
-		pcl.SkipResourceTypechecking, pcl.AllowMissingProperties,
+		pcl.SkipResourceTypechecking,
+		pcl.AllowMissingProperties,
 		pcl.AllowMissingVariables,
 	}
 	if host != nil {

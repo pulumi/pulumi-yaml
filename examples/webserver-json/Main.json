@@ -9,7 +9,7 @@
   },
   "Resources": {
     "WebSecGrp": {
-      "Type": "aws:ec2/securityGroup:SecurityGroup",
+      "Type": "aws:ec2:SecurityGroup",
       "Properties": {
         "ingress": [
           {
@@ -25,12 +25,12 @@
       }
     },
     "WebServer": {
-      "Type": "aws:ec2/instance:Instance",
+      "Type": "aws:ec2:Instance",
       "Properties": {
         "instanceType": "${InstanceType}",
         "ami": {
           "Fn::Invoke": {
-            "Function": "aws:index/getAmi:getAmi",
+            "Function": "aws:getAmi",
             "Arguments": {
               "filters": [
                 { "name": "name", "values": ["amzn-ami-hvm-*-x86_64-ebs"] }

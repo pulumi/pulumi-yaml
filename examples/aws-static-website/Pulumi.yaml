@@ -8,7 +8,7 @@ resources:
       websiteConfiguration:
         indexDocument: index.html
   index.html:
-    type: aws:s3/bucketObject:BucketObject
+    type: aws:s3:BucketObject
     properties:
       bucket: ${site-bucket}
       source:
@@ -16,7 +16,7 @@ resources:
       acl: public-read
       contentType: text/html
   favicon.png:
-    type: aws:s3/bucketObject:BucketObject
+    type: aws:s3:BucketObject
     properties:
       bucket: ${site-bucket}
       source:
@@ -24,7 +24,7 @@ resources:
       acl: public-read
       contentType: image/png
   bucketPolicy:
-    type: aws:s3/bucketPolicy:BucketPolicy
+    type: aws:s3:BucketPolicy
     properties:
       bucket: ${site-bucket}
       policy: |

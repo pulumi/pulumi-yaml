@@ -12,6 +12,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/iancoleman/strcase"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
@@ -31,6 +32,87 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 )
+
+// We stub out the real plugin hosting architecture for a fake that gives us reasonably good
+// results without the time and compute
+type FakePackage struct {
+	t *testing.T
+}
+
+func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
+	switch typeName {
+	case "random:RandomPassword":
+		// classic provider used with "index" in the name
+		parts := strings.Split(typeName, ":")
+		name := fmt.Sprintf("%v:index/%v:%v", parts[0], strcase.ToLowerCamel(parts[1]), parts[1])
+		return pulumiyaml.CanonicalTypeToken(name), nil
+	case
+		// classic providers that repeat the last label in the type token
+		"aws:ec2:Instance",
+		"aws:ec2:SecurityGroup",
+		"aws:s3:Bucket",
+		"aws:s3:BucketObject",
+		"aws:s3:BucketPolicy":
+		parts := strings.Split(typeName, ":")
+		name := fmt.Sprintf("%v:%v/%v:%v", parts[0], parts[1], strcase.ToLowerCamel(parts[2]), parts[2])
+		return pulumiyaml.CanonicalTypeToken(name), nil
+	case
+		"aws-native:s3:Bucket",
+		"azure-native:resources:ResourceGroup",
+		"azure-native:storage:Blob",
+		"azure-native:storage:StorageAccount",
+		"azure-native:storage:StorageAccountStaticWebsite",
+		"pulumi:providers:aws":
+		return pulumiyaml.CanonicalTypeToken(typeName), nil
+	default:
+		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
+		m.t.Logf(msg)
+		return "", fmt.Errorf(msg)
+	}
+}
+
+func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
+	switch typeName {
+	case "aws:getAmi":
+		// classic provider used with "index" in the name
+		parts := strings.Split(typeName, ":")
+		name := fmt.Sprintf("%v:index/%v:%v", parts[0], strcase.ToLowerCamel(parts[1]), parts[1])
+		return pulumiyaml.CanonicalTypeToken(name), nil
+	case "aws:ec2:getAmiIds",
+		"aws:ec2:getPrefixList",
+		"aws:ec2:getSubnetIds":
+		// classic providers that repeat the last label in the type token
+		parts := strings.Split(typeName, ":")
+		name := fmt.Sprintf("%v:%v/%v:%v", parts[0], parts[1], strcase.ToLowerCamel(parts[2]), parts[2])
+		return pulumiyaml.CanonicalTypeToken(name), nil
+	default:
+		msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
+		m.t.Logf(msg)
+		return "", fmt.Errorf(msg)
+	}
+}
+
+func (m FakePackage) IsComponent(typeName pulumiyaml.CanonicalTypeToken) (bool, error) {
+	// No component test cases presently.
+	// If the resource resolves, default to false until we add exceptions.
+	if _, err := m.ResolveResource(string(typeName)); err != nil {
+		return false, nil
+	}
+	msg := fmt.Sprintf("Unexpected type token in IsComponent: %q", typeName)
+	m.t.Logf(msg)
+	return false, fmt.Errorf(msg)
+}
+
+func newFakePackageMap(t *testing.T) pulumiyaml.PackageMap {
+	return pulumiyaml.PackageMap{
+		"aws":          FakePackage{t},
+		"aws-native":   FakePackage{t},
+		"azure-native": FakePackage{t},
+		"kubernetes":   FakePackage{t},
+		"other":        FakePackage{t},
+		"random":       FakePackage{t},
+	}
+}
 
 var (
 	examplesPath = filepath.Join("..", "..", "examples")

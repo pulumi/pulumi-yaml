@@ -138,7 +138,12 @@ func Run(ctx *pulumi.Context) error {
 		return multierror.Append(err, diags)
 	}
 
-	pluginCtx, packages, err := NewResourcePackageMap(t)
+	plugins, diags := GetReferencedPlugins(t)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	pluginCtx, packages, err := NewResourcePackageMap(plugins)
 	if err != nil {
 		return err
 	}
@@ -585,12 +590,13 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		res = &r
 	}
 
-	tyInfo, err := resolveTypeInfo(v.Type.Value)
+	tyInfo, err := ResolveResource(v.Type.Value, ctx.packages)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		return nil, false
 	}
-	typ := tyInfo.typeName
+	typ := tyInfo.TypeName
+	pkg := tyInfo.Pkg
 
 	if !overallOk || ctx.sdiags.HasErrors() {
 		return nil, false
@@ -598,23 +604,19 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 
 	isComponent := false
 	if !isProvider {
-		pkg, found := ctx.packages[tyInfo.packageName]
-		// TODO: treat not finding a package as a failure and update integration tests,
-		if found {
-			result, err := pkg.IsComponent(tyInfo.typeName)
-			if err != nil {
-				ctx.error(v.Type, "unable to resolve type")
-				return nil, false
-			}
-			isComponent = result
+		result, err := pkg.IsComponent(tyInfo.TypeName)
+		if err != nil {
+			ctx.error(v.Type, "unable to resolve type")
+			return nil, false
 		}
+		isComponent = result
 	}
 
 	// Now register the resulting resource with the engine.
 	if isComponent {
-		err = ctx.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
+		err = ctx.ctx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
 	} else {
-		err = ctx.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)
+		err = ctx.ctx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 	}
 	if err != nil {
 		ctx.error(kvp.Key, err.Error())
@@ -916,7 +918,12 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		if err := ctx.ctx.Invoke(t.Token.Value, args[0], &result); err != nil {
+		functionName, err := ResolveFunction(t.Token.Value, ctx.packages)
+		if err != nil {
+			return ctx.error(t, err.Error())
+		}
+
+		if err := ctx.ctx.Invoke(string(functionName), args[0], &result); err != nil {
 			return ctx.error(t, err.Error())
 		}
 

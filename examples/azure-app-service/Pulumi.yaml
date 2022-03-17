@@ -62,7 +62,7 @@ resources:
       applicationType: web
       kind: web
   sqlPassword:
-    type: random:index/randomPassword:RandomPassword
+    type: random:RandomPassword
     properties:
       length: 16
       special: true

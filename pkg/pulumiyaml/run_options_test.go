@@ -12,6 +12,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type FakePackage struct {
+	t *testing.T
+}
+
+func (m FakePackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
+	switch typeName {
+	case "foo":
+		return CanonicalTypeToken(typeName), nil
+	default:
+		assert.Fail(m.t, "Unexpected type token %q", typeName)
+		return "", fmt.Errorf("Unexpected type token %q", typeName)
+	}
+}
+
+func (m FakePackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
+	switch string(typeName) {
+	case "foo":
+		return false, nil
+	default:
+		assert.Fail(m.t, "Unexpected type token %q", typeName)
+		return false, fmt.Errorf("Unexpected type token %q", typeName)
+	}
+}
+
 func TestResourceOptions(t *testing.T) {
 	const text = `
 name: test-yaml
@@ -61,20 +85,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, PackageMap{
-			"test": MockPackage{
-				isComponent: func(typeName string) (bool, error) {
-					switch typeName {
-					case testResourceToken:
-						return false, nil
-					case testComponentToken:
-						return true, nil
-					default:
-						return false, nil
-					}
-				},
-			},
-		})
+		runner := newRunner(ctx, template, NewMockPackageMap())
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil

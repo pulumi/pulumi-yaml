@@ -32,7 +32,7 @@ outputs:
 
 	mocks := &testMonitor{}
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, NewMockPackageMap())
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		ectx := runner.newContext(nil)
@@ -291,7 +291,6 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 			switch args.TypeToken {
 			case testResourceToken:
 				assert.Equal(t, testResourceToken, args.TypeToken)
@@ -319,7 +318,7 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, NewMockPackageMap())
 		err := runner.Evaluate()
 		if err != nil {
 			return err
