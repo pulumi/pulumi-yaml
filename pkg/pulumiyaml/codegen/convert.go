@@ -11,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 )
 
 // A GenerateFunc generates a set of output files from a PCL program. This is used to convert YAML templates to
@@ -18,7 +19,9 @@ import (
 type GenerateFunc func(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error)
 
 // ConvertTemplate converts a Pulumi YAML template to a target language using PCL as an intermediate representation.
-func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[string][]byte, hcl.Diagnostics, error) {
+//
+// host is the plugin.Host used when binding the the PCL program. If nil, the default plugin.Host is used.
+func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, host plugin.Host) (map[string][]byte, hcl.Diagnostics, error) {
 	var diags hcl.Diagnostics
 
 	templateBody, tdiags := ImportTemplate(template)
@@ -36,9 +39,14 @@ func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc) (map[str
 	if diags.HasErrors() {
 		return nil, diags, nil
 	}
-
-	program, pdiags, err := pcl.BindProgram(parser.Files, pcl.SkipResourceTypechecking, pcl.AllowMissingProperties,
-		pcl.AllowMissingVariables)
+	bindOpts := []pcl.BindOption{
+		pcl.SkipResourceTypechecking, pcl.AllowMissingProperties,
+		pcl.AllowMissingVariables,
+	}
+	if host != nil {
+		bindOpts = append(bindOpts, pcl.PluginHost(host))
+	}
+	program, pdiags, err := pcl.BindProgram(parser.Files, bindOpts...)
 	if err != nil {
 		return nil, diags, err
 	}

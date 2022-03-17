@@ -147,14 +147,14 @@ func getMain(dir string) (string, error) {
 	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
-func pluginHost() pcl.BindOption {
+func pluginHost() plugin.Host {
 	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
 		})
 	}
-	return pcl.PluginHost(deploytest.NewPluginHost(nil, nil, nil,
+	return deploytest.NewPluginHost(nil, nil, nil,
 		host("aws", semver.MustParse("4.26.0")),
 		host("azure-native", semver.MustParse("1.29.0")),
 		host("azure", semver.MustParse("4.18.0")),
@@ -168,7 +168,7 @@ func pluginHost() pcl.BindOption {
 		// depending on the difference between them.
 		host("aws", semver.MustParse("4.15.0")),
 		host("kubernetes", semver.MustParse("3.0.0")),
-	))
+	)
 }
 
 func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
@@ -183,7 +183,7 @@ func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files, pluginHost())
+	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.PluginHost(pluginHost()))
 	if err != nil {
 		return []byte(program), diags, err
 	}
@@ -231,7 +231,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			if shouldBeParallel() {
 				t.Parallel()
 			}
-			files, diags, err := codegen.ConvertTemplate(template, generator)
+			files, diags, err := codegen.ConvertTemplate(template, generator, pluginHost())
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			writeOrCompare(t, writeTo, files)
