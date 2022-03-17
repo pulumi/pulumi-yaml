@@ -162,6 +162,7 @@ func pluginHost() plugin.Host {
 		host("random", semver.MustParse("4.2.0")),
 		host("eks", semver.MustParse("0.37.1")),
 		host("aws-native", semver.MustParse("0.13.0")),
+		host("docker", semver.MustParse("3.1.0")),
 
 		// Extra packages are to satisfy the versioning requirement of aws-eks.
 		// While the schemas are not the correct version, we rely on not

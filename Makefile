@@ -81,4 +81,4 @@ schema-%:
 get_schemas: schema-aws!4.26.0 schema-azure-native!1.29.0 \
 			 schema-azure!4.18.0 schema-kubernetes!3.7.2  \
 			 schema-random!4.2.0 schema-eks!0.37.1        \
-			 schema-aws-native!0.13.0
+			 schema-aws-native!0.13.0 schema-docker!3.1.0
