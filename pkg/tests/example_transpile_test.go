@@ -156,7 +156,7 @@ func pluginHost() plugin.Host {
 	}
 	return deploytest.NewPluginHost(nil, nil, nil,
 		host("aws", semver.MustParse("4.26.0")),
-		host("azure-native", semver.MustParse("1.29.0")),
+		host("azure-native", semver.MustParse("1.60.0")),
 		host("azure", semver.MustParse("4.18.0")),
 		host("kubernetes", semver.MustParse("3.7.2")),
 		host("random", semver.MustParse("4.2.0")),
