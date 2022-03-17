@@ -21,6 +21,8 @@ func TestImportTemplate(t *testing.T) {
 		input string
 		// A PCL program
 		expected string
+
+		diagErrors []string
 	}{
 		{
 			name: "complex resource options",
@@ -43,6 +45,51 @@ resource bar "test:mod:typ" {
 }
 `,
 		},
+		{
+			name: "func name shadowing",
+			input: `
+outputs:
+  cwd: "${pulumi.cwd}"
+  stack: "${pulumi.stack}"
+  project: "${pulumi.project}"
+`,
+			expected: `output cwd0 {
+	value = cwd()
+}
+
+output stack0 {
+	value = stack()
+}
+
+output project0 {
+	value = project()
+}
+`,
+		},
+		{
+			name: "complex pulumi variables",
+			input: `
+resources:
+  bar:
+    type: test:mod:typ
+    properties:
+      foo: ${pulumi.cwd}
+`,
+			expected: `resource bar "test:mod:typ" {
+	foo = cwd()
+}
+`,
+		},
+		{
+			name: "invalid pulumi variable",
+			input: `
+outputs:
+  foo: ${pulumi.bar}
+`,
+			diagErrors: []string{"invalid pulumi variable.yaml:3,8-21: " +
+				"Unknown property of the `pulumi` variable: 'bar'; " +
+				"Unknown property of the `pulumi` variable: 'bar'"},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -54,9 +101,18 @@ resource bar "test:mod:typ" {
 			assert.Empty(t, diags)
 
 			result, diags := ImportTemplate(decl)
-			require.False(t, diags.HasErrors(), diags)
-			assert.Equal(t, tt.expected, fmt.Sprintf("%v", result))
-			assert.Empty(t, diags)
+			if tt.diagErrors == nil {
+				require.False(t, diags.HasErrors(), diags)
+				assert.Equal(t, tt.expected, fmt.Sprintf("%v", result))
+				assert.Empty(t, diags)
+			} else {
+				require.True(t, diags.HasErrors())
+				var diagErrors []string
+				for _, err := range diags {
+					diagErrors = append(diagErrors, err.Error())
+				}
+				assert.Equal(t, tt.diagErrors, diagErrors)
+			}
 		})
 
 	}
