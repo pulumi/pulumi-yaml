@@ -236,7 +236,6 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		return &model.ScopeTraversalExpression{
 			Traversal: hcl.Traversal{
 				hcl.TraverseRoot{Name: resourceVar.Name},
-				hcl.TraverseAttr{Name: "attributes"},
 				hcl.TraverseAttr{Name: propertyName},
 			},
 			Parts: []model.Traversable{
