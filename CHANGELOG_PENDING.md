@@ -26,4 +26,6 @@
 - [features] no longer need to specify `component` property on resources, instead this is determined
   by discovering the package schema and using the value declared there.
 
+- [features] can use shorter resource types and function names against one of a couple patterns.
+
 ### Bug Fixes
