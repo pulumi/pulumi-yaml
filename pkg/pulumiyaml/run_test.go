@@ -20,6 +20,41 @@ import (
 const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
 
+type MockPackageLoader struct {
+	packages PackageMap
+	err      error
+}
+
+func (l MockPackageLoader) getPackages() (PackageMap, error) {
+	return l.packages, l.err
+}
+
+type MockPackage struct {
+	isComponent func(typeName string) (bool, error)
+}
+
+func (m MockPackage) IsComponent(typeName string) (bool, error) {
+	return m.isComponent(typeName)
+}
+
+func NewMockPackageMap() PackageMap {
+	return PackageMap{
+		"test": MockPackage{
+			isComponent: func(typeName string) (bool, error) {
+				switch typeName {
+				case testResourceToken:
+					return false, nil
+				case testComponentToken:
+					return true, nil
+				default:
+					// TODO: Remove this and fix all test cases.
+					return false, nil
+				}
+			},
+		},
+	}
+}
+
 type testMonitor struct {
 	CallF        func(args pulumi.MockCallArgs) (resource.PropertyMap, error)
 	NewResourceF func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error)
@@ -80,7 +115,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template)
+		runner := newRunner(ctx, template, make(PackageMap))
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -118,7 +153,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template)
+		runner := newRunner(ctx, template, make(PackageMap))
 		err := runner.Evaluate()
 		if err != nil {
 			return err

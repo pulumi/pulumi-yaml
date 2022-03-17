@@ -57,7 +57,7 @@ func generateCmd(name, friendlyName string, generate codegen.GenerateFunc) *cobr
 				return diags
 			}
 
-			files, cdiags, err := codegen.ConvertTemplate(template, generate)
+			files, cdiags, err := codegen.ConvertTemplate(template, generate, nil)
 			diags = diags.Extend(cdiags)
 			if err != nil {
 				return err

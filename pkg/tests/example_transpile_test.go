@@ -10,9 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +26,9 @@ import (
 	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/python"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 )
 
@@ -34,7 +39,6 @@ var (
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
 		"azure-app-service",
-		"aws-eks",
 		"webserver-json",
 		"stackreference-consumer",
 	}
@@ -50,6 +54,7 @@ var (
 		"aws-static-website":      AllLanguages(),
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
+		"aws-eks":                 AllLanguages().Except(Python),
 	}
 
 	langTests = []ConvertFunc{
@@ -116,9 +121,11 @@ func TestGenerateExamples(t *testing.T) {
 			}
 
 			pcl, tdiags, err := getValidPCLFile(template)
+			if pcl != nil {
+				// If there wasn't an error, we write out the program file, even if it is invalid PCL.
+				writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
+			}
 			require.NoError(t, err)
-			// If there wasn't an error, we write out the program file, even if it is invalid PCL.
-			writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			for _, f := range langTests {
 				f(t, template, dir.Name())
@@ -140,6 +147,30 @@ func getMain(dir string) (string, error) {
 	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
+func pluginHost() plugin.Host {
+	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
+	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
+		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
+			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
+		})
+	}
+	return deploytest.NewPluginHost(nil, nil, nil,
+		host("aws", semver.MustParse("4.26.0")),
+		host("azure-native", semver.MustParse("1.29.0")),
+		host("azure", semver.MustParse("4.18.0")),
+		host("kubernetes", semver.MustParse("3.7.2")),
+		host("random", semver.MustParse("4.2.0")),
+		host("eks", semver.MustParse("0.37.1")),
+		host("aws-native", semver.MustParse("0.13.0")),
+
+		// Extra packages are to satisfy the versioning requirement of aws-eks.
+		// While the schemas are not the correct version, we rely on not
+		// depending on the difference between them.
+		host("aws", semver.MustParse("4.15.0")),
+		host("kubernetes", semver.MustParse("3.0.0")),
+	)
+}
+
 func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file)
 	diags := hcl.Diagnostics(tdiags)
@@ -152,9 +183,9 @@ func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files)
+	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.PluginHost(pluginHost()))
 	if err != nil {
-		return nil, diags, err
+		return []byte(program), diags, err
 	}
 	diags = diags.Extend(pdiags)
 	if diags.HasErrors() {
@@ -200,7 +231,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			if shouldBeParallel() {
 				t.Parallel()
 			}
-			files, diags, err := codegen.ConvertTemplate(template, generator)
+			files, diags, err := codegen.ConvertTemplate(template, generator, pluginHost())
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			writeOrCompare(t, writeTo, files)

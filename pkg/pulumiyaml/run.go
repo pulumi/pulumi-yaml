@@ -138,13 +138,19 @@ func Run(ctx *pulumi.Context) error {
 		return multierror.Append(err, diags)
 	}
 
+	pluginCtx, packages, err := NewResourcePackageMap(t)
+	if err != nil {
+		return err
+	}
+	defer pluginCtx.Close()
+
 	// Now "evaluate" the template.
-	return RunTemplate(ctx, t)
+	return RunTemplate(ctx, t, packages)
 }
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl) error {
-	diags := newRunner(ctx, t).Evaluate()
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, packages PackageMap) error {
+	diags := newRunner(ctx, t, packages).Evaluate()
 
 	if diags.HasErrors() {
 		return diags
@@ -178,6 +184,7 @@ func (d *syncDiags) HasErrors() bool {
 type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
+	packages  PackageMap
 	config    map[string]interface{}
 	variables map[string]interface{}
 	resources map[string]lateboundResource
@@ -304,10 +311,11 @@ func (*lateboundProviderResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
 }
 
-func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl) *runner {
+func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageMap) *runner {
 	return &runner{
 		ctx:       ctx,
 		t:         t,
+		packages:  p,
 		config:    make(map[string]interface{}),
 		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
@@ -565,34 +573,45 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	// whether the type token indicates a special provider type.
 	var state lateboundResource
 	var res pulumi.Resource
+	isProvider := false
 	if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 		r := lateboundProviderResourceState{name: k}
 		state = &r
 		res = &r
+		isProvider = true
 	} else {
 		r := lateboundCustomResourceState{name: k}
 		state = &r
 		res = &r
 	}
 
-	// If the provided type token is `pkg:type`, expand it to `pkd:index:type` automatically.  We may
-	// well want to handle this more fundamentally in Pulumi itself to avoid the need for `:index:`
-	// ceremony quite generally.
-	typ := v.Type.Value
-	typParts := strings.Split(typ, ":")
-	if len(typParts) < 2 || len(typParts) > 3 {
-		ctx.error(v.Type, fmt.Sprintf("invalid type token %q for resource %q", v.Type.Value, k))
-	} else if len(typParts) == 2 {
-		typ = fmt.Sprintf("%s:index:%s", typParts[0], typParts[1])
+	tyInfo, err := resolveTypeInfo(v.Type.Value)
+	if err != nil {
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
+		return nil, false
 	}
+	typ := tyInfo.typeName
 
 	if !overallOk || ctx.sdiags.HasErrors() {
 		return nil, false
 	}
 
+	isComponent := false
+	if !isProvider {
+		pkg, found := ctx.packages[tyInfo.packageName]
+		// TODO: treat not finding a package as a failure and update integration tests,
+		if found {
+			result, err := pkg.IsComponent(tyInfo.typeName)
+			if err != nil {
+				ctx.error(v.Type, "unable to resolve type")
+				return nil, false
+			}
+			isComponent = result
+		}
+	}
+
 	// Now register the resulting resource with the engine.
-	var err error
-	if v.Component != nil && v.Component.Value {
+	if isComponent {
 		err = ctx.ctx.RegisterRemoteComponentResource(typ, k, untypedArgs(props), res, opts...)
 	} else {
 		err = ctx.ctx.RegisterResource(typ, k, untypedArgs(props), res, opts...)

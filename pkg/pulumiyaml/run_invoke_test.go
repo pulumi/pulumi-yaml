@@ -132,7 +132,7 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template)
+		runner := newRunner(ctx, template, make(PackageMap))
 		err := runner.Evaluate()
 		if err != nil {
 			return err

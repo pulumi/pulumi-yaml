@@ -127,7 +127,6 @@ The value of `resources` is an object whose keys  are logical resource names by 
 | Property        | Type | Required           | Expressions  | Description |
 | ------------- |---|-------------| -----|---|
 | `type`      | string | Yes | No | Type is the Pulumi type token for this resource. |
-| `component`      | bool | No | No | Component indicates this resources is a component.  Default `false`. |
 | `properties`      | map[string]Expression | No | Yes | Properties contains the primary resource-specific keys and values to initialize the resource state. |
 | `additionalSecretOutputs`      | string[] | No | No | AdditionalSecretOutputs specifies properties that must be encrypted as secrets |
 | `aliases`      | string[] | No | No | Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it |

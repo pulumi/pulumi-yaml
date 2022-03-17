@@ -103,8 +103,6 @@ type ResourceOptions struct {
 type Resource struct {
 	// Type is the Pulumi type token for this resource.
 	Type string `yaml:""`
-	// Component indicates this resources is a component
-	Component bool `yaml:",omitempty"`
 	// Properties contains the primary resource-specific keys and values to initialize the resource state.
 	Properties map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Options contains all Pulumi resource options used to register the resource.
