@@ -26,8 +26,7 @@ resources:
   res-dependency:
     type: test:resource:trivial
   res-a:
-    type: test:resource:type
-    component: true # required to set "remote: true" in engine and parse providers option
+    type: test:component:type
     options:
       protect: true
       provider: ${provider-a}
@@ -46,7 +45,7 @@ resources:
 				return "providerId", resource.PropertyMap{}, nil
 			case "test:resource:trivial":
 				return "resourceId", resource.PropertyMap{}, nil
-			case testResourceToken:
+			case testComponentToken:
 				assert.Equal(t, "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-a::providerId", args.RegisterRPC.Provider)
 				assert.Equal(t, map[string]string{
 					"test": "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-a::providerId",
@@ -62,7 +61,20 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template)
+		runner := newRunner(ctx, template, PackageMap{
+			"test": MockPackage{
+				isComponent: func(typeName string) (bool, error) {
+					switch typeName {
+					case testResourceToken:
+						return false, nil
+					case testComponentToken:
+						return true, nil
+					default:
+						return false, nil
+					}
+				},
+			},
+		})
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil

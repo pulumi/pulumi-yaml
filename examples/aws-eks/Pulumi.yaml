@@ -17,7 +17,6 @@ variables:
 resources:
   cluster:
     type: eks:Cluster
-    component: true
     properties:
       vpcId: ${vpcId}
       subnetIds: ${subnetIds}

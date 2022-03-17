@@ -350,7 +350,6 @@ type ResourceDecl struct {
 	declNode
 
 	Type       *StringExpr
-	Component  *BooleanExpr
 	Properties PropertyMapDecl
 	Options    ResourceOptionsDecl
 }
@@ -359,19 +358,18 @@ func (d *ResourceDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, component *BooleanExpr,
+func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr,
 	properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:   decl(node),
 		Type:       typ,
-		Component:  component,
 		Properties: properties,
 		Options:    options,
 	}
 }
 
-func Resource(typ *StringExpr, component *BooleanExpr, properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
-	return ResourceSyntax(nil, typ, component, properties, options)
+func Resource(typ *StringExpr, properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
+	return ResourceSyntax(nil, typ, properties, options)
 }
 
 type CustomTimeoutsDecl struct {
