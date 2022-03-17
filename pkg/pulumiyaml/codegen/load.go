@@ -13,6 +13,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/zclconf/go-cty/cty"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
@@ -36,6 +37,8 @@ var null = &model.Variable{
 // importRef imports a reference to a config variable or resource. These entities all correspond to top-level variables
 // in the Pulumi program, so each reference is imported as a scope traversal expression.
 func (imp *importer) importRef(node ast.Expr, name string, environment map[string]model.Expression, isAccess bool) (model.Expression, syntax.Diagnostics) {
+	// `pulumi` is not a real variable, so it doesn't make sense to look it up.
+	contract.Assertf(name != pulumiyaml.PulumiVarName, "%[1]T: %[1]v", node)
 	if v, ok := imp.configuration[name]; ok {
 		return model.VariableReference(v), nil
 	}
@@ -62,25 +65,24 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 }
 
 // Handles the special object `pulumi` injected into the global namespace of YAML programs.
-func (imp *importer) pulumiPropertyAccess(symbol *ast.SymbolExpr) (model.Expression, bool, syntax.Diagnostics) {
-	l := symbol.Property.Accessors
+func (imp *importer) pulumiPropertyAccess(node ast.Expr, accessors []ast.PropertyAccessor) (model.Expression, bool, syntax.Diagnostics) {
 	wrapDiag := func(msg string, args ...interface{}) syntax.Diagnostics {
-		return syntax.Diagnostics{ast.ExprError(symbol, fmt.Sprintf(msg, args...), "")}
+		return syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf(msg, args...), "")}
 	}
-	if len(l) == 0 {
+	if len(accessors) == 0 {
 		// Invalid SymbolExpr
 		return nil, false, wrapDiag("Cannot have empty variables")
 	}
-	if name, ok := l[0].(*ast.PropertyName); !ok || name.Name != "pulumi" {
+	if name, ok := accessors[0].(*ast.PropertyName); !ok || name.Name != pulumiyaml.PulumiVarName {
 		// Not the `pulumi` symbol, so return
 		return nil, false, nil
 	}
-	if len(l) == 1 {
+	if len(accessors) == 1 {
 		return nil, false, wrapDiag("`pulumi` is a special variable, and cannot be passed around in transpiled code.")
 	}
-	prop, ok := l[1].(*ast.PropertyName)
+	prop, ok := accessors[1].(*ast.PropertyName)
 	if !ok {
-		return nil, true, wrapDiag("cannot index into the `pulumi` variable: %v", symbol)
+		return nil, true, wrapDiag("cannot index into the `pulumi` variable: %v", node)
 	}
 	simple := model.StaticFunctionSignature{ReturnType: model.StringType}
 	switch prop.Name {
@@ -108,6 +110,10 @@ func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAcc
 	var diags syntax.Diagnostics
 
 	accessors := access.Accessors
+
+	if f, ok, diags := imp.pulumiPropertyAccess(node, accessors); ok {
+		return f, diags
+	}
 
 	receiver, rdiags := imp.importRef(node, accessors[0].(*ast.PropertyName).Name, environment, len(accessors) > 1)
 	diags.Extend(rdiags...)
@@ -370,7 +376,7 @@ func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnos
 	case *ast.InterpolateExpr:
 		return imp.importInterpolate(node, nil)
 	case *ast.SymbolExpr:
-		if f, ok, diags := imp.pulumiPropertyAccess(node); ok {
+		if f, ok, diags := imp.pulumiPropertyAccess(node, node.Property.Accessors); ok {
 			return f, diags
 		}
 		return imp.importPropertyAccess(node, node.Property, nil)
