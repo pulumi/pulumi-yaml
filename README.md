@@ -20,7 +20,7 @@ resources:
   index.html:
     type: aws:s3/bucketObject:BucketObject
     properties:
-      bucket: !Ref my-bucket
+      bucket: ${my-bucket}
       source:
         Fn::StringAsset: <h1>Hello, world!</h1>
       acl: public-read
@@ -176,14 +176,6 @@ unicode_digit  is a Unicode code point classified as "Number, decimal digit"
 An expression `a.b` is evaluated as if it were an expression object `{ "Fn:GetAtt": [ a, b] }`.  An expression `a` is evaluated as it it were an expression object `{ "Ref": a }`.
 
 #### Expression Objects
-
-##### `Ref`
-
-TODO
-
-##### `Fn::GetAtt`
-
-TODO
 
 ##### `Fn::Invoke`
 

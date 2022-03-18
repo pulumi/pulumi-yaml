@@ -242,7 +242,7 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //   the string is of the form "${resource.property}", it is treated as a symbol. If the result contains no property
 //   accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 // - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
-//   that key names a builtin function ("Ref", "Fn::GetAtt", "Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select",
+//   that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select",
 //   "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
 //   Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
@@ -402,50 +402,6 @@ func (n *builtinNode) Name() *StringExpr {
 
 func (n *builtinNode) Args() Expr {
 	return n.args
-}
-
-// RefExpr is a function expression that computes a reference to another resource.
-type RefExpr struct {
-	builtinNode
-
-	ResourceName *StringExpr
-}
-
-func RefSyntax(node *syntax.ObjectNode, name *StringExpr, resourceName *StringExpr) *RefExpr {
-	return &RefExpr{
-		builtinNode:  builtin(node, name, resourceName),
-		ResourceName: resourceName,
-	}
-}
-
-func Ref(resourceName string) *RefExpr {
-	return &RefExpr{ResourceName: String(resourceName)}
-}
-
-// GetAttExpr is a function expression that accesses an output property of another resources.
-type GetAttExpr struct {
-	builtinNode
-
-	ResourceName *StringExpr
-	// TODO: CloudFormation allows nested Ref in PropertyName, so this could be an Expr
-	PropertyName *StringExpr
-}
-
-func GetAttSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, resourceName, propertyName *StringExpr) *GetAttExpr {
-	return &GetAttExpr{
-		builtinNode:  builtin(node, name, args),
-		ResourceName: resourceName,
-		PropertyName: propertyName,
-	}
-}
-
-func GetAtt(resourceName, propertyName string) *GetAttExpr {
-	name, resName, propName := String("Fn::GetAtt"), String(resourceName), String(propertyName)
-	return &GetAttExpr{
-		builtinNode:  builtin(nil, name, List(resName, propName)),
-		ResourceName: resName,
-		PropertyName: propName,
-	}
 }
 
 // InvokeExpr is a function expression that invokes a Pulumi function by type token.
@@ -751,10 +707,6 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 
 	var parse func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)
 	switch kvp.Key.Value() {
-	case "Ref":
-		parse = parseRef
-	case "Fn::GetAtt":
-		parse = parseGetAtt
 	case "Fn::Invoke":
 		parse = parseInvoke
 	case "Fn::Join":
@@ -796,41 +748,6 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	}
 
 	return expr, diags, true
-}
-
-// parseRef reads and validates the arguments to Ref.
-func parseRef(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	str, ok := args.(*StringExpr)
-	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the resource name for Ref must be a string literal", "")}
-	}
-	return RefSyntax(node, name, str), nil
-}
-
-// parseGetAtt reads and validates the arguments to Fn::GetAtt.
-func parseGetAtt(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::GetAtt must be a two-valued list", "")}
-	}
-
-	var diags syntax.Diagnostics
-
-	resourceName, ok := list.Elements[0].(*StringExpr)
-	if !ok {
-		diags.Extend(ExprError(list.Elements[0], "the first argument to Fn::GetAtt must be a string literal", ""))
-	}
-
-	propertyName, ok := list.Elements[1].(*StringExpr)
-	if !ok {
-		diags.Extend(ExprError(list.Elements[0], "the second argument to Fn::GetAtt must be a string literal", ""))
-	}
-
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return GetAttSyntax(node, name, list, resourceName, propertyName), diags
 }
 
 func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
