@@ -92,12 +92,10 @@ var (
 // ```
 //
 // This will add the current transpile result to the known results.
+//nolint:paralleltest // yarn install concurrency bug if two "yarn" executions try to cache a file
 func TestGenerateExamples(t *testing.T) {
-	t.Parallel()
-
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
-	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via "dir.Name()"
 	for _, dir := range examples {
 		dir := dir
 		t.Run(dir.Name(), func(t *testing.T) {
