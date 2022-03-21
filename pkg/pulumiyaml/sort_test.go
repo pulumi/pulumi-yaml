@@ -65,9 +65,7 @@ func TestSortOrdered(t *testing.T) {
 			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
-					"Bucket": map[string]interface{}{
-						"Fn::GetAtt": []interface{}{"my-bucket", "bucketDomainName"},
-					},
+					"Bucket":  "${my-bucket.bucketDomainName}",
 					"Content": "Hello, world!",
 					"Key":     "info.txt",
 				},
@@ -88,9 +86,7 @@ func TestSortUnordered(t *testing.T) {
 			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
-					"Bucket": map[string]interface{}{
-						"Fn::GetAtt": []interface{}{"my-bucket", "bucketDomainName"},
-					},
+					"Bucket":  "${my-bucket.bucketDomainName}",
 					"Content": "Hello, world!",
 					"Key":     "info.txt",
 				},
@@ -115,9 +111,7 @@ func TestSortErrorCycle(t *testing.T) {
 			"my-object": {
 				Type: "aws:s3/bucketObject:BucketObject",
 				Properties: map[string]interface{}{
-					"Bucket": map[string]interface{}{
-						"Fn::GetAtt": []interface{}{"my-bucket", "bucketDomainName"},
-					},
+					"Bucket":  "${my-bucket.bucketDomainName}",
 					"Content": "Hello, world!",
 					"Key":     "info.txt",
 				},
@@ -125,9 +119,7 @@ func TestSortErrorCycle(t *testing.T) {
 			"my-bucket": {
 				Type: "aws:s3/bucket:Bucket",
 				Properties: map[string]interface{}{
-					"Invalid": map[string]interface{}{
-						"Fn::GetAtt": []interface{}{"my-object", "id"},
-					},
+					"Invalid": "${my-object.id}",
 				},
 			},
 		},

@@ -25,7 +25,7 @@ resources:
   index.html:
     type: aws:s3/bucketObject:BucketObject
     properties:
-      bucket: !Ref my-bucket
+      bucket: ${my-bucket}
       source:
         Fn::StringAsset: <h1>Hello, world!</h1>
       acl: public-read

@@ -189,8 +189,8 @@ resources:
     properties:
       foo: ${res-a.bar}
 outputs:
-  foo: !GetAtt res-a.foo
-  bar: !Ref res-a
+  foo: ${res-a.foo}
+  bar: ${res-a}
 `
 	tmpl := yamlTemplate(t, text)
 	testTemplate(t, tmpl, func(r *evalContext) {})
@@ -252,13 +252,13 @@ resources:
     properties:
       foo: oof
 outputs:
-  out: !Ref res-b
+  out: ${res-b}
 `
 
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
-	assert.Equal(t, "<stdin>:9:8: resource Ref named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
@@ -368,15 +368,8 @@ func TestJSON(t *testing.T) {
 		}
 	},
 	"outputs": {
-		"foo": {
-			"Fn::GetAtt": [
-				"res-a",
-				"bar"
-			]
-		},
-		"bar": {
-			"Ref": "res-a"
-		}
+		"foo": "${res-a.bar}",
+		"bar": "${res-a}"
 	}
 }`
 
@@ -397,9 +390,7 @@ func TestJSONDiags(t *testing.T) {
 		}
 	},
 	"outputs": {
-		"foo": {
-			"Ref": "res-b"
-		}
+		"foo": "${res-b}"
 	}
 }
 `
@@ -408,7 +399,7 @@ func TestJSONDiags(t *testing.T) {
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	require.Len(t, diags, 1)
-	assert.Equal(t, "<stdin>:13:10: resource Ref named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
 func TestPropertyAccess(t *testing.T) {
@@ -673,9 +664,13 @@ func TestSelect(t *testing.T) {
 		{
 			input: &ast.SelectExpr{
 				Index: ast.Number(0),
-				Values: &ast.GetAttExpr{
-					ResourceName: ast.String("resA"),
-					PropertyName: ast.String("outList"),
+				Values: &ast.SymbolExpr{
+					Property: &ast.PropertyAccess{
+						Accessors: []ast.PropertyAccessor{
+							&ast.PropertyName{Name: "resA"},
+							&ast.PropertyName{Name: "outList"},
+						},
+					},
 				},
 			},
 			expected: map[string]interface{}{"value": 42.0},
@@ -683,9 +678,13 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			input: &ast.SelectExpr{
-				Index: &ast.GetAttExpr{
-					ResourceName: ast.String("resA"),
-					PropertyName: ast.String("outNum"),
+				Index: &ast.SymbolExpr{
+					Property: &ast.PropertyAccess{
+						Accessors: []ast.PropertyAccessor{
+							&ast.PropertyName{Name: "resA"},
+							&ast.PropertyName{Name: "outNum"},
+						},
+					},
 				},
 				Values: ast.List(
 					ast.String("first"),
@@ -870,45 +869,5 @@ func TestSub(t *testing.T) {
 			return nil, nil
 		})
 		r.ctx.Export("out", out)
-	})
-}
-
-func TestRef(t *testing.T) {
-	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{
-			"resA": {
-				Type: testResourceToken,
-				Properties: map[string]interface{}{
-					"foo": "oof",
-				},
-			},
-			"compA": {
-				Type: testComponentToken,
-				Properties: map[string]interface{}{
-					"foo": "oof",
-				},
-			},
-		},
-	})
-	testTemplate(t, tmpl, func(r *evalContext) {
-		{
-			v, ok := r.evaluateBuiltinRef(ast.Ref("resA"))
-
-			assert.True(t, ok)
-			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
-				assert.Equal(t, "someID", x)
-				return nil, nil
-			})
-			r.ctx.Export("out", out)
-		}
-		{
-			v, ok := r.evaluateBuiltinRef(ast.Ref("compA"))
-			assert.True(t, ok)
-			out := v.(pulumi.StringOutput).ApplyT(func(x string) (interface{}, error) {
-				assert.Equal(t, "", x)
-				return nil, nil
-			})
-			r.ctx.Export("out", out)
-		}
 	})
 }

@@ -53,19 +53,13 @@
             ]
           ]
         },
-        "vpcSecurityGroupIds": [{ "Ref": "WebSecGrp" }]
+        "vpcSecurityGroupIds": ["${WebSecGrp.id}"]
       }
     }
   },
   "Outputs": {
-    "InstanceId": {
-      "Ref": "WebServer"
-    },
-    "PublicIp": {
-      "Fn::GetAtt": ["WebServer", "publicIp"]
-    },
-    "PublicHostName": {
-      "Fn::GetAtt": ["WebServer", "publicDns"]
-    }
+    "InstanceId": "${WebServer.id}",
+    "PublicIp": "${WebServer.publicIp}",
+    "PublicHostName": "${WebServer.publicDns}"
   }
 }

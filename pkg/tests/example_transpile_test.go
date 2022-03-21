@@ -40,7 +40,6 @@ var (
 	failingExamples = []string{
 		"azure-container-apps",
 		"azure-app-service",
-		"webserver-json",
 		"stackreference-consumer",
 	}
 
@@ -54,6 +53,7 @@ var (
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
 		"webserver":               AllLanguages().Except(Nodejs),
+		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
 	}
 
