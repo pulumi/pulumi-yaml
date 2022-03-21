@@ -38,7 +38,7 @@ resources:
         name: "PerGB2018"
       retentionInDays: 30
   kubeEnv:
-    type: azure-native:web/v20210301:KubeEnvironment
+    type: azure-native:web:KubeEnvironment
     properties:
       resourceGroupName: ${resourceGroup.name}
       environmentType: Managed
