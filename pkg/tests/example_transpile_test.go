@@ -38,7 +38,6 @@ var (
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
-		"azure-app-service",
 		"stackreference-consumer",
 	}
 
@@ -55,6 +54,7 @@ var (
 		"azure-container-apps":    AllLanguages(),
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
+		"azure-app-service":       AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{
