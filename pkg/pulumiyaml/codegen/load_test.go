@@ -90,6 +90,17 @@ outputs:
 				"Unknown property of the `pulumi` variable: 'bar'; " +
 				"Unknown property of the `pulumi` variable: 'bar'"},
 		},
+		{
+			name: "interpolate pulumi variable",
+			input: `
+outputs:
+  foo: ${pulumi.cwd}/folder
+`,
+			expected: `output foo {
+	value = "${cwd()}/folder"
+}
+`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
