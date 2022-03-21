@@ -117,6 +117,7 @@ func (m FakePackage) Name() string {
 	return "fake"
 }
 
+//nolint:paralleltest // mutates environment variables
 func TestGenerateProgram(t *testing.T) {
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
