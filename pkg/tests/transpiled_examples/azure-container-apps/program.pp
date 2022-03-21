@@ -26,7 +26,7 @@ resource workspace "azure-native:operationalinsights:Workspace" {
 	retentionInDays = 30
 }
 
-resource kubeEnv "azure-native:web/v20210301:KubeEnvironment" {
+resource kubeEnv "azure-native:web:KubeEnvironment" {
 	resourceGroupName = resourceGroup.name
 	environmentType = "Managed"
 	appLogsConfiguration = {
