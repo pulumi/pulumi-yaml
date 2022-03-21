@@ -34,9 +34,9 @@ output instanceId {
 }
 
 output publicIp {
-	value = webServer.attributes.publicIp
+	value = webServer.publicIp
 }
 
 output publicHostName {
-	value = webServer.attributes.publicDns
+	value = webServer.publicDns
 }

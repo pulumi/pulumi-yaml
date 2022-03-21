@@ -33,7 +33,7 @@ install::
 
 clean::
 	rm -f ./bin/*
-	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random,eks,aws-native}.json
+	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random,eks,aws-native,docker}.json
 
 ensure::
 	${GO} mod download
@@ -74,11 +74,16 @@ test_gen: get_schemas
 name=$(subst schema-,,$(word 1,$(subst !, ,$@)))
 version=$(word 2,$(subst !, ,$@))
 schema-%:
-	@echo Ensuring $@
+	@echo "Ensuring $@ => ${name}, ${version}"
 	@[ -f pkg/pulumiyaml/testing/test/testdata/${name}.json ] || \
 		curl "https://raw.githubusercontent.com/pulumi/pulumi-${name}/v${version}/provider/cmd/pulumi-resource-${name}/schema.json" \
 	 	| jq '.version = "${version}"' >  pkg/pulumiyaml/testing/test/testdata/${name}.json
-get_schemas: schema-aws!4.26.0 schema-azure-native!1.29.0 \
+	@FOUND="$$(jq -r '.version' pkg/pulumiyaml/testing/test/testdata/${name}.json)" &&     \
+		if ! [ "$$FOUND" = "${version}" ]; then									           \
+			echo "${name} required version ${version} but found existing version $$FOUND"; \
+			exit 1;																		   \
+		fi
+get_schemas: schema-aws!4.26.0 schema-azure-native!1.56.0 \
 			 schema-azure!4.18.0 schema-kubernetes!3.7.2  \
 			 schema-random!4.2.0 schema-eks!0.37.1        \
-			 schema-aws-native!0.13.0
+			 schema-aws-native!0.13.0 schema-docker!3.1.0

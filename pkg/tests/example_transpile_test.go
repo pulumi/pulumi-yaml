@@ -38,8 +38,6 @@ var (
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
-		"azure-container-apps",
-		"webserver-json",
 		"stackreference-consumer",
 	}
 
@@ -53,6 +51,8 @@ var (
 		"azure-static-website":    AllLanguages(),
 		"aws-static-website":      AllLanguages(),
 		"webserver":               AllLanguages().Except(Nodejs),
+		"azure-container-apps":    AllLanguages(),
+		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
 		"azure-app-service":       AllLanguages(),
 	}
@@ -156,12 +156,13 @@ func pluginHost() plugin.Host {
 	}
 	return deploytest.NewPluginHost(nil, nil, nil,
 		host("aws", semver.MustParse("4.26.0")),
-		host("azure-native", semver.MustParse("1.29.0")),
+		host("azure-native", semver.MustParse("1.56.0")),
 		host("azure", semver.MustParse("4.18.0")),
 		host("kubernetes", semver.MustParse("3.7.2")),
 		host("random", semver.MustParse("4.2.0")),
 		host("eks", semver.MustParse("0.37.1")),
 		host("aws-native", semver.MustParse("0.13.0")),
+		host("docker", semver.MustParse("3.1.0")),
 
 		// Extra packages are to satisfy the versioning requirement of aws-eks.
 		// While the schemas are not the correct version, we rely on not
