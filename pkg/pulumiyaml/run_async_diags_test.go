@@ -38,6 +38,8 @@ func (l *interceptingLog) Error(msg string, args *pulumi.LogArgs) error {
 
 // Test that errors within applies propagate to Pulumi's error logging
 func TestAsyncDiagsOptions(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

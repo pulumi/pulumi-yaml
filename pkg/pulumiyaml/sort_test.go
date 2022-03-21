@@ -56,6 +56,8 @@ func template(t *testing.T, tm *Template) *ast.TemplateDecl {
 }
 
 func TestSortOrdered(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"my-bucket": {
@@ -81,6 +83,8 @@ func TestSortOrdered(t *testing.T) {
 }
 
 func TestSortUnordered(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"my-object": {
@@ -106,6 +110,8 @@ func TestSortUnordered(t *testing.T) {
 }
 
 func TestSortErrorCycle(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"my-object": {

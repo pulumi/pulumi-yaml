@@ -11,6 +11,8 @@ import (
 )
 
 func TestVersionValueComplex(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -38,6 +40,8 @@ resources:
 }
 
 func TestVersionValuePatched(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -65,6 +69,8 @@ resources:
 }
 
 func TestVersionValueMajorMinor(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -92,6 +98,8 @@ resources:
 }
 
 func TestVersionOnExample(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 configuration:
   InstanceType:
@@ -166,6 +174,8 @@ outputs:
 }
 
 func TestVersionDuplicate(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -201,6 +211,8 @@ resources:
 }
 
 func TestVersionConflicts(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

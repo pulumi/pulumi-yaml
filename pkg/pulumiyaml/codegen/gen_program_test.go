@@ -263,6 +263,8 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 
 // Tests both isEscapedString and asEscapedString.
 func TestEscapedString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input     string
 		isEscaped bool   // If input is escaped
@@ -277,7 +279,10 @@ func TestEscapedString(t *testing.T) {
 		{`"goo\\"bar"`, false, `"goo\\\"bar"`},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.isEscaped, isEscapedString(tt.input))
 			s := asEscapedString(tt.input)
 			assert.Equal(t, tt.asEscaped, s)

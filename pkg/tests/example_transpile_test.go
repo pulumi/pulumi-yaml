@@ -93,11 +93,15 @@ var (
 //
 // This will add the current transpile result to the known results.
 func TestGenerateExamples(t *testing.T) {
+	t.Parallel()
+
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
+	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via "dir.Name()"
 	for _, dir := range examples {
 		dir := dir
 		t.Run(dir.Name(), func(t *testing.T) {
+			t.Parallel()
 			var skip bool
 			for _, ex := range failingExamples {
 				if ex == dir.Name() {

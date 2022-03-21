@@ -37,6 +37,8 @@ func (m FakePackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
 }
 
 func TestResourceOptions(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

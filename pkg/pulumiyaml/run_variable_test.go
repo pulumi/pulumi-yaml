@@ -17,6 +17,8 @@ import (
 
 // Test that we can evaluate the Pulumi built-in variable.
 func TestVariablePulumi(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -65,6 +67,8 @@ outputs:
 }
 
 func TestVariablePulumiInDependencies(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -93,6 +97,8 @@ resources:
 //  1. Resource `res-a` depends on variable `someVar`
 //  2. Variable `someVar` has no dependencies
 func TestVariableInput(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -121,6 +127,8 @@ resources:
 //  2. Variable `someVar` depends on resource `res-a`
 //  3. `res-a` has no dependencies
 func TestVariableIntermediate(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -154,6 +162,8 @@ resources:
 //  2. Variable `passthrough` depends on resource `res-a`
 //  3. `res-a` has no dependencies
 func TestVariableDoubleIntermediate(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -191,6 +201,8 @@ resources:
 //  1. Variable `someVar` depends on resource `res-a`
 //  1. Resource `res-a` depends on nothing
 func TestVariableOutput(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -216,6 +228,8 @@ outputs:
 }
 
 func TestVariableMemozied(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -248,6 +262,8 @@ resources:
 
 // Tests that the invoke is still called even when it is not referenced by any resource.
 func TestUnusedVariablesEvaluated(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

@@ -29,22 +29,27 @@ func exampleDir(dir string) string {
 	return filepath.Join("../../examples/", dir)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestRandom(t *testing.T) {
 	testWrapper(t, exampleDir("random"))
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleAwsStaticWebsite(t *testing.T) {
 	testWrapper(t, exampleDir("aws-static-website"), RequireLiveRun, awsConfig)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleAzureStaticWebsite(t *testing.T) {
 	testWrapper(t, exampleDir("azure-static-website"), RequireLiveRun, azureConfig)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleAzureAppService(t *testing.T) {
 	testWrapper(t, exampleDir("azure-app-service"), RequireLiveRun, azureConfig)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleGettingStarted(t *testing.T) {
 	testWrapper(t, exampleDir("getting-started"), RequireLiveRun, awsConfig)
 }
@@ -126,14 +131,17 @@ func stackReferenceSourceProject(t *testing.T) string {
 	return stackName
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleWebserver(t *testing.T) {
 	testWrapper(t, exampleDir("webserver"), RequireLiveRun, ExpectRefreshChanges, awsConfig)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExampleWebserverJson(t *testing.T) {
 	testWrapper(t, exampleDir("webserver-json"), ExpectRefreshChanges, RequireLiveRun, awsConfig)
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestExamplePulumiVariable(t *testing.T) {
 	testWrapper(t, exampleDir("pulumi-variable"),
 		RequireLiveRun,

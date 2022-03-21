@@ -15,6 +15,8 @@ import (
 )
 
 func TestInvokeOutputs(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -40,6 +42,8 @@ resources:
 }
 
 func TestInvokeVariable(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -62,6 +66,8 @@ resources:
 }
 
 func TestInvokeOutputVariable(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

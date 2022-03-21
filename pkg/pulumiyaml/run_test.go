@@ -201,6 +201,8 @@ func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*evalC
 }
 
 func TestYAML(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -222,6 +224,8 @@ outputs:
 }
 
 func TestAssetOrArchive(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 variables:
   dir:
@@ -253,6 +257,8 @@ variables:
 }
 
 func TestPropertiesAbsent(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -269,6 +275,8 @@ resources:
 }
 
 func TestYAMLDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -287,6 +295,8 @@ outputs:
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 configuration:
@@ -322,6 +332,8 @@ resources:
 }
 
 func TestConflictKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 configuration:
@@ -350,6 +362,8 @@ resources:
 }
 
 func TestConflictResourceVarKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 variables:
@@ -374,6 +388,8 @@ resources:
 }
 
 func TestJSON(t *testing.T) {
+	t.Parallel()
+
 	const text = `{
 	"name": "test-yaml",
 	"runtime": "yaml",
@@ -403,6 +419,8 @@ func TestJSON(t *testing.T) {
 }
 
 func TestJSONDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `{
 	"name": "test-yaml",
 	"runtime": "yaml",
@@ -428,6 +446,7 @@ func TestJSONDiags(t *testing.T) {
 }
 
 func TestPropertyAccess(t *testing.T) {
+	t.Parallel()
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
@@ -449,6 +468,8 @@ func TestPropertyAccess(t *testing.T) {
 }
 
 func TestJoin(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
@@ -502,6 +523,8 @@ func TestJoin(t *testing.T) {
 }
 
 func TestSplit(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.SplitExpr
 		expected []string
@@ -544,8 +567,12 @@ func TestSplit(t *testing.T) {
 			isOutput: true,
 		},
 	}
+	//nolint:paralleltest // false positive that the "tt" var isn't used, it is via "tt.expected"
 	for _, tt := range tests {
+		tt := tt
 		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -574,6 +601,8 @@ func TestSplit(t *testing.T) {
 }
 
 func TestToJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.ToJSONExpr
 		expected string
@@ -641,7 +670,10 @@ func TestToJSON(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -670,6 +702,8 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.SelectExpr
 		expected interface{}
@@ -754,8 +788,12 @@ func TestSelect(t *testing.T) {
 			isError: true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via idx
+	for idx, tt := range tests {
+		tt := tt
+		t.Run(fmt.Sprint(idx), func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -792,6 +830,8 @@ func TestSelect(t *testing.T) {
 }
 
 func TestToBase64(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.ToBase64Expr
 		expected string
@@ -831,7 +871,10 @@ func TestToBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -865,6 +908,8 @@ func TestToBase64(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Variables: map[string]interface{}{
 			"foo": "oof",
