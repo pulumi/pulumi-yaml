@@ -85,7 +85,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, NewMockPackageMap())
+		runner := newRunner(ctx, template, newMockPackageMap())
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil

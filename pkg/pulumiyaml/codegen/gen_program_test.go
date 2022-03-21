@@ -6,16 +6,73 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
+	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
+
+var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
+	{Package: "aws", Version: "4.26.0"},
+	{Package: "azure-native", Version: "1.56.0"},
+	{Package: "azure", Version: "4.18.0"},
+	{Package: "kubernetes", Version: "3.7.2"},
+	{Package: "random", Version: "4.2.0"},
+	{Package: "eks", Version: "0.37.1"},
+	{Package: "aws-native", Version: "0.13.0"},
+	{Package: "docker", Version: "3.1.0"},
+
+	// Extra packages are to satisfy the versioning requirement of aws-eks.
+	// While the schemas are not the correct version, we rely on not
+	// depending on the difference between them.
+	{Package: "aws", Version: "4.15.0"},
+	{Package: "kubernetes", Version: "3.0.0"},
+}
+
+type testPackageLoader struct{ *testing.T }
+
+func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+	if name == "other" || name == "test" {
+		return FakePackage{l.T}, nil
+	}
+
+	pkg, err := rootPluginLoader.LoadPackage(name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return pulumiyaml.NewResourcePackage(pkg), nil
+}
+
+func (l testPackageLoader) Close() {}
+
+func newPluginLoader() schema.Loader {
+	schemaLoadPath := filepath.Join("..", "testing", "test", "testdata")
+	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
+		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
+			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
+		})
+	}
+	var pluginLoaders []*deploytest.PluginLoader
+	for _, p := range defaultPlugins {
+		pluginLoaders = append(pluginLoaders, host(tokens.Package(p.Package), semver.MustParse(p.Version)))
+	}
+
+	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
+}
+
+var rootPluginLoader schema.Loader = newPluginLoader()
 
 // We stub out the real plugin hosting architecture for a fake that gives us reasonably good
 // results without the time and compute
@@ -25,37 +82,11 @@ type FakePackage struct {
 
 func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
 	switch typeName {
-	case "aws:ec2/instance:Instance",
-		"aws:ec2/networkAcl:NetworkAcl",
-		"aws:ec2/networkAclRule:NetworkAclRule",
-		"aws:ec2/securityGroup:SecurityGroup",
-		"aws:ec2/vpc:Vpc",
-		"aws:ec2/vpcEndpoint:VpcEndpoint",
-		"aws:ecs/cluster:Cluster",
-		"aws:ecs/service:Service",
-		"aws:ecs/taskDefinition:TaskDefinition",
-		"aws:elasticloadbalancingv2/listener:Listener",
-		"aws:elasticloadbalancingv2/loadBalancer:LoadBalancer",
-		"aws:elasticloadbalancingv2/targetGroup:TargetGroup",
-		"aws:iam/policy:Policy",
-		"aws:iam/role:Role",
-		"aws:iam/rolePolicyAttachment:RolePolicyAttachment",
-		"aws:rds/cluster:Cluster",
-		"aws:s3/bucket:Bucket",
-		"azure-native:cdn:Endpoint",
-		"azure-native:network:FrontDoor",
-		"kubernetes:apps/v1:Deployment",
-		"kubernetes:core/v1:Pod",
-		"kubernetes:core/v1:ServiceAccount",
-		"kubernetes:rbac.authorization.k8s.io/v1:Role",
-		"kubernetes:rbac.authorization.k8s.io/v1:RoleBinding",
-		"other:index:Thing",
-		"other:module:Object",
-		"pulumi:providers:aws",
-		"random:index/randomPet:RandomPet":
-		return pulumiyaml.CanonicalTypeToken(typeName), nil
-	// TestImportTemplate fakes:
-	case "test:mod:prov", "test:mod:typ":
+	case
+		// TestImportTemplate fakes:
+		"test:mod:prov", "test:mod:typ",
+		// third-party-package fakes:
+		"other:index:Thing", "other:module:Object":
 		return pulumiyaml.CanonicalTypeToken(typeName), nil
 	default:
 		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
@@ -65,19 +96,9 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeT
 }
 
 func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
-	switch typeName {
-	case "aws:ec2/getVpc:getVpc",
-		"aws:ec2/getSubnetIds:getSubnetIds",
-		"aws:iam/getPolicyDocument:getPolicyDocument",
-		"aws:index/getAmi:getAmi",
-		"aws:ec2/getPrefixList:getPrefixList",
-		"aws:ec2/getAmiIds:getAmiIds":
-		return pulumiyaml.CanonicalTypeToken(typeName), nil
-	default:
-		msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
-		m.t.Logf(msg)
-		return "", fmt.Errorf(msg)
-	}
+	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
+	m.t.Logf(msg)
+	return "", fmt.Errorf(msg)
 }
 
 func (m FakePackage) IsComponent(typeName pulumiyaml.CanonicalTypeToken) (bool, error) {
@@ -92,19 +113,11 @@ func (m FakePackage) IsComponent(typeName pulumiyaml.CanonicalTypeToken) (bool, 
 	return false, fmt.Errorf(msg)
 }
 
-func newFakePackageMap(t *testing.T) pulumiyaml.PackageMap {
-	return pulumiyaml.PackageMap{
-		"aws":          FakePackage{t},
-		"azure-native": FakePackage{t},
-		"kubernetes":   FakePackage{t},
-		"other":        FakePackage{t},
-		"random":       FakePackage{t},
-		"test":         FakePackage{t},
-	}
+func (m FakePackage) Name() string {
+	return "fake"
 }
 
 func TestGenerateProgram(t *testing.T) {
-	skipNonexistantPackageTest := false
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
 			{
@@ -126,39 +139,11 @@ func TestGenerateProgram(t *testing.T) {
 				// Note: aws-s3-folder errors with
 				// 14,27-52: the asset parameter must be a string literal; the asset parameter must be a string literal
 				// But the actual error is that it is using a Splat operator.
-			case "third-party-package":
-				if !skipNonexistantPackageTest {
-					// Reason: when we run the full aka integration test, we allow Pulumi to host the plugin
-					// packages and perform real schema resolution. This test uses a fake package named
-					// "other".
-					l = append(l, tt)
-				}
 			default:
 				l = append(l, tt)
 			}
 		}
 		return l
-	}
-
-	var packageMap pulumiyaml.PackageMap
-	if testing.Short() {
-		packageMap = newFakePackageMap(t)
-	} else {
-		var err error
-		plugins := []pulumiyaml.Plugin{
-			{Package: "aws"},
-			{Package: "kubernetes"},
-			{Package: "random"},
-			{Package: "azure-native"},
-		}
-		pluginCtx, pkgMap, err := pulumiyaml.NewResourcePackageMap(plugins)
-		t.Cleanup(func() { pluginCtx.Close() })
-		assert.NoError(t, err)
-		if err != nil {
-			t.FailNow()
-		}
-		packageMap = pkgMap
-		skipNonexistantPackageTest = true
 	}
 
 	check := func(t *testing.T, output string, _ codegen.StringSet) {
@@ -168,7 +153,7 @@ func TestGenerateProgram(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
 		err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-			return pulumiyaml.RunTemplate(ctx, templateDecl, packageMap)
+			return pulumiyaml.RunTemplate(ctx, templateDecl, testPackageLoader{t})
 		}, pulumi.WithMocks("test", "gen", &testMonitor{}))
 		assert.NoError(t, err)
 	}

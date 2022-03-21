@@ -73,7 +73,7 @@ resources:
 	var hoistedRunner *runner
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		ctx.Log = log
-		r := newRunner(ctx, template, NewMockPackageMap())
+		r := newRunner(ctx, template, newMockPackageMap())
 		hoistedRunner = r
 		diags := r.Evaluate()
 		// 1. This test demonstrates that the synchronous output of evaluate is nil

@@ -138,24 +138,19 @@ func Run(ctx *pulumi.Context) error {
 		return multierror.Append(err, diags)
 	}
 
-	plugins, diags := GetReferencedPlugins(t)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	pluginCtx, packages, err := NewResourcePackageMap(plugins)
+	loader, err := NewPackageLoader()
 	if err != nil {
 		return err
 	}
-	defer pluginCtx.Close()
+	defer loader.Close()
 
 	// Now "evaluate" the template.
-	return RunTemplate(ctx, t, packages)
+	return RunTemplate(ctx, t, loader)
 }
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, packages PackageMap) error {
-	diags := newRunner(ctx, t, packages).Evaluate()
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
+	diags := newRunner(ctx, t, loader).Evaluate()
 
 	if diags.HasErrors() {
 		return diags
@@ -189,7 +184,7 @@ func (d *syncDiags) HasErrors() bool {
 type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
-	packages  PackageMap
+	pkgLoader PackageLoader
 	config    map[string]interface{}
 	variables map[string]interface{}
 	resources map[string]lateboundResource
@@ -316,11 +311,11 @@ func (*lateboundProviderResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
 }
 
-func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageMap) *runner {
+func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
 	return &runner{
 		ctx:       ctx,
 		t:         t,
-		packages:  p,
+		pkgLoader: p,
 		config:    make(map[string]interface{}),
 		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
@@ -590,7 +585,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		res = &r
 	}
 
-	tyInfo, err := ResolveResource(v.Type.Value, ctx.packages)
+	tyInfo, err := ResolveResource(v.Type.Value, ctx.pkgLoader)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		return nil, false
@@ -918,7 +913,7 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		functionName, err := ResolveFunction(t.Token.Value, ctx.packages)
+		functionName, err := ResolveFunction(t.Token.Value, ctx.pkgLoader)
 		if err != nil {
 			return ctx.error(t, err.Error())
 		}

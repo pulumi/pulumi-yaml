@@ -12,9 +12,9 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/iancoleman/strcase"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,87 +32,6 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 )
-
-// We stub out the real plugin hosting architecture for a fake that gives us reasonably good
-// results without the time and compute
-type FakePackage struct {
-	t *testing.T
-}
-
-func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
-	switch typeName {
-	case "random:RandomPassword":
-		// classic provider used with "index" in the name
-		parts := strings.Split(typeName, ":")
-		name := fmt.Sprintf("%v:index/%v:%v", parts[0], strcase.ToLowerCamel(parts[1]), parts[1])
-		return pulumiyaml.CanonicalTypeToken(name), nil
-	case
-		// classic providers that repeat the last label in the type token
-		"aws:ec2:Instance",
-		"aws:ec2:SecurityGroup",
-		"aws:s3:Bucket",
-		"aws:s3:BucketObject",
-		"aws:s3:BucketPolicy":
-		parts := strings.Split(typeName, ":")
-		name := fmt.Sprintf("%v:%v/%v:%v", parts[0], parts[1], strcase.ToLowerCamel(parts[2]), parts[2])
-		return pulumiyaml.CanonicalTypeToken(name), nil
-	case
-		"aws-native:s3:Bucket",
-		"azure-native:resources:ResourceGroup",
-		"azure-native:storage:Blob",
-		"azure-native:storage:StorageAccount",
-		"azure-native:storage:StorageAccountStaticWebsite",
-		"pulumi:providers:aws":
-		return pulumiyaml.CanonicalTypeToken(typeName), nil
-	default:
-		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
-		m.t.Logf(msg)
-		return "", fmt.Errorf(msg)
-	}
-}
-
-func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
-	switch typeName {
-	case "aws:getAmi":
-		// classic provider used with "index" in the name
-		parts := strings.Split(typeName, ":")
-		name := fmt.Sprintf("%v:index/%v:%v", parts[0], strcase.ToLowerCamel(parts[1]), parts[1])
-		return pulumiyaml.CanonicalTypeToken(name), nil
-	case "aws:ec2:getAmiIds",
-		"aws:ec2:getPrefixList",
-		"aws:ec2:getSubnetIds":
-		// classic providers that repeat the last label in the type token
-		parts := strings.Split(typeName, ":")
-		name := fmt.Sprintf("%v:%v/%v:%v", parts[0], parts[1], strcase.ToLowerCamel(parts[2]), parts[2])
-		return pulumiyaml.CanonicalTypeToken(name), nil
-	default:
-		msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
-		m.t.Logf(msg)
-		return "", fmt.Errorf(msg)
-	}
-}
-
-func (m FakePackage) IsComponent(typeName pulumiyaml.CanonicalTypeToken) (bool, error) {
-	// No component test cases presently.
-	// If the resource resolves, default to false until we add exceptions.
-	if _, err := m.ResolveResource(string(typeName)); err != nil {
-		return false, nil
-	}
-	msg := fmt.Sprintf("Unexpected type token in IsComponent: %q", typeName)
-	m.t.Logf(msg)
-	return false, fmt.Errorf(msg)
-}
-
-func newFakePackageMap(t *testing.T) pulumiyaml.PackageMap {
-	return pulumiyaml.PackageMap{
-		"aws":          FakePackage{t},
-		"aws-native":   FakePackage{t},
-		"azure-native": FakePackage{t},
-		"kubernetes":   FakePackage{t},
-		"other":        FakePackage{t},
-		"random":       FakePackage{t},
-	}
-}
 
 var (
 	examplesPath = filepath.Join("..", "..", "examples")
@@ -202,7 +121,7 @@ func TestGenerateExamples(t *testing.T) {
 				return
 			}
 
-			pcl, tdiags, err := getValidPCLFile(template)
+			pcl, tdiags, err := getValidPCLFile(t, template)
 			if pcl != nil {
 				// If there wasn't an error, we write out the program file, even if it is invalid PCL.
 				writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
@@ -229,33 +148,54 @@ func getMain(dir string) (string, error) {
 	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
-func pluginHost() plugin.Host {
+var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
+	{Package: "aws", Version: "4.26.0"},
+	{Package: "azure-native", Version: "1.56.0"},
+	{Package: "azure", Version: "4.18.0"},
+	{Package: "kubernetes", Version: "3.7.2"},
+	{Package: "random", Version: "4.2.0"},
+	{Package: "eks", Version: "0.37.1"},
+	{Package: "aws-native", Version: "0.13.0"},
+	{Package: "docker", Version: "3.1.0"},
+
+	// Extra packages are to satisfy the versioning requirement of aws-eks.
+	// While the schemas are not the correct version, we rely on not
+	// depending on the difference between them.
+	{Package: "aws", Version: "4.15.0"},
+	{Package: "kubernetes", Version: "3.0.0"},
+}
+
+func newPluginLoader() schema.Loader {
 	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
 		})
 	}
-	return deploytest.NewPluginHost(nil, nil, nil,
-		host("aws", semver.MustParse("4.26.0")),
-		host("azure-native", semver.MustParse("1.56.0")),
-		host("azure", semver.MustParse("4.18.0")),
-		host("kubernetes", semver.MustParse("3.7.2")),
-		host("random", semver.MustParse("4.2.0")),
-		host("eks", semver.MustParse("0.37.1")),
-		host("aws-native", semver.MustParse("0.13.0")),
-		host("docker", semver.MustParse("3.1.0")),
+	var pluginLoaders []*deploytest.PluginLoader
+	for _, p := range defaultPlugins {
+		pluginLoaders = append(pluginLoaders, host(tokens.Package(p.Package), semver.MustParse(p.Version)))
+	}
 
-		// Extra packages are to satisfy the versioning requirement of aws-eks.
-		// While the schemas are not the correct version, we rely on not
-		// depending on the difference between them.
-		host("aws", semver.MustParse("4.15.0")),
-		host("kubernetes", semver.MustParse("3.0.0")),
-	)
+	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
 }
 
-func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
-	templateBody, tdiags := codegen.ImportTemplate(file)
+type mockPackageLoader struct{ schema.Loader }
+
+func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+	pkg, err := l.Loader.LoadPackage(name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return pulumiyaml.NewResourcePackage(pkg), nil
+}
+
+func (l mockPackageLoader) Close() {}
+
+var rootPluginLoader = mockPackageLoader{newPluginLoader()}
+
+func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
+	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
 	diags := hcl.Diagnostics(tdiags)
 	if tdiags.HasErrors() {
 		return nil, diags, nil
@@ -266,7 +206,7 @@ func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.PluginHost(pluginHost()))
+	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.Loader(rootPluginLoader.Loader))
 	if err != nil {
 		return []byte(program), diags, err
 	}
@@ -314,7 +254,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			if shouldBeParallel() {
 				t.Parallel()
 			}
-			files, diags, err := codegen.ConvertTemplate(template, generator, pluginHost())
+			files, diags, err := codegen.ConvertTemplate(template, generator, rootPluginLoader.Loader)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			writeOrCompare(t, writeTo, files)

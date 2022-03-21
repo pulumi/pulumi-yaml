@@ -3,7 +3,6 @@
 package codegen
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -88,26 +87,4 @@ func relativeTraversal(source model.Expression, attr string) *model.RelativeTrav
 		Traversal: hcl.Traversal{hcl.TraverseAttr{Name: attr}},
 		Parts:     []model.Traversable{model.DynamicType, model.DynamicType},
 	}
-}
-
-// resourceToken returns the Pulumi token for the given CloudFormation resource type.
-func resourceToken(typ string) string {
-	components := strings.Split(typ, "::")
-	if len(components) != 3 {
-		return normalizeType(typ)
-	}
-	moduleName, resourceName := components[1], components[2]
-
-	// Override the name of the Config module.
-	if moduleName == "Config" {
-		moduleName = "Configuration"
-	}
-	return "cloudformation:" + moduleName + ":" + resourceName
-}
-
-func normalizeType(typ string) string {
-	if parts := strings.Split(typ, ":"); len(parts) == 2 {
-		typ = fmt.Sprintf("%s:index:%s", parts[0], parts[1])
-	}
-	return typ
 }

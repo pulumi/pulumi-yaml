@@ -21,7 +21,7 @@ import (
 type importer struct {
 	referencedStacks []string
 
-	packages        pulumiyaml.PackageMap
+	loader          pulumiyaml.PackageLoader
 	configuration   map[string]*model.Variable
 	variables       map[string]*model.Variable
 	stackReferences map[string]*model.Variable
@@ -232,7 +232,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		functionName, err := pulumiyaml.ResolveFunction(node.Token.Value, imp.packages)
+		functionName, err := pulumiyaml.ResolveFunction(node.Token.Value, imp.loader)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -517,7 +517,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	resInfo, err := pulumiyaml.ResolveResource(resource.Type.Value, imp.packages)
+	resInfo, err := pulumiyaml.ResolveResource(resource.Type.Value, imp.loader)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
@@ -824,9 +824,9 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 }
 
 // ImportTemplate converts a YAML template to a PCL definition.
-func ImportTemplate(file *ast.TemplateDecl, packages pulumiyaml.PackageMap) (*model.Body, syntax.Diagnostics) {
+func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*model.Body, syntax.Diagnostics) {
 	imp := importer{
-		packages:        packages,
+		loader:          loader,
 		configuration:   map[string]*model.Variable{},
 		variables:       map[string]*model.Variable{},
 		stackReferences: map[string]*model.Variable{},

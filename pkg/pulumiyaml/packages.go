@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/blang/semver"
 	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
@@ -22,12 +21,50 @@ type CanonicalTypeToken string
 // delivered via plugins, and this interface provides enough surface area to get information about
 // resources in a package.
 type Package interface {
+	Name() string
 	ResolveResource(typeName string) (CanonicalTypeToken, error)
 	ResolveFunction(typeName string) (CanonicalTypeToken, error)
 	IsComponent(typeName CanonicalTypeToken) (bool, error)
 }
 
-type PackageMap map[string]Package
+type PackageLoader interface {
+	LoadPackage(name string) (Package, error)
+	Close()
+}
+
+type packageLoader struct {
+	schema.Loader
+
+	host plugin.Host
+}
+
+func (l packageLoader) LoadPackage(name string) (Package, error) {
+	pkg, err := l.Loader.LoadPackage(name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return resourcePackage{pkg}, nil
+}
+
+func (l packageLoader) Close() {
+	if l.host != nil {
+		l.host.Close()
+	}
+}
+
+func NewPackageLoader() (PackageLoader, error) {
+	host, err := newResourcePackageHost()
+	if err != nil {
+		return nil, err
+	}
+	return packageLoader{schema.NewPluginLoader(host), host}, nil
+}
+
+// Unsafely create a PackageLoader from a schema.Loader, forfeiting the ability to close the host
+// and clean up plugins when finished. Useful for test cases.
+func NewPackageLoaderFromSchemaLoader(loader schema.Loader) PackageLoader {
+	return packageLoader{loader, nil}
+}
 
 // Plugin is metadata containing a package name, possibly empty version and download URL. Used to
 // inform the engine of the required plugins at the beginning of program execution.
@@ -111,16 +148,16 @@ func resolvePkgName(typeString string) string {
 	return typeParts[0]
 }
 
-func ResolveResource(typeString string, packages PackageMap) (*ResourceInfo, error) {
+func ResolveResource(typeString string, loader PackageLoader) (*ResourceInfo, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return nil, fmt.Errorf("invalid type token %q", typeString)
 	}
 
 	packageName := resolvePkgName(typeString)
-	pkg, found := packages[packageName]
-	if !found {
-		return nil, fmt.Errorf("resource provider %q not found", packageName)
+	pkg, err := loader.LoadPackage(packageName)
+	if err != nil {
+		return nil, fmt.Errorf("internal error loading package %q: %v", packageName, err)
 	}
 	canonicalName, err := pkg.ResolveResource(typeString)
 	if err != nil {
@@ -134,16 +171,16 @@ func ResolveResource(typeString string, packages PackageMap) (*ResourceInfo, err
 	}, nil
 }
 
-func ResolveFunction(typeString string, packages PackageMap) (CanonicalTypeToken, error) {
+func ResolveFunction(typeString string, loader PackageLoader) (CanonicalTypeToken, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return "", fmt.Errorf("invalid type token %q", typeString)
 	}
 
 	packageName := resolvePkgName(typeString)
-	pkg, found := packages[packageName]
-	if !found {
-		return "", fmt.Errorf("resource provider %q not found", packageName)
+	pkg, err := loader.LoadPackage(packageName)
+	if err != nil {
+		return "", fmt.Errorf("internal error loading package %q: %v", packageName, err)
 	}
 	canonicalName, err := pkg.ResolveFunction(typeString)
 	if err != nil {
@@ -155,6 +192,10 @@ func ResolveFunction(typeString string, packages PackageMap) (CanonicalTypeToken
 
 type resourcePackage struct {
 	*schema.Package
+}
+
+func NewResourcePackage(pkg *schema.Package) Package {
+	return resourcePackage{pkg}
 }
 
 func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
@@ -196,7 +237,7 @@ func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, e
 		}
 	}
 
-	return "", fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name)
+	return "", fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
 }
 
 func (p resourcePackage) ResolveFunction(typeName string) (CanonicalTypeToken, error) {
@@ -230,45 +271,30 @@ func (p resourcePackage) ResolveFunction(typeName string) (CanonicalTypeToken, e
 		}
 	}
 
-	return "", fmt.Errorf("unable to find function %q in resource provider %q", typeName, p.Name)
+	return "", fmt.Errorf("unable to find function %q in resource provider %q", typeName, p.Name())
 }
 
 func (p resourcePackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
 	if res, found := p.GetResource(string(typeName)); found {
 		return res.IsComponent, nil
 	}
-	return false, fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name)
+	return false, fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
 }
 
-func NewResourcePackageMap(plugins []Plugin) (*plugin.Context, PackageMap, error) {
+func (p resourcePackage) Name() string {
+	return p.Provider.Package.Name
+}
+
+func newResourcePackageHost() (plugin.Host, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{})
 	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	pulumiLoader := schema.NewPluginLoader(pluginCtx.Host)
-
-	packages := map[string]Package{}
-	for _, p := range plugins {
-		var version *semver.Version
-		if p.Version != "" {
-			parsedVersion, err := semver.ParseTolerant(p.Version)
-			if err != nil {
-				return nil, nil, err
-			}
-			version = &parsedVersion
-		}
-		pkg, err := pulumiLoader.LoadPackage(p.Package, version)
-		if err != nil {
-			return nil, nil, err
-		}
-		packages[p.Package] = resourcePackage{pkg}
-	}
-
-	return pluginCtx, packages, nil
+	return pluginCtx.Host, nil
 }
