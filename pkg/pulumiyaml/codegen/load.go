@@ -201,14 +201,11 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 // function:
 //
 // - `Fn::Asset` is imported as a call to the `fileAsset` function
-// - `Fn::GetAtt` is imported as a scope traversal expression on the referenced resource to fetch the referenced
-//   attribute
 // - `Fn::Invoke` is imported as a call to `invoke`
 // - `Fn::Join` is imported as either a template expression or a call to `join`
 // - `Fn::Split` is imported as a call to `split`
 // - `Fn::StackReference` is imported as a reference to the named stack
 // - `Fn::Sub` is imported as a template expression
-// - `Ref` is imported as a variable reference
 //
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
@@ -231,26 +228,6 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Args: []model.Expression{path},
 		}, pdiags
 
-	case *ast.GetAttExpr:
-		resourceName, propertyName := node.ResourceName.Value, node.PropertyName.Value
-
-		resourceVar, ok := imp.resources[resourceName]
-		if !ok {
-			return nil, syntax.Diagnostics{ast.ExprError(node.ResourceName, fmt.Sprintf("unknown resource '%v'", resourceName), "")}
-		}
-
-		return &model.ScopeTraversalExpression{
-			Traversal: hcl.Traversal{
-				hcl.TraverseRoot{Name: resourceVar.Name},
-				hcl.TraverseAttr{Name: "attributes"},
-				hcl.TraverseAttr{Name: propertyName},
-			},
-			Parts: []model.Traversable{
-				resourceVar,
-				model.DynamicType,
-				model.DynamicType,
-			},
-		}, nil
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
@@ -321,8 +298,6 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		}, diags
 	case *ast.SubExpr:
 		return imp.importInterpolate(node.Interpolate, node.Substitutions)
-	case *ast.RefExpr:
-		return imp.importRef(node.ResourceName, node.ResourceName.Value, nil, false)
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil

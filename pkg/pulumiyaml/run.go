@@ -720,10 +720,6 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return ctx.evaluateInterpolate(x, nil)
 	case *ast.SymbolExpr:
 		return ctx.evaluatePropertyAccess(x, x.Property, nil)
-	case *ast.RefExpr:
-		return ctx.evaluateBuiltinRef(x)
-	case *ast.GetAttExpr:
-		return ctx.evaluateBuiltinGetAtt(x)
 	case *ast.InvokeExpr:
 		return ctx.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
@@ -907,38 +903,6 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 	})
 
 	return evaluateAccessF(receiver, access.Accessors[1:])
-}
-
-// evaluateBuiltinRef evaluates a "Ref" builtin. This map entry has a single value, which represents
-// the resource name whose ID will be looked up and substituted in its place.
-func (ctx *evalContext) evaluateBuiltinRef(v *ast.RefExpr) (interface{}, bool) {
-	res, ok := ctx.resources[v.ResourceName.Value]
-	if ok {
-		return res.CustomResource().ID().ToStringOutput(), true
-	}
-	x, ok := ctx.variables[v.ResourceName.Value]
-	if ok {
-		return x, true
-	}
-	p, ok := ctx.config[v.ResourceName.Value]
-	if ok {
-		return p, true
-	}
-	return ctx.error(v, fmt.Sprintf("resource Ref named %s could not be found", v.ResourceName.Value))
-}
-
-// evaluateBuiltinGetAtt evaluates a "GetAtt" builtin. This map entry has a single two-valued array,
-// the first value being the resource name, and the second being the property to read, and whose
-// value will be looked up and substituted in its place.
-func (ctx *evalContext) evaluateBuiltinGetAtt(v *ast.GetAttExpr) (interface{}, bool) {
-	// Look up the resource and ensure it exists.
-	res, ok := ctx.resources[v.ResourceName.Value]
-	if !ok {
-		return ctx.error(v, fmt.Sprintf("resource %s named by Fn::GetAtt could not be found", v.ResourceName.Value))
-	}
-
-	// Get the requested property's output value from the resource state
-	return res.GetOutput(v.PropertyName.Value), true
 }
 
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
