@@ -83,7 +83,7 @@ func (imp *importer) pulumiPropertyAccess(symbol *ast.SymbolExpr) (model.Express
 		return nil, true, wrapDiag("cannot index into the `pulumi` variable: %v", symbol)
 	}
 	simple := model.StaticFunctionSignature{ReturnType: model.StringType}
-	switch camel(prop.Name) {
+	switch prop.Name {
 	case "cwd":
 		return &model.FunctionCallExpression{
 			Name:      "cwd",
@@ -116,7 +116,7 @@ func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAcc
 	for accessors = accessors[1:]; len(accessors) != 0; accessors = accessors[1:] {
 		switch accessor := accessors[0].(type) {
 		case *ast.PropertyName:
-			traversal = append(traversal, hcl.TraverseAttr{Name: camel(accessor.Name)})
+			traversal = append(traversal, hcl.TraverseAttr{Name: accessor.Name})
 		case *ast.PropertySubscript:
 			switch index := accessor.Index.(type) {
 			case string:

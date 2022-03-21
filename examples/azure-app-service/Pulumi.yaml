@@ -98,6 +98,6 @@ resources:
         connectionStrings:
           - name: db
             type: SQLAzure
-            connectionString: Server= tcp:${sqlServer.Name}.database.windows.net;initial catalog=${db.Name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;
+            connectionString: Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;
 outputs:
   endpoint: ${app.defaultHostName}
