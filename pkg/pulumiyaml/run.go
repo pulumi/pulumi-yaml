@@ -712,9 +712,9 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.ObjectExpr:
 		return ctx.evaluateObject(x, map[string]interface{}{}, x.Entries)
 	case *ast.InterpolateExpr:
-		return ctx.evaluateInterpolate(x, nil)
+		return ctx.evaluateInterpolate(x)
 	case *ast.SymbolExpr:
-		return ctx.evaluatePropertyAccess(x, x.Property, nil)
+		return ctx.evaluatePropertyAccess(x, x.Property)
 	case *ast.InvokeExpr:
 		return ctx.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
@@ -723,8 +723,6 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return ctx.evaluateBuiltinSplit(x)
 	case *ast.ToJSONExpr:
 		return ctx.evaluateBuiltinToJSON(x)
-	case *ast.SubExpr:
-		return ctx.evaluateBuiltinSub(x)
 	case *ast.SelectExpr:
 		return ctx.evaluateBuiltinSelect(x)
 	case *ast.ToBase64Expr:
@@ -800,17 +798,17 @@ func (ctx *evalContext) continueObject(x *ast.ObjectExpr, m map[string]interface
 	return ctx.evaluateObject(x, m, entries[1:])
 }
 
-func (ctx *evalContext) evaluateInterpolate(x *ast.InterpolateExpr, subs map[string]interface{}) (interface{}, bool) {
-	return ctx.evaluateInterpolations(x, &strings.Builder{}, x.Parts, subs)
+func (ctx *evalContext) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
+	return ctx.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
 }
 
-func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation, subs map[string]interface{}) (interface{}, bool) {
+func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
 	for ; len(parts) > 0; parts = parts[1:] {
 		i := parts[0]
 		b.WriteString(i.Text)
 
 		if i.Value != nil {
-			p, ok := ctx.evaluatePropertyAccess(x, i.Value, subs)
+			p, ok := ctx.evaluatePropertyAccess(x, i.Value)
 			if !ok {
 				return nil, false
 			}
@@ -818,7 +816,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 			if o, ok := p.(pulumi.Output); ok {
 				return o.ApplyT(func(v interface{}) (interface{}, error) {
 					fmt.Fprintf(b, "%v", v)
-					v, ok := ctx.evaluateInterpolations(x, b, parts[1:], subs)
+					v, ok := ctx.evaluateInterpolations(x, b, parts[1:])
 					if !ok {
 						return nil, fmt.Errorf("runtime error")
 					}
@@ -832,7 +830,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 	return b.String(), true
 }
 
-func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess, subs map[string]interface{}) (interface{}, bool) {
+func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.Accessors[0].(*ast.PropertyName).Name
 
 	var receiver interface{}
@@ -842,8 +840,6 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 		receiver = p
 	} else if v, ok := ctx.variables[resourceName]; ok {
 		receiver = v
-	} else if s, ok := subs[resourceName]; ok {
-		receiver = s
 	} else {
 		return ctx.error(expr, fmt.Sprintf("resource or variable named %s could not be found", resourceName))
 	}
@@ -1085,23 +1081,6 @@ func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{
 		return b64.StdEncoding.EncodeToString([]byte(s)), true
 	})
 	return toBase64(str)
-}
-
-func (ctx *evalContext) evaluateBuiltinSub(v *ast.SubExpr) (interface{}, bool) {
-	// Evaluate all the substition mapping expressions.
-	substitutions := make(map[string]interface{})
-	if v.Substitutions != nil {
-		for _, kvp := range v.Substitutions.Entries {
-			k := kvp.Key.(*ast.StringExpr).Value
-
-			v, ok := ctx.evaluateExpr(kvp.Value)
-			if !ok {
-				return nil, false
-			}
-			substitutions[k] = v
-		}
-	}
-	return ctx.evaluateInterpolate(v.Interpolate, substitutions)
 }
 
 func (ctx *evalContext) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, bool) {
