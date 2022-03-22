@@ -468,7 +468,7 @@ type JoinExpr struct {
 	Values *ListExpr
 }
 
-func JoinSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delimiter Expr, values *ListExpr) *JoinExpr {
+func JoinSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, delimiter Expr, values *ListExpr) *JoinExpr {
 	return &JoinExpr{
 		builtinNode: builtin(node, name, args),
 		Delimiter:   delimiter,
@@ -800,17 +800,40 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 }
 
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Join must be a two-valued list", "")}
-	}
-
-	values, ok := list.Elements[1].(*ListExpr)
+	obj, ok := args.(*ObjectExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(list.Elements[1], "the second argument to Fn::Join must be a list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Join must be an object containing 'Values' and optionally 'Delimiter'", "")}
 	}
 
-	return JoinSyntax(node, name, list, list.Elements[0], values), nil
+	var valuesExpr, delimiterExpr Expr
+	for i := 0; i < len(obj.Entries); i++ {
+		kvp := obj.Entries[i]
+		if str, ok := kvp.Key.(*StringExpr); ok {
+			switch str.Value {
+			case "Values":
+				valuesExpr = kvp.Value
+			case "Delimiter":
+				delimiterExpr = kvp.Value
+			}
+		}
+	}
+
+	var diags syntax.Diagnostics
+
+	values, ok := valuesExpr.(*ListExpr)
+	if !ok {
+		if valuesExpr == nil {
+			diags.Extend(ExprError(obj, "missing items to join ('Values')", ""))
+		} else {
+			diags.Extend(ExprError(valuesExpr, "Values must be a list", ""))
+		}
+	}
+
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	return JoinSyntax(node, name, obj, delimiterExpr, values), diags
 }
 
 func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

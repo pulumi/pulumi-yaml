@@ -512,7 +512,9 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		// useJoin implies we need to use "Fn::Join" to construct the desired
 		// string.
 		if useJoin {
-			return wrapFn("Join", syn.List(syn.String(""), syn.List(nodes...)))
+			return wrapFn("Join", syn.Object(
+				syn.ObjectProperty(syn.String("Values"), syn.List(nodes...)),
+			))
 		}
 
 		s := ""
@@ -596,11 +598,12 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			syn.ObjectProperty(syn.String("File"), g.expr(f.Args[0])),
 		))
 	case "join":
-		args := make([]syn.Node, len(f.Args))
-		for i, arg := range f.Args {
-			args[i] = g.expr(arg)
-		}
-		return wrapFn("Join", syn.List(args...))
+		delim := g.expr(f.Args[0])
+		values := g.expr(f.Args[1])
+		return wrapFn("Join", syn.Object(
+			syn.ObjectProperty(syn.String("Delimiter"), delim),
+			syn.ObjectProperty(syn.String("Values"), values),
+		))
 	case "split":
 		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":

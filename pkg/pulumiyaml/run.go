@@ -935,9 +935,15 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 }
 
 func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
-	delim, ok := ctx.evaluateExpr(v.Delimiter)
-	if !ok {
-		return nil, false
+	var delim interface{}
+	if v.Delimiter == nil {
+		delim = nil
+	} else {
+		delimValue, ok := ctx.evaluateExpr(v.Delimiter)
+		if !ok {
+			return nil, false
+		}
+		delim = delimValue
 	}
 
 	overallOk := true

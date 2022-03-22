@@ -42,16 +42,16 @@
           }
         },
         "userData": {
-          "Fn::Join": [
-            "\n",
-            [
+          "Fn::Join": {
+            "Delimiter": "\n",
+            "Values": [
               "#!/bin/bash",
               {
                 "Fn::Sub": "echo 'Hello, World from ${WebSecGrp.arn}!' > index.html"
               },
               "nohup python -m SimpleHTTPServer 80 &"
             ]
-          ]
+          }
         },
         "vpcSecurityGroupIds": ["${WebSecGrp.id}"]
       }

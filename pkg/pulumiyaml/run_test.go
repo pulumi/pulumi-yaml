@@ -470,38 +470,44 @@ func TestPropertyAccess(t *testing.T) {
 func TestJoin(t *testing.T) {
 	t.Parallel()
 
-	tmpl := template(t, &Template{
-		Resources: map[string]*Resource{
-			"resA": {
-				Type: "test:resource:type",
-				Properties: map[string]interface{}{
-					"foo": "oof",
-				},
-			},
-		},
-	})
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  resA:
+    type: test:resource:type
+    properties:
+      foo: oof
+variables:
+  first:
+    Fn::Join:
+      Delimiter: ","
+      Values: ["a", "b", "c"]
+  second:
+    Fn::Join:
+      Delimiter: ${resA.out}
+      Values: ['[', ']']
+  third:
+    Fn::Join:
+      Delimiter: ","
+      Values:
+      - ${resA.out}
+      - ${resA.out}
+  fourth:
+    Fn::Join:
+      Values:
+      - ${resA.out}
+      - ${resA.out}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+
 	testTemplate(t, tmpl, func(r *evalContext) {
-		v, ok := r.evaluateBuiltinJoin(&ast.JoinExpr{
-			Delimiter: ast.String(","),
-			Values: ast.List(
-				ast.String("a"),
-				ast.String("b"),
-				ast.String("c"),
-			),
-		})
+		v, ok := r.evaluateInterpolate(ast.MustInterpolate("${first}"), nil)
 		assert.True(t, ok)
 		assert.Equal(t, "a,b,c", v)
 
-		x, diags := ast.Interpolate("${resA.out}")
-		requireNoErrors(t, tmpl, diags)
-
-		v, ok = r.evaluateBuiltinJoin(&ast.JoinExpr{
-			Delimiter: x,
-			Values: ast.List(
-				ast.String("["),
-				ast.String("]"),
-			),
-		})
+		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${second}"), nil)
 		assert.True(t, ok)
 		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "[tuo]", x)
@@ -509,16 +515,21 @@ func TestJoin(t *testing.T) {
 		})
 		r.ctx.Export("out", out)
 
-		v, ok = r.evaluateBuiltinJoin(&ast.JoinExpr{
-			Delimiter: ast.String(","),
-			Values:    ast.List(x, x),
-		})
+		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${third}"), nil)
 		assert.True(t, ok)
 		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo,tuo", x)
 			return nil, nil
 		})
 		r.ctx.Export("out2", out)
+
+		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${fourth}"), nil)
+		assert.True(t, ok)
+		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "tuotuo", x)
+			return nil, nil
+		})
+		r.ctx.Export("out3", out)
 	})
 }
 
