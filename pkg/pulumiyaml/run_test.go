@@ -461,7 +461,7 @@ func TestPropertyAccess(t *testing.T) {
 		x, diags := ast.Interpolate("${resA.outList[0].value}")
 		requireNoErrors(t, tmpl, diags)
 
-		v, ok := r.evaluatePropertyAccess(x, x.Parts[0].Value, nil)
+		v, ok := r.evaluatePropertyAccess(x, x.Parts[0].Value)
 		assert.True(t, ok)
 		r.ctx.Export("out", pulumi.Any(v))
 	})
@@ -924,15 +924,11 @@ func TestSub(t *testing.T) {
 		},
 	})
 	testTemplate(t, tmpl, func(r *evalContext) {
-		v, ok := r.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("Hello ${foo}!"),
-		})
+		v, ok := r.evaluateInterpolate(ast.MustInterpolate("Hello ${foo}!"))
 		assert.True(t, ok)
 		assert.Equal(t, "Hello oof!", v)
 
-		v, ok = r.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"),
-		})
+		v, ok = r.evaluateInterpolate(ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"))
 		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "Hello tuo - someID!!", x)
