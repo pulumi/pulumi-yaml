@@ -101,6 +101,23 @@ outputs:
 }
 `,
 		},
+		{
+			name: "nested-map-declaration",
+			input: `
+resources:
+  my-bucket:
+    type: aws:s3:Bucket
+    properties:
+      website:
+        indexDocument: index.html
+`,
+			expected: `resource mybucket "aws:s3/bucket:Bucket" {
+	website = {
+		indexDocument = "index.html"
+	}
+}
+`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt

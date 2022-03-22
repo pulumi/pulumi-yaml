@@ -117,6 +117,24 @@ func (m FakePackage) Name() string {
 	return "fake"
 }
 
+func (m FakePackage) ResourceProperties(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.ResourceProperties {
+	switch typeName {
+	case "test:mod:prov", "test:mod:typ",
+		// third-party-package fakes:
+		"other:index:Thing", "other:module:Object":
+		return FakeResourceProperties{typeName}
+	}
+	return nil
+}
+
+type FakeResourceProperties struct {
+	resourceName pulumiyaml.ResourceTypeToken
+}
+
+func (frp FakeResourceProperties) IsArg(name string) (bool, bool) {
+	return false, false
+}
+
 //nolint:paralleltest // mutates environment variables
 func TestGenerateProgram(t *testing.T) {
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {

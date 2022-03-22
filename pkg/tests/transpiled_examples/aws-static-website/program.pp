@@ -1,6 +1,6 @@
 resource sitebucket "aws-native:s3:Bucket" {
 	websiteConfiguration = {
-		"indexDocument" = "index.html"
+		indexDocument = "index.html"
 	}
 }
 

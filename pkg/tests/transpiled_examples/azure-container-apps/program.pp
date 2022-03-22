@@ -21,7 +21,7 @@ resource resourceGroup "azure-native:resources:ResourceGroup" {
 resource workspace "azure-native:operationalinsights:Workspace" {
 	resourceGroupName = resourceGroup.name
 	sku = {
-		"name" = "PerGB2018"
+		name = "PerGB2018"
 	}
 	retentionInDays = 30
 }
@@ -30,8 +30,8 @@ resource kubeEnv "azure-native:web:KubeEnvironment" {
 	resourceGroupName = resourceGroup.name
 	environmentType = "Managed"
 	appLogsConfiguration = {
-		"destination" = "log-analytics",
-		"logAnalyticsConfiguration" = {
+		destination = "log-analytics",
+		logAnalyticsConfiguration = {
 			"customerId" = workspace.customerId,
 			"sharedKey" = sharedKey
 		}
@@ -41,7 +41,7 @@ resource kubeEnv "azure-native:web:KubeEnvironment" {
 resource registry "azure-native:containerregistry:Registry" {
 	resourceGroupName = resourceGroup.name
 	sku = {
-		"name" = "Basic"
+		name = "Basic"
 	}
 	adminUserEnabled = true
 }
@@ -57,7 +57,7 @@ resource provider "pulumi:providers:docker" {
 resource myImage "docker:index/registryImage:RegistryImage" {
 	name = "${registry.loginServer}/node-app:v1.0.0"
 	build = {
-		"context" = "${cwd()}/node-app"
+		context = "${cwd()}/node-app"
 	}
 
 	options {
@@ -69,22 +69,22 @@ resource containerapp "azure-native:web:ContainerApp" {
 	resourceGroupName = resourceGroup.name
 	kubeEnvironmentId = kubeEnv.id
 	configuration = {
-		"ingress" = {
+		ingress = {
 			"external" = true,
 			"targetPort" = 80
 		},
-		"registries" = [{
+		registries = [{
 			"server" = registry.loginServer,
 			"username" = adminUsername,
 			"passwordSecretRef" = "pwd"
 		}],
-		"secrets" = [{
+		secrets = [{
 			"name" = "pwd",
 			"value" = adminPasswords[0].value
 		}]
 	}
 	template = {
-		"containers" = [{
+		containers = [{
 			"name" = "myapp",
 			"image" = myImage.name
 		}]

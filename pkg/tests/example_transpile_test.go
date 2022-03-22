@@ -48,14 +48,14 @@ var (
 		"stackreference-producer": Dotnet.And(Golang),
 		"stackreference-consumer": AllLanguages().Except(Python),
 		"random":                  Dotnet.And(Nodejs),
-		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
-		"aws-static-website":      AllLanguages(),
+		"aws-static-website":      AllLanguages().Except(Python),
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
-		"azure-app-service":       AllLanguages(),
+		// TODO: azure-app-service has nested types.
+		"azure-app-service": AllLanguages(),
 	}
 
 	langTests = []ConvertFunc{

@@ -34,9 +34,10 @@ func (m MockPackageLoader) LoadPackage(name string) (Package, error) {
 func (m MockPackageLoader) Close() {}
 
 type MockPackage struct {
-	isComponent     func(typeName string) (bool, error)
-	resolveResource func(typeName string) (ResourceTypeToken, error)
-	resolveFunction func(typeName string) (FunctionTypeToken, error)
+	isComponent        func(typeName string) (bool, error)
+	resolveResource    func(typeName string) (ResourceTypeToken, error)
+	resolveFunction    func(typeName string) (FunctionTypeToken, error)
+	resourceProperties func(typeName string) ResourceProperties
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -54,7 +55,11 @@ func (m MockPackage) ResolveFunction(typeName string) (FunctionTypeToken, error)
 }
 
 func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
-	return m.isComponent(string(typeName))
+	return m.isComponent(typeName.String())
+}
+
+func (m MockPackage) ResourceProperties(typeName ResourceTypeToken) ResourceProperties {
+	return m.resourceProperties(typeName.String())
 }
 
 func (m MockPackage) Name() string {

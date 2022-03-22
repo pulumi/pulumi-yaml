@@ -24,7 +24,7 @@ resource sa "azure-native:storage:StorageAccount" {
 	resourceGroupName = appservicegroup.name
 	kind = "StorageV2"
 	sku = {
-		"name" = "Standard_LRS"
+		name = "Standard_LRS"
 	}
 }
 
@@ -32,8 +32,8 @@ resource appserviceplan "azure-native:web:AppServicePlan" {
 	resourceGroupName = appservicegroup.name
 	kind = "App"
 	sku = {
-		"name" = "B1",
-		"tier" = "Basic"
+		name = "B1",
+		tier = "Basic"
 	}
 }
 
@@ -73,7 +73,7 @@ resource db "azure-native:sql:Database" {
 	resourceGroupName = appservicegroup.name
 	serverName = sqlServer.name
 	sku = {
-		"name" = "S0"
+		name = "S0"
 	}
 }
 
@@ -81,7 +81,7 @@ resource app "azure-native:web:WebApp" {
 	resourceGroupName = appservicegroup.name
 	serverFarmId = appserviceplan.id
 	siteConfig = {
-		"appSettings" = [
+		appSettings = [
 			{
 				"name" = "WEBSITE_RUN_FROM_PACKAGE",
 				"value" = "https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}"
@@ -99,7 +99,7 @@ resource app "azure-native:web:WebApp" {
 				"value" = "~2"
 			}
 		],
-		"connectionStrings" = [{
+		connectionStrings = [{
 			"name" = "db",
 			"type" = "SQLAzure",
 			"connectionString" = "Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;"

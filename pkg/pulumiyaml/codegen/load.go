@@ -517,17 +517,26 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	_, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
+	pkg, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
-
+	props := pkg.ResourceProperties(token)
+	contract.Assertf(props != nil,
+		"token(%s) was obtained by the same ResolveResource call as pkg(%s),"+
+			" so must produce a non nil value", token.String(), pkg.Name())
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
 	for _, kvp := range resource.Properties.Entries {
 		v, vdiags := imp.importExpr(kvp.Value)
 		diags.Extend(vdiags...)
-
+		if isArg, found := props.IsArg(kvp.Key.Value); found && isArg {
+			if v, ok := v.(*model.ObjectConsExpression); ok {
+				for i, item := range v.Items {
+					v.Items[i].Key = item.Key.(*model.TemplateExpression).Parts[0]
+				}
+			}
+		}
 		items = append(items, &model.Attribute{
 			Name:  kvp.Key.Value,
 			Value: v,

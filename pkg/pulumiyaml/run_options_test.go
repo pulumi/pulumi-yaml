@@ -27,12 +27,23 @@ func (m FakePackage) ResolveResource(typeName string) (ResourceTypeToken, error)
 }
 
 func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
-	switch string(typeName) {
+	switch typeName.String() {
 	case "foo":
 		return false, nil
 	default:
 		assert.Fail(m.t, "Unexpected type token %q", typeName)
 		return false, fmt.Errorf("Unexpected type token %q", typeName)
+	}
+}
+
+func (m FakePackage) ResourceProperties(typeName ResourceTypeToken) ResourceProperties {
+	switch typeName.String() {
+	case "foo":
+		return nil
+	default:
+		assert.Fail(m.t, "Unexpected type token %q", typeName)
+		return nil
+
 	}
 }
 
