@@ -37,7 +37,7 @@ func newPluginHost() (plugin.Host, error) {
 
 // ConvertTemplate converts a Pulumi YAML template to a target language using PCL as an intermediate representation.
 //
-// host is the plugin.Host used when binding the the PCL program. If nil, the default plugin.Host is used.
+// loader is the schema.Loader used when binding the the PCL program. If `nil`, a `schema.Loader` will be created from `newPluginHost()`.
 func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, loader schema.Loader) (map[string][]byte, hcl.Diagnostics, error) {
 	var diags hcl.Diagnostics
 
