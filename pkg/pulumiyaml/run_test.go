@@ -35,25 +35,25 @@ func (m MockPackageLoader) Close() {}
 
 type MockPackage struct {
 	isComponent     func(typeName string) (bool, error)
-	resolveResource func(typeName string) (CanonicalTypeToken, error)
-	resolveFunction func(typeName string) (CanonicalTypeToken, error)
+	resolveResource func(typeName string) (ResourceTypeToken, error)
+	resolveFunction func(typeName string) (FunctionTypeToken, error)
 }
 
-func (m MockPackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
+func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
 	if m.resolveResource != nil {
 		return m.resolveResource(typeName)
 	}
-	return CanonicalTypeToken(typeName), nil
+	return ResourceTypeToken(typeName), nil
 }
 
-func (m MockPackage) ResolveFunction(typeName string) (CanonicalTypeToken, error) {
+func (m MockPackage) ResolveFunction(typeName string) (FunctionTypeToken, error) {
 	if m.resolveFunction != nil {
 		return m.resolveFunction(typeName)
 	}
-	return CanonicalTypeToken(typeName), nil
+	return FunctionTypeToken(typeName), nil
 }
 
-func (m MockPackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
+func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(string(typeName))
 }
 

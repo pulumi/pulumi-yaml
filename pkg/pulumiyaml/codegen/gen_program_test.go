@@ -80,14 +80,14 @@ type FakePackage struct {
 	t *testing.T
 }
 
-func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
+func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeToken, error) {
 	switch typeName {
 	case
 		// TestImportTemplate fakes:
 		"test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
 		"other:index:Thing", "other:module:Object":
-		return pulumiyaml.CanonicalTypeToken(typeName), nil
+		return pulumiyaml.ResourceTypeToken(typeName), nil
 	default:
 		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
 		m.t.Logf(msg)
@@ -95,13 +95,13 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.CanonicalTypeT
 	}
 }
 
-func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.CanonicalTypeToken, error) {
+func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeToken, error) {
 	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
 	m.t.Logf(msg)
 	return "", fmt.Errorf(msg)
 }
 
-func (m FakePackage) IsComponent(typeName pulumiyaml.CanonicalTypeToken) (bool, error) {
+func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, error) {
 	// No component test cases presently.
 	// If the resource resolves, default to false until we add exceptions.
 	if _, err := m.ResolveResource(string(typeName)); err == nil {

@@ -15,16 +15,28 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 )
 
-type CanonicalTypeToken string
+type ResourceTypeToken string
+
+type FunctionTypeToken string
 
 // Package is our external facing term, e.g.: a provider package in the registry. Packages are
 // delivered via plugins, and this interface provides enough surface area to get information about
 // resources in a package.
 type Package interface {
+	// Returns the name of the package.
 	Name() string
-	ResolveResource(typeName string) (CanonicalTypeToken, error)
-	ResolveFunction(typeName string) (CanonicalTypeToken, error)
-	IsComponent(typeName CanonicalTypeToken) (bool, error)
+	// Given a type name, look up that type in a package's defined resources and return a canonical
+	// type name. The lookup may take the form of trying alternate names or aliases.
+	//
+	// e.g.: given "aws:s3:Bucket", it will return "aws:s3/bucket:Bucket".
+	ResolveResource(typeName string) (ResourceTypeToken, error)
+	// Given a type name, look up that type in a package's defined resources and return a canonical
+	// type name. The lookup may take the form of trying alternate names or aliases.
+	//
+	// e.g.: given "aws:s3:Bucket", it will return "aws:s3/bucket:Bucket".
+	ResolveFunction(typeName string) (FunctionTypeToken, error)
+	// Given the canonical name of a resource, return the IsComponent property of the resource schema.
+	IsComponent(typeName ResourceTypeToken) (bool, error)
 }
 
 type PackageLoader interface {
@@ -131,12 +143,6 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 	return plugins, nil
 }
 
-type ResourceInfo struct {
-	Pkg         Package
-	TypeName    CanonicalTypeToken
-	PackageName string
-}
-
 func resolvePkgName(typeString string) string {
 	typeParts := strings.Split(typeString, ":")
 
@@ -148,7 +154,7 @@ func resolvePkgName(typeString string) string {
 	return typeParts[0]
 }
 
-func ResolveResource(typeString string, loader PackageLoader) (*ResourceInfo, error) {
+func loadPackage(loader PackageLoader, typeString string) (Package, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return nil, fmt.Errorf("invalid type token %q", typeString)
@@ -159,35 +165,40 @@ func ResolveResource(typeString string, loader PackageLoader) (*ResourceInfo, er
 	if err != nil {
 		return nil, fmt.Errorf("internal error loading package %q: %v", packageName, err)
 	}
-	canonicalName, err := pkg.ResolveResource(typeString)
-	if err != nil {
-		return nil, err
-	}
 
-	return &ResourceInfo{
-		Pkg:         pkg,
-		TypeName:    canonicalName,
-		PackageName: packageName,
-	}, nil
+	return pkg, nil
 }
 
-func ResolveFunction(typeString string, loader PackageLoader) (CanonicalTypeToken, error) {
-	typeParts := strings.Split(typeString, ":")
-	if len(typeParts) < 2 || len(typeParts) > 3 {
-		return "", fmt.Errorf("invalid type token %q", typeString)
+// ResolveResource determines the appropriate package for a resource, loads that package, then calls
+// the package's ResolveResource method to determine the canonical name of the resource, returning
+// both the package and the canonical name.
+func ResolveResource(loader PackageLoader, typeString string) (Package, ResourceTypeToken, error) {
+	pkg, err := loadPackage(loader, typeString)
+	if err != nil {
+		return nil, "", err
+	}
+	canonicalName, err := pkg.ResolveResource(typeString)
+	if err != nil {
+		return nil, "", err
 	}
 
-	packageName := resolvePkgName(typeString)
-	pkg, err := loader.LoadPackage(packageName)
+	return pkg, canonicalName, nil
+}
+
+// ResolveResource determines the appropriate package for a function, loads that package, then calls
+// the package's ResolveResource method to determine the canonical name of the resource, returning
+// both the package and the canonical name.
+func ResolveFunction(loader PackageLoader, typeString string) (Package, FunctionTypeToken, error) {
+	pkg, err := loadPackage(loader, typeString)
 	if err != nil {
-		return "", fmt.Errorf("internal error loading package %q: %v", packageName, err)
+		return nil, "", err
 	}
 	canonicalName, err := pkg.ResolveFunction(typeString)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	return canonicalName, nil
+	return pkg, canonicalName, nil
 }
 
 type resourcePackage struct {
@@ -198,7 +209,7 @@ func NewResourcePackage(pkg *schema.Package) Package {
 	return resourcePackage{pkg}
 }
 
-func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
+func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
 	typeParts := strings.Split(typeName, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return "", fmt.Errorf("invalid type token %q", typeName)
@@ -209,11 +220,11 @@ func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, e
 		typeParts[0] == "pulumi" &&
 		typeParts[1] == "providers" &&
 		typeParts[2] == p.Package.Name {
-		return CanonicalTypeToken(p.Provider.Token), nil
+		return ResourceTypeToken(p.Provider.Token), nil
 	}
 
 	if res, found := p.GetResource(typeName); found {
-		return CanonicalTypeToken(res.Token), nil
+		return ResourceTypeToken(res.Token), nil
 	}
 
 	// If the provided type token is `$pkg:type`, expand it to `$pkg:index:type` automatically. We
@@ -222,7 +233,7 @@ func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, e
 	if len(typeParts) == 2 {
 		alternateName := fmt.Sprintf("%s:index:%s", typeParts[0], typeParts[1])
 		if res, found := p.GetResource(alternateName); found {
-			return CanonicalTypeToken(res.Token), nil
+			return ResourceTypeToken(res.Token), nil
 		}
 		typeParts = []string{typeParts[0], "index", typeParts[1]}
 	}
@@ -233,21 +244,21 @@ func (p resourcePackage) ResolveResource(typeName string) (CanonicalTypeToken, e
 		repeatedSection := strcase.ToLowerCamel(typeParts[2])
 		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
 		if res, found := p.GetResource(alternateName); found {
-			return CanonicalTypeToken(res.Token), nil
+			return ResourceTypeToken(res.Token), nil
 		}
 	}
 
 	return "", fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
 }
 
-func (p resourcePackage) ResolveFunction(typeName string) (CanonicalTypeToken, error) {
+func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, error) {
 	typeParts := strings.Split(typeName, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return "", fmt.Errorf("invalid type token %q", typeName)
 	}
 
 	if res, found := p.GetFunction(typeName); found {
-		return CanonicalTypeToken(res.Token), nil
+		return FunctionTypeToken(res.Token), nil
 	}
 
 	// If the provided type token is `$pkg:type`, expand it to `$pkg:index:type` automatically. We
@@ -256,7 +267,7 @@ func (p resourcePackage) ResolveFunction(typeName string) (CanonicalTypeToken, e
 	if len(typeParts) == 2 {
 		alternateName := fmt.Sprintf("%s:index:%s", typeParts[0], typeParts[1])
 		if res, found := p.GetFunction(alternateName); found {
-			return CanonicalTypeToken(res.Token), nil
+			return FunctionTypeToken(res.Token), nil
 		}
 		typeParts = []string{typeParts[0], "index", typeParts[1]}
 	}
@@ -267,14 +278,14 @@ func (p resourcePackage) ResolveFunction(typeName string) (CanonicalTypeToken, e
 		repeatedSection := strcase.ToLowerCamel(typeParts[2])
 		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
 		if res, found := p.GetFunction(alternateName); found {
-			return CanonicalTypeToken(res.Token), nil
+			return FunctionTypeToken(res.Token), nil
 		}
 	}
 
 	return "", fmt.Errorf("unable to find function %q in resource provider %q", typeName, p.Name())
 }
 
-func (p resourcePackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
+func (p resourcePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	if res, found := p.GetResource(string(typeName)); found {
 		return res.IsComponent, nil
 	}

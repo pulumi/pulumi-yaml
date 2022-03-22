@@ -585,13 +585,11 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		res = &r
 	}
 
-	tyInfo, err := ResolveResource(v.Type.Value, ctx.pkgLoader)
+	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		return nil, false
 	}
-	typ := tyInfo.TypeName
-	pkg := tyInfo.Pkg
 
 	if !overallOk || ctx.sdiags.HasErrors() {
 		return nil, false
@@ -599,7 +597,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 
 	isComponent := false
 	if !isProvider {
-		result, err := pkg.IsComponent(tyInfo.TypeName)
+		result, err := pkg.IsComponent(typ)
 		if err != nil {
 			ctx.error(v.Type, "unable to resolve type")
 			return nil, false
@@ -913,7 +911,7 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		functionName, err := ResolveFunction(t.Token.Value, ctx.pkgLoader)
+		_, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
 		if err != nil {
 			return ctx.error(t, err.Error())
 		}

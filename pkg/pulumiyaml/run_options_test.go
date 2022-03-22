@@ -16,17 +16,17 @@ type FakePackage struct {
 	t *testing.T
 }
 
-func (m FakePackage) ResolveResource(typeName string) (CanonicalTypeToken, error) {
+func (m FakePackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
 	switch typeName {
 	case "foo":
-		return CanonicalTypeToken(typeName), nil
+		return ResourceTypeToken(typeName), nil
 	default:
 		assert.Fail(m.t, "Unexpected type token %q", typeName)
 		return "", fmt.Errorf("Unexpected type token %q", typeName)
 	}
 }
 
-func (m FakePackage) IsComponent(typeName CanonicalTypeToken) (bool, error) {
+func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	switch string(typeName) {
 	case "foo":
 		return false, nil

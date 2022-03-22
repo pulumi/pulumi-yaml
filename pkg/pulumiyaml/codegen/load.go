@@ -232,7 +232,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		functionName, err := pulumiyaml.ResolveFunction(node.Token.Value, imp.loader)
+		_, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -517,11 +517,10 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	resInfo, err := pulumiyaml.ResolveResource(resource.Type.Value, imp.loader)
+	_, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
-	token := resInfo.TypeName
 
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
