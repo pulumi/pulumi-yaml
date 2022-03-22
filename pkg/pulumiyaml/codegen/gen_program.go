@@ -611,11 +611,12 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 	case "toJSON":
 		return wrapFn("ToJSON", g.expr(f.Args[0]))
 	case "element":
-		args := make([]syn.Node, len(f.Args))
-		for i, arg := range f.Args {
-			args[i] = g.expr(arg)
-		}
-		return wrapFn("Select", syn.List(args[1], args[0]))
+		values := g.expr(f.Args[0])
+		index := g.expr(f.Args[1])
+		return wrapFn("Select", syn.Object(
+			syn.ObjectProperty(syn.String("Values"), values),
+			syn.ObjectProperty(syn.String("Index"), index),
+		))
 	default:
 		YAMLError{
 			kind:   "Unknown Function",

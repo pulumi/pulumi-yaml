@@ -6,14 +6,16 @@ resources:
                 Fn::Join:
                     Values:
                         - Fn::Select:
-                            - 0
-                            - - foo
-                              - bar
+                            Values:
+                                - foo
+                                - bar
+                            Index: 0
                         - -policy
             path: /
             policy:
                 Fn::Select:
-                    - 0
-                    - Fn::Split:
-                        - '-'
-                        - '{}-foo'
+                    Values:
+                        Fn::Split:
+                            - '-'
+                            - '{}-foo'
+                    Index: 0

@@ -200,6 +200,11 @@ func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*evalC
 	requireNoErrors(t, template, diags)
 }
 
+func testTemplateErrors(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) syntax.Diagnostics {
+	diags := testTemplateDiags(t, template, callback)
+	return diags
+}
+
 func TestYAML(t *testing.T) {
 	t.Parallel()
 
@@ -503,11 +508,11 @@ variables:
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 
 	testTemplate(t, tmpl, func(r *evalContext) {
-		v, ok := r.evaluateInterpolate(ast.MustInterpolate("${first}"), nil)
+		v, ok := r.evaluateExpr(ast.MustInterpolate("${first}"))
 		assert.True(t, ok)
 		assert.Equal(t, "a,b,c", v)
 
-		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${second}"), nil)
+		v, ok = r.evaluateExpr(ast.MustInterpolate("${second}"))
 		assert.True(t, ok)
 		out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "[tuo]", x)
@@ -515,7 +520,7 @@ variables:
 		})
 		r.ctx.Export("out", out)
 
-		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${third}"), nil)
+		v, ok = r.evaluateExpr(ast.MustInterpolate("${third}"))
 		assert.True(t, ok)
 		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo,tuo", x)
@@ -523,7 +528,7 @@ variables:
 		})
 		r.ctx.Export("out2", out)
 
-		v, ok = r.evaluateInterpolate(ast.MustInterpolate("${fourth}"), nil)
+		v, ok = r.evaluateExpr(ast.MustInterpolate("${fourth}"))
 		assert.True(t, ok)
 		out = v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuotuo", x)
@@ -716,86 +721,31 @@ func TestSelect(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		input    *ast.SelectExpr
+		input    string
 		expected interface{}
 		isOutput bool
 		isError  bool
 	}{
 		{
-			input: &ast.SelectExpr{
-				Index: ast.Number(1),
-				Values: ast.List(
-					ast.Number(1),
-					ast.String("second"),
-				),
-			},
+			input:    `{ Fn::Select: { Index: 1, Values: [1, "second"] } }`,
 			expected: "second",
 		},
 		{
-			input: &ast.SelectExpr{
-				Index: ast.Number(0),
-				Values: &ast.SymbolExpr{
-					Property: &ast.PropertyAccess{
-						Accessors: []ast.PropertyAccessor{
-							&ast.PropertyName{Name: "resA"},
-							&ast.PropertyName{Name: "outList"},
-						},
-					},
-				},
-			},
+			input:    `{ Fn::Select: { Index: 0, Values: "${resA.outList}" } }`,
 			expected: map[string]interface{}{"value": 42.0},
 			isOutput: true,
 		},
 		{
-			input: &ast.SelectExpr{
-				Index: &ast.SymbolExpr{
-					Property: &ast.PropertyAccess{
-						Accessors: []ast.PropertyAccessor{
-							&ast.PropertyName{Name: "resA"},
-							&ast.PropertyName{Name: "outNum"},
-						},
-					},
-				},
-				Values: ast.List(
-					ast.String("first"),
-					ast.String("second"),
-					ast.String("third"),
-				),
-			},
+			input:    `{ Fn::Select: { Index: "${resA.outNum}", Values: ["first", "second", "third"] } }`,
 			expected: "second",
 			isOutput: true,
 		},
 		{
-			input: &ast.SelectExpr{
-				Index: ast.Number(1.5),
-				Values: ast.List(
-					ast.String("first"),
-					ast.String("second"),
-					ast.String("third"),
-				),
-			},
+			input:   `{ Fn::Select: { Index: 3, Values: ["first", "second", "third"] } }`,
 			isError: true,
 		},
 		{
-			input: &ast.SelectExpr{
-				Index: ast.Number(3),
-				Values: ast.List(
-					ast.String("first"),
-					ast.String("second"),
-					ast.String("third"),
-				),
-			},
-			isError: true,
-		},
-		{
-			input: &ast.SelectExpr{
-				Index: ast.Number(-182),
-				Values: ast.List(
-					ast.String("first"),
-					ast.String("second"),
-					ast.String("third"),
-				),
-			},
+			input:   `{ Fn::Select: { Index: -182, Values: ["first", "second", third"] } }`,
 			isError: true,
 		},
 	}
@@ -805,37 +755,41 @@ func TestSelect(t *testing.T) {
 		t.Run(fmt.Sprint(idx), func(t *testing.T) {
 			t.Parallel()
 
-			tmpl := template(t, &Template{
-				Resources: map[string]*Resource{
-					"resA": {
-						Type: testResourceToken,
-						Properties: map[string]interface{}{
-							"foo": "oof",
-						},
-					},
-				},
-			})
-			testTemplate(t, tmpl, func(ctx *evalContext) {
-				v, ok := ctx.evaluateBuiltinSelect(tt.input)
-				if tt.isError {
-					assert.False(t, ok)
-					assert.True(t, ctx.sdiags.HasErrors())
-					assert.Nil(t, v)
-					return
-				}
+			text := strings.TrimSpace(`
+name: test-yaml
+runtime: yaml
+resources:
+  resA:
+    type: test:resource:type
+    properties:
+      foo: oof
+variables:
+  testVar: ` + tt.input)
 
-				requireNoErrors(t, tmpl, ctx.sdiags.diags)
-				if tt.isOutput {
-					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
-						assert.Equal(t, tt.expected, x)
-						return nil, nil
-					})
-					ctx.ctx.Export("out", out)
-				} else {
-					assert.Equal(t, tt.expected, v)
-				}
+			tmpl := yamlTemplate(t, strings.TrimSpace(text))
 
-			})
+			if tt.isError {
+				diags := testTemplateErrors(t, tmpl, func(ec *evalContext) {})
+				assert.NotNil(t, diags)
+				assert.True(t, diags.HasErrors())
+			} else {
+				testTemplate(t, tmpl, func(ctx *evalContext) {
+					v, ok := ctx.evaluateExpr(ast.MustInterpolate(`${testVar}`))
+					assert.True(t, ok)
+
+					requireNoErrors(t, tmpl, ctx.sdiags.diags)
+					if tt.isOutput {
+						out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
+							assert.Equal(t, tt.expected, x)
+							return nil, nil
+						})
+						ctx.ctx.Export("out", out)
+					} else {
+						assert.Equal(t, tt.expected, v)
+					}
+
+				})
+			}
 		})
 	}
 }
@@ -935,15 +889,11 @@ func TestSub(t *testing.T) {
 		},
 	})
 	testTemplate(t, tmpl, func(r *evalContext) {
-		v, ok := r.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("Hello ${foo}!"),
-		})
+		v, ok := r.evaluateExpr(ast.MustInterpolate("Hello ${foo}!"))
 		assert.True(t, ok)
 		assert.Equal(t, "Hello oof!", v)
 
-		v, ok = r.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"),
-		})
+		v, ok = r.evaluateExpr(ast.MustInterpolate("Hello ${resA.out} - ${resA.id}!!"))
 		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "Hello tuo - someID!!", x)

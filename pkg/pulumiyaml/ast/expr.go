@@ -162,13 +162,35 @@ func Interpolate(value string) (*InterpolateExpr, syntax.Diagnostics) {
 	return InterpolateSyntax(syntax.String(value))
 }
 
+func simplifyInterpolate(node *syntax.StringNode) (Expr, syntax.Diagnostics) {
+	interpolate, diags := InterpolateSyntax(node)
+
+	switch len(interpolate.Parts) {
+	case 0:
+		return StringSyntax(node), diags
+	case 1:
+		switch {
+		case interpolate.Parts[0].Value == nil:
+			return StringSyntax(node), diags
+		case interpolate.Parts[0].Text == "":
+			return &SymbolExpr{
+				exprNode: expr(node),
+				Property: interpolate.Parts[0].Value,
+			}, diags
+		}
+	}
+
+	return interpolate, diags
+}
+
 // MustInterpolate creates a new interpolated string expression and panics if parsing fails.
-func MustInterpolate(value string) *InterpolateExpr {
-	x, diags := Interpolate(value)
+func MustInterpolate(value string) Expr {
+	node := syntax.String(value)
+	expr, diags := simplifyInterpolate(node)
 	if diags.HasErrors() {
 		panic(diags)
 	}
-	return x
+	return expr
 }
 
 // A SymbolExpr represents a symbol: a reference to a resource or config property.
@@ -254,26 +276,7 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	case *syntax.NumberNode:
 		return NumberSyntax(node), nil
 	case *syntax.StringNode:
-		interpolate, diags := InterpolateSyntax(node)
-
-		if interpolate != nil {
-			switch len(interpolate.Parts) {
-			case 0:
-				return StringSyntax(node), diags
-			case 1:
-				switch {
-				case interpolate.Parts[0].Value == nil:
-					return StringSyntax(node), diags
-				case interpolate.Parts[0].Text == "":
-					return &SymbolExpr{
-						exprNode: expr(node),
-						Property: interpolate.Parts[0].Value,
-					}, diags
-				}
-			}
-		}
-
-		return interpolate, diags
+		return simplifyInterpolate(node)
 	case *syntax.ListNode:
 		var diags syntax.Diagnostics
 
@@ -520,7 +523,7 @@ type SelectExpr struct {
 	Values Expr
 }
 
-func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, index Expr, values Expr) *SelectExpr {
+func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, index Expr, values Expr) *SelectExpr {
 	return &SelectExpr{
 		builtinNode: builtin(node, name, args),
 		Index:       index,
@@ -841,14 +844,25 @@ func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 }
 
 func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Select must be a two-valued list", "")}
+	obj, ok := args.(*ObjectExpr)
+	if !ok {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Select must be an object containing 'Values' and 'Index'", "")}
 	}
 
-	index := list.Elements[0]
-	values := list.Elements[1]
-	return SelectSyntax(node, name, list, index, values), nil
+	var values, index Expr
+	for i := 0; i < len(obj.Entries); i++ {
+		kvp := obj.Entries[i]
+		if str, ok := kvp.Key.(*StringExpr); ok {
+			switch str.Value {
+			case "Values":
+				values = kvp.Value
+			case "Index":
+				index = kvp.Value
+			}
+		}
+	}
+
+	return SelectSyntax(node, name, obj, index, values), nil
 }
 
 func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
