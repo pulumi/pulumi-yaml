@@ -132,12 +132,13 @@ The value of `resources` is an object whose keys  are logical resource names by 
 | `aliases`      | string[] | No | No | Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it |
 | `customTimeouts`      | CustomTimeout | No | No | CustomTimeouts overrides the default retry/timeout behavior for resource provisioning |
 | `deleteBeforeReplace`      | bool | No | No | DeleteBeforeReplace  overrides the default create-before-delete behavior when replacing |
-| `dependsOn`      | string[] | No | No | DependsOn makes this resource explicitly depend on another resource, by name, so that it won't be created before the dependent finishes being created (and the reverse for destruction). Normally, Pulumi automatically tracks implicit dependencies through inputs/outputs, but this can be used when dependencies aren't captured purely from input/output edges.|
+| `dependsOn`      | string[] | No | Yes | DependsOn makes this resource explicitly depend on another resource, by name, so that it won't be created before the dependent finishes being created (and the reverse for destruction). Normally, Pulumi automatically tracks implicit dependencies through inputs/outputs, but this can be used when dependencies aren't captured purely from input/output edges.|
 | `ignoreChanges`      | string[] | No | No | IgnoreChangs declares that changes to certain properties should be ignored during diffing |
 | `import`      | string | No | No | Import adopts an existing resource from your cloud account under the control of Pulumi |
-| `parent`      | string | No | No | Parent specifies a parent for the resource |
+| `parent`      | string | No | Yes | Parent specifies a parent for the resource |
 | `protect`      | bool | No | No | Protect prevents accidental deletion of a resource |
-| `provider`      | string | No | No | Provider specifies an explicitly configured provider, instead of using the default global provider |
+| `provider`      | string | No | Yes | Provider specifies an explicitly configured provider, instead of using the default global provider |
+| `providers`      | map[string]Expression | No | Yes | Map of providers for a resource and its children. |
 | `version`      | string | No | No | Version specifies a provider plugin version that should be used when operating on a resource |
 
 #### CustomTimeout
@@ -156,7 +157,10 @@ The value of `outputs` is an object whose keys are the logical names of the outp
 
 ### Expressions
 
-Expressions can be used in two contexts: (1) the values of `properties` of `resources` (2) the values of `outputs`.
+Expressions can be used in several contexts:
+* the values of `properties` of `resources`
+* the values of `options` of `resources` that take references to other resources:
+* the values of `variables` and `outputs`
 
 In these contexts, any JSON/YAML value may be provided.  If that value is a string, it is interpolated.  If that value is an object, and the object has a key with the name `Ref` or with a prefix of `Fn::`, it is evaluated as an expression.
 
@@ -173,17 +177,50 @@ unicode_letter is a Unicode code point classified as "Letter"
 unicode_digit  is a Unicode code point classified as "Number, decimal digit"
 ```
 
-An expression `a.b` is evaluated as if it were an expression object `{ "Fn:GetAtt": [ a, b] }`.  An expression `a` is evaluated as it it were an expression object `{ "Ref": a }`.
+#### Built-in Functions
 
-#### Expression Objects
+In any expression location, an object containing a single key beginning with "Fn::" calls a built-in function.
 
 ##### `Fn::Invoke`
 
-TODO
+Calls a function from a package and returns either the whole object or a single key if given the "Return" property. The schema is:
+
+| Property        | Type | Required           | Expression  | Description |
+| ------------- |---|-------------| -----|---|
+| `Function`    | string | Yes | No | Name of a function to call. |
+| `Arguments`   | map[string]Expression | Yes | Yes | Arguments to pass to the expression, each key is a named argument. |
+| `Return`      | string | No | No | If the function returns an object, a single key may be selected and returned instead with its name. |
+
+```yaml
+variables:
+  AmazonLinuxAmi:
+    Fn::Invoke:
+      Function: aws:getAmi
+      Arguments:
+        filters:
+          - name: name
+            values: ["amzn-ami-hvm-*-x86_64-ebs"]
+        owners: ["137112412989"]
+        mostRecent: true
+      Return: id
+```
+
+The expression `${AmazonLinuxAmi}` will return the AMI ID returned from the [`aws:getAmi`](https://www.pulumi.com/registry/packages/aws/api-docs/getami/) function.
 
 ##### `Fn::Join`
 
-TODO
+Joins strings together separated by a delimiter. Arguments are passed as a list, with the first item being the delimiter, and the second item a list of expressions to concatenate.
+
+```yaml
+variables:
+    banana:
+        Fn::Join:
+            - 'NaN'
+            - - Ba
+              - a
+```
+
+The expression `${banana}` will have the value "BaNaNa".
 
 ##### `Fn::Sub`
 
@@ -191,16 +228,67 @@ TODO
 
 ##### `Fn::Select`
 
-TODO
+Selects one of several options given an index. Arguments are passed as a list, with the first item being the index, 0-based, and the second item a list of expressions to select from.
 
-##### `Fn::*Asset`
 
-TODO
+```yaml
+variables:
+    policyVersion:
+        Fn::Select:
+            - 1
+            - - v1
+              - v1.1
+              - v2.0
+```
 
-##### `Fn::*Archive`
+The expression `${policyVersion}` will have the value `v1.1`.
 
-TODO
+##### `Fn::*Asset` and `Fn::*Archive`
+
+[Assets and Archives](https://www.pulumi.com/docs/intro/concepts/assets-archives/) are intrinsic types to Pulumi, like strings and numbers, and some resources may take these as inputs or return them as outputs. The built-ins create each kind of asset or archive. Each takes all take a single string value.
+
+
+| Built-In      | Argument Type | Description |
+| ------------- |---|------|
+| `Fn::FileAsset` | string | The contents of the asset are read from a file on disk. |
+| `Fn::StringAsset` | string | The contents of the asset are read from a string in memory. |
+| `Fn::RemoteAsset` | string | The contents of the asset are read from an http, https or file URI. |
+| `Fn::FileArchive` | string | The contents of the archive are read from either a folder on disk or a file on disk in one of the supported formats: .tar, .tgz, .tar.gz, .zip or .jar. |
+| `Fn::RemoteArchive` | string | The contents of the asset are read from an http, https or file URI, which must produce an archive of one of the same supported types as FileArchive. |
+| `Fn::AssetArchive` | map | The contents of the archive are read from a map of either Asset or Archive objects, one file or folder respectively per entry in the map.
+
+
+```yaml
+variables:
+  aFile:
+    Fn::FileAsset: ./file.txt
+  aString:
+    Fn::StringAsset: Hello, world!
+  aRemoteAsset:
+    Fn::RemoteAsset: http://worldclockapi.com/api/json/est/now
+
+  aFileArchive:
+    Fn::FileArchive: ./file.zip
+  aRemoteArchive:
+    Fn::RemoteArchive: http://example.com/file.zip
+  anAssetArchive:
+    Fn::AssetArchive:
+      file:
+        Fn::StringAsset: Hello, world!
+      folder:
+        Fn::FileArchive: ./folder
+```
 
 ##### `Fn::StackReference`
 
-TODO
+[Stack References](https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences) allow accessing the outputs of a stack from a YAML program. Arguments are passed as a list, with the first item being the stack name and the second argument the name of an output to reference:
+
+```yaml
+variables:
+  reference:
+    Fn::StackReference:
+      - org/project/stack
+      - outputName
+```
+
+The expression `${reference}` will have the value of the `outputName` output from the stack `org/project/stack`.
