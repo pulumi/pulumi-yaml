@@ -16,6 +16,7 @@ linters:
     - structcheck
     - unconvert
     - varcheck
+    - paralleltest
   disable:
     - lll
     - staticcheck # Disabled due to OOM errors in golangci-lint@v1.18.0

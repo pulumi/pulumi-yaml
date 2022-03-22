@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,7 @@ var (
 // ```
 //
 // This will add the current transpile result to the known results.
+//nolint:paralleltest // yarn install concurrency bug if two "yarn" executions try to cache a file
 func TestGenerateExamples(t *testing.T) {
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
@@ -120,7 +122,7 @@ func TestGenerateExamples(t *testing.T) {
 				return
 			}
 
-			pcl, tdiags, err := getValidPCLFile(template)
+			pcl, tdiags, err := getValidPCLFile(t, template)
 			if pcl != nil {
 				// If there wasn't an error, we write out the program file, even if it is invalid PCL.
 				writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
@@ -147,33 +149,54 @@ func getMain(dir string) (string, error) {
 	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
-func pluginHost() plugin.Host {
+var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
+	{Package: "aws", Version: "4.26.0"},
+	{Package: "azure-native", Version: "1.56.0"},
+	{Package: "azure", Version: "4.18.0"},
+	{Package: "kubernetes", Version: "3.7.2"},
+	{Package: "random", Version: "4.2.0"},
+	{Package: "eks", Version: "0.37.1"},
+	{Package: "aws-native", Version: "0.13.0"},
+	{Package: "docker", Version: "3.1.0"},
+
+	// Extra packages are to satisfy the versioning requirement of aws-eks.
+	// While the schemas are not the correct version, we rely on not
+	// depending on the difference between them.
+	{Package: "aws", Version: "4.15.0"},
+	{Package: "kubernetes", Version: "3.0.0"},
+}
+
+func newPluginLoader() schema.Loader {
 	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
 		})
 	}
-	return deploytest.NewPluginHost(nil, nil, nil,
-		host("aws", semver.MustParse("4.26.0")),
-		host("azure-native", semver.MustParse("1.56.0")),
-		host("azure", semver.MustParse("4.18.0")),
-		host("kubernetes", semver.MustParse("3.7.2")),
-		host("random", semver.MustParse("4.2.0")),
-		host("eks", semver.MustParse("0.37.1")),
-		host("aws-native", semver.MustParse("0.13.0")),
-		host("docker", semver.MustParse("3.1.0")),
+	var pluginLoaders []*deploytest.PluginLoader
+	for _, p := range defaultPlugins {
+		pluginLoaders = append(pluginLoaders, host(tokens.Package(p.Package), semver.MustParse(p.Version)))
+	}
 
-		// Extra packages are to satisfy the versioning requirement of aws-eks.
-		// While the schemas are not the correct version, we rely on not
-		// depending on the difference between them.
-		host("aws", semver.MustParse("4.15.0")),
-		host("kubernetes", semver.MustParse("3.0.0")),
-	)
+	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
 }
 
-func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
-	templateBody, tdiags := codegen.ImportTemplate(file)
+type mockPackageLoader struct{ schema.Loader }
+
+func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+	pkg, err := l.Loader.LoadPackage(name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return pulumiyaml.NewResourcePackage(pkg), nil
+}
+
+func (l mockPackageLoader) Close() {}
+
+var rootPluginLoader = mockPackageLoader{newPluginLoader()}
+
+func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
+	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
 	diags := hcl.Diagnostics(tdiags)
 	if tdiags.HasErrors() {
 		return nil, diags, nil
@@ -184,7 +207,7 @@ func getValidPCLFile(file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.PluginHost(pluginHost()))
+	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.Loader(rootPluginLoader.Loader))
 	if err != nil {
 		return []byte(program), diags, err
 	}
@@ -232,7 +255,7 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			if shouldBeParallel() {
 				t.Parallel()
 			}
-			files, diags, err := codegen.ConvertTemplate(template, generator, pluginHost())
+			files, diags, err := codegen.ConvertTemplate(template, generator, rootPluginLoader.Loader)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			writeOrCompare(t, writeTo, files)

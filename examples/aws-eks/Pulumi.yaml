@@ -4,13 +4,13 @@ description: An EKS cluster
 variables:
   vpcId:
     Fn::Invoke:
-      Function: aws:ec2/getVpc:getVpc
+      Function: aws:ec2:getVpc
       Arguments:
         default: true
       Return: id
   subnetIds:
     Fn::Invoke:
-      Function: aws:ec2/getSubnetIds:getSubnetIds
+      Function: aws:ec2:getSubnetIds
       Arguments:
         vpcId: ${vpcId}
       Return: ids

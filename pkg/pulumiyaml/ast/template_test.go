@@ -36,6 +36,8 @@ outputs:
 `
 
 func TestExample(t *testing.T) {
+	t.Parallel()
+
 	syntax, diags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(example)), nil)
 	require.Len(t, diags, 0)
 

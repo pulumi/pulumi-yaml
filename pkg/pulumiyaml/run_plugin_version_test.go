@@ -11,6 +11,8 @@ import (
 )
 
 func TestVersionValueComplex(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -38,6 +40,8 @@ resources:
 }
 
 func TestVersionValuePatched(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -65,6 +69,8 @@ resources:
 }
 
 func TestVersionValueMajorMinor(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -92,6 +98,8 @@ resources:
 }
 
 func TestVersionOnExample(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 configuration:
   InstanceType:
@@ -120,7 +128,7 @@ resources:
       instanceType: ${InstanceType}
       ami:
         Fn::Invoke:
-          Function: aws:index/getAmi:getAmi
+          Function: aws:getAmi
           Arguments:
             filters:
               - name: name
@@ -141,7 +149,7 @@ resources:
   MyBucket:
     type: aws:s3/bucket:Bucket
     options:
-      provider: UsEast2Provider
+      provider: ${UsEast2Provider}
 outputs:
   InstanceId: ${WebServer}
   PublicIp: ${WebServer.publicIp}
@@ -166,6 +174,8 @@ outputs:
 }
 
 func TestVersionDuplicate(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -201,6 +211,8 @@ resources:
 }
 
 func TestVersionConflicts(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml

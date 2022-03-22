@@ -21,38 +21,63 @@ const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
 
 type MockPackageLoader struct {
-	packages PackageMap
-	err      error
+	packages map[string]Package
 }
 
-func (l MockPackageLoader) getPackages() (PackageMap, error) {
-	return l.packages, l.err
+func (m MockPackageLoader) LoadPackage(name string) (Package, error) {
+	if pkg, found := m.packages[name]; found {
+		return pkg, nil
+	}
+	return nil, fmt.Errorf("package not found")
 }
+
+func (m MockPackageLoader) Close() {}
 
 type MockPackage struct {
-	isComponent func(typeName string) (bool, error)
+	isComponent     func(typeName string) (bool, error)
+	resolveResource func(typeName string) (ResourceTypeToken, error)
+	resolveFunction func(typeName string) (FunctionTypeToken, error)
 }
 
-func (m MockPackage) IsComponent(typeName string) (bool, error) {
-	return m.isComponent(typeName)
-}
-
-func NewMockPackageMap() PackageMap {
-	return PackageMap{
-		"test": MockPackage{
-			isComponent: func(typeName string) (bool, error) {
-				switch typeName {
-				case testResourceToken:
-					return false, nil
-				case testComponentToken:
-					return true, nil
-				default:
-					// TODO: Remove this and fix all test cases.
-					return false, nil
-				}
-			},
-		},
+func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
+	if m.resolveResource != nil {
+		return m.resolveResource(typeName)
 	}
+	return ResourceTypeToken(typeName), nil
+}
+
+func (m MockPackage) ResolveFunction(typeName string) (FunctionTypeToken, error) {
+	if m.resolveFunction != nil {
+		return m.resolveFunction(typeName)
+	}
+	return FunctionTypeToken(typeName), nil
+}
+
+func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
+	return m.isComponent(string(typeName))
+}
+
+func (m MockPackage) Name() string {
+	return "test"
+}
+
+func newMockPackageMap() PackageLoader {
+	return MockPackageLoader{
+		packages: map[string]Package{
+			"test": MockPackage{
+				isComponent: func(typeName string) (bool, error) {
+					switch typeName {
+					case testResourceToken:
+						return false, nil
+					case testComponentToken:
+						return true, nil
+					default:
+						// TODO: Remove this and fix all test cases.
+						return false, nil
+					}
+				},
+			},
+		}}
 }
 
 type testMonitor struct {
@@ -115,7 +140,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, newMockPackageMap())
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -153,7 +178,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, make(PackageMap))
+		runner := newRunner(ctx, template, newMockPackageMap())
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -176,6 +201,8 @@ func testTemplate(t *testing.T, template *ast.TemplateDecl, callback func(*evalC
 }
 
 func TestYAML(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -197,6 +224,8 @@ outputs:
 }
 
 func TestAssetOrArchive(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 variables:
   dir:
@@ -228,6 +257,8 @@ variables:
 }
 
 func TestPropertiesAbsent(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -244,6 +275,8 @@ resources:
 }
 
 func TestYAMLDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 resources:
@@ -262,6 +295,8 @@ outputs:
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 configuration:
@@ -297,6 +332,8 @@ resources:
 }
 
 func TestConflictKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 configuration:
@@ -325,6 +362,8 @@ resources:
 }
 
 func TestConflictResourceVarKeyDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `name: test-yaml
 runtime: yaml
 variables:
@@ -349,6 +388,8 @@ resources:
 }
 
 func TestJSON(t *testing.T) {
+	t.Parallel()
+
 	const text = `{
 	"name": "test-yaml",
 	"runtime": "yaml",
@@ -378,6 +419,8 @@ func TestJSON(t *testing.T) {
 }
 
 func TestJSONDiags(t *testing.T) {
+	t.Parallel()
+
 	const text = `{
 	"name": "test-yaml",
 	"runtime": "yaml",
@@ -403,6 +446,7 @@ func TestJSONDiags(t *testing.T) {
 }
 
 func TestPropertyAccess(t *testing.T) {
+	t.Parallel()
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
@@ -424,6 +468,8 @@ func TestPropertyAccess(t *testing.T) {
 }
 
 func TestJoin(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Resources: map[string]*Resource{
 			"resA": {
@@ -477,6 +523,8 @@ func TestJoin(t *testing.T) {
 }
 
 func TestSplit(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.SplitExpr
 		expected []string
@@ -519,8 +567,12 @@ func TestSplit(t *testing.T) {
 			isOutput: true,
 		},
 	}
+	//nolint:paralleltest // false positive that the "tt" var isn't used, it is via "tt.expected"
 	for _, tt := range tests {
+		tt := tt
 		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -549,6 +601,8 @@ func TestSplit(t *testing.T) {
 }
 
 func TestToJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.ToJSONExpr
 		expected string
@@ -616,7 +670,10 @@ func TestToJSON(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -645,6 +702,8 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.SelectExpr
 		expected interface{}
@@ -729,8 +788,12 @@ func TestSelect(t *testing.T) {
 			isError: true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via idx
+	for idx, tt := range tests {
+		tt := tt
+		t.Run(fmt.Sprint(idx), func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -767,6 +830,8 @@ func TestSelect(t *testing.T) {
 }
 
 func TestToBase64(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    *ast.ToBase64Expr
 		expected string
@@ -806,7 +871,10 @@ func TestToBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
 			tmpl := template(t, &Template{
 				Resources: map[string]*Resource{
 					"resA": {
@@ -840,6 +908,8 @@ func TestToBase64(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
+	t.Parallel()
+
 	tmpl := template(t, &Template{
 		Variables: map[string]interface{}{
 			"foo": "oof",

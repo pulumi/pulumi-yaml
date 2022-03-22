@@ -13,12 +13,12 @@ name: simple-yaml
 runtime: yaml
 resources:
   my-bucket:
-    type: aws:s3/bucket:Bucket
+    type: aws:s3:Bucket
     properties:
       website:
         indexDocument: index.html
   index.html:
-    type: aws:s3/bucketObject:BucketObject
+    type: aws:s3:BucketObject
     properties:
       bucket: ${my-bucket}
       source:
@@ -47,7 +47,7 @@ configuration:
 variables:
   AmazonLinuxAmi:
     Fn::Invoke:
-      Function: aws:index/getAmi:getAmi
+      Function: aws:getAmi
       Arguments:
         filters:
           - name: name
@@ -57,7 +57,7 @@ variables:
       Return: id
 resources:
   WebSecGrp:
-    type: aws:ec2/securityGroup:SecurityGroup
+    type: aws:ec2:SecurityGroup
     properties:
       ingress:
         - protocol: tcp
@@ -66,7 +66,7 @@ resources:
           cidrBlocks: ["0.0.0.0/0"]
     protect: true
   WebServer:
-    type: aws:ec2/instance:Instance
+    type: aws:ec2:Instance
     properties:
       instanceType: ${InstanceType}
       ami: ${AmazonLinuxAmi}
@@ -81,7 +81,7 @@ resources:
     properties:
       region: us-east-2
   MyBucket:
-    type: aws:s3/bucket:Bucket
+    type: aws:s3:Bucket
     options:
       provider: ${UsEast2Provider}
 outputs:
