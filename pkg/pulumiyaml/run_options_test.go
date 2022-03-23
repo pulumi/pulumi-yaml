@@ -36,7 +36,7 @@ func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	}
 }
 
-func (m FakePackage) ResourceProperties(typeName ResourceTypeToken) ResourceProperties {
+func (m FakePackage) ResourceProperties(typeName ResourceTypeToken) TypeHint {
 	switch typeName.String() {
 	case "foo":
 		return nil

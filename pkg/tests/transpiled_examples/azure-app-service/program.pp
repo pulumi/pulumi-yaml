@@ -83,26 +83,26 @@ resource app "azure-native:web:WebApp" {
 	siteConfig = {
 		appSettings = [
 			{
-				"name" = "WEBSITE_RUN_FROM_PACKAGE",
-				"value" = "https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}"
+				name = "WEBSITE_RUN_FROM_PACKAGE",
+				value = "https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}"
 			},
 			{
-				"name" = "APPINSIGHTS_INSTRUMENTATIONKEY",
-				"value" = appInsights.instrumentationKey
+				name = "APPINSIGHTS_INSTRUMENTATIONKEY",
+				value = appInsights.instrumentationKey
 			},
 			{
-				"name" = "APPLICATIONINSIGHTS_CONNECTION_STRING",
-				"value" = "InstrumentationKey=${appInsights.instrumentationKey}"
+				name = "APPLICATIONINSIGHTS_CONNECTION_STRING",
+				value = "InstrumentationKey=${appInsights.instrumentationKey}"
 			},
 			{
-				"name" = "ApplicationInsightsAgent_EXTENSION_VERSION",
-				"value" = "~2"
+				name = "ApplicationInsightsAgent_EXTENSION_VERSION",
+				value = "~2"
 			}
 		],
 		connectionStrings = [{
-			"name" = "db",
-			"type" = "SQLAzure",
-			"connectionString" = "Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;"
+			name = "db",
+			type = "SQLAzure",
+			connectionString = "Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;"
 		}]
 	}
 }

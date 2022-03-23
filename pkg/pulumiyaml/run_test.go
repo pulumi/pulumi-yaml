@@ -37,7 +37,7 @@ type MockPackage struct {
 	isComponent        func(typeName string) (bool, error)
 	resolveResource    func(typeName string) (ResourceTypeToken, error)
 	resolveFunction    func(typeName string) (FunctionTypeToken, error)
-	resourceProperties func(typeName string) ResourceProperties
+	resourceProperties func(typeName string) TypeHint
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -58,7 +58,7 @@ func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(typeName.String())
 }
 
-func (m MockPackage) ResourceProperties(typeName ResourceTypeToken) ResourceProperties {
+func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) TypeHint {
 	return m.resourceProperties(typeName.String())
 }
 

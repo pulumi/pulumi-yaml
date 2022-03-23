@@ -117,22 +117,25 @@ func (m FakePackage) Name() string {
 	return "fake"
 }
 
-func (m FakePackage) ResourceProperties(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.ResourceProperties {
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
 	switch typeName {
 	case "test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
 		"other:index:Thing", "other:module:Object":
-		return FakeResourceProperties{typeName}
+		return FakeTypeHint{typeName}
 	}
 	return nil
 }
 
-type FakeResourceProperties struct {
+type FakeTypeHint struct {
 	resourceName pulumiyaml.ResourceTypeToken
 }
 
-func (frp FakeResourceProperties) IsArg(name string) (bool, bool) {
-	return false, false
+func (frp FakeTypeHint) Fields() map[string]pulumiyaml.TypeHint {
+	return nil
+}
+func (frp FakeTypeHint) Element() pulumiyaml.TypeHint {
+	return nil
 }
 
 //nolint:paralleltest // mutates environment variables
