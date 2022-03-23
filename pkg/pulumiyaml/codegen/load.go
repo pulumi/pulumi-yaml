@@ -206,7 +206,6 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 // - `Fn::Join` is imported as either a template expression or a call to `join`
 // - `Fn::Split` is imported as a call to `split`
 // - `Fn::StackReference` is imported as a reference to the named stack
-// - `Fn::Sub` is imported as a template expression
 //
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
@@ -300,8 +299,6 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			},
 			Key: propertyName,
 		}, diags
-	case *ast.SubExpr:
-		return imp.importInterpolate(node.Interpolate, node.Substitutions)
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil

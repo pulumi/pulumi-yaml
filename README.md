@@ -185,10 +185,6 @@ TODO
 
 TODO
 
-##### `Fn::Sub`
-
-TODO
-
 ##### `Fn::Select`
 
 TODO

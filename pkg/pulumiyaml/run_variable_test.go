@@ -38,21 +38,15 @@ outputs:
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		ectx := runner.newContext(nil)
-		cwdOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("${pulumi.cwd}"),
-		})
+		cwdOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.cwd}"))
 		assert.True(t, ok)
 		assert.Equal(t, cwd, cwdOutput)
 
-		projectOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("${pulumi.project}"),
-		})
+		projectOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.project}"))
 		assert.True(t, ok)
 		assert.Equal(t, "projectFoo", projectOutput)
 
-		stackOutput, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("${pulumi.stack}"),
-		})
+		stackOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.stack}"))
 		assert.True(t, ok)
 		assert.Equal(t, "stackDev", stackOutput)
 
@@ -344,9 +338,7 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		}
 
 		ectx := runner.newContext(nil)
-		v, ok := ectx.evaluateBuiltinSub(&ast.SubExpr{
-			Interpolate: ast.MustInterpolate("${resFinal.out}"),
-		})
+		v, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${resFinal.out}"))
 		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo", x)
