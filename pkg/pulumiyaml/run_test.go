@@ -542,43 +542,24 @@ func TestSplit(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		input    *ast.SplitExpr
+		input    string
 		expected []string
 		isOutput bool
 	}{
 		{
-			input: &ast.SplitExpr{
-				Delimiter: ast.String(","),
-				Source:    ast.String("a,b"),
-			},
+			input:    `{ Fn::Split: { Separator: ",", Value: "a,b" } }`,
 			expected: []string{"a", "b"},
 		},
 		{
-			input: &ast.SplitExpr{
-				Delimiter: ast.String(","),
-				Source:    ast.String("a"),
-			},
+			input:    `{ Fn::Split: { Separator: ",", Value: "a" } }`,
 			expected: []string{"a"},
 		},
 		{
-			input: &ast.SplitExpr{
-				Delimiter: ast.String(","),
-				Source:    ast.String(""),
-			},
+			input:    `{ Fn::Split: { Separator: ",", Value: "" } }`,
 			expected: []string{""},
 		},
 		{
-			input: &ast.SplitExpr{
-				Source: &ast.SymbolExpr{
-					Property: &ast.PropertyAccess{
-						Accessors: []ast.PropertyAccessor{
-							&ast.PropertyName{Name: "resA"},
-							&ast.PropertyName{Name: "outSep"},
-						},
-					},
-				},
-				Delimiter: ast.String("-"),
-			},
+			input:    `{ Fn::Split: { Separator: "-", Value: "${resA.outSep}" } }`,
 			expected: []string{"1", "2", "3", "4"},
 			isOutput: true,
 		},
@@ -589,21 +570,26 @@ func TestSplit(t *testing.T) {
 		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
 			t.Parallel()
 
-			tmpl := template(t, &Template{
-				Resources: map[string]*Resource{
-					"resA": {
-						Type: "test:resource:type",
-						Properties: map[string]interface{}{
-							"foo": "oof",
-						},
-					},
-				},
-			})
+			text := strings.TrimSpace(`
+name: test-yaml
+runtime: yaml
+resources:
+  resA:
+    type: test:resource:type
+    properties:
+      foo: oof
+variables:
+  testVar: ` + tt.input)
+
+			tmpl := yamlTemplate(t, strings.TrimSpace(text))
+
 			testTemplate(t, tmpl, func(ctx *evalContext) {
-				v, ok := ctx.evaluateBuiltinSplit(tt.input)
+				v, ok := ctx.evaluateExpr(ast.MustInterpolate(`${testVar}`))
 				assert.True(t, ok)
+
+				requireNoErrors(t, tmpl, ctx.sdiags.diags)
 				if tt.isOutput {
-					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+					out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 						assert.Equal(t, tt.expected, x)
 						return nil, nil
 					})
@@ -611,6 +597,7 @@ func TestSplit(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expected, v)
 				}
+
 			})
 		})
 	}

@@ -492,17 +492,17 @@ func Join(delimiter Expr, values *ListExpr) *JoinExpr {
 type SplitExpr struct {
 	builtinNode
 
-	Delimiter Expr
+	Separator Expr
 	Source    Expr
 }
 
-func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr) *SplitExpr {
-	elems := args.Elements
+func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, obj *ObjectExpr, delimiter Expr, value Expr) *SplitExpr {
+	elems := obj.Entries
 	contract.Assertf(len(elems) == 2, "Must have exactly 2 elements")
 	return &SplitExpr{
-		builtinNode: builtin(node, name, args),
-		Delimiter:   elems[0],
-		Source:      elems[1],
+		builtinNode: builtin(node, name, obj),
+		Separator:   delimiter,
+		Source:      value,
 	}
 }
 
@@ -510,7 +510,7 @@ func Split(delimiter, source Expr) *SplitExpr {
 	name := String("Fn::Split")
 	return &SplitExpr{
 		builtinNode: builtin(nil, name, List(delimiter, source)),
-		Delimiter:   delimiter,
+		Separator:   delimiter,
 		Source:      source,
 	}
 }
@@ -866,12 +866,25 @@ func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 }
 
 func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "The argument to Fn::Select must be a two-values list", "")}
+	obj, ok := args.(*ObjectExpr)
+	if !ok || len(obj.Entries) != 2 {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Split must be an object containing 'Separator' or 'Sep' and 'Value'", "")}
 	}
 
-	return SplitSyntax(node, name, list), nil
+	var separator, value Expr
+	for i := 0; i < len(obj.Entries); i++ {
+		kvp := obj.Entries[i]
+		if str, ok := kvp.Key.(*StringExpr); ok {
+			switch str.Value {
+			case "Separator":
+				separator = kvp.Value
+			case "Value":
+				value = kvp.Value
+			}
+		}
+	}
+
+	return SplitSyntax(node, name, obj, separator, value), nil
 }
 
 func parseSub(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

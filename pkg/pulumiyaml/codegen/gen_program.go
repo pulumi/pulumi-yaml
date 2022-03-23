@@ -605,7 +605,10 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			syn.ObjectProperty(syn.String("Values"), values),
 		))
 	case "split":
-		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
+		return wrapFn("Split", syn.Object(
+			syn.ObjectProperty(syn.String("Separator"), g.expr(f.Args[1])),
+			syn.ObjectProperty(syn.String("Value"), g.expr(f.Args[0])),
+		))
 	case "toBase64":
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
 	case "toJSON":

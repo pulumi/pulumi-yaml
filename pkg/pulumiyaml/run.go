@@ -995,7 +995,7 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 }
 
 func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
-	delimiter, delimOk := ctx.evaluateExpr(v.Delimiter)
+	delimiter, delimOk := ctx.evaluateExpr(v.Separator)
 	source, sourceOk := ctx.evaluateExpr(v.Source)
 	if !delimOk || !sourceOk {
 		return nil, false
@@ -1004,7 +1004,7 @@ func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, boo
 	split := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		d, delimOk := args[0].(string)
 		if !delimOk {
-			ctx.error(v.Delimiter, fmt.Sprintf("Must be a string, not %v", typeString(d)))
+			ctx.error(v.Separator, fmt.Sprintf("Must be a string, not %v", typeString(d)))
 		}
 		s, sourceOk := args[1].(string)
 		if !sourceOk {

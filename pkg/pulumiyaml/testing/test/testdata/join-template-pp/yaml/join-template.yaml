@@ -16,6 +16,6 @@ resources:
                 Fn::Select:
                     Values:
                         Fn::Split:
-                            - '-'
-                            - '{}-foo'
+                            Separator: '-'
+                            Value: '{}-foo'
                     Index: 0
