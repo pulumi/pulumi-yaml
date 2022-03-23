@@ -10,5 +10,5 @@ outputs:
       # * Stack name is determined when you run "pulumi up" for the first time, such as "dev"
       #
       # So you might use "alice/infra-project-name/dev", as an example.
-      - PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
-      - imageName
+      StackName: PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
+      Output: imageName

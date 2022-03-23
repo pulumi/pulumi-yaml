@@ -683,7 +683,7 @@ type StackReferenceExpr struct {
 	PropertyName Expr
 }
 
-func StackReferenceSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, stackName *StringExpr, propertyName Expr) *StackReferenceExpr {
+func StackReferenceSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, stackName *StringExpr, propertyName Expr) *StackReferenceExpr {
 	return &StackReferenceExpr{
 		builtinNode:  builtin(node, name, args),
 		StackName:    stackName,
@@ -868,7 +868,7 @@ func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	obj, ok := args.(*ObjectExpr)
 	if !ok || len(obj.Entries) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Split must be an object containing 'Separator' or 'Sep' and 'Value'", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Select must be an object containing 'Separator' or 'Sep' and 'Value'", "")}
 	}
 
 	var separator, value Expr
@@ -953,17 +953,30 @@ func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, 
 }
 
 func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::StackReference must be a two-valued list", "")}
+	obj, ok := args.(*ObjectExpr)
+	if !ok || len(obj.Entries) != 2 {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::StackReference must be an object containing 'Name' and 'Output'", "")}
 	}
 
-	stackName, ok := list.Elements[0].(*StringExpr)
+	var stackNameExpr, output Expr
+	for i := 0; i < len(obj.Entries); i++ {
+		kvp := obj.Entries[i]
+		if str, ok := kvp.Key.(*StringExpr); ok {
+			switch str.Value {
+			case "StackName":
+				stackNameExpr = kvp.Value
+			case "Output":
+				output = kvp.Value
+			}
+		}
+	}
+
+	stackName, ok := stackNameExpr.(*StringExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the first argument to Fn::StackReference must be a string literal", "")}
+		return nil, syntax.Diagnostics{ExprError(stackNameExpr, "the argument must be a string literal", "")}
 	}
 
-	return StackReferenceSyntax(node, name, list, stackName, list.Elements[1]), nil
+	return StackReferenceSyntax(node, name, obj, stackName, output), nil
 }
 
 // We expect the following format
