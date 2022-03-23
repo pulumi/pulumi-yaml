@@ -3,20 +3,20 @@ config instanceType string {
 }
 
 ec2ami = invoke("aws:index/getAmi:getAmi", {
-	"filters" = [{
-		"name" = "name",
-		"values" = ["amzn-ami-hvm-*-x86_64-ebs"]
+	filters = [{
+		name = "name",
+		values = ["amzn-ami-hvm-*-x86_64-ebs"]
 	}],
-	"owners" = ["137112412989"],
-	"mostRecent" = true
+	owners = ["137112412989"],
+	mostRecent = true
 }).id
 
 resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 	ingress = [{
-		"protocol" = "tcp",
-		"fromPort" = 80,
-		"toPort" = 80,
-		"cidrBlocks" = ["0.0.0.0/0"]
+		protocol = "tcp",
+		fromPort = 80,
+		toPort = 80,
+		cidrBlocks = ["0.0.0.0/0"]
 	}]
 }
 

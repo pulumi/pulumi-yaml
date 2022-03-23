@@ -3,18 +3,18 @@ config sqlAdmin string {
 }
 
 blobAccessToken = invoke("azure-native:storage:listStorageAccountServiceSAS", {
-	"accountName" = sa.name,
-	"protocols" = "https",
-	"sharedAccessStartTime" = "2022-01-01",
-	"sharedAccessExpiryTime" = "2030-01-01",
-	"resource" = "c",
-	"resourceGroupName" = appservicegroup.name,
-	"permissions" = "r",
-	"canonicalizedResource" = "/blob/${sa.name}/${container.name}",
-	"contentType" = "application/json",
-	"cacheControl" = "max-age=5",
-	"contentDisposition" = "inline",
-	"contentEncoding" = "deflate"
+	accountName = sa.name,
+	protocols = "https",
+	sharedAccessStartTime = "2022-01-01",
+	sharedAccessExpiryTime = "2030-01-01",
+	resource = "c",
+	resourceGroupName = appservicegroup.name,
+	permissions = "r",
+	canonicalizedResource = "/blob/${sa.name}/${container.name}",
+	contentType = "application/json",
+	cacheControl = "max-age=5",
+	contentDisposition = "inline",
+	contentEncoding = "deflate"
 }).serviceSasToken
 
 resource appservicegroup "azure-native:resources:ResourceGroup" {

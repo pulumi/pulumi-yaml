@@ -232,17 +232,16 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		_, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
+		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
 		function := quotedLit(string(functionName))
 
 		invokeArgs := []model.Expression{function}
-
 		if node.CallArgs != nil {
-			// TODO: we should calculate type hints here from the function
-			args, adiags := imp.importExpr(node.CallArgs, nil)
+			args, adiags := imp.importExpr(node.CallArgs,
+				pkg.FunctionTypeHint(functionName))
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
@@ -333,7 +332,11 @@ func (imp *importer) importExpr(node ast.Expr, hint pulumiyaml.TypeHint) (model.
 		var diags syntax.Diagnostics
 		var expressions []model.Expression
 		for _, v := range node.Elements {
-			e, ediags := imp.importExpr(v, hint.Element())
+			var eHint pulumiyaml.TypeHint
+			if hint != nil {
+				eHint = hint.Element()
+			}
+			e, ediags := imp.importExpr(v, eHint)
 			diags.Extend(ediags...)
 
 			expressions = append(expressions, e)

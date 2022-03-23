@@ -12,13 +12,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const fakeName = "foo"
+
 type FakePackage struct {
 	t *testing.T
 }
 
 func (m FakePackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
 	switch typeName {
-	case "foo":
+	case fakeName:
 		return ResourceTypeToken(typeName), nil
 	default:
 		assert.Fail(m.t, "Unexpected type token %q", typeName)
@@ -28,7 +30,7 @@ func (m FakePackage) ResolveResource(typeName string) (ResourceTypeToken, error)
 
 func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	switch typeName.String() {
-	case "foo":
+	case fakeName:
 		return false, nil
 	default:
 		assert.Fail(m.t, "Unexpected type token %q", typeName)
@@ -36,9 +38,9 @@ func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	}
 }
 
-func (m FakePackage) ResourceProperties(typeName ResourceTypeToken) TypeHint {
+func (m FakePackage) ResourceTypeHint(typeName ResourceTypeToken) TypeHint {
 	switch typeName.String() {
-	case "foo":
+	case fakeName:
 		return nil
 	default:
 		assert.Fail(m.t, "Unexpected type token %q", typeName)

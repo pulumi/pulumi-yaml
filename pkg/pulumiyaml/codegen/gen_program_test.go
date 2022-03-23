@@ -95,10 +95,24 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 	}
 }
 
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
+	switch typeName {
+	case "test:mod:prov", "test:mod:typ",
+		// third-party-package fakes:
+		"other:index:Thing", "other:module:Object":
+		return FakeTypeHint{typeName}
+	}
+	return nil
+}
+
 func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeToken, error) {
 	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
 	m.t.Logf(msg)
 	return "", fmt.Errorf(msg)
+}
+
+func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.TypeHint {
+	return nil
 }
 
 func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, error) {
@@ -115,16 +129,6 @@ func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, e
 
 func (m FakePackage) Name() string {
 	return "fake"
-}
-
-func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
-	switch typeName {
-	case "test:mod:prov", "test:mod:typ",
-		// third-party-package fakes:
-		"other:index:Thing", "other:module:Object":
-		return FakeTypeHint{typeName}
-	}
-	return nil
 }
 
 type FakeTypeHint struct {

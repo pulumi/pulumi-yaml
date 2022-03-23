@@ -54,8 +54,7 @@ var (
 		"azure-container-apps":    AllLanguages(),
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
-		// TODO: azure-app-service has nested types.
-		"azure-app-service": Dotnet.And(Golang),
+		"azure-app-service":       Dotnet.And(Golang),
 	}
 
 	langTests = []ConvertFunc{

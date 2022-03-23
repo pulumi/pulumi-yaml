@@ -3,16 +3,16 @@ config sqlAdmin string {
 }
 
 sharedKey = invoke("azure-native:operationalinsights:getSharedKeys", {
-	"resourceGroupName" = resourceGroup.name,
-	"workspaceName" = workspace.name
+	resourceGroupName = resourceGroup.name,
+	workspaceName = workspace.name
 }).primarySharedKey
 adminUsername = invoke("azure-native:containerregistry:listRegistryCredentials", {
-	"resourceGroupName" = resourceGroup.name,
-	"registryName" = registry.name
+	resourceGroupName = resourceGroup.name,
+	registryName = registry.name
 }).username
 adminPasswords = invoke("azure-native:containerregistry:listRegistryCredentials", {
-	"resourceGroupName" = resourceGroup.name,
-	"registryName" = registry.name
+	resourceGroupName = resourceGroup.name,
+	registryName = registry.name
 }).passwords
 
 resource resourceGroup "azure-native:resources:ResourceGroup" {
@@ -32,8 +32,8 @@ resource kubeEnv "azure-native:web:KubeEnvironment" {
 	appLogsConfiguration = {
 		destination = "log-analytics",
 		logAnalyticsConfiguration = {
-			"customerId" = workspace.customerId,
-			"sharedKey" = sharedKey
+			customerId = workspace.customerId,
+			sharedKey = sharedKey
 		}
 	}
 }
@@ -70,23 +70,23 @@ resource containerapp "azure-native:web:ContainerApp" {
 	kubeEnvironmentId = kubeEnv.id
 	configuration = {
 		ingress = {
-			"external" = true,
-			"targetPort" = 80
+			external = true,
+			targetPort = 80
 		},
 		registries = [{
-			"server" = registry.loginServer,
-			"username" = adminUsername,
-			"passwordSecretRef" = "pwd"
+			server = registry.loginServer,
+			username = adminUsername,
+			passwordSecretRef = "pwd"
 		}],
 		secrets = [{
-			"name" = "pwd",
-			"value" = adminPasswords[0].value
+			name = "pwd",
+			value = adminPasswords[0].value
 		}]
 	}
 	template = {
 		containers = [{
-			"name" = "myapp",
-			"image" = myImage.name
+			name = "myapp",
+			image = myImage.name
 		}]
 	}
 }
