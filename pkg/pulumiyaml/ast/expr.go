@@ -101,7 +101,7 @@ type StringExpr struct {
 	Value string
 }
 
-// GetValue returns the expression's value. If the receiever is null, GetValue returns the empty string.
+// GetValue returns the expression's value. If the receiver is null, GetValue returns the empty string.
 func (x *StringExpr) GetValue() string {
 	if x == nil {
 		return ""
