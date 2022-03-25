@@ -303,10 +303,6 @@ variables:
 
 The expression `${banana}` will have the value `"BaNaNa"`.
 
-##### `Fn::Sub`
-
-TODO
-
 ##### `Fn::Select`
 
 Selects one of several options given an index. Arguments are passed as a list, with the first item being the index, 0-based, and the second item a list of expressions to select from.

@@ -242,7 +242,7 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //   the string is of the form "${resource.property}", it is treated as a symbol. If the result contains no property
 //   accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 // - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
-//   that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Sub", "Fn::Select",
+//   that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Select",
 //   "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
 //   Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
@@ -537,39 +537,6 @@ func Select(index Expr, values Expr) *SelectExpr {
 	}
 }
 
-// SubExpr substitutes variables in an input string with values that you specify. In your templates, you can use this
-// function to construct commands or outputs that include values that aren't available until you create or update a
-// stack.
-type SubExpr struct {
-	builtinNode
-
-	Interpolate   *InterpolateExpr
-	Substitutions *ObjectExpr
-}
-
-func SubSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr, interpolate *InterpolateExpr, substitutions *ObjectExpr) *SubExpr {
-	return &SubExpr{
-		builtinNode:   builtin(node, name, args),
-		Interpolate:   interpolate,
-		Substitutions: substitutions,
-	}
-}
-
-func Sub(interpolate *InterpolateExpr, substitutions *ObjectExpr) *SubExpr {
-	name := String("Fn::Sub")
-
-	args := Expr(interpolate)
-	if substitutions != nil {
-		args = List(interpolate, substitutions)
-	}
-
-	return &SubExpr{
-		builtinNode:   builtin(nil, name, args),
-		Interpolate:   interpolate,
-		Substitutions: substitutions,
-	}
-}
-
 type ToBase64Expr struct {
 	builtinNode
 
@@ -713,8 +680,6 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseJoin
 	case "Fn::ToJSON":
 		parse = parseToJSON
-	case "Fn::Sub":
-		parse = parseSub
 	case "Fn::ToBase64":
 		parse = parseToBase64
 	case "Fn::Select":
@@ -835,63 +800,6 @@ func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syn
 	}
 
 	return SplitSyntax(node, name, list), nil
-}
-
-func parseSub(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	var diags syntax.Diagnostics
-
-	// Read and validate the arguments to Fn::Sub.
-	var template Expr
-	var substitutions *ObjectExpr
-	switch args := args.(type) {
-	case *ListExpr:
-		if len(args.Elements) != 2 {
-			return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Sub must be a two-valued list or a string", "")}
-		}
-
-		subs, ok := args.Elements[1].(*ObjectExpr)
-		if !ok {
-			diags.Extend(ExprError(args.Elements[1], "the second argument to Fn::Sub must be an object", ""))
-		} else {
-			for _, kvp := range subs.Entries {
-				if _, ok := kvp.Key.(*StringExpr); !ok {
-					diags.Extend(ExprError(kvp.Key, "substitution name must be a string literal", ""))
-				}
-			}
-		}
-		substitutions = subs
-
-		template = args.Elements[0]
-
-	case *InterpolateExpr, *SymbolExpr, *StringExpr:
-		template = args
-	default:
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Sub must be a two-valued list or a string", "")}
-	}
-
-	var interpolate *InterpolateExpr
-	switch template := template.(type) {
-	case *InterpolateExpr:
-		interpolate = template
-	case *SymbolExpr:
-		interpolate = &InterpolateExpr{
-			exprNode: template.exprNode,
-			Parts:    []Interpolation{{Value: template.Property}},
-		}
-	case *StringExpr:
-		interpolate = &InterpolateExpr{
-			exprNode: template.exprNode,
-			Parts:    []Interpolation{{Text: template.Value}},
-		}
-	default:
-		diags.Extend(ExprError(template, "the first argument to Fn::Sub must be a string", ""))
-	}
-
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return SubSyntax(node, name, args, interpolate, substitutions), diags
 }
 
 func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
