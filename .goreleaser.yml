@@ -10,9 +10,6 @@ archives:
 builds:
 - id: pulumi-language-yaml
   binary: pulumi-language-yaml
-  env:
-  - CGO_ENABLED=0
-  - GO111MODULE=on
   goarch:
   - amd64
   - arm64
@@ -27,9 +24,6 @@ builds:
   main: ./cmd/pulumi-language-yaml/
 - id: yaml2pulumi
   binary: yaml2pulumi
-  env:
-  - CGO_ENABLED=0
-  - GO111MODULE=on
   goarch:
   - amd64
   - arm64
