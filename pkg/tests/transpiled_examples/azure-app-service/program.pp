@@ -3,18 +3,18 @@ config sqlAdmin string {
 }
 
 blobAccessToken = invoke("azure-native:storage:listStorageAccountServiceSAS", {
-	"accountName" = sa.name,
-	"protocols" = "https",
-	"sharedAccessStartTime" = "2022-01-01",
-	"sharedAccessExpiryTime" = "2030-01-01",
-	"resource" = "c",
-	"resourceGroupName" = appservicegroup.name,
-	"permissions" = "r",
-	"canonicalizedResource" = "/blob/${sa.name}/${container.name}",
-	"contentType" = "application/json",
-	"cacheControl" = "max-age=5",
-	"contentDisposition" = "inline",
-	"contentEncoding" = "deflate"
+	accountName = sa.name,
+	protocols = "https",
+	sharedAccessStartTime = "2022-01-01",
+	sharedAccessExpiryTime = "2030-01-01",
+	resource = "c",
+	resourceGroupName = appservicegroup.name,
+	permissions = "r",
+	canonicalizedResource = "/blob/${sa.name}/${container.name}",
+	contentType = "application/json",
+	cacheControl = "max-age=5",
+	contentDisposition = "inline",
+	contentEncoding = "deflate"
 }).serviceSasToken
 
 resource appservicegroup "azure-native:resources:ResourceGroup" {
@@ -24,7 +24,7 @@ resource sa "azure-native:storage:StorageAccount" {
 	resourceGroupName = appservicegroup.name
 	kind = "StorageV2"
 	sku = {
-		"name" = "Standard_LRS"
+		name = "Standard_LRS"
 	}
 }
 
@@ -32,8 +32,8 @@ resource appserviceplan "azure-native:web:AppServicePlan" {
 	resourceGroupName = appservicegroup.name
 	kind = "App"
 	sku = {
-		"name" = "B1",
-		"tier" = "Basic"
+		name = "B1",
+		tier = "Basic"
 	}
 }
 
@@ -73,7 +73,7 @@ resource db "azure-native:sql:Database" {
 	resourceGroupName = appservicegroup.name
 	serverName = sqlServer.name
 	sku = {
-		"name" = "S0"
+		name = "S0"
 	}
 }
 
@@ -81,28 +81,28 @@ resource app "azure-native:web:WebApp" {
 	resourceGroupName = appservicegroup.name
 	serverFarmId = appserviceplan.id
 	siteConfig = {
-		"appSettings" = [
+		appSettings = [
 			{
-				"name" = "WEBSITE_RUN_FROM_PACKAGE",
-				"value" = "https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}"
+				name = "WEBSITE_RUN_FROM_PACKAGE",
+				value = "https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}"
 			},
 			{
-				"name" = "APPINSIGHTS_INSTRUMENTATIONKEY",
-				"value" = appInsights.instrumentationKey
+				name = "APPINSIGHTS_INSTRUMENTATIONKEY",
+				value = appInsights.instrumentationKey
 			},
 			{
-				"name" = "APPLICATIONINSIGHTS_CONNECTION_STRING",
-				"value" = "InstrumentationKey=${appInsights.instrumentationKey}"
+				name = "APPLICATIONINSIGHTS_CONNECTION_STRING",
+				value = "InstrumentationKey=${appInsights.instrumentationKey}"
 			},
 			{
-				"name" = "ApplicationInsightsAgent_EXTENSION_VERSION",
-				"value" = "~2"
+				name = "ApplicationInsightsAgent_EXTENSION_VERSION",
+				value = "~2"
 			}
 		],
-		"connectionStrings" = [{
-			"name" = "db",
-			"type" = "SQLAzure",
-			"connectionString" = "Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;"
+		connectionStrings = [{
+			name = "db",
+			type = "SQLAzure",
+			connectionString = "Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;"
 		}]
 	}
 }

@@ -1,6 +1,6 @@
 resource mybucket "aws:s3/bucket:Bucket" {
 	website = {
-		"indexDocument" = "index.html"
+		indexDocument = "index.html"
 	}
 }
 

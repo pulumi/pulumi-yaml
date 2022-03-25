@@ -5,7 +5,7 @@ resource storageaccount "azure-native:storage:StorageAccount" {
 	resourceGroupName = staticsitegroup.name
 	kind = "StorageV2"
 	sku = {
-		"name" = "Standard_LRS"
+		name = "Standard_LRS"
 	}
 }
 

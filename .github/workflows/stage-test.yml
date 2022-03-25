@@ -52,6 +52,7 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
   ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
   PULUMI_TEST_PARALLEL: false
+  NODE_OPTIONS: --max-old-space-size=3072
 
 jobs:
   test:

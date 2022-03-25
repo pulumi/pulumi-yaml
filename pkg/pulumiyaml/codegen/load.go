@@ -150,7 +150,7 @@ func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions 
 	if substitutions != nil {
 		environment := map[string]model.Expression{}
 		for _, kvp := range substitutions.Entries {
-			v, vdiags := imp.importExpr(kvp.Value)
+			v, vdiags := imp.importExpr(kvp.Value, nil)
 			diags.Extend(vdiags...)
 
 			environment[kvp.Key.(*ast.StringExpr).Value] = v
@@ -181,10 +181,10 @@ func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions 
 func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
-	delim, ddiags := imp.importExpr(node.Delimiter)
+	delim, ddiags := imp.importExpr(node.Delimiter, nil)
 	diags.Extend(ddiags...)
 
-	values, vdiags := imp.importExpr(node.Values)
+	values, vdiags := imp.importExpr(node.Values, nil)
 	diags.Extend(vdiags...)
 
 	if diags.HasErrors() {
@@ -210,19 +210,19 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.FileAssetExpr:
-		path, pdiags := imp.importExpr(node.Source)
+		path, pdiags := imp.importExpr(node.Source, nil)
 		return &model.FunctionCallExpression{
 			Name: "fileAsset",
 			Args: []model.Expression{path},
 		}, pdiags
 	case *ast.FileArchiveExpr:
-		path, pdiags := imp.importExpr(node.Source)
+		path, pdiags := imp.importExpr(node.Source, nil)
 		return &model.FunctionCallExpression{
 			Name: "fileArchive",
 			Args: []model.Expression{path},
 		}, pdiags
 	case *ast.StringAssetExpr:
-		path, pdiags := imp.importExpr(node.Source)
+		path, pdiags := imp.importExpr(node.Source, nil)
 		return &model.FunctionCallExpression{
 			Name: "fileArchive",
 			Args: []model.Expression{path},
@@ -231,16 +231,16 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		_, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
+		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
 		function := quotedLit(string(functionName))
 
 		invokeArgs := []model.Expression{function}
-
 		if node.CallArgs != nil {
-			args, adiags := imp.importExpr(node.CallArgs)
+			args, adiags := imp.importExpr(node.CallArgs,
+				pkg.FunctionTypeHint(functionName))
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
@@ -255,10 +255,10 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.SelectExpr:
 		var diags syntax.Diagnostics
 
-		index, idiags := imp.importExpr(node.Index)
+		index, idiags := imp.importExpr(node.Index, nil)
 		diags.Extend(idiags...)
 
-		values, vdiags := imp.importExpr(node.Values)
+		values, vdiags := imp.importExpr(node.Values, nil)
 		diags.Extend(vdiags...)
 
 		return &model.IndexExpression{
@@ -269,7 +269,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		stackName := node.StackName.Value
 		stackVar := imp.stackReferences[stackName]
 
-		propertyName, diags := imp.importExpr(node.PropertyName)
+		propertyName, diags := imp.importExpr(node.PropertyName, nil)
 
 		if str, ok := propertyName.(*model.LiteralValueExpression); ok {
 			return &model.ScopeTraversalExpression{
@@ -305,10 +305,13 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	}
 }
 
-// importExpr imports an AST expression as its equivalent PCL. Most nodes are imported as one would expect (e.g.
-// sequences -> tuple construction, maps -> object construction, etc.). Function calls are the lone exception; see
-// importFunction for more details.
-func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnostics) {
+// importExpr imports an AST expression as its equivalent PCL. Most nodes are imported as one
+// would expect (e.g. sequences -> tuple construction, maps -> object construction, etc.).
+// Function calls are the lone exception; see importFunction for more details.
+//
+// Because yaml does not distinguish between maps (string to value) and objects (known keys and
+// value heterogeneous values), we also pass a type hint where possible.
+func (imp *importer) importExpr(node ast.Expr, hint pulumiyaml.TypeHint) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.NullExpr:
 		return model.VariableReference(null), nil
@@ -326,7 +329,11 @@ func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnos
 		var diags syntax.Diagnostics
 		var expressions []model.Expression
 		for _, v := range node.Elements {
-			e, ediags := imp.importExpr(v)
+			var eHint pulumiyaml.TypeHint
+			if hint != nil {
+				eHint = hint.Element()
+			}
+			e, ediags := imp.importExpr(v, eHint)
 			diags.Extend(ediags...)
 
 			expressions = append(expressions, e)
@@ -337,11 +344,26 @@ func (imp *importer) importExpr(node ast.Expr) (model.Expression, syntax.Diagnos
 	case *ast.ObjectExpr:
 		var diags syntax.Diagnostics
 		var items []model.ObjectConsItem
+		var fieldHints map[string]pulumiyaml.TypeHint
+		if hint != nil {
+			fieldHints = hint.Fields()
+		}
 		for _, kvp := range node.Entries {
-			k, kdiags := imp.importExpr(kvp.Key)
-			diags.Extend(kdiags...)
+			var k model.Expression
+			var hint pulumiyaml.TypeHint
+			// We have a type hint, so this will be a plain string, not a quoted string
+			// (template expression).
+			if fieldHints != nil {
+				prop := kvp.Key.(*ast.StringExpr).Value
+				hint = fieldHints[prop]
+				k = plainLit(prop)
+			} else {
+				var kdiags syntax.Diagnostics
+				k, kdiags = imp.importExpr(kvp.Key, nil)
+				diags.Extend(kdiags...)
+			}
 
-			v, vdiags := imp.importExpr(kvp.Value)
+			v, vdiags := imp.importExpr(kvp.Value, hint)
 			diags.Extend(vdiags...)
 
 			items = append(items, model.ObjectConsItem{Key: k, Value: v})
@@ -394,7 +416,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 
 	var defaultValue model.Expression
 	if config.Default != nil {
-		v, diags := imp.importExpr(config.Default)
+		v, diags := imp.importExpr(config.Default, nil)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -496,7 +518,7 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry) (model.BodyItem, 
 	_, ok := imp.variables[name]
 	contract.Assert(ok)
 
-	v, vdiags := imp.importExpr(value)
+	v, vdiags := imp.importExpr(value, nil)
 	diags.Extend(vdiags...)
 	if vdiags.HasErrors() {
 		return nil, diags
@@ -514,17 +536,20 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	_, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
+	pkg, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
-
+	props := pkg.ResourceTypeHint(token)
+	contract.Assertf(props != nil,
+		"token(%s) was obtained by the same ResolveResource call as pkg(%s),"+
+			" so must produce a non nil value", token.String(), pkg.Name())
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
+	hints := props.Fields()
 	for _, kvp := range resource.Properties.Entries {
-		v, vdiags := imp.importExpr(kvp.Value)
+		v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
 		diags.Extend(vdiags...)
-
 		items = append(items, &model.Attribute{
 			Name:  kvp.Key.Value,
 			Value: v,
@@ -627,7 +652,7 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 	outputVar, ok := imp.outputs[name]
 	contract.Assert(ok)
 
-	x, diags := imp.importExpr(kvp.Value)
+	x, diags := imp.importExpr(kvp.Value, nil)
 
 	return &model.Block{
 		Type:   "output",

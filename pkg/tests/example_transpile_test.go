@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver"
@@ -48,14 +49,13 @@ var (
 		"stackreference-producer": Dotnet.And(Golang),
 		"stackreference-consumer": AllLanguages().Except(Python),
 		"random":                  Dotnet.And(Nodejs),
-		"getting-started":         AllLanguages(),
 		"azure-static-website":    AllLanguages(),
-		"aws-static-website":      AllLanguages(),
+		"aws-static-website":      AllLanguages().Except(Python),
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
-		"azure-app-service":       AllLanguages(),
+		"azure-app-service":       Dotnet.And(Golang),
 	}
 
 	langTests = []ConvertFunc{
@@ -96,6 +96,16 @@ var (
 func TestGenerateExamples(t *testing.T) {
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
+	// The various generate functions are not thread safe, and several mutate
+	// the *schema.Package that they contain. To avoid parallel iteration, we
+	// lock during the generate function.
+	//
+	// Warning: This is a possible cause of non-determinism in our test suite,
+	// since we don't guarantee the ordering of test execution. Because of the
+	// memory consumption of using independent schema.Package instances, we
+	// decided to maintain a single copy of each schema until non-determinism is
+	// observed.
+	var generateLock sync.Mutex
 	for _, dir := range examples {
 		dir := dir
 		t.Run(dir.Name(), func(t *testing.T) {
@@ -130,7 +140,7 @@ func TestGenerateExamples(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			for _, f := range langTests {
-				f(t, template, dir.Name())
+				f(t, template, dir.Name(), &generateLock)
 			}
 		})
 	}
@@ -219,7 +229,7 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnost
 
 }
 
-type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string)
+type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string, lock *sync.Mutex)
 type CheckFunc = func(t *testing.T, dir string, deps pcodegen.StringSet)
 
 func shouldBeParallel() bool {
@@ -245,7 +255,7 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 }
 
 func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
-	return func(t *testing.T, template *ast.TemplateDecl, name string) {
+	return func(t *testing.T, template *ast.TemplateDecl, name string, lock *sync.Mutex) {
 		writeTo := filepath.Join(outDir, name, lang)
 		t.Run(lang, func(t *testing.T) {
 			if failingCompile[name].Has(lang) {
@@ -255,7 +265,19 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 			if shouldBeParallel() {
 				t.Parallel()
 			}
-			files, diags, err := codegen.ConvertTemplate(template, generator, rootPluginLoader.Loader)
+			var (
+				files map[string][]byte
+				diags hcl.Diagnostics
+				err   error
+			)
+			func() {
+				// We embed the lock and generate in a lambda so we can
+				// a. use a defer to guarantee unlocking
+				// b. ensure the critical section is as short as possible
+				lock.Lock()
+				defer lock.Unlock()
+				files, diags, err = codegen.ConvertTemplate(template, generator, rootPluginLoader.Loader)
+			}()
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
 			writeOrCompare(t, writeTo, files)
