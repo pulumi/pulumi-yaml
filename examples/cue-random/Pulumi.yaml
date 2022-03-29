@@ -1,0 +1,5 @@
+name: cue
+runtime: yaml
+description: CUE Example
+main: infra.cue
+

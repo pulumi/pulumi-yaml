@@ -1,0 +1,4 @@
+name: cue
+runtime: yaml
+description: CUE Example
+main: cue.mod

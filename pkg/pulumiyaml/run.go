@@ -18,7 +18,11 @@ import (
 	"strings"
 	"sync"
 
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/load"
+	cueYaml "cuelang.org/go/encoding/yaml"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
@@ -29,27 +33,73 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
 
-// MainTemplate is the assumed name of the JSON template file.
-// TODO: would be nice to permit multiple files, but we'd need to know which is "main", and there's
-//     no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
-//     One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
-const MainTemplate = "Main"
+func getProject() (*workspace.Project, error) {
+	projPath, err := workspace.DetectProjectPath()
+	if err != nil {
+		return nil, err
+	}
 
-// Load a template from the current working directory
+	if projPath != "" {
+		proj, err := workspace.LoadProject(projPath)
+		if err != nil {
+			return nil, fmt.Errorf("error loading project %q: %w", projPath, err)
+		}
+
+		return proj, nil
+	}
+
+	return nil, fmt.Errorf("error loading project, no project found")
+}
+
+// Load a template from the current project
 func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
-	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
-	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	var filename string
 	var bs []byte
-	if b, err := ioutil.ReadFile(MainTemplate + ".json"); err == nil {
-		filename, bs = MainTemplate+".json", b
-	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
-		filename, bs = MainTemplate+".yaml", b
-	} else if b, err := ioutil.ReadFile("Pulumi.yaml"); err == nil {
-		filename, bs = "Pulumi.yaml", b
+
+	project, err := getProject()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if project.Main == "" {
+		project.Main = "Pulumi.yaml"
+	}
+
+	if strings.HasSuffix(project.Main, ".cue") || project.Main == "cue.mod" {
+		var cueFile string
+
+		cueFile = project.Main
+		if project.Main == "cue.mod" {
+			cueFile = ".."
+		}
+
+		_, err := os.Stat("cue.mod")
+		if err == nil {
+			return nil, nil, fmt.Errorf("there was no cue.mod found: %w", err)
+		}
+
+		ctx := cuecontext.New()
+		is := load.Instances([]string{cueFile}, nil)
+		v := ctx.BuildInstance(is[0])
+
+		if v.Err() != nil {
+			return nil, nil, fmt.Errorf("parsing CUE: %w", err)
+		}
+
+		b, err := cueYaml.Encode(v)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing CUE: %w", err)
+		}
+
+		filename, bs = project.Main, b
+	} else if strings.HasSuffix(project.Main, ".yaml") || strings.HasSuffix(project.Main, ".yml") || strings.HasSuffix(project.Main, ".json") {
+		b, err := ioutil.ReadFile(project.Main)
+		if err != nil {
+			return nil, nil, err
+		}
+		filename, bs = project.Main, b
 	} else {
-		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
+		return nil, nil, fmt.Errorf("Unsupported entrypoint: %s", project.Main)
 	}
 
 	return LoadYAMLBytes(filename, bs)
