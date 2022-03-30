@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
@@ -138,4 +139,8 @@ func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Em
 	return &pulumirpc.PluginInfo{
 		Version: version.Version,
 	}, nil
+}
+
+func (host *yamlLanguageHost) Start(req *pulumirpc.StartRequest, server pulumirpc.LanguageRuntime_StartServer) error {
+	return errors.New("not supported")
 }
