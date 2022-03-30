@@ -10,8 +10,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.27.1-0.20220325185156-017dcad7786b
-	github.com/pulumi/pulumi/sdk/v3 v3.27.1-0.20220325185156-017dcad7786b
+	github.com/pulumi/pulumi/pkg/v3 v3.27.1-0.20220330193606-234426d6e08b
+	github.com/pulumi/pulumi/sdk/v3 v3.27.1-0.20220330193606-234426d6e08b
 	github.com/spf13/cast v1.4.1
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/testify v1.7.0
@@ -49,6 +49,7 @@ require (
 	github.com/cheggaaa/pb v1.0.29 // indirect
 	github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4 // indirect
 	github.com/cncf/xds/go v0.0.0-20211130200136-a8f946100490 // indirect
+	github.com/creack/pty v1.1.18 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/djherbis/times v1.5.0 // indirect
