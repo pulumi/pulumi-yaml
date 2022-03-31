@@ -47,7 +47,15 @@ func NewLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeSer
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	tmpl, diags, err := pulumiyaml.Load()
+	// Ensure we're in the right directory so files, etc, are in the expected place.
+	if pwd := req.GetPwd(); pwd != "" {
+		err := os.Chdir(pwd)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	tmpl, diags, err := pulumiyaml.Load(req.GetProgram())
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +84,6 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
 func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
 	// Ensure we're in the right directory so files, etc, are in the expected place.
-	// TODO: ignoring main for now until we figure out what this means.
 	if pwd := req.GetPwd(); pwd != "" {
 		err := os.Chdir(pwd)
 		if err != nil {
@@ -84,7 +91,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		}
 	}
 
-	template, diags, err := pulumiyaml.Load()
+	template, diags, err := pulumiyaml.Load(req.GetProgram())
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -117,7 +124,8 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	defer pctx.Close()
 
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
-	if err := pulumi.RunWithContext(pctx, pulumiyaml.Run); err != nil {
+	runner := pulumiyaml.Runner{Template: template}
+	if err := pulumi.RunWithContext(pctx, runner.Run); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
 			if err != nil {

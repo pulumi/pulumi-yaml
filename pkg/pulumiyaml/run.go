@@ -52,24 +52,24 @@ func getProject() (*workspace.Project, error) {
 }
 
 // Load a template from the current project
-func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func Load(program string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	var filename string
 	var bs []byte
 
-	project, err := getProject()
+	if program == "." {
+		program = "Pulumi.yaml"
+	}
+
+	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if project.Main == "" {
-		project.Main = "Pulumi.yaml"
-	}
-
-	if strings.HasSuffix(project.Main, ".cue") || project.Main == "cue.mod" {
+	if strings.HasSuffix(program, ".cue") || filepath.Base(cwd) == "cue.mod" {
 		var cueFile string
 
-		cueFile = project.Main
-		if project.Main == "cue.mod" {
+		cueFile = program
+		if program == "cue.mod" {
 			cueFile = ".."
 		}
 
@@ -91,15 +91,15 @@ func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 			return nil, nil, fmt.Errorf("parsing CUE: %w", err)
 		}
 
-		filename, bs = project.Main, b
-	} else if strings.HasSuffix(project.Main, ".yaml") || strings.HasSuffix(project.Main, ".yml") || strings.HasSuffix(project.Main, ".json") {
-		b, err := ioutil.ReadFile(project.Main)
+		filename, bs = program, b
+	} else if strings.HasSuffix(program, ".yaml") || strings.HasSuffix(program, ".yml") || strings.HasSuffix(program, ".json") {
+		b, err := ioutil.ReadFile(program)
 		if err != nil {
 			return nil, nil, err
 		}
-		filename, bs = project.Main, b
+		filename, bs = program, b
 	} else {
-		return nil, nil, fmt.Errorf("Unsupported entrypoint: %s", project.Main)
+		return nil, nil, fmt.Errorf("Unsupported entrypoint: %s", program)
 	}
 
 	return LoadYAMLBytes(filename, bs)
@@ -181,13 +181,12 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-// Run loads and evaluates a template using the given request/settings.
-func Run(ctx *pulumi.Context) error {
-	t, diags, err := Load()
-	if err != nil {
-		return multierror.Append(err, diags)
-	}
+type Runner struct {
+	Template *ast.TemplateDecl
+}
 
+// Run evaluates a template using the given request/settings.
+func (runner *Runner) Run(ctx *pulumi.Context) error {
 	loader, err := NewPackageLoader()
 	if err != nil {
 		return err
@@ -195,7 +194,7 @@ func Run(ctx *pulumi.Context) error {
 	defer loader.Close()
 
 	// Now "evaluate" the template.
-	return RunTemplate(ctx, t, loader)
+	return RunTemplate(ctx, runner.Template, loader)
 }
 
 // RunTemplate runs the evaluator against a template using the given request/settings.

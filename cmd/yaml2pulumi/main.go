@@ -24,10 +24,9 @@ var yamlPath string
 
 func loadTemplate() (*ast.TemplateDecl, hcl.Diagnostics, error) {
 	if yamlPath == "" {
-		t, diags, err := yaml.Load()
-		return t, hcl.Diagnostics(diags), err
+		yamlPath = "."
 	}
-	t, diags, err := yaml.LoadFile(yamlPath)
+	t, diags, err := yaml.Load(yamlPath)
 	return t, hcl.Diagnostics(diags), err
 }
 
