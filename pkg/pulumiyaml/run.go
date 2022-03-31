@@ -69,13 +69,8 @@ func Load(program string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		var cueFile string
 
 		cueFile = program
-		if program == "cue.mod" {
+		if filepath.Base(cwd) == "cue.mod" {
 			cueFile = ".."
-		}
-
-		_, err := os.Stat("cue.mod")
-		if err == nil {
-			return nil, nil, fmt.Errorf("there was no cue.mod found: %w", err)
 		}
 
 		ctx := cuecontext.New()
