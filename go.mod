@@ -10,8 +10,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.27.1-0.20220331085222-20d8a74889d5
-	github.com/pulumi/pulumi/sdk/v3 v3.27.1-0.20220331085222-20d8a74889d5
+	github.com/pulumi/pulumi/pkg/v3 v3.27.1-0.20220331102518-5075f0112521
+	github.com/pulumi/pulumi/sdk/v3 v3.27.1-0.20220331102518-5075f0112521
 	github.com/spf13/cast v1.4.1
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.0
