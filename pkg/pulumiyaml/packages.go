@@ -394,7 +394,7 @@ func newResourcePackageHost() (plugin.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{})
+	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{Color: "never"})
 	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
 	if err != nil {
 		return nil, err
