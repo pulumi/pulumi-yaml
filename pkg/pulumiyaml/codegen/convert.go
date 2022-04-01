@@ -13,6 +13,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -27,7 +28,9 @@ func newPluginHost() (plugin.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{})
+	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
+		Color: cmdutil.GetGlobalColorization(),
+	})
 	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
 	if err != nil {
 		return nil, err
