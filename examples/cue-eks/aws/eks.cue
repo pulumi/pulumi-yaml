@@ -3,9 +3,9 @@ package eks
 #EksCluster: {
 	type: "eks:Cluster"
 	properties: {
-		instanceType:    "t2.medium"
-		desiredCapacity: 2
-		minSize:         1
-		maxSize:         2
+		instanceType:    *"t2.medium" | "t3.medium"
+		desiredCapacity: int | *2
+		minSize:         int | *1
+		maxSize:         int | *2
 	}
 }

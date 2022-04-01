@@ -78,7 +78,7 @@ func Load(program string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		v := ctx.BuildInstance(is[0])
 
 		if v.Err() != nil {
-			return nil, nil, fmt.Errorf("parsing CUE: %w", err)
+			return nil, nil, fmt.Errorf("parsing CUE: %w", v.Err())
 		}
 
 		b, err := cueYaml.Encode(v)

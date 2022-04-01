@@ -2,4 +2,3 @@ name: cue
 runtime: yaml
 description: CUE Example
 main: app.cue
-
