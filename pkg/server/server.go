@@ -139,3 +139,8 @@ func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Em
 		Version: version.Version,
 	}, nil
 }
+
+func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependenciesRequest, server pulumirpc.LanguageRuntime_InstallDependenciesServer) error {
+	// No dependencies to install for YAML
+	return nil
+}
