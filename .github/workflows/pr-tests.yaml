@@ -1,4 +1,4 @@
-name: Acceptance Tests
+name: Run Acceptance Tests from PR
 
 on:
   pull_request:
