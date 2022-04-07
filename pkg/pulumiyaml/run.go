@@ -19,12 +19,14 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
@@ -464,12 +466,41 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	// Read the properties and then evaluate them in case there are expressions contained inside.
 	props := make(map[string]interface{})
 	overallOk := true
+
+	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
+	var nonExistantFieldFormatter yamldiags.NonExistantFieldFormatter
+	var fields map[string]TypeHint
+	if err != nil {
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
+		overallOk = false
+	} else {
+		fields = pkg.ResourceTypeHint(typ).InputProperties()
+		var allProperties []string
+		for k := range fields {
+			allProperties = append(allProperties, k)
+		}
+		nonExistantFieldFormatter = yamldiags.NonExistantFieldFormatter{
+			ParentLabel:         fmt.Sprintf("Resource '%s'", typ.String()),
+			Fields:              allProperties,
+			MaxElements:         5,
+			FieldsAreProperties: true,
+		}
+	}
+
 	for _, kvp := range v.Properties.Entries {
 		vv, ok := ctx.evaluateExpr(kvp.Value)
 		if !ok {
 			overallOk = false
 		}
 		props[kvp.Key.Value] = vv
+
+		if fields != nil {
+			if _, hasField := fields[kvp.Key.Value]; !hasField {
+
+				msg := nonExistantFieldFormatter.Message(kvp.Key.Value, fmt.Sprintf("Property '%s'", kvp.Key.Value))
+				contract.IgnoreError(ctx.ctx.Log.Warn(msg, &pulumi.LogArgs{}))
+			}
+		}
 	}
 
 	var opts []pulumi.ResourceOption
@@ -583,12 +614,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		r := lateboundCustomResourceState{name: k}
 		state = &r
 		res = &r
-	}
-
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
-	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
-		return nil, false
 	}
 
 	if !overallOk || ctx.sdiags.HasErrors() {

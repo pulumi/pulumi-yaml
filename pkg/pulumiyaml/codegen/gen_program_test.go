@@ -95,7 +95,7 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 	}
 }
 
-func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.ResourceTypeHint {
 	switch typeName {
 	case "test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
@@ -139,6 +139,9 @@ func (frp FakeTypeHint) Fields() map[string]pulumiyaml.TypeHint {
 	return nil
 }
 func (frp FakeTypeHint) Element() pulumiyaml.TypeHint {
+	return nil
+}
+func (frp FakeTypeHint) InputProperties() map[string]pulumiyaml.TypeHint {
 	return nil
 }
 
