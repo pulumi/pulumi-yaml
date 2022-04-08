@@ -150,8 +150,9 @@ func Run(ctx *pulumi.Context) error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	diags := newRunner(ctx, t, loader).Evaluate()
+	runner := newRunner(ctx, t, loader)
 
+	diags := runner.Evaluate()
 	if diags.HasErrors() {
 		return diags
 	}
@@ -325,7 +326,81 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 
 const PulumiVarName = "pulumi"
 
+type Evaluator interface {
+	EvalConfig(r *runner, node configNode) bool
+	EvalVariable(r *runner, node variableNode) bool
+	EvalResource(r *runner, node resourceNode) bool
+	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
+}
+
+type evaluator struct{}
+
+func (evaluator) EvalConfig(r *runner, node configNode) bool {
+	ctx := r.newContext(node)
+	c, ok := ctx.registerConfig(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+		if err != nil {
+			return false
+		}
+	} else {
+		r.config[node.Key.Value] = c
+	}
+	return true
+}
+
+func (evaluator) EvalVariable(r *runner, node variableNode) bool {
+	ctx := r.newContext(node)
+	value, ok := ctx.evaluateExpr(node.Value)
+	if !ok {
+		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.variables[node.Key.Value] = value
+	}
+	return true
+}
+
+func (evaluator) EvalResource(r *runner, node resourceNode) bool {
+	ctx := r.newContext(node)
+	res, ok := ctx.registerResource(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.resources[node.Key.Value] = res
+	}
+	return true
+
+}
+
+func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+	ctx := r.newContext(node)
+	out, ok := ctx.registerOutput(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.ctx.Export(node.Key.Value, out)
+	}
+	return true
+}
+
 func (r *runner) Evaluate() syntax.Diagnostics {
+	return r.Run(evaluator{})
+}
+
+func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
@@ -349,60 +424,32 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 			if err != nil {
 				return r.sdiags.diags
 			}
-			ctx := r.newContext(kvp)
-			c, ok := ctx.registerConfig(kvp)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{}) //nolint:errcheck
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalConfig(r, kvp) {
+				return r.sdiags.diags
 			}
-			r.config[kvp.Key.Value] = c
 		case variableNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return r.sdiags.diags
 			}
-			ctx := r.newContext(kvp)
-			value, ok := ctx.evaluateExpr(kvp.Value)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalVariable(r, kvp) {
+				return r.sdiags.diags
 			}
-			r.variables[kvp.Key.Value] = value
 		case resourceNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return r.sdiags.diags
 			}
-			ctx := r.newContext(kvp)
-			res, ok := ctx.registerResource(kvp)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalResource(r, kvp) {
+				return r.sdiags.diags
 			}
-			r.resources[kvp.Key.Value] = res
 		}
 	}
 
 	for _, kvp := range r.t.Outputs.Entries {
-		ctx := r.newContext(kvp)
-		out, ok := ctx.registerOutput(kvp)
-		if !ok {
-			err := r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-			if err != nil {
-				return r.sdiags.diags
-			}
-			continue
+		if !e.EvalOutput(r, kvp) {
+			return r.sdiags.diags
 		}
-		r.ctx.Export(kvp.Key.Value, out)
 	}
 
 	return r.sdiags.diags
