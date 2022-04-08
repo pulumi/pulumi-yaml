@@ -37,8 +37,8 @@ type MockPackage struct {
 	isComponent      func(typeName string) (bool, error)
 	resolveResource  func(typeName string) (ResourceTypeToken, error)
 	resolveFunction  func(typeName string) (FunctionTypeToken, error)
-	resourceTypeHint func(typeName string) ResourceTypeHint
-	functionTypeHint func(typeName string) TypeHint
+	resourceTypeHint func(typeName string) InputTypeHint
+	functionTypeHint func(typeName string) InputTypeHint
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -59,11 +59,11 @@ func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(typeName.String())
 }
 
-func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) ResourceTypeHint {
+func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) InputTypeHint {
 	return m.resourceTypeHint(typeName.String())
 }
 
-func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) TypeHint {
+func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint {
 	return m.functionTypeHint(typeName.String())
 }
 
@@ -71,34 +71,37 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
-type mockResourceTypeHint []string
+type mockInputTypeHint []string
 
-func (m mockResourceTypeHint) InputProperties() map[string]TypeHint {
+func (m mockInputTypeHint) InputProperties() FieldsTypeHint {
 	return m.Fields()
 }
 
-func (m mockResourceTypeHint) Fields() map[string]TypeHint {
-	o := map[string]TypeHint{}
+func (m mockInputTypeHint) Fields() FieldsTypeHint {
+	o := FieldsTypeHint{}
 	for _, f := range m {
 		o[f] = nil
 	}
 	return o
 }
-func (m mockResourceTypeHint) Element() TypeHint { return nil }
+func (m mockInputTypeHint) Element() TypeHint { return nil }
 
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"test": MockPackage{
-				resourceTypeHint: func(typeName string) ResourceTypeHint {
+				resourceTypeHint: func(typeName string) InputTypeHint {
 					switch typeName {
 					case testResourceToken:
-						return mockResourceTypeHint{"foo"}
+						return mockInputTypeHint{"foo"}
 					case testComponentToken:
-						return mockResourceTypeHint{"foo"}
+						return mockInputTypeHint{"foo"}
 					default:
-						return mockResourceTypeHint{}
+						return mockInputTypeHint{}
 					}
+				},
+				functionTypeHint: func(typeName string) InputTypeHint {
+					return mockInputTypeHint{}
 				},
 				isComponent: func(typeName string) (bool, error) {
 					switch typeName {

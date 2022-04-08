@@ -240,7 +240,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		invokeArgs := []model.Expression{function}
 		if node.CallArgs != nil {
 			args, adiags := imp.importExpr(node.CallArgs,
-				pkg.FunctionTypeHint(functionName))
+				pkg.FunctionTypeHint(functionName).InputProperties())
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
