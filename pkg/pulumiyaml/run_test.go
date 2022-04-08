@@ -71,10 +71,35 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
+type mockResourceTypeHint []string
+
+func (m mockResourceTypeHint) InputProperties() map[string]TypeHint {
+	return m.Fields()
+}
+
+func (m mockResourceTypeHint) Fields() map[string]TypeHint {
+	o := map[string]TypeHint{}
+	for _, f := range m {
+		o[f] = nil
+	}
+	return o
+}
+func (m mockResourceTypeHint) Element() TypeHint { return nil }
+
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"test": MockPackage{
+				resourceTypeHint: func(typeName string) ResourceTypeHint {
+					switch typeName {
+					case testResourceToken:
+						return mockResourceTypeHint{"foo"}
+					case testComponentToken:
+						return mockResourceTypeHint{"foo"}
+					default:
+						return mockResourceTypeHint{}
+					}
+				},
 				isComponent: func(typeName string) (bool, error) {
 					switch typeName {
 					case testResourceToken:

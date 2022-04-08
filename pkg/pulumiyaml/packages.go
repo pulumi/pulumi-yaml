@@ -338,7 +338,7 @@ func (p resourcePackage) Name() string {
 func (p resourcePackage) ResourceTypeHint(typeName ResourceTypeToken) ResourceTypeHint {
 	if _, ok := p.resolveProvider(typeName.String()); ok {
 		prov := p.Package.Provider
-		return &resourceTypeHint{
+		return resourceTypeHint{
 			fieldTypeHint{append(prov.Properties, prov.InputProperties...)},
 			p.Provider.InputProperties}
 	}
@@ -346,7 +346,7 @@ func (p resourcePackage) ResourceTypeHint(typeName ResourceTypeToken) ResourceTy
 	if !ok {
 		return nil
 	}
-	return &resourceTypeHint{
+	return resourceTypeHint{
 		fieldTypeHint{append(r.Properties, r.InputProperties...)},
 		r.InputProperties}
 }
@@ -369,7 +369,7 @@ type resourceTypeHint struct {
 	inputProps []*schema.Property
 }
 
-func (r *resourceTypeHint) InputProperties() map[string]TypeHint {
+func (r resourceTypeHint) InputProperties() map[string]TypeHint {
 	m := map[string]TypeHint{}
 	for _, p := range r.inputProps {
 		m[p.Name] = typeHintFromType(p.Type)
