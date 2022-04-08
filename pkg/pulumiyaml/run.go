@@ -19,12 +19,14 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
@@ -511,12 +513,41 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	// Read the properties and then evaluate them in case there are expressions contained inside.
 	props := make(map[string]interface{})
 	overallOk := true
+
+	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
+	var nonExistantFieldFormatter yamldiags.NonExistantFieldFormatter
+	var fields map[string]TypeHint
+	if err != nil {
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
+		overallOk = false
+	} else {
+		fields = pkg.ResourceTypeHint(typ).InputProperties()
+		var allProperties []string
+		for k := range fields {
+			allProperties = append(allProperties, k)
+		}
+		nonExistantFieldFormatter = yamldiags.NonExistantFieldFormatter{
+			ParentLabel:         fmt.Sprintf("Resource '%s'", typ.String()),
+			Fields:              allProperties,
+			MaxElements:         5,
+			FieldsAreProperties: true,
+		}
+	}
+
 	for _, kvp := range v.Properties.Entries {
 		vv, ok := ctx.evaluateExpr(kvp.Value)
 		if !ok {
 			overallOk = false
 		}
 		props[kvp.Key.Value] = vv
+
+		if fields != nil {
+			if _, hasField := fields[kvp.Key.Value]; !hasField {
+
+				msg := nonExistantFieldFormatter.Message(kvp.Key.Value, fmt.Sprintf("Property '%s'", kvp.Key.Value))
+				contract.IgnoreError(ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}))
+			}
+		}
 	}
 
 	var opts []pulumi.ResourceOption
@@ -630,12 +661,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		r := lateboundCustomResourceState{name: k}
 		state = &r
 		res = &r
-	}
-
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
-	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
-		return nil, false
 	}
 
 	if !overallOk || ctx.sdiags.HasErrors() {
@@ -954,11 +979,30 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		_, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
+		pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
 		if err != nil {
 			return ctx.error(t, err.Error())
 		}
 
+		// We ensure that invokes have valid inputs
+		if args0, ok := args[0].(map[string]interface{}); ok {
+			var existing []string
+			inputs := pkg.FunctionTypeHint(functionName).InputProperties()
+			for k := range inputs {
+				existing = append(existing, k)
+			}
+			fmtr := yamldiags.NonExistantFieldFormatter{
+				ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
+				Fields:      existing,
+				MaxElements: 5,
+			}
+			for k := range args0 {
+				if _, ok := inputs[k]; !ok {
+					msg := fmtr.Message(k, k)
+					contract.IgnoreError(ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}))
+				}
+			}
+		}
 		if err := ctx.ctx.Invoke(string(functionName), args[0], &result); err != nil {
 			return ctx.error(t, err.Error())
 		}

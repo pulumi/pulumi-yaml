@@ -95,7 +95,7 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 	}
 }
 
-func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.InputTypeHint {
 	switch typeName {
 	case "test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
@@ -111,7 +111,7 @@ func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeTo
 	return "", fmt.Errorf(msg)
 }
 
-func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.TypeHint {
+func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.InputTypeHint {
 	return nil
 }
 
@@ -135,10 +135,13 @@ type FakeTypeHint struct {
 	resourceName pulumiyaml.ResourceTypeToken
 }
 
-func (frp FakeTypeHint) Fields() map[string]pulumiyaml.TypeHint {
+func (frp FakeTypeHint) Fields() pulumiyaml.FieldsTypeHint {
 	return nil
 }
 func (frp FakeTypeHint) Element() pulumiyaml.TypeHint {
+	return nil
+}
+func (frp FakeTypeHint) InputProperties() pulumiyaml.FieldsTypeHint {
 	return nil
 }
 

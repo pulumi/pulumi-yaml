@@ -48,9 +48,9 @@ resource registry "azure-native:containerregistry:Registry" {
 
 resource provider "pulumi:providers:docker" {
 	registryAuth = [{
-		"address" = registry.loginServer,
-		"username" = adminUsername,
-		"password" = adminPasswords[0].value
+		address = registry.loginServer,
+		username = adminUsername,
+		password = adminPasswords[0].value
 	}]
 }
 
