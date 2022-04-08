@@ -90,7 +90,7 @@ func (resourceAnalyzer) EvalResource(r *runner, node resourceNode) bool {
 			subject := kvp.Key.Syntax().Syntax().Range()
 			valueRange := kvp.Value.Syntax().Syntax().Range()
 			context := hcl.RangeOver(*subject, *valueRange)
-			ctx.sdiags.Extend(&syntax.Diagnostic{
+			ctx.addDiag(&syntax.Diagnostic{
 				Severity:    hcl.DiagError,
 				Summary:     summary,
 				Detail:      detail,
@@ -126,7 +126,7 @@ func invokeAnalyzer() Evaluator {
 				k := prop.Key.(*ast.StringExpr).Value
 				if _, ok := inputs[k]; !ok {
 					msg, detail := fmtr.MessageWithDetail(k, k)
-					ctx.sdiags.diags.Extend(&syntax.Diagnostic{
+					ctx.addDiag(&syntax.Diagnostic{
 						Severity: hcl.DiagError,
 						Summary:  msg,
 						Detail:   detail,

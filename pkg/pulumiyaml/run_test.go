@@ -329,6 +329,7 @@ outputs:
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
+	assert.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
@@ -479,7 +480,7 @@ func TestJSONDiags(t *testing.T) {
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
-	require.Len(t, diags, 1)
+	assert.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 

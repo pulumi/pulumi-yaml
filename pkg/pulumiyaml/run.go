@@ -197,17 +197,26 @@ type runner struct {
 	stackRefs map[string]*pulumi.StackReference
 
 	sdiags syncDiags
+
+	// Used to store sorted nodes. A non `nil` value indicates that the runner
+	// is already setup for running.
+	intermediates []graphNode
 }
 
 type evalContext struct {
 	*runner
 
 	root   interface{}
-	sdiags *syncDiags
+	sdiags syncDiags
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
 	diag := ast.ExprError(expr, summary, "")
+	ctx.addDiag(diag)
+	return nil, false
+}
+
+func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	ctx.sdiags.Extend(diag)
 	ctx.runner.sdiags.Extend(diag)
 
@@ -222,15 +231,13 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 	if err != nil {
 		os.Stderr.Write([]byte(err.Error()))
 	}
-
-	return nil, false
 }
 
 func (r *runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
 		runner: r,
 		root:   root,
-		sdiags: &r.sdiags,
+		sdiags: syncDiags{},
 	}
 
 	return ctx
@@ -405,59 +412,79 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	return r.Run(evaluator{})
 }
 
+func (r *runner) ensureSetup() {
+	if r.intermediates == nil {
+		r.intermediates = []graphNode{}
+		cwd, err := os.Getwd()
+		if err != nil {
+			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+			return
+		}
+		r.variables[PulumiVarName] = map[string]interface{}{
+			"cwd":     cwd,
+			"project": r.ctx.Project(),
+			"stack":   r.ctx.Stack(),
+		}
+
+		// Topologically sort the intermediates based on implicit and explicit dependencies
+		intermediates, rdiags := topologicallySortedResources(r.t)
+		r.sdiags.Extend(rdiags...)
+		if rdiags.HasErrors() {
+			return
+		}
+		if intermediates != nil {
+			r.intermediates = intermediates
+		}
+	}
+}
+
 func (r *runner) Run(e Evaluator) syntax.Diagnostics {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+	r.ensureSetup()
+	returnDiags := func() syntax.Diagnostics {
+		r.sdiags.mutex.Lock()
+		defer r.sdiags.mutex.Unlock()
+		return r.sdiags.diags
 	}
-	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": r.ctx.Project(),
-		"stack":   r.ctx.Stack(),
-	}
-
-	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t)
-	if rdiags.HasErrors() {
-		return rdiags
+	if r.sdiags.HasErrors() {
+		return returnDiags()
 	}
 
-	for _, kvp := range intermediates {
+	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 			if !e.EvalConfig(r, kvp) {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 		case variableNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 			if !e.EvalVariable(r, kvp) {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 		case resourceNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 			if !e.EvalResource(r, kvp) {
-				return r.sdiags.diags
+				return returnDiags()
 			}
 		}
 	}
 
 	for _, kvp := range r.t.Outputs.Entries {
 		if !e.EvalOutput(r, kvp) {
-			return r.sdiags.diags
+			return returnDiags()
 		}
 	}
 
-	return r.sdiags.diags
+	return returnDiags()
 }
 
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
