@@ -498,7 +498,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 			if _, hasField := fields[kvp.Key.Value]; !hasField {
 
 				msg := nonExistantFieldFormatter.Message(kvp.Key.Value, fmt.Sprintf("Property '%s'", kvp.Key.Value))
-				contract.IgnoreError(ctx.ctx.Log.Warn(msg, &pulumi.LogArgs{}))
+				contract.IgnoreError(ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}))
 			}
 		}
 	}
@@ -952,7 +952,7 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 			for k := range args0 {
 				if _, ok := inputs[k]; !ok {
 					msg := fmtr.Message(k, k)
-					contract.IgnoreError(ctx.ctx.Log.Warn(msg, &pulumi.LogArgs{}))
+					contract.IgnoreError(ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}))
 				}
 			}
 		}
