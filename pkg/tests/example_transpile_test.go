@@ -56,6 +56,7 @@ var (
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
 		"azure-app-service":       Dotnet.And(Golang),
+		"pulumi-variable":         AllLanguages().Except(Python),
 	}
 
 	langTests = []ConvertFunc{
@@ -121,6 +122,18 @@ func TestGenerateExamples(t *testing.T) {
 			}
 			main, err := getMain(filepath.Join(examplesPath, dir.Name()))
 			require.NoError(t, err, "Could not get file path")
+
+			// Set the correct working directory. This is needed for the `main`
+			// key in `Pulumi.yaml`.
+			cwd, err := os.Getwd()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := os.Chdir(cwd)
+				assert.NoError(t, err)
+			})
+			err = os.Chdir(filepath.Join(examplesPath, dir.Name()))
+			require.NoError(t, err)
+
 			template, diags, err := pulumiyaml.LoadFile(main)
 			if err == os.ErrNotExist {
 				template, diags, err = pulumiyaml.LoadFile(main)

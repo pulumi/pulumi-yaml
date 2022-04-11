@@ -281,12 +281,17 @@ func (v *yamlValue) UnmarshalYAML(n *yaml.Node) error {
 
 // DecodeYAML decodes a YAML value from the given decoder into a syntax node. See UnmarshalYAML for mode details on the
 // decoding process.
-func DecodeYAML(filename string, d *yaml.Decoder, tags TagDecoder) (syntax.Node, syntax.Diagnostics) {
+func DecodeYAML(filename string, d *yaml.Decoder, tags TagDecoder) (*syntax.ObjectNode, syntax.Diagnostics) {
 	v := yamlValue{filename: filename, tags: tags}
 	if err := d.Decode(&v); err != nil {
 		return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 	}
-	return v.node, v.diags
+	obj, ok := v.node.(*syntax.ObjectNode)
+	if !ok {
+		return nil, syntax.Diagnostics{syntax.Error(nil,
+			fmt.Sprintf("Top level of '%s' must be an object", filename), "")}
+	}
+	return obj, v.diags
 }
 
 // EncodeYAML encodes a syntax node into YAML text using the given encoder. See MarshalYAML for mode details on the
