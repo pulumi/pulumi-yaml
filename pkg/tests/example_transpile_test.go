@@ -35,8 +35,10 @@ import (
 )
 
 var (
-	examplesPath = filepath.Join("..", "..", "examples")
-	outDir       = "transpiled_examples"
+	examplesPath     = makeAbs(filepath.Join("..", "..", "examples"))
+	outDir           = makeAbs("transpiled_examples")
+	schemaLoadPath   = makeAbs(filepath.Join("..", "pulumiyaml", "testing", "test", "testdata"))
+	rootPluginLoader = mockPackageLoader{newPluginLoader()}
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
@@ -74,6 +76,14 @@ var (
 		}),
 	}
 )
+
+func makeAbs(path string) string {
+	out, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 // TestGenerateExamples transpiles and and checks all tests in the examples
 // folder.
@@ -190,7 +200,6 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 }
 
 func newPluginLoader() schema.Loader {
-	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
@@ -215,8 +224,6 @@ func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) 
 }
 
 func (l mockPackageLoader) Close() {}
-
-var rootPluginLoader = mockPackageLoader{newPluginLoader()}
 
 func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
