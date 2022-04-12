@@ -11,15 +11,9 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-type typeCache map[ast.Expr]TypeHint
-
-func (tc *typeCache) insert(e ast.Expr, t TypeHint) {
-	map[ast.Expr]TypeHint(*tc)[e] = t
-}
-
-func (tc *typeCache) get(e ast.Expr) (TypeHint, bool) {
-	t, ok := map[ast.Expr]TypeHint(*tc)[e]
-	return t, ok
+type typeCache struct {
+	exprs     map[ast.Expr]TypeHint
+	resources map[*ast.ResourceDecl]TypeHint
 }
 
 func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
@@ -30,13 +24,14 @@ func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
-	fields := pkg.ResourceTypeHint(typ).InputProperties()
+	hint := pkg.ResourceTypeHint(typ)
+	fields := hint.InputProperties()
 	var allProperties []string
 	for k := range fields {
 		allProperties = append(allProperties, k)
 	}
 	fmtr := yamldiags.NonExistantFieldFormatter{
-		ParentLabel:         fmt.Sprintf("Resource '%s'", typ.String()),
+		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
 		Fields:              allProperties,
 		MaxElements:         5,
 		FieldsAreProperties: true,
@@ -44,7 +39,7 @@ func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
 
 	for _, kvp := range v.Properties.Entries {
 		if typ, hasField := fields[kvp.Key.Value]; !hasField {
-			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property '%s'", kvp.Key.Value))
+			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
 			subject := kvp.Key.Syntax().Syntax().Range()
 			valueRange := kvp.Value.Syntax().Syntax().Range()
 			context := hcl.RangeOver(*subject, *valueRange)
@@ -58,9 +53,10 @@ func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
 				EvalContext: &hcl.EvalContext{},
 			})
 		} else {
-			tc.insert(kvp.Value, typ)
+			tc.exprs[kvp.Value] = typ
 		}
 	}
+	tc.resources[node.Value] = hint.Fields()
 	return true
 }
 
@@ -71,7 +67,8 @@ func (tc *typeCache) anchorInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		return b
 	}
 	var existing []string
-	inputs := pkg.FunctionTypeHint(functionName).InputProperties()
+	hint := pkg.FunctionTypeHint(functionName)
+	inputs := hint.InputProperties()
 	for k := range inputs {
 		existing = append(existing, k)
 	}
@@ -92,9 +89,10 @@ func (tc *typeCache) anchorInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 				Context:  t.Syntax().Syntax().Range(),
 			})
 		} else {
-			tc.insert(prop.Value, typ)
+			tc.exprs[prop.Value] = typ
 		}
 	}
+	tc.exprs[t] = hint.Fields()
 	return true
 }
 
