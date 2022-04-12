@@ -105,8 +105,15 @@ func (tc *typeCache) anchorExpr(ctx *evalContext, t ast.Expr) bool {
 	}
 }
 
+func newTypeCache() *typeCache {
+	return &typeCache{
+		exprs:     map[ast.Expr]TypeHint{},
+		resources: map[*ast.ResourceDecl]TypeHint{},
+	}
+}
+
 func TypeCheck(r *runner) syntax.Diagnostics {
-	types := typeCache{}
+	types := newTypeCache()
 
 	// Set roots
 	diags := r.Run(walker{
