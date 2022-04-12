@@ -33,7 +33,7 @@ func (e NonExistantFieldFormatter) MessageWithDetail(field, fieldLabel string) (
 }
 
 func (e NonExistantFieldFormatter) messageHeader(fieldLabel string) string {
-	return fmt.Sprintf("%s does not exist on %s.", fieldLabel, e.ParentLabel)
+	return fmt.Sprintf("%s does not exist on %s", fieldLabel, e.ParentLabel)
 }
 
 func (e NonExistantFieldFormatter) messageBody(field string) string {

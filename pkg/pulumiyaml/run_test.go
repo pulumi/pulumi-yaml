@@ -101,7 +101,12 @@ func newMockPackageMap() PackageLoader {
 					}
 				},
 				functionTypeHint: func(typeName string) InputTypeHint {
-					return mockInputTypeHint{}
+					switch typeName {
+					case "test:fn":
+						return mockInputTypeHint{"yesArg", "someSuchArg"}
+					default:
+						return mockInputTypeHint{}
+					}
 				},
 				isComponent: func(typeName string) (bool, error) {
 					switch typeName {
@@ -179,6 +184,10 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
+		diags := TypeCheck(runner)
+		if diags.HasErrors() {
+			return diags
+		}
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -482,6 +491,37 @@ func TestJSONDiags(t *testing.T) {
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
+}
+
+func TestSchemaPropertyDiags(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: aws-eks
+runtime: yaml
+description: An EKS cluster
+variables:
+  vpcId:
+    Fn::Invoke:
+      Function: test:fn
+      Arguments:
+        noArg: false
+        yesArg: true
+resources:
+  r:
+    type: test:resource:type
+    properties:
+      foo: does exist
+      bar: does not exist
+`
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	require.True(t, diags.HasErrors())
+	assert.Len(t, diags, 2)
+	assert.Equal(t, "<stdin>:17:7: Property 'bar' does not exist on Resource 'test:resource:type'",
+		diagString(diags[0]))
+	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn", diagString(diags[1]))
+
 }
 
 func TestPropertyAccess(t *testing.T) {

@@ -152,7 +152,7 @@ func Run(ctx *pulumi.Context) error {
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	runner := newRunner(ctx, t, loader)
 
-	diags := runner.Run(newAnalyzer())
+	diags := TypeCheck(runner)
 	if diags.HasErrors() {
 		return diags
 	}

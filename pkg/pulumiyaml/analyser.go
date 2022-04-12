@@ -11,60 +11,18 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-type analyzer struct {
-	passes []Evaluator
+type typeCache map[ast.Expr]TypeHint
+
+func (tc *typeCache) insert(e ast.Expr, t TypeHint) {
+	map[ast.Expr]TypeHint(*tc)[e] = t
 }
 
-func newAnalyzer() Evaluator {
-	return &analyzer{
-		passes: []Evaluator{
-			resourceAnalyzer{},
-			invokeAnalyzer(),
-		},
-	}
+func (tc *typeCache) get(e ast.Expr) (TypeHint, bool) {
+	t, ok := map[ast.Expr]TypeHint(*tc)[e]
+	return t, ok
 }
 
-func (a *analyzer) EvalConfig(r *runner, node configNode) bool {
-	for _, pass := range a.passes {
-		if !pass.EvalConfig(r, node) {
-			return false
-		}
-	}
-	return true
-}
-func (a *analyzer) EvalVariable(r *runner, node variableNode) bool {
-	for _, pass := range a.passes {
-		if !pass.EvalVariable(r, node) {
-			return false
-		}
-	}
-	return true
-
-}
-func (a *analyzer) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	for _, pass := range a.passes {
-		if !pass.EvalOutput(r, node) {
-			return false
-		}
-	}
-	return true
-}
-func (a *analyzer) EvalResource(r *runner, node resourceNode) bool {
-	for _, pass := range a.passes {
-		if !pass.EvalResource(r, node) {
-			return false
-		}
-	}
-	return true
-}
-
-type resourceAnalyzer struct{}
-
-func (resourceAnalyzer) EvalConfig(r *runner, node configNode) bool           { return true }
-func (resourceAnalyzer) EvalVariable(r *runner, node variableNode) bool       { return true }
-func (resourceAnalyzer) EvalOutput(r *runner, node ast.PropertyMapEntry) bool { return true }
-
-func (resourceAnalyzer) EvalResource(r *runner, node resourceNode) bool {
+func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
@@ -85,7 +43,7 @@ func (resourceAnalyzer) EvalResource(r *runner, node resourceNode) bool {
 	}
 
 	for _, kvp := range v.Properties.Entries {
-		if _, hasField := fields[kvp.Key.Value]; !hasField {
+		if typ, hasField := fields[kvp.Key.Value]; !hasField {
 			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property '%s'", kvp.Key.Value))
 			subject := kvp.Key.Syntax().Syntax().Range()
 			valueRange := kvp.Value.Syntax().Syntax().Range()
@@ -99,56 +57,81 @@ func (resourceAnalyzer) EvalResource(r *runner, node resourceNode) bool {
 				Expression:  nil,
 				EvalContext: &hcl.EvalContext{},
 			})
+		} else {
+			tc.insert(kvp.Value, typ)
 		}
 	}
 	return true
 }
 
-func invokeAnalyzer() Evaluator {
-	return exprWalker{func(ctx *evalContext, expr ast.Expr) bool {
-		if t, ok := expr.(*ast.InvokeExpr); ok {
-			pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
-			if err != nil {
-				_, b := ctx.error(t, err.Error())
-				return b
-			}
-			var existing []string
-			inputs := pkg.FunctionTypeHint(functionName).InputProperties()
-			for k := range inputs {
-				existing = append(existing, k)
-			}
-			fmtr := yamldiags.NonExistantFieldFormatter{
-				ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
-				Fields:      existing,
-				MaxElements: 5,
-			}
-			for _, prop := range t.CallArgs.Entries {
-				k := prop.Key.(*ast.StringExpr).Value
-				if _, ok := inputs[k]; !ok {
-					msg, detail := fmtr.MessageWithDetail(k, k)
-					ctx.addDiag(&syntax.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  msg,
-						Detail:   detail,
-						Subject:  prop.Key.Syntax().Syntax().Range(),
-						Context:  t.Syntax().Syntax().Range(),
-					})
-				}
-			}
+func (tc *typeCache) anchorInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
+	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
+	if err != nil {
+		_, b := ctx.error(t, err.Error())
+		return b
+	}
+	var existing []string
+	inputs := pkg.FunctionTypeHint(functionName).InputProperties()
+	for k := range inputs {
+		existing = append(existing, k)
+	}
+	fmtr := yamldiags.NonExistantFieldFormatter{
+		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
+		Fields:      existing,
+		MaxElements: 5,
+	}
+	for _, prop := range t.CallArgs.Entries {
+		k := prop.Key.(*ast.StringExpr).Value
+		if typ, ok := inputs[k]; !ok {
+			msg, detail := fmtr.MessageWithDetail(k, k)
+			ctx.addDiag(&syntax.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  msg,
+				Detail:   detail,
+				Subject:  prop.Key.Syntax().Syntax().Range(),
+				Context:  t.Syntax().Syntax().Range(),
+			})
+		} else {
+			tc.insert(prop.Value, typ)
 		}
+	}
+	return true
+}
+
+func (tc *typeCache) anchorExpr(ctx *evalContext, t ast.Expr) bool {
+	switch t := t.(type) {
+	case *ast.InvokeExpr:
+		return tc.anchorInvoke(ctx, t)
+	default:
 		return true
-	}}
+	}
 }
 
-type exprWalker struct {
-	f func(*evalContext, ast.Expr) bool
+func TypeCheck(r *runner) syntax.Diagnostics {
+	types := typeCache{}
+
+	// Set roots
+	diags := r.Run(walker{
+		EvalResourceFunc: types.anchorResource,
+		EvalExprFunc:     types.anchorExpr,
+	})
+
+	return diags
 }
 
-func (e exprWalker) walk(ctx *evalContext, x ast.Expr) bool {
+type walker struct {
+	EvalConfigFunc   func(r *runner, node configNode) bool
+	EvalVariableFunc func(r *runner, node variableNode) bool
+	EvalOutputFunc   func(r *runner, node ast.PropertyMapEntry) bool
+	EvalResourceFunc func(r *runner, node resourceNode) bool
+	EvalExprFunc     func(*evalContext, ast.Expr) bool
+}
+
+func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	if x == nil {
 		return true
 	}
-	if !e.f(ctx, x) {
+	if !e.EvalExprFunc(ctx, x) {
 		return false
 	}
 
@@ -224,55 +207,92 @@ func (e exprWalker) walk(ctx *evalContext, x ast.Expr) bool {
 	return true
 }
 
-func (e exprWalker) EvalConfig(r *runner, node configNode) bool {
-	ctx := r.newContext(node)
-	if !e.walk(ctx, node.Key) {
-		return false
+func (e walker) EvalConfig(r *runner, node configNode) bool {
+	if e.EvalConfigFunc != nil {
+		if !e.EvalConfigFunc(r, node) {
+			return false
+		}
 	}
-	c := node.Value
-	if !e.walk(ctx, c.Secret) {
-		return false
-	}
-	if !e.walk(ctx, c.Default) {
-		return false
+	if e.EvalExprFunc != nil {
+		ctx := r.newContext(node)
+		if !e.walk(ctx, node.Key) {
+			return false
+		}
+		c := node.Value
+		if !e.walk(ctx, c.Secret) {
+			return false
+		}
+		if !e.walk(ctx, c.Default) {
+			return false
+		}
 	}
 	return true
 }
-func (e exprWalker) EvalVariable(r *runner, node variableNode) bool {
-	ctx := r.newContext(node)
-	if !e.walk(ctx, node.Key) {
-		return false
-	}
-	return e.walk(ctx, node.Value)
-}
-func (e exprWalker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	ctx := r.newContext(node)
-	if !e.walk(ctx, node.Key) {
-		return false
-	}
-	return e.walk(ctx, node.Value)
-}
-func (e exprWalker) EvalResource(r *runner, node resourceNode) bool {
-	ctx := r.newContext(node)
-	if !e.walk(ctx, node.Key) {
-		return false
-	}
-	v := node.Value
-	if !e.walk(ctx, v.Type) {
-		return false
-	}
-	for _, prop := range v.Properties.Entries {
-		if !e.walk(ctx, prop.Key) {
-			return false
-		}
-		if !e.walk(ctx, prop.Value) {
+func (e walker) EvalVariable(r *runner, node variableNode) bool {
+	if e.EvalVariableFunc != nil {
+		if !e.EvalVariableFunc(r, node) {
 			return false
 		}
 	}
-	return e.walkResourceOptions(ctx, v.Options)
+	if e.EvalExprFunc != nil {
+		ctx := r.newContext(node)
+		if !e.walk(ctx, node.Key) {
+			return false
+		}
+		if !e.walk(ctx, node.Value) {
+			return false
+		}
+	}
+	return true
+}
+func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+	if e.EvalOutputFunc != nil {
+		if !e.EvalOutputFunc(r, node) {
+			return false
+		}
+	}
+	if e.EvalExprFunc != nil {
+		ctx := r.newContext(node)
+		if !e.walk(ctx, node.Key) {
+			return false
+		}
+		if !e.walk(ctx, node.Value) {
+			return false
+		}
+	}
+	return true
+}
+func (e walker) EvalResource(r *runner, node resourceNode) bool {
+	if e.EvalResourceFunc != nil {
+		if !e.EvalResourceFunc(r, node) {
+			return false
+		}
+	}
+	if e.EvalExprFunc != nil {
+		ctx := r.newContext(node)
+		if !e.walk(ctx, node.Key) {
+			return false
+		}
+		v := node.Value
+		if !e.walk(ctx, v.Type) {
+			return false
+		}
+		for _, prop := range v.Properties.Entries {
+			if !e.walk(ctx, prop.Key) {
+				return false
+			}
+			if !e.walk(ctx, prop.Value) {
+				return false
+			}
+		}
+		if !e.walkResourceOptions(ctx, v.Options) {
+			return false
+		}
+	}
+	return true
 }
 
-func (e exprWalker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDecl) bool {
+func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDecl) bool {
 	if !e.walkStringList(ctx, opts.AdditionalSecretOutputs) {
 		return false
 	}
@@ -327,7 +347,7 @@ func (e exprWalker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptio
 	return true
 }
 
-func (e exprWalker) walkStringList(ctx *evalContext, l *ast.StringListDecl) bool {
+func (e walker) walkStringList(ctx *evalContext, l *ast.StringListDecl) bool {
 	if l != nil {
 		for _, el := range l.Elements {
 			if !e.walk(ctx, el) {
