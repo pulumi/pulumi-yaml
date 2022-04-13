@@ -511,16 +511,17 @@ resources:
   r:
     type: test:resource:type
     properties:
-      foo: does exist
+      foo: ${vpcId} # order to ensure determinism
       bar: does not exist
 `
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 2)
-	assert.Equal(t, "<stdin>:17:7: Property 'bar' does not exist on Resource 'test:resource:type'",
+	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
 		diagString(diags[0]))
-	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn", diagString(diags[1]))
+	assert.Equal(t, "<stdin>:17:7: Property bar does not exist on Resource test:resource:type",
+		diagString(diags[1]))
 
 }
 
