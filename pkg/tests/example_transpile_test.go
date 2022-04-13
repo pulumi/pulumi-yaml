@@ -35,8 +35,10 @@ import (
 )
 
 var (
-	examplesPath = filepath.Join("..", "..", "examples")
-	outDir       = "transpiled_examples"
+	examplesPath     = makeAbs(filepath.Join("..", "..", "examples"))
+	outDir           = makeAbs("transpiled_examples")
+	schemaLoadPath   = makeAbs(filepath.Join("..", "pulumiyaml", "testing", "test", "testdata"))
+	rootPluginLoader = mockPackageLoader{newPluginLoader()}
 
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
@@ -56,6 +58,7 @@ var (
 		"webserver-json":          AllLanguages().Except(Nodejs),
 		"aws-eks":                 AllLanguages().Except(Python),
 		"azure-app-service":       Dotnet.And(Golang),
+		"pulumi-variable":         AllLanguages().Except(Python),
 	}
 
 	langTests = []ConvertFunc{
@@ -73,6 +76,14 @@ var (
 		}),
 	}
 )
+
+func makeAbs(path string) string {
+	out, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 // TestGenerateExamples transpiles and and checks all tests in the examples
 // folder.
@@ -121,6 +132,18 @@ func TestGenerateExamples(t *testing.T) {
 			}
 			main, err := getMain(filepath.Join(examplesPath, dir.Name()))
 			require.NoError(t, err, "Could not get file path")
+
+			// Set the correct working directory. This is needed for the `main`
+			// key in `Pulumi.yaml`.
+			cwd, err := os.Getwd()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				err := os.Chdir(cwd)
+				assert.NoError(t, err)
+			})
+			err = os.Chdir(filepath.Join(examplesPath, dir.Name()))
+			require.NoError(t, err)
+
 			template, diags, err := pulumiyaml.LoadFile(main)
 			if err == os.ErrNotExist {
 				template, diags, err = pulumiyaml.LoadFile(main)
@@ -177,7 +200,6 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 }
 
 func newPluginLoader() schema.Loader {
-	schemaLoadPath := filepath.Join("..", "pulumiyaml", "testing", "test", "testdata")
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
@@ -202,8 +224,6 @@ func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) 
 }
 
 func (l mockPackageLoader) Close() {}
-
-var rootPluginLoader = mockPackageLoader{newPluginLoader()}
 
 func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
