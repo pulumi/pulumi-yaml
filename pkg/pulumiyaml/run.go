@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"github.com/spf13/cast"
@@ -238,6 +239,7 @@ type lateboundResource interface {
 	GetOutputs() pulumi.Output
 	CustomResource() *pulumi.CustomResourceState
 	ProviderResource() *pulumi.ProviderResourceState
+	GetRawOutputs(ctx *pulumi.Context) pulumi.Output
 }
 
 // lateboundCustomResourceState is a resource state that stores all computed outputs into a single
@@ -277,6 +279,10 @@ func (*lateboundCustomResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
 }
 
+func (st *lateboundCustomResourceState) GetRawOutputs(ctx *pulumi.Context) pulumi.Output {
+	return pulumi.GetRawOutputs(ctx, &st.CustomResourceState.ResourceState)
+}
+
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
 	name    string
@@ -309,6 +315,10 @@ func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderRes
 
 func (*lateboundProviderResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
+func (st *lateboundProviderResourceState) GetRawOutputs(ctx *pulumi.Context) pulumi.Output {
+	return pulumi.GetRawOutputs(ctx, &st.CustomResourceState.ResourceState)
 }
 
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
@@ -859,7 +869,25 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
 				}
-				return evaluateAccessF(x.GetOutputs(), accessors)
+				rawOutputs := x.GetRawOutputs(ctx.ctx)
+				return evaluateAccessF(rawOutputs, accessors)
+			case resource.PropertyMap:
+				var k string
+				switch a := accessors[0].(type) {
+				case *ast.PropertyName:
+					k = a.Name
+				case *ast.PropertySubscript:
+					s, ok := a.Index.(string)
+					if !ok {
+						return ctx.error(expr, "cannot access an object property using an integer index")
+					}
+					k = s
+				}
+				var ok bool
+				receiver, ok = x[resource.PropertyKey(k)]
+				if !ok {
+					return ctx.error(expr, fmt.Sprintf("key %v does not exist on object, valid keys: %v", k, x.StableKeys()))
+				}
 			case []interface{}:
 				sub, ok := accessors[0].(*ast.PropertySubscript)
 				if !ok {
@@ -888,6 +916,15 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 				receiver = x[k]
 			default:
 				return ctx.error(expr, fmt.Sprintf("receiver must be a list or object, not %v", typeString(receiver)))
+			}
+
+			if x, ok := receiver.(resource.PropertyValue); ok {
+				if x.IsSecret() {
+					receiver = pulumi.ToSecret(x.SecretValue().Element.V)
+				} else {
+					receiver = x.V
+				}
+				return evaluateAccessF(receiver, accessors[1:])
 			}
 		}
 		return receiver, true
