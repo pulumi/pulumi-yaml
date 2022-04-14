@@ -1,0 +1,14 @@
+name: ${PROJECT}
+description: ${DESCRIPTION}
+template:
+  description: A minimal AliCloud Pulumi YAML program
+  config:
+    alicloud:region:
+      description: The AliCloud region to deploy into
+      default: cn-beijing
+
+resources:
+  bucket:
+    type: alicloud:oss:Bucket
+outputs:
+  bucketName: ${bucket.id}
