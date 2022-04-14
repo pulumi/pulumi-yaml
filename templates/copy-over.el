@@ -34,13 +34,13 @@
 (defun start-next-template (src dst)
   "Copy the template from SRC to DST and open DST."
   (copy-directory src dst)
-  (find-dired dst))
+  (find-file-other-window dst))
 
 (let ((next (find-next-template)))
   (if next
       (progn
         (message "Starting on template %s" next)
-      (start-next-template (concat "../../templates/" next) next))
+      (start-next-template (concat "../../templates/" (string-replace "yaml" "typescript" next)) next))
     (message "No templates remaining")))
 
 ;;; End

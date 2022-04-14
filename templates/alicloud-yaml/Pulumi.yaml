@@ -1,5 +1,6 @@
 name: ${PROJECT}
 description: ${DESCRIPTION}
+runtime: yaml
 template:
   description: A minimal AliCloud Pulumi YAML program
   config:
