@@ -1,4 +1,6 @@
 
+;;; To fetch the next template, just run `eval-buffer'.
+
 (setq template-list '("alicloud-typescript/"
                       "auth0-typescript/"
                       "aws-native-typescript/"
