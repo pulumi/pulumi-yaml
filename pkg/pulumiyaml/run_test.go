@@ -304,6 +304,39 @@ outputs:
 	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
+func TestConfigTypes(t *testing.T) {
+	t.Parallel()
+
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    type: String
+    default: 42
+  bar: {}
+  fizz:
+    default: 42
+  buzz:
+    type: List<String>
+  fizzBuzz:
+    default: [ "fizz", "buzz" ]
+`
+
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	assert.Contains(t, diagStrings,
+		"<stdin>:4:3: type mismatch: default value of type Number but type String was specified")
+	assert.Contains(t, diagStrings,
+		"<stdin>:7:3: unable to infer type: either 'default' or 'type' is required")
+	assert.Len(t, diagStrings, 2)
+	require.True(t, diags.HasErrors())
+
+}
+
 func TestDuplicateKeyDiags(t *testing.T) {
 	t.Parallel()
 

@@ -105,11 +105,6 @@ configuration:
   InstanceType:
     type: String
     default: t2.micro
-    allowedValues:
-      - t2.micro
-      - m1.small
-      - m1.large
-    description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
 resources:
   WebSecGrp:
     type: aws:ec2/securityGroup:SecurityGroup

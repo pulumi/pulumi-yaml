@@ -16,6 +16,8 @@ GO                          := go
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
 
+default: ensure build
+
 get_plugins::
 	pulumi plugin install resource aws ${PLUGIN_VERSION_AWS}
 	pulumi plugin install resource random ${PLUGIN_VERSION_RANDOM}

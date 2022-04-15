@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
-	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -262,6 +261,10 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 	return nil, false
 }
 
+func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return ctx.error(expr, fmt.Sprintf(format, a...))
+}
+
 func (r *runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
 		runner: r,
@@ -450,51 +453,135 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 	return r.sdiags.diags
 }
 
+type configType string
+
+var (
+	ConfigString     configType = "String"
+	ConfigNumber     configType = "Number"
+	ConfigListNumber configType = "List<Number>"
+	ConfigListString configType = "List<String>"
+)
+
+type configTypes []configType
+
+var ConfigTypes = configTypes{
+	ConfigString,
+	ConfigNumber,
+	ConfigListNumber,
+	ConfigListString,
+}
+
+func (c configType) IsValid() bool {
+	for _, v := range ConfigTypes {
+		if v == c {
+			return true
+		}
+	}
+	return false
+}
+
+func (c configTypes) String() string {
+	l := make([]string, len(c))
+	for i, v := range c {
+		l[i] = string(v)
+	}
+	return strings.Join(l, ", ")
+}
+
+func (c configType) String() string {
+	return string(c)
+}
+
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	k, c := intm.Key.Value, intm.Value
 
+	// If we implement global type checking, the type of configuration variables
+	// can be inferred and this requirement relaxed.
+	if c.Type == nil && c.Default == nil {
+		return ctx.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
+	}
+
 	var defaultValue interface{}
+	var expectedType configType
 	if c.Default != nil {
 		d, ok := ctx.evaluateExpr(c.Default)
 		if !ok {
 			return nil, false
 		}
 		defaultValue = d
+		switch d := d.(type) {
+		case string:
+			expectedType = ConfigString
+		case float64, int:
+			expectedType = ConfigNumber
+		case []interface{}:
+			if len(d) == 0 && c.Type == nil {
+				return ctx.errorf(c.Default,
+					"unable to infer type: cannot infer type of empty list, please specify type")
+			}
+			switch d[0].(type) {
+			case string:
+				expectedType = ConfigListString
+			case int, float64:
+				expectedType = ConfigListNumber
+			}
+			for i := 1; i < len(d); i++ {
+				if reflect.TypeOf(d[i-1]) != reflect.TypeOf(d[i]) {
+					return ctx.errorf(c.Default,
+						"heterogeneous typed lists are not allowed: found types %T and %T", d[i-1], d[i])
+				}
+			}
+		case []int, []float64:
+			expectedType = ConfigListNumber
+		default:
+			return ctx.errorf(c.Default,
+				"unexpected configuration type '%T': valid types are %s",
+				d, ConfigTypes)
+		}
+	}
+
+	if c.Type != nil {
+		t := configType(c.Type.Value)
+		if !t.IsValid() {
+			return ctx.errorf(c.Type,
+				"unexpected configuration type '%s': valid types are %s",
+				c.Type.Value, ConfigTypes)
+		}
+
+		// We have both a default value and a explicit type. Make sure they
+		// agree.
+		if expectedType.IsValid() && t != expectedType {
+			return ctx.errorf(intm.Key,
+				"type mismatch: default value of type %s but type %s was specified",
+				expectedType, t)
+		}
+
+		expectedType = t
+
 	}
 
 	var v interface{}
 	var err error
-	switch c.Type.Value {
-	case "String":
+	switch expectedType {
+	case ConfigString:
 		v, err = config.Try(ctx.ctx, k)
-	case "Number":
+	case ConfigNumber:
 		v, err = config.TryFloat64(ctx.ctx, k)
-	case "List<Number>":
-		v, err = config.Try(ctx.ctx, k)
+	case ConfigListNumber:
+		var arr []float64
+		err = config.TryObject(ctx.ctx, k, &arr)
 		if err == nil {
-			var arr []float64
-			for _, nstr := range strings.Split(v.(string), ",") {
-				f, err := cast.ToFloat64E(nstr)
-				if err != nil {
-					ctx.error(intm.Key, err.Error())
-					continue
-				}
-				arr = append(arr, f)
-			}
 			v = arr
 		}
-	case "CommaDelimitedList":
-		v, err = config.Try(ctx.ctx, k)
+	case ConfigListString:
+		var arr []string
+		err = config.TryObject(ctx.ctx, k, &arr)
 		if err == nil {
-			v = strings.Split(v.(string), ",")
+			v = arr
 		}
 	}
 	if err != nil {
 		v = defaultValue
-	}
-	// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-	if c.Secret != nil && c.Secret.Value {
-		v = pulumi.ToSecret(v)
 	}
 
 	return v, true
