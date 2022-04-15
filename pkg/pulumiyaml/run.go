@@ -1119,9 +1119,8 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
 					return evaluateAccessF(x.GetRawOutputs(), accessors)
-				} else {
-					return x, true
 				}
+				return x, true
 			case resource.PropertyMap:
 				if len(accessors) == 0 {
 					if !ctx.isVariableContext() {
