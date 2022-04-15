@@ -1071,7 +1071,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 }
 
 func unknownOutput() pulumi.Output {
-	return pulumi.UnknownOutput()
+	return pulumi.UnsafeUnknownOutput()
 }
 
 // evaluatePropertyAccess evaluates interpolation expressions, `${foo.bar[baz]}`. The first item in
