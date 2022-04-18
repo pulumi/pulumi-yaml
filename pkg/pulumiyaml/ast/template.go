@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 	"unicode"
 
 	"github.com/hashicorp/hcl/v2"
 
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -532,8 +532,6 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 			}
 		}
 		if !hasMatch && noMatchWarning {
-			msg := fmt.Sprintf("Object '%s' has no field named '%s'", objName, key)
-			detail := "note: "
 			var fieldNames []string
 			for i := 0; i < t.NumField(); i++ {
 				f := t.Field(i)
@@ -543,12 +541,11 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 					fieldNames = append(fieldNames, fmt.Sprintf("'%s'", string(name)))
 				}
 			}
-			if len(fieldNames) == 0 {
-				detail += fmt.Sprintf("'%s' has no fields", objName)
-			} else {
-				detail += fmt.Sprintf("available fields are: %s", strings.Join(fieldNames, ", "))
+			formatter := yamldiags.NonExistantFieldFormatter{
+				ParentLabel: fmt.Sprintf("Object '%s'", objName),
+				Fields:      fieldNames,
 			}
-
+			msg, detail := formatter.MessageWithDetail(key, fmt.Sprintf("Field '%s'", key))
 			nodeError := syntax.NodeError(kvp.Key, msg, detail)
 			nodeError.Severity = hcl.DiagWarning
 			diags = append(diags, nodeError)

@@ -80,13 +80,18 @@ type FakePackage struct {
 	t *testing.T
 }
 
+const (
+	OtherThing  = "other:index:Thing"
+	OtherModule = "other:module:Object"
+)
+
 func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeToken, error) {
 	switch typeName {
 	case
 		// TestImportTemplate fakes:
 		"test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
-		"other:index:Thing", "other:module:Object":
+		OtherThing, OtherModule:
 		return pulumiyaml.ResourceTypeToken(typeName), nil
 	default:
 		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
@@ -95,11 +100,11 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 	}
 }
 
-func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.TypeHint {
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.InputTypeHint {
 	switch typeName {
 	case "test:mod:prov", "test:mod:typ",
 		// third-party-package fakes:
-		"other:index:Thing", "other:module:Object":
+		OtherThing, OtherModule:
 		return FakeTypeHint{typeName}
 	}
 	return nil
@@ -111,7 +116,7 @@ func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeTo
 	return "", fmt.Errorf(msg)
 }
 
-func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.TypeHint {
+func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.InputTypeHint {
 	return nil
 }
 
@@ -135,11 +140,25 @@ type FakeTypeHint struct {
 	resourceName pulumiyaml.ResourceTypeToken
 }
 
-func (frp FakeTypeHint) Fields() map[string]pulumiyaml.TypeHint {
+func (fth FakeTypeHint) Fields() pulumiyaml.FieldsTypeHint {
 	return nil
 }
-func (frp FakeTypeHint) Element() pulumiyaml.TypeHint {
+func (fth FakeTypeHint) Element() pulumiyaml.TypeHint {
 	return nil
+}
+func (fth FakeTypeHint) InputProperties() pulumiyaml.FieldsTypeHint {
+	switch fth.resourceName {
+	case OtherThing:
+		return pulumiyaml.FieldsTypeHint{
+			"idea": nil,
+		}
+	case OtherModule:
+		return pulumiyaml.FieldsTypeHint{
+			"answer": nil,
+		}
+	default:
+		return nil
+	}
 }
 
 //nolint:paralleltest // mutates environment variables

@@ -240,7 +240,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		invokeArgs := []model.Expression{function}
 		if node.CallArgs != nil {
 			args, adiags := imp.importExpr(node.CallArgs,
-				pkg.FunctionTypeHint(functionName))
+				pkg.FunctionTypeHint(functionName).InputProperties())
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
@@ -552,7 +552,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 			" so must produce a non nil value", token.String(), pkg.Name())
 	var diags syntax.Diagnostics
 	var items []model.BodyItem
-	hints := props.Fields()
+	hints := props.InputProperties()
 	for _, kvp := range resource.Properties.Entries {
 		v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
 		diags.Extend(vdiags...)
