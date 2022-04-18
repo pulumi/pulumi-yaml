@@ -37,6 +37,11 @@ const MainTemplate = "Main"
 
 // Load a template from the current working directory
 func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	return load(true)
+}
+
+// Load a template from the current working directory.
+func load(allowMain bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
 	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
@@ -52,7 +57,8 @@ func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
 	}
 
-	return LoadYAMLBytes(filename, bs)
+	return LoadYAMLBytes(filename, bs, allowMain)
+
 }
 
 // Load a template from the current working directory
@@ -72,11 +78,11 @@ func LoadYAML(filename string, r io.Reader) (*ast.TemplateDecl, syntax.Diagnosti
 	if err != nil {
 		return nil, nil, err
 	}
-	return LoadYAMLBytes(filename, bytes)
+	return LoadYAMLBytes(filename, bytes, true)
 }
 
 // LoadYAMLBytes decodes a YAML template from a byte array.
-func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func LoadYAMLBytes(filename string, source []byte, allowMain bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	var diags syntax.Diagnostics
 
 	syn, sdiags := encoding.DecodeYAML(filename, yaml.NewDecoder(bytes.NewReader(source)), TagDecoder)
@@ -87,6 +93,42 @@ func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Di
 
 	t, tdiags := ast.ParseTemplate(source, syn)
 	diags.Extend(tdiags...)
+
+	mains := []syntax.ObjectPropertyDef{}
+	for i := 0; i < syn.Len(); i++ {
+		i := syn.Index(i)
+		if i.Key.Value() == "main" {
+			if allowMain {
+				if _, ok := i.Value.(*syntax.StringNode); ok {
+					mains = append(mains, i)
+				} else {
+					diags.Extend(syntax.NodeError(
+						i.Value, "'main' key must be of type string",
+						fmt.Sprintf("main is of type %T", i.Value)))
+				}
+			} else {
+				diags.Extend(syntax.NodeError(i.Key, "'main' not allowed here", ""))
+			}
+		}
+	}
+
+	switch len(mains) {
+	case 0:
+		// No main specified, so we do nothing
+	case 1:
+		err := os.Chdir(mains[0].Value.(*syntax.StringNode).Value())
+		// Other error messages won't be correct, so we exit early.
+		if err != nil {
+			diags.Extend(syntax.NodeError(mains[0].Value,
+				fmt.Sprintf("Cannot set main directory: %s", err.Error()), ""))
+			return nil, diags, err
+		}
+		te, d, e := load(false)
+		diags.Extend(d...)
+		return te, diags, e
+	default:
+		diags.Extend(syntax.NodeError(mains[1].Key, "Only 1 'main' key is allowed", ""))
+	}
 
 	return t, diags, nil
 }
