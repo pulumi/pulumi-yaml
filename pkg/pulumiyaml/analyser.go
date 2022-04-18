@@ -223,11 +223,7 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 		if !e.walk(ctx, node.Key) {
 			return false
 		}
-		c := node.Value
-		if !e.walk(ctx, c.Secret) {
-			return false
-		}
-		if !e.walk(ctx, c.Default) {
+		if !e.walk(ctx, node.Value.Default) {
 			return false
 		}
 	}
