@@ -37,8 +37,8 @@ type MockPackage struct {
 	isComponent      func(typeName string) (bool, error)
 	resolveResource  func(typeName string) (ResourceTypeToken, error)
 	resolveFunction  func(typeName string) (FunctionTypeToken, error)
-	resourceTypeHint func(typeName string) TypeHint
-	functionTypeHint func(typeName string) TypeHint
+	resourceTypeHint func(typeName string) InputTypeHint
+	functionTypeHint func(typeName string) InputTypeHint
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -59,11 +59,11 @@ func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(typeName.String())
 }
 
-func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) TypeHint {
+func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) InputTypeHint {
 	return m.resourceTypeHint(typeName.String())
 }
 
-func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) TypeHint {
+func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint {
 	return m.functionTypeHint(typeName.String())
 }
 
@@ -71,10 +71,43 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
+type mockInputTypeHint []string
+
+func (m mockInputTypeHint) InputProperties() FieldsTypeHint {
+	return m.Fields()
+}
+
+func (m mockInputTypeHint) Fields() FieldsTypeHint {
+	o := FieldsTypeHint{}
+	for _, f := range m {
+		o[f] = nil
+	}
+	return o
+}
+func (m mockInputTypeHint) Element() TypeHint { return nil }
+
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"test": MockPackage{
+				resourceTypeHint: func(typeName string) InputTypeHint {
+					switch typeName {
+					case testResourceToken:
+						return mockInputTypeHint{"foo"}
+					case testComponentToken:
+						return mockInputTypeHint{"foo"}
+					default:
+						return mockInputTypeHint{}
+					}
+				},
+				functionTypeHint: func(typeName string) InputTypeHint {
+					switch typeName {
+					case "test:fn":
+						return mockInputTypeHint{"yesArg", "someSuchArg"}
+					default:
+						return mockInputTypeHint{}
+					}
+				},
 				isComponent: func(typeName string) (bool, error) {
 					switch typeName {
 					case testResourceToken:
@@ -151,6 +184,10 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
+		diags := TypeCheck(runner)
+		if diags.HasErrors() {
+			return diags
+		}
 		err := runner.Evaluate()
 		if err != nil {
 			return err
@@ -301,6 +338,7 @@ outputs:
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
+	assert.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
@@ -451,8 +489,40 @@ func TestJSONDiags(t *testing.T) {
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
-	require.Len(t, diags, 1)
+	assert.Len(t, diags, 1)
 	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
+}
+
+func TestSchemaPropertyDiags(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: aws-eks
+runtime: yaml
+description: An EKS cluster
+variables:
+  vpcId:
+    Fn::Invoke:
+      Function: test:fn
+      Arguments:
+        noArg: false
+        yesArg: true
+resources:
+  r:
+    type: test:resource:type
+    properties:
+      foo: ${vpcId} # order to ensure determinism
+      bar: does not exist
+`
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	require.True(t, diags.HasErrors())
+	assert.Len(t, diags, 2)
+	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
+		diagString(diags[0]))
+	assert.Equal(t, "<stdin>:17:7: Property bar does not exist on Resource test:resource:type",
+		diagString(diags[1]))
+
 }
 
 func TestPropertyAccess(t *testing.T) {

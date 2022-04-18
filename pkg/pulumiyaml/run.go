@@ -192,8 +192,14 @@ func Run(ctx *pulumi.Context) error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	diags := newRunner(ctx, t, loader).Evaluate()
+	runner := newRunner(ctx, t, loader)
 
+	diags := TypeCheck(runner)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	diags.Extend(runner.Evaluate()...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -233,6 +239,10 @@ type runner struct {
 	stackRefs map[string]*pulumi.StackReference
 
 	sdiags syncDiags
+
+	// Used to store sorted nodes. A non `nil` value indicates that the runner
+	// is already setup for running.
+	intermediates []graphNode
 }
 
 type evalContext struct {
@@ -244,6 +254,11 @@ type evalContext struct {
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
 	diag := ast.ExprError(expr, summary, "")
+	ctx.addDiag(diag)
+	return nil, false
+}
+
+func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	ctx.sdiags.Extend(diag)
 	ctx.runner.sdiags.Extend(diag)
 
@@ -258,8 +273,6 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 	if err != nil {
 		os.Stderr.Write([]byte(err.Error()))
 	}
-
-	return nil, false
 }
 
 func (r *runner) newContext(root interface{}) *evalContext {
@@ -367,87 +380,153 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 
 const PulumiVarName = "pulumi"
 
+type Evaluator interface {
+	EvalConfig(r *runner, node configNode) bool
+	EvalVariable(r *runner, node variableNode) bool
+	EvalResource(r *runner, node resourceNode) bool
+	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
+}
+
+type evaluator struct{}
+
+func (evaluator) EvalConfig(r *runner, node configNode) bool {
+	ctx := r.newContext(node)
+	c, ok := ctx.registerConfig(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+		if err != nil {
+			return false
+		}
+	} else {
+		r.config[node.Key.Value] = c
+	}
+	return true
+}
+
+func (evaluator) EvalVariable(r *runner, node variableNode) bool {
+	ctx := r.newContext(node)
+	value, ok := ctx.evaluateExpr(node.Value)
+	if !ok {
+		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.variables[node.Key.Value] = value
+	}
+	return true
+}
+
+func (evaluator) EvalResource(r *runner, node resourceNode) bool {
+	ctx := r.newContext(node)
+	res, ok := ctx.registerResource(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.resources[node.Key.Value] = res
+	}
+	return true
+
+}
+
+func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+	ctx := r.newContext(node)
+	out, ok := ctx.registerOutput(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.ctx.Export(node.Key.Value, out)
+	}
+	return true
+}
+
 func (r *runner) Evaluate() syntax.Diagnostics {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+	return r.Run(evaluator{})
+}
+
+func (r *runner) ensureSetup() {
+	if r.intermediates == nil {
+		r.intermediates = []graphNode{}
+		cwd, err := os.Getwd()
+		if err != nil {
+			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+			return
+		}
+		r.variables[PulumiVarName] = map[string]interface{}{
+			"cwd":     cwd,
+			"project": r.ctx.Project(),
+			"stack":   r.ctx.Stack(),
+		}
+
+		// Topologically sort the intermediates based on implicit and explicit dependencies
+		intermediates, rdiags := topologicallySortedResources(r.t)
+		r.sdiags.Extend(rdiags...)
+		if rdiags.HasErrors() {
+			return
+		}
+		if intermediates != nil {
+			r.intermediates = intermediates
+		}
 	}
-	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": r.ctx.Project(),
-		"stack":   r.ctx.Stack(),
+}
+
+func (r *runner) Run(e Evaluator) syntax.Diagnostics {
+	r.ensureSetup()
+	returnDiags := func() syntax.Diagnostics {
+		r.sdiags.mutex.Lock()
+		defer r.sdiags.mutex.Unlock()
+		return r.sdiags.diags
+	}
+	if r.sdiags.HasErrors() {
+		return returnDiags()
 	}
 
-	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t)
-	if rdiags.HasErrors() {
-		return rdiags
-	}
-
-	for _, kvp := range intermediates {
+	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
-			ctx := r.newContext(kvp)
-			c, ok := ctx.registerConfig(kvp)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering config [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{}) //nolint:errcheck
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalConfig(r, kvp) {
+				return returnDiags()
 			}
-			r.config[kvp.Key.Value] = c
 		case variableNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
-			ctx := r.newContext(kvp)
-			value, ok := ctx.evaluateExpr(kvp.Value)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering variable [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalVariable(r, kvp) {
+				return returnDiags()
 			}
-			r.variables[kvp.Key.Value] = value
 		case resourceNode:
 			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
-				return r.sdiags.diags
+				return returnDiags()
 			}
-			ctx := r.newContext(kvp)
-			res, ok := ctx.registerResource(kvp)
-			if !ok {
-				err := r.ctx.Log.Error(fmt.Sprintf("Error registering resource [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-				if err != nil {
-					return r.sdiags.diags
-				}
-				continue
+			if !e.EvalResource(r, kvp) {
+				return returnDiags()
 			}
-			r.resources[kvp.Key.Value] = res
 		}
 	}
 
 	for _, kvp := range r.t.Outputs.Entries {
-		ctx := r.newContext(kvp)
-		out, ok := ctx.registerOutput(kvp)
-		if !ok {
-			err := r.ctx.Log.Error(fmt.Sprintf("Error registering output [%v]: %v", kvp.Key.Value, ctx.sdiags.Error()), &pulumi.LogArgs{})
-			if err != nil {
-				return r.sdiags.diags
-			}
-			continue
+		if !e.EvalOutput(r, kvp) {
+			return returnDiags()
 		}
-		r.ctx.Export(kvp.Key.Value, out)
 	}
 
-	return r.sdiags.diags
+	return returnDiags()
 }
 
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
@@ -506,6 +585,13 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	// Read the properties and then evaluate them in case there are expressions contained inside.
 	props := make(map[string]interface{})
 	overallOk := true
+
+	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
+	if err != nil {
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
+		overallOk = false
+	}
+
 	for _, kvp := range v.Properties.Entries {
 		vv, ok := ctx.evaluateExpr(kvp.Value)
 		if !ok {
@@ -625,12 +711,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		r := lateboundCustomResourceState{name: k}
 		state = &r
 		res = &r
-	}
-
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
-	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
-		return nil, false
 	}
 
 	if !overallOk || ctx.sdiags.HasErrors() {
