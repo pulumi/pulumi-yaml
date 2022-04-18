@@ -580,8 +580,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 			v = arr
 		}
 	}
-	if err != nil {
+	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
 		v = defaultValue
+	} else if err != nil {
+		return ctx.errorf(intm.Key, err.Error())
 	}
 
 	return v, true

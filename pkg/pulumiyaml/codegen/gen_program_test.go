@@ -165,6 +165,8 @@ func TestGenerateProgram(t *testing.T) {
 				// Note: aws-s3-folder errors with
 				// 14,27-52: the asset parameter must be a string literal; the asset parameter must be a string literal
 				// But the actual error is that it is using a Splat operator.
+			case "python-resource-names":
+				// Reason: A python only test.
 			default:
 				l = append(l, tt)
 			}
