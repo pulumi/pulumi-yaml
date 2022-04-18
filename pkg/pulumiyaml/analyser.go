@@ -16,7 +16,7 @@ type typeCache struct {
 	resources map[*ast.ResourceDecl]TypeHint
 }
 
-func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
+func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
@@ -60,7 +60,7 @@ func (tc *typeCache) anchorResource(r *runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) anchorInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
+func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
 	if err != nil {
 		_, b := ctx.error(t, err.Error())
@@ -96,10 +96,10 @@ func (tc *typeCache) anchorInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	return true
 }
 
-func (tc *typeCache) anchorExpr(ctx *evalContext, t ast.Expr) bool {
+func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	switch t := t.(type) {
 	case *ast.InvokeExpr:
-		return tc.anchorInvoke(ctx, t)
+		return tc.typeInvoke(ctx, t)
 	default:
 		return true
 	}
@@ -117,26 +117,26 @@ func TypeCheck(r *runner) syntax.Diagnostics {
 
 	// Set roots
 	diags := r.Run(walker{
-		EvalResourceFunc: types.anchorResource,
-		EvalExprFunc:     types.anchorExpr,
+		VisitResource: types.typeResource,
+		VisitExpr:     types.typeExpr,
 	})
 
 	return diags
 }
 
 type walker struct {
-	EvalConfigFunc   func(r *runner, node configNode) bool
-	EvalVariableFunc func(r *runner, node variableNode) bool
-	EvalOutputFunc   func(r *runner, node ast.PropertyMapEntry) bool
-	EvalResourceFunc func(r *runner, node resourceNode) bool
-	EvalExprFunc     func(*evalContext, ast.Expr) bool
+	VisitConfig   func(r *runner, node configNode) bool
+	VisitVariable func(r *runner, node variableNode) bool
+	VisitOutput   func(r *runner, node ast.PropertyMapEntry) bool
+	VisitResource func(r *runner, node resourceNode) bool
+	VisitExpr     func(*evalContext, ast.Expr) bool
 }
 
 func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	if x == nil {
 		return true
 	}
-	if !e.EvalExprFunc(ctx, x) {
+	if !e.VisitExpr(ctx, x) {
 		return false
 	}
 
@@ -158,54 +158,13 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 			}
 		}
 	case *ast.InterpolateExpr, *ast.SymbolExpr:
-	case *ast.InvokeExpr:
-		if !e.walk(ctx, x.Token) {
+	case ast.BuiltinExpr:
+		if !e.walk(ctx, x.Name()) {
 			return false
 		}
-		if !e.walk(ctx, x.CallArgs) {
+		if !e.walk(ctx, x.Args()) {
 			return false
 		}
-		return e.walk(ctx, x.Return)
-	case *ast.JoinExpr:
-		if !e.walk(ctx, x.Delimiter) {
-			return false
-		}
-		return e.walk(ctx, x.Values)
-	case *ast.SplitExpr:
-		if !e.walk(ctx, x.Delimiter) {
-			return false
-		}
-		return e.walk(ctx, x.Source)
-	case *ast.ToJSONExpr:
-		return e.walk(ctx, x.Value)
-	case *ast.SelectExpr:
-		if !e.walk(ctx, x.Index) {
-			return false
-		}
-		return e.walk(ctx, x.Values)
-	case *ast.ToBase64Expr:
-		return e.walk(ctx, x.Value)
-	case *ast.FileAssetExpr:
-		return e.walk(ctx, x.Source)
-	case *ast.StringAssetExpr:
-		return e.walk(ctx, x.Source)
-	case *ast.RemoteAssetExpr:
-		return e.walk(ctx, x.Source)
-	case *ast.FileArchiveExpr:
-		return e.walk(ctx, x.Source)
-	case *ast.RemoteArchiveExpr:
-		return e.walk(ctx, x.Source)
-	case *ast.AssetArchiveExpr:
-		for _, v := range x.AssetOrArchives {
-			if !e.walk(ctx, v) {
-				return false
-			}
-		}
-	case *ast.StackReferenceExpr:
-		if !e.walk(ctx, x.PropertyName) {
-			return false
-		}
-		return e.walk(ctx, x.StackName)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %T", x))
 	}
@@ -213,12 +172,12 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 }
 
 func (e walker) EvalConfig(r *runner, node configNode) bool {
-	if e.EvalConfigFunc != nil {
-		if !e.EvalConfigFunc(r, node) {
+	if e.VisitConfig != nil {
+		if !e.VisitConfig(r, node) {
 			return false
 		}
 	}
-	if e.EvalExprFunc != nil {
+	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
@@ -234,12 +193,12 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 	return true
 }
 func (e walker) EvalVariable(r *runner, node variableNode) bool {
-	if e.EvalVariableFunc != nil {
-		if !e.EvalVariableFunc(r, node) {
+	if e.VisitVariable != nil {
+		if !e.VisitVariable(r, node) {
 			return false
 		}
 	}
-	if e.EvalExprFunc != nil {
+	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
@@ -251,12 +210,12 @@ func (e walker) EvalVariable(r *runner, node variableNode) bool {
 	return true
 }
 func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	if e.EvalOutputFunc != nil {
-		if !e.EvalOutputFunc(r, node) {
+	if e.VisitOutput != nil {
+		if !e.VisitOutput(r, node) {
 			return false
 		}
 	}
-	if e.EvalExprFunc != nil {
+	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
@@ -268,12 +227,12 @@ func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	return true
 }
 func (e walker) EvalResource(r *runner, node resourceNode) bool {
-	if e.EvalResourceFunc != nil {
-		if !e.EvalResourceFunc(r, node) {
+	if e.VisitResource != nil {
+		if !e.VisitResource(r, node) {
 			return false
 		}
 	}
-	if e.EvalExprFunc != nil {
+	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
