@@ -1,0 +1,30 @@
+resources:
+    staticwebsite:
+        type: azure-native:storage:StorageAccountStaticWebsite
+        properties:
+            resourceGroupName: ${someString}
+            accountName: ${someString}
+    faviconpng:
+        type: azure-native:storage:Blob
+        properties:
+            resourceGroupName: ${someString}
+            accountName: ${someString}
+            containerName: ${someString}
+            type: Block
+    _404html:
+        type: azure-native:storage:Blob
+        properties:
+            resourceGroupName: ${someString}
+            accountName: ${someString}
+            containerName: ${someString}
+            type: ${staticwebsite.indexDocument}
+    another:
+        type: azure-native:storage:Blob
+        properties:
+            resourceGroupName: ${someString}
+            accountName: ${someString}
+            containerName: ${someString}
+            type: ${typeVar}
+variables:
+    someString: foobar
+    typeVar: Block
