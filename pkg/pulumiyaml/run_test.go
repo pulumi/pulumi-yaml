@@ -370,7 +370,9 @@ configuration:
 		"<stdin>:4:3: type mismatch: default value of type Number but type String was specified")
 	assert.Contains(t, diagStrings,
 		"<stdin>:7:3: unable to infer type: either 'default' or 'type' is required")
-	assert.Len(t, diagStrings, 2)
+	assert.Contains(t, diagStrings,
+		"<stdin>:10:3: missing required configuration variable 'buzz'; run `pulumi config` to set")
+	assert.Len(t, diagStrings, 3)
 	require.True(t, diags.HasErrors())
 
 }

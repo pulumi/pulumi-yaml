@@ -15,22 +15,22 @@ const sa = new azure_native.storage.StorageAccount("sa", {
 const container = new azure_native.storage.BlobContainer("container", {
     resourceGroupName: appservicegroup.name,
     accountName: sa.name,
-    publicAccess: "None",
+    publicAccess: azure_native.storage.PublicAccess.None,
 });
-const blobAccessToken = azure_native.storage.listStorageAccountServiceSASOutput({
-    accountName: sa.name,
-    protocols: "https",
+const blobAccessToken = pulumi.all([sa.name, appservicegroup.name, sa.name, container.name]).apply(([saName, appservicegroupName, saName1, containerName]) => azure_native.storage.listStorageAccountServiceSASOutput({
+    accountName: saName,
+    protocols: azure_native.storage.HttpProtocol.Https,
     sharedAccessStartTime: "2022-01-01",
     sharedAccessExpiryTime: "2030-01-01",
     resource: "c",
-    resourceGroupName: appservicegroup.name,
+    resourceGroupName: appservicegroupName,
     permissions: "r",
-    canonicalizedResource: pulumi.interpolate`/blob/${sa.name}/${container.name}`,
+    canonicalizedResource: `/blob/${saName1}/${containerName}`,
     contentType: "application/json",
     cacheControl: "max-age=5",
     contentDisposition: "inline",
     contentEncoding: "deflate",
-}).apply(invoke => invoke.serviceSasToken);
+})).apply(invoke => invoke.serviceSasToken);
 const appserviceplan = new azure_native.web.AppServicePlan("appserviceplan", {
     resourceGroupName: appservicegroup.name,
     kind: "App",
@@ -43,7 +43,7 @@ const blob = new azure_native.storage.Blob("blob", {
     resourceGroupName: appservicegroup.name,
     accountName: sa.name,
     containerName: container.name,
-    type: "Block",
+    type: azure_native.storage.BlobType.Block,
     source: new pulumi.asset.FileArchive("./www"),
 });
 const appInsights = new azure_native.insights.Component("appInsights", {
@@ -92,7 +92,7 @@ const app = new azure_native.web.WebApp("app", {
         ],
         connectionStrings: [{
             name: "db",
-            type: "SQLAzure",
+            type: azure_native.web.ConnectionStringType.SQLAzure,
             connectionString: pulumi.interpolate`Server= tcp:${sqlServer.name}.database.windows.net;initial catalog=${db.name};userID=${sqlAdmin};password=${sqlPassword.result};Min Pool Size=0;Max Pool Size=30;Persist Security Info=true;`,
         }],
     },
