@@ -110,6 +110,10 @@ func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pul
 	return nil
 }
 
+func (m FakePackage) ResourceConstants(typeName pulumiyaml.ResourceTypeToken) map[string]interface{} {
+	return nil
+}
+
 func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeToken, error) {
 	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
 	m.t.Logf(msg)

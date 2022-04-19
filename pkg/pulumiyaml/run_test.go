@@ -68,6 +68,10 @@ func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint 
 	return m.functionTypeHint(typeName.String())
 }
 
+func (m MockPackage) ResourceConstants(typeName ResourceTypeToken) map[string]interface{} {
+	return nil
+}
+
 func (m MockPackage) Name() string {
 	return "test"
 }
