@@ -4,7 +4,9 @@ package pulumiyaml
 
 import (
 	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -142,6 +144,32 @@ func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resourc
 	return m.NewResourceF(args)
 }
 
+const testProject = "foo"
+
+func projectConfigKey(k string) resource.PropertyKey {
+	return resource.PropertyKey(testProject + ":" + k)
+}
+
+func setConfig(t *testing.T, m resource.PropertyMap) {
+	config := m.Mappable()
+	b, err := json.Marshal(config)
+	require.NoError(t, err, "Failed to marshal the map")
+	t.Setenv(pulumi.EnvConfig, string(b))
+	if m.ContainsSecrets() {
+		var secrets []string
+		for k, v := range m {
+			if v.IsSecret() {
+				secrets = append(secrets, string(k))
+				t.Logf("Found secret: '%s': %v <== %v", string(k), v, secrets)
+			}
+		}
+		t.Logf("Setting secret keys = %v", secrets)
+		s, err := json.Marshal(secrets)
+		require.NoError(t, err, "Failed to marshal secrets")
+		t.Setenv(pulumi.EnvConfigSecretKeys, string(s))
+	}
+}
+
 func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
@@ -189,7 +217,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			return diags
 		}
 		err := runner.Evaluate()
-		if err != nil {
+		if err.HasErrors() {
 			return err
 		}
 		if callback != nil {
@@ -197,7 +225,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 			callback(ctx)
 		}
 		return nil
-	}, pulumi.WithMocks("foo", "dev", mocks))
+	}, pulumi.WithMocks(testProject, "dev", mocks))
 	if diags, ok := HasDiagnostics(err); ok {
 		return diags
 	}
@@ -374,7 +402,48 @@ configuration:
 		"<stdin>:10:3: missing required configuration variable 'buzz'; run `pulumi config` to set")
 	assert.Len(t, diagStrings, 3)
 	require.True(t, diags.HasErrors())
+}
 
+func TestConfigSecrets(t *testing.T) {
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    secret: true
+    type: Number
+  bar:
+    type: String
+  fizz:
+    default: 42
+  buzz:
+    default: 42
+    secret: true
+`
+
+	tmpl := yamlTemplate(t, text)
+	setConfig(t,
+		resource.PropertyMap{
+			projectConfigKey("foo"): resource.NewStringProperty("42.0"),
+			projectConfigKey("bar"): resource.MakeSecret(resource.NewStringProperty("the answer")),
+		})
+	t.Logf("Found map = %s", os.Getenv(pulumi.EnvConfig))
+	testRan := false
+	err := testTemplateDiags(t, tmpl, func(r *evalContext) {
+
+		// Secret because declared secret in configuration
+		assert.True(t, pulumi.IsSecret(r.config["foo"].(pulumi.Output)))
+		// Secret because declared secret in in config
+		assert.True(t, pulumi.IsSecret(r.config["bar"].(pulumi.Output)))
+		// Secret because declared secret in configuration (& default)
+		assert.True(t, pulumi.IsSecret(r.config["buzz"].(pulumi.Output)))
+		// not secret
+		assert.Equal(t, 42.0, r.config["fizz"])
+
+		testRan = true
+	})
+	assert.True(t, testRan, "Our tests didn't run")
+	diags, found := HasDiagnostics(err)
+	assert.False(t, found, "We should not get any errors: '%s'", diags)
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {

@@ -155,7 +155,10 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 
 	switch err := err.(type) {
 	case syntax.Diagnostics:
-		return err, true
+		if len(err) > 0 {
+			return err, true
+		}
+		return nil, false
 	case *multierror.Error:
 		var diags syntax.Diagnostics
 		var has bool
@@ -639,32 +642,63 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 
 	}
 
+	// A value is considered secret if either it is either marked as secret in
+	// the config section or the configuration section.
+	//
+	// We only want to execute a TrySecret* if the value is secret in the config
+	// section. It the value is specified as secret only in the configuration
+	// section, we call Try* normally, and later wrap the value with
+	// `pulumi.ToSecret`.
+	isSecretInConfig := ctx.ctx.IsConfigSecret(ctx.ctx.Project() + ":" + k)
+
 	var v interface{}
 	var err error
 	switch expectedType {
 	case ConfigString:
-		v, err = config.Try(ctx.ctx, k)
+		if isSecretInConfig {
+			v, err = config.TrySecret(ctx.ctx, k)
+		} else {
+			v, err = config.Try(ctx.ctx, k)
+		}
 	case ConfigNumber:
-		v, err = config.TryFloat64(ctx.ctx, k)
+		if isSecretInConfig {
+			v, err = config.TrySecretFloat64(ctx.ctx, k)
+		} else {
+			v, err = config.TryFloat64(ctx.ctx, k)
+		}
 	case ConfigListNumber:
 		var arr []float64
-		err = config.TryObject(ctx.ctx, k, &arr)
-		if err == nil {
-			v = arr
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
+			}
 		}
 	case ConfigListString:
 		var arr []string
-		err = config.TryObject(ctx.ctx, k, &arr)
-		if err == nil {
-			v = arr
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
+			}
 		}
 	}
+
 	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
 		v = defaultValue
 	} else if err != nil {
 		return ctx.errorf(intm.Key, err.Error())
 	}
 
+	// The value was marked secret in the configuration section, but in the
+	// config section. We need to wrap it in `pulumi.ToSecret`.
+	if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
+		v = pulumi.ToSecret(v)
+	}
 	return v, true
 }
 

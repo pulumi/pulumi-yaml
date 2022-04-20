@@ -248,6 +248,7 @@ type ConfigParamDecl struct {
 	declNode
 
 	Type    *StringExpr
+	Secret  *BooleanExpr
 	Default Expr
 }
 
@@ -256,17 +257,18 @@ func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
 }
 
 func ConfigParamSyntax(node *syntax.ObjectNode, typ *StringExpr,
-	defaultValue Expr) *ConfigParamDecl {
+	secret *BooleanExpr, defaultValue Expr) *ConfigParamDecl {
 
 	return &ConfigParamDecl{
 		declNode: decl(node),
 		Type:     typ,
+		Secret:   secret,
 		Default:  defaultValue,
 	}
 }
 
 func ConfigParam(typ *StringExpr, defaultValue Expr, secret *BooleanExpr) *ConfigParamDecl {
-	return ConfigParamSyntax(nil, typ, defaultValue)
+	return ConfigParamSyntax(nil, typ, secret, defaultValue)
 }
 
 type ResourceOptionsDecl struct {

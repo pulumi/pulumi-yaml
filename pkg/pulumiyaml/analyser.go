@@ -226,6 +226,9 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 		if !e.walk(ctx, node.Value.Default) {
 			return false
 		}
+		if !e.walk(ctx, node.Value.Secret) {
+			return false
+		}
 	}
 	return true
 }

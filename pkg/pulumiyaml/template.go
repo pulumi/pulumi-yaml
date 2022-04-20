@@ -46,6 +46,8 @@ type Configuration struct {
 	Type string `yaml:",omitempty"`
 	// Default is a value of the appropriate type for the template to use if no value is specified.
 	Default interface{} `json:",omitempty" yaml:",omitempty"`
+	// Secret masks the parameter by marking it a secret.
+	Secret bool `yaml:",omitempty"`
 }
 
 // ResourceOptions describes additional options common to all Pulumi resources.
