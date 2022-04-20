@@ -651,6 +651,12 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	// `pulumi.ToSecret`.
 	isSecretInConfig := ctx.ctx.IsConfigSecret(ctx.ctx.Project() + ":" + k)
 
+	if isSecretInConfig && c.Secret != nil && !c.Secret.Value {
+		return ctx.error(c.Secret,
+			"Cannot mark a configuration value as not secret"+
+				" if the associated config value is secret")
+	}
+
 	var v interface{}
 	var err error
 	switch expectedType {

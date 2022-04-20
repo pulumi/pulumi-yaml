@@ -6,7 +6,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -404,7 +403,7 @@ configuration:
 	require.True(t, diags.HasErrors())
 }
 
-func TestConfigSecrets(t *testing.T) {
+func TestConfigSecrets(t *testing.T) { //nolint:paralleltest
 	const text = `name: test-yaml
 runtime: yaml
 configuration:
@@ -426,7 +425,6 @@ configuration:
 			projectConfigKey("foo"): resource.NewStringProperty("42.0"),
 			projectConfigKey("bar"): resource.MakeSecret(resource.NewStringProperty("the answer")),
 		})
-	t.Logf("Found map = %s", os.Getenv(pulumi.EnvConfig))
 	testRan := false
 	err := testTemplateDiags(t, tmpl, func(r *evalContext) {
 
@@ -444,6 +442,33 @@ configuration:
 	assert.True(t, testRan, "Our tests didn't run")
 	diags, found := HasDiagnostics(err)
 	assert.False(t, found, "We should not get any errors: '%s'", diags)
+}
+
+func TestConflictingConfigSecrets(t *testing.T) { //nolint:paralleltest
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    secret: false
+    type: Number
+`
+
+	tmpl := yamlTemplate(t, text)
+	setConfig(t,
+		resource.PropertyMap{
+			projectConfigKey("foo"): resource.MakeSecret(resource.NewStringProperty("42.0")),
+		})
+	diags := testTemplateDiags(t, tmpl, nil)
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+
+	assert.Contains(t, diagStrings,
+		"<stdin>:5:13: Cannot mark a configuration value as not secret if the associated config value is secret")
+	assert.Len(t, diagStrings, 1)
+	require.True(t, diags.HasErrors())
+
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
