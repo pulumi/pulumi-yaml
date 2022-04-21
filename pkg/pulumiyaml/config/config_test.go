@@ -1,3 +1,4 @@
+// Copyright 2022, Pulumi Corporation.  All rights reserved.
 package config
 
 import (
@@ -22,6 +23,7 @@ func TestParse(t *testing.T) {
 	for _, c := range cases {
 		c := c
 		t.Run(c.input, func(t *testing.T) {
+			t.Parallel()
 			output, ok := Parse(c.input)
 			if c.expected == nil {
 				assert.False(t, ok)
