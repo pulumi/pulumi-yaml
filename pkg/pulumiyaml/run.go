@@ -24,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
@@ -535,45 +536,6 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	return returnDiags()
 }
 
-type configType string
-
-var (
-	ConfigString     configType = "String"
-	ConfigNumber     configType = "Number"
-	ConfigListNumber configType = "List<Number>"
-	ConfigListString configType = "List<String>"
-)
-
-type configTypes []configType
-
-var ConfigTypes = configTypes{
-	ConfigString,
-	ConfigNumber,
-	ConfigListNumber,
-	ConfigListString,
-}
-
-func (c configType) IsValid() bool {
-	for _, v := range ConfigTypes {
-		if v == c {
-			return true
-		}
-	}
-	return false
-}
-
-func (c configTypes) String() string {
-	l := make([]string, len(c))
-	for i, v := range c {
-		l[i] = string(v)
-	}
-	return strings.Join(l, ", ")
-}
-
-func (c configType) String() string {
-	return string(c)
-}
-
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	k, c := intm.Key.Value, intm.Value
 
@@ -584,7 +546,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	}
 
 	var defaultValue interface{}
-	var expectedType configType
+	var expectedType ctypes.Type
 	if c.Default != nil {
 		d, ok := ctx.evaluateExpr(c.Default)
 		if !ok {
@@ -593,9 +555,9 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		defaultValue = d
 		switch d := d.(type) {
 		case string:
-			expectedType = ConfigString
+			expectedType = ctypes.String
 		case float64, int:
-			expectedType = ConfigNumber
+			expectedType = ctypes.Number
 		case []interface{}:
 			if len(d) == 0 && c.Type == nil {
 				return ctx.errorf(c.Default,
@@ -603,9 +565,11 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 			}
 			switch d[0].(type) {
 			case string:
-				expectedType = ConfigListString
+				expectedType = ctypes.StringList
 			case int, float64:
-				expectedType = ConfigListNumber
+				expectedType = ctypes.NumberList
+			case bool:
+				expectedType = ctypes.BooleanList
 			}
 			for i := 1; i < len(d); i++ {
 				if reflect.TypeOf(d[i-1]) != reflect.TypeOf(d[i]) {
@@ -614,25 +578,25 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 				}
 			}
 		case []int, []float64:
-			expectedType = ConfigListNumber
+			expectedType = ctypes.NumberList
 		default:
 			return ctx.errorf(c.Default,
 				"unexpected configuration type '%T': valid types are %s",
-				d, ConfigTypes)
+				d, ctypes.ConfigTypes)
 		}
 	}
 
 	if c.Type != nil {
-		t := configType(c.Type.Value)
-		if !t.IsValid() {
+		t, ok := ctypes.Parse(c.Type.Value)
+		if !ok {
 			return ctx.errorf(c.Type,
 				"unexpected configuration type '%s': valid types are %s",
-				c.Type.Value, ConfigTypes)
+				c.Type.Value, ctypes.ConfigTypes)
 		}
 
 		// We have both a default value and a explicit type. Make sure they
 		// agree.
-		if expectedType.IsValid() && t != expectedType {
+		if ctypes.IsValidType(expectedType) && t != expectedType {
 			return ctx.errorf(intm.Key,
 				"type mismatch: default value of type %s but type %s was specified",
 				expectedType, t)
@@ -660,19 +624,19 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	var v interface{}
 	var err error
 	switch expectedType {
-	case ConfigString:
+	case ctypes.String:
 		if isSecretInConfig {
 			v, err = config.TrySecret(ctx.ctx, k)
 		} else {
 			v, err = config.Try(ctx.ctx, k)
 		}
-	case ConfigNumber:
+	case ctypes.Number:
 		if isSecretInConfig {
 			v, err = config.TrySecretFloat64(ctx.ctx, k)
 		} else {
 			v, err = config.TryFloat64(ctx.ctx, k)
 		}
-	case ConfigListNumber:
+	case ctypes.NumberList:
 		var arr []float64
 		if isSecretInConfig {
 			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
@@ -682,8 +646,18 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 				v = arr
 			}
 		}
-	case ConfigListString:
+	case ctypes.StringList:
 		var arr []string
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
+			}
+		}
+	case ctypes.BooleanList:
+		var arr []bool
 		if isSecretInConfig {
 			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
 		} else {
