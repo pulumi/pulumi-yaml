@@ -248,40 +248,27 @@ type ConfigParamDecl struct {
 	declNode
 
 	Type    *StringExpr
-	Default *StringExpr
 	Secret  *BooleanExpr
-
-	// TODO:
-
-	// List copied from template.go. While these fields are not currently used,
-	// they are necessary to avoid invalid field errors.
-	AllowedPattern        *StringExpr
-	AllowedValues         *ListExpr
-	ConstraintDescription *StringExpr
-	Description           *StringExpr
-	MaxLength             *NumberExpr
-	MaxValue              *NumberExpr
-	MinLength             *NumberExpr
-	MinValue              *NumberExpr
+	Default Expr
 }
 
 func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func ConfigParamSyntax(node *syntax.ObjectNode, typ *StringExpr, defaultValue *StringExpr,
-	secret *BooleanExpr) *ConfigParamDecl {
+func ConfigParamSyntax(node *syntax.ObjectNode, typ *StringExpr,
+	secret *BooleanExpr, defaultValue Expr) *ConfigParamDecl {
 
 	return &ConfigParamDecl{
 		declNode: decl(node),
 		Type:     typ,
-		Default:  defaultValue,
 		Secret:   secret,
+		Default:  defaultValue,
 	}
 }
 
-func ConfigParam(typ *StringExpr, defaultValue *StringExpr, secret *BooleanExpr) *ConfigParamDecl {
-	return ConfigParamSyntax(nil, typ, defaultValue, secret)
+func ConfigParam(typ *StringExpr, defaultValue Expr, secret *BooleanExpr) *ConfigParamDecl {
+	return ConfigParamSyntax(nil, typ, secret, defaultValue)
 }
 
 type ResourceOptionsDecl struct {

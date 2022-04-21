@@ -43,6 +43,8 @@ var (
 	// failingExamples examples are known to not produce valid PCL.
 	failingExamples = []string{
 		"stackreference-consumer",
+		// PCL does not have stringAssets
+		"getting-started",
 	}
 
 	// failingCompile examples are known to produce valid PCL, but produce

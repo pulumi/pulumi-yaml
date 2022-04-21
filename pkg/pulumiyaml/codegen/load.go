@@ -209,10 +209,23 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 //
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
+	case *ast.StringAssetExpr:
+		path, pdiags := imp.importExpr(node.Source, nil)
+		return &model.FunctionCallExpression{
+			Name: "stringAsset",
+			Args: []model.Expression{path},
+		}, pdiags
+
 	case *ast.FileAssetExpr:
 		path, pdiags := imp.importExpr(node.Source, nil)
 		return &model.FunctionCallExpression{
 			Name: "fileAsset",
+			Args: []model.Expression{path},
+		}, pdiags
+	case *ast.RemoteAssetExpr:
+		path, pdiags := imp.importExpr(node.Source, nil)
+		return &model.FunctionCallExpression{
+			Name: "remoteAsset",
 			Args: []model.Expression{path},
 		}, pdiags
 	case *ast.FileArchiveExpr:
@@ -221,13 +234,18 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "fileArchive",
 			Args: []model.Expression{path},
 		}, pdiags
-	case *ast.StringAssetExpr:
+	case *ast.RemoteArchiveExpr:
 		path, pdiags := imp.importExpr(node.Source, nil)
 		return &model.FunctionCallExpression{
-			Name: "fileArchive",
+			Name: "remoteArchive",
 			Args: []model.Expression{path},
 		}, pdiags
-
+	case *ast.AssetArchiveExpr:
+		path, pdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "assetArchive",
+			Args: []model.Expression{path},
+		}, pdiags
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
@@ -395,7 +413,7 @@ func importParameterType(s string) (string, bool) {
 		return "number", true
 	case "List<Number>":
 		return "list(number)", true
-	case "CommaDelimitedList", "List<String>":
+	case "List<String>":
 		return "list(string)", true
 	default:
 		return "", false
@@ -406,9 +424,15 @@ func importParameterType(s string) (string, bool) {
 func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, syntax.Diagnostics) {
 	name, config := kvp.Key.Value, kvp.Value
 
-	typeExpr, ok := importParameterType(config.Type.Value)
-	if !ok {
-		return nil, syntax.Diagnostics{ast.ExprError(config.Type, fmt.Sprintf("unrecognized type '%v' for config variable '%s'", config.Type.Value, name), "")}
+	var typeExpr string
+	if config.Type != nil {
+		var ok bool
+		typeExpr, ok = importParameterType(config.Type.Value)
+		if !ok {
+			return nil, syntax.Diagnostics{ast.ExprError(config.Type, fmt.Sprintf("unrecognized type '%v' for config variable '%s'", config.Type.Value, name), "")}
+		}
+	} else {
+		typeExpr = "string"
 	}
 
 	configVar, ok := imp.configuration[name]

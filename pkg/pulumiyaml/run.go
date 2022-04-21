@@ -21,10 +21,10 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
-	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
@@ -156,7 +156,10 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 
 	switch err := err.(type) {
 	case syntax.Diagnostics:
-		return err, true
+		if len(err) > 0 {
+			return err, true
+		}
+		return nil, false
 	case *multierror.Error:
 		var diags syntax.Diagnostics
 		var has bool
@@ -273,6 +276,10 @@ func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	if err != nil {
 		os.Stderr.Write([]byte(err.Error()))
 	}
+}
+
+func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return ctx.error(expr, fmt.Sprintf(format, a...))
 }
 
 func (r *runner) newContext(root interface{}) *evalContext {
@@ -532,50 +539,146 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	k, c := intm.Key.Value, intm.Value
 
+	// If we implement global type checking, the type of configuration variables
+	// can be inferred and this requirement relaxed.
+	if c.Type == nil && c.Default == nil {
+		return ctx.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
+	}
+
 	var defaultValue interface{}
+	var expectedType ctypes.Type
 	if c.Default != nil {
 		d, ok := ctx.evaluateExpr(c.Default)
 		if !ok {
 			return nil, false
 		}
 		defaultValue = d
+		switch d := d.(type) {
+		case string:
+			expectedType = ctypes.String
+		case float64, int:
+			expectedType = ctypes.Number
+		case []interface{}:
+			if len(d) == 0 && c.Type == nil {
+				return ctx.errorf(c.Default,
+					"unable to infer type: cannot infer type of empty list, please specify type")
+			}
+			switch d[0].(type) {
+			case string:
+				expectedType = ctypes.StringList
+			case int, float64:
+				expectedType = ctypes.NumberList
+			case bool:
+				expectedType = ctypes.BooleanList
+			}
+			for i := 1; i < len(d); i++ {
+				if reflect.TypeOf(d[i-1]) != reflect.TypeOf(d[i]) {
+					return ctx.errorf(c.Default,
+						"heterogeneous typed lists are not allowed: found types %T and %T", d[i-1], d[i])
+				}
+			}
+		case []int, []float64:
+			expectedType = ctypes.NumberList
+		default:
+			return ctx.errorf(c.Default,
+				"unexpected configuration type '%T': valid types are %s",
+				d, ctypes.ConfigTypes)
+		}
+	}
+
+	if c.Type != nil {
+		t, ok := ctypes.Parse(c.Type.Value)
+		if !ok {
+			return ctx.errorf(c.Type,
+				"unexpected configuration type '%s': valid types are %s",
+				c.Type.Value, ctypes.ConfigTypes)
+		}
+
+		// We have both a default value and a explicit type. Make sure they
+		// agree.
+		if ctypes.IsValidType(expectedType) && t != expectedType {
+			return ctx.errorf(intm.Key,
+				"type mismatch: default value of type %s but type %s was specified",
+				expectedType, t)
+		}
+
+		expectedType = t
+
+	}
+
+	// A value is considered secret if either it is either marked as secret in
+	// the config section or the configuration section.
+	//
+	// We only want to execute a TrySecret* if the value is secret in the config
+	// section. It the value is specified as secret only in the configuration
+	// section, we call Try* normally, and later wrap the value with
+	// `pulumi.ToSecret`.
+	isSecretInConfig := ctx.ctx.IsConfigSecret(ctx.ctx.Project() + ":" + k)
+
+	if isSecretInConfig && c.Secret != nil && !c.Secret.Value {
+		return ctx.error(c.Secret,
+			"Cannot mark a configuration value as not secret"+
+				" if the associated config value is secret")
 	}
 
 	var v interface{}
 	var err error
-	switch c.Type.Value {
-	case "String":
-		v, err = config.Try(ctx.ctx, k)
-	case "Number":
-		v, err = config.TryFloat64(ctx.ctx, k)
-	case "List<Number>":
-		v, err = config.Try(ctx.ctx, k)
-		if err == nil {
-			var arr []float64
-			for _, nstr := range strings.Split(v.(string), ",") {
-				f, err := cast.ToFloat64E(nstr)
-				if err != nil {
-					ctx.error(intm.Key, err.Error())
-					continue
-				}
-				arr = append(arr, f)
+	switch expectedType {
+	case ctypes.String:
+		if isSecretInConfig {
+			v, err = config.TrySecret(ctx.ctx, k)
+		} else {
+			v, err = config.Try(ctx.ctx, k)
+		}
+	case ctypes.Number:
+		if isSecretInConfig {
+			v, err = config.TrySecretFloat64(ctx.ctx, k)
+		} else {
+			v, err = config.TryFloat64(ctx.ctx, k)
+		}
+	case ctypes.NumberList:
+		var arr []float64
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
 			}
-			v = arr
 		}
-	case "CommaDelimitedList":
-		v, err = config.Try(ctx.ctx, k)
-		if err == nil {
-			v = strings.Split(v.(string), ",")
+	case ctypes.StringList:
+		var arr []string
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
+			}
 		}
-	}
-	if err != nil {
-		v = defaultValue
-	}
-	// TODO: Validate AllowedPattern, AllowedValues, MaxValue, MaxLength, MinValue, MinLength
-	if c.Secret != nil && c.Secret.Value {
-		v = pulumi.ToSecret(v)
+	case ctypes.BooleanList:
+		var arr []bool
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err == nil {
+				v = arr
+			}
+		}
 	}
 
+	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
+		v = defaultValue
+	} else if err != nil {
+		return ctx.errorf(intm.Key, err.Error())
+	}
+
+	// The value was marked secret in the configuration section, but in the
+	// config section. We need to wrap it in `pulumi.ToSecret`.
+	if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
+		v = pulumi.ToSecret(v)
+	}
 	return v, true
 }
 

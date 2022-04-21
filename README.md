@@ -54,13 +54,7 @@ runtime: yaml
 description: Basic example of an AWS web server accessible over HTTP
 configuration:
   InstanceType:
-    type: String
     default: t3.micro
-    allowedValues:
-      - t3.micro
-      - t3.small
-      - m4.large
-    description: Enter t3.micro, t3.small, or m4.large. Default is t3.micro.
 variables:
   AmazonLinuxAmi:
     Fn::Invoke:
@@ -129,14 +123,12 @@ The supported expression forms for each of these is detailed below.
 
 ### Configuration
 
-The value of `configuration` is an object whose keys are logical names by which the config input will be referenced in expressions within the program, and whose values are elements of the schema below.  Each item in this object represents an independent config input.
+The value of `configuration` is an object whose keys are logical names by which the config input will be referenced in expressions within the program, and whose values are elements of the schema below.  Each item in this object represents an independent config input. Either `type` or `default` is required.
 
 | Property        | Type | Required           | Expression  | Description |
 | ------------- |---|-------------| -----|---|
-| `type`      | string | Yes | No | Type is the (required) data type for the parameter. It can be one of: `String`, `Number`, `List<Number>`, or `CommaDelimitedList`. |
+| `type`      | string | No | No | Type is the (required) data type for the parameter. It can be one of: `String`, `Number`, `List<Number>`, or `List<String>`. |
 | `default`      | any | No | No | Default is a value of the appropriate type for the template to use if no value is specified. |
-| `default`      | any | No | No | Default is a value of the appropriate type for the template to use if no value is specified. |
-| `secret`      | bool | No | No | Secret masks the parameter by marking it a secret. |
 
 ### Resources
 

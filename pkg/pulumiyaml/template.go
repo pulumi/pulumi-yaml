@@ -39,32 +39,15 @@ type Template struct {
 // Configuration represents a single configurable parameter for this template. The parameters are
 // validated before evaluating the template and may be specified using the Pulumi configuration system.
 type Configuration struct {
-	// Type is the (required) data type for the parameter. It can be one of: `String`, `Number`,
-	// `List<Number>`, or `CommaDelimetedList`.
-	Type string `yaml:""`
+	// Either `Type` or `Default` is required.
+
+	// Type is the  data type for the parameter. It can be one of: `String`, `Number`,
+	// `List<Number>`, or `List<String>`.
+	Type string `yaml:",omitempty"`
 	// Default is a value of the appropriate type for the template to use if no value is specified.
 	Default interface{} `json:",omitempty" yaml:",omitempty"`
 	// Secret masks the parameter by marking it a secret.
-	Secret *bool `json:",omitempty" yaml:",omitempty"`
-
-	// TODO: AllowedPattern, AllowedValues, ConstraintDescription, Description, MaxLength, MaxValue, MinLength, MinValue
-
-	// AllowedPattern is a regular expression that represents the patterns to allow for string types.
-	AllowedPattern *string `json:",omitempty" yaml:",omitempty"`
-	// AllowedValues is an array containing the list of values allowed for the parameter.
-	AllowedValues *[]string `json:",omitempty" yaml:",omitempty"`
-	// ConstraintDescription is a string that explains a constraint when the constraint is violated.
-	ConstraintDescription string `json:",omitempty" yaml:",omitempty"`
-	// Description is a string that describes the parameter.
-	Description string `json:",omitempty" yaml:",omitempty"`
-	// MaxLength is an integer value that determines the largest number of characters you want to allow for strings.
-	MaxLength *int64 `json:",omitempty" yaml:",omitempty"`
-	// MaxValue is a numeric value that determines the largest numeric value you want to allow for numbers.
-	MaxValue *int64 `json:",omitempty" yaml:",omitempty"`
-	// MinLength is an integer value that determines the smallest number of characters you want to allow for strings.
-	MinLength *int64 `json:",omitempty" yaml:",omitempty"`
-	// MinValue is a numeric value that determines the smallest numeric value you want to allow for numbers.
-	MinValue *int64 `json:",omitempty" yaml:",omitempty"`
+	Secret bool `yaml:",omitempty"`
 }
 
 // ResourceOptions describes additional options common to all Pulumi resources.
