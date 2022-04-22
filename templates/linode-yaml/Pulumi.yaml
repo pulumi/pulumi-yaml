@@ -9,6 +9,7 @@ template:
       secret: true
 
 resources:
+  # Create a Linode resource (Linode Instance)
   instance:
     type: linode:Instance
     properties:
@@ -17,4 +18,5 @@ resources:
       image: linode/ubuntu18.04
 
 outputs:
+  # Export the Instance label of the instance
   instanceLabel: ${instance.label}
