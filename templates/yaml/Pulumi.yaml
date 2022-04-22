@@ -3,3 +3,8 @@ description: ${DESCRIPTION}
 runtime: yaml
 template:
   description: A minimal Pulumi YAML program
+
+configuration: {}
+variables:     {}
+resources:     {}
+outputs:       {}
