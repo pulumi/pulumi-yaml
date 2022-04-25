@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ettle/strcase"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
@@ -598,10 +599,9 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 	switch f.Name {
 	case pcl.Invoke:
 		return g.MustInvoke(f, "")
-	case "fileAsset":
-		return wrapFn("Asset", syn.Object(
-			syn.ObjectProperty(syn.String("File"), g.expr(f.Args[0])),
-		))
+	case "fileArchive", "remoteArchive", "assetArchive",
+		"fileAsset", "stringAsset", "remoteAsset":
+		return wrapFn(strcase.ToPascal(f.Name), g.expr(f.Args[0]))
 	case "join":
 		args := make([]syn.Node, len(f.Args))
 		for i, arg := range f.Args {
