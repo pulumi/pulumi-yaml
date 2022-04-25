@@ -49,6 +49,10 @@ func (m FakePackage) ResourceTypeHint(typeName ResourceTypeToken) TypeHint {
 	}
 }
 
+func (m FakePackage) ResourceConstants(typeName ResourceTypeToken) map[string]interface{} {
+	return nil
+}
+
 func TestResourceOptions(t *testing.T) {
 	t.Parallel()
 

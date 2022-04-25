@@ -61,6 +61,7 @@ var (
 		"aws-eks":                 AllLanguages().Except(Python),
 		"azure-app-service":       Dotnet.And(Golang),
 		"pulumi-variable":         AllLanguages().Except(Python),
+		"kubernetes":              Golang, // returning string instead of *string in ApplyT
 	}
 
 	langTests = []ConvertFunc{
