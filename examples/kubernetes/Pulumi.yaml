@@ -4,10 +4,6 @@ configuration:
   hostname:
     default: example.com
     type: String
-variables:
-  appLabels:
-    app.kubernetes.io/name: nginx-demo
-  servicePort: 80
 resources:
   nginx-demo: # namespace name generated based on resource name
     type: kubernetes:core/v1:Namespace
@@ -18,11 +14,13 @@ resources:
         namespace: ${nginx-demo.metadata.name}
       spec:
         selector:
-          matchLabels: ${appLabels}
+          matchLabels:
+            app.kubernetes.io/name: nginx-demo
         replicas: 1
         template:
           metadata:
-            labels: ${appLabels}
+            labels:
+              app.kubernetes.io/name: nginx-demo
           spec:
             containers: [{ name: app, image: "nginx:1.15-alpine" }]
   service:
@@ -30,11 +28,13 @@ resources:
     properties:
       metadata:
         namespace: ${nginx-demo.metadata.name}
-        labels: ${appLabels}
+        labels:
+          app.kubernetes.io/name: nginx-demo
       spec:
         type: ClusterIP
         ports: [{ port: 80, targetPort: 80, protocol: "TCP" }]
-        selector: ${appLabels}
+        selector:
+          app.kubernetes.io/name: nginx-demo
   ingress:
     type: kubernetes:networking.k8s.io/v1:Ingress
     properties:

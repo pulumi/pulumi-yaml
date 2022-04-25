@@ -831,10 +831,8 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	}
 
 	constants := pkg.ResourceConstants(typ)
-	if constants != nil {
-		for k, v := range constants {
-			props[k] = v
-		}
+	for k, v := range constants {
+		props[k] = v
 	}
 
 	// Now register the resulting resource with the engine.
