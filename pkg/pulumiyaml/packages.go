@@ -206,14 +206,38 @@ func loadPackage(loader PackageLoader, typeString string) (Package, error) {
 	return pkg, nil
 }
 
+var disallowedResourceNames = map[string]string{
+	"docker:image:Image": "https://github.com/pulumi/pulumi-docker/issues/132",
+	"docker:Image":       "https://github.com/pulumi/pulumi-docker/issues/132",
+	"kubernetes:apiextensions.k8s.io:CustomResource": "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
+	"kubernetes:kustomize:Directory":                 "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
+	"kubernetes:yaml:ConfigFile":                     "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
+	"kubernetes:yaml:ConfigGroup":                    "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
+}
+
+var exists = struct{}{}
+var helmResourceNames = map[string]struct{}{
+	"kubernetes:helm.sh/v2:Chart": exists,
+	"kubernetes:helm.sh/v3:Chart": exists,
+}
+
 // ResolveResource determines the appropriate package for a resource, loads that package, then calls
 // the package's ResolveResource method to determine the canonical name of the resource, returning
 // both the package and the canonical name.
 func ResolveResource(loader PackageLoader, typeString string) (Package, ResourceTypeToken, error) {
+	if issue, found := disallowedResourceNames[typeString]; found {
+		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
+	}
+
+	if _, found := helmResourceNames[typeString]; found {
+		return nil, "", fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
+	}
+
 	pkg, err := loadPackage(loader, typeString)
 	if err != nil {
 		return nil, "", err
 	}
+
 	canonicalName, err := pkg.ResolveResource(typeString)
 	if err != nil {
 		return nil, "", err
