@@ -4,14 +4,15 @@ go 1.17
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/ettle/strcase v0.1.1
 	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.29.2-0.20220419113532-59a4786a5f98
-	github.com/pulumi/pulumi/sdk/v3 v3.29.2-0.20220419113532-59a4786a5f98
+	github.com/pulumi/pulumi/pkg/v3 v3.30.1-0.20220425210338-85c9458052e7
+	github.com/pulumi/pulumi/sdk/v3 v3.30.1-0.20220425210338-85c9458052e7
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
 	github.com/zclconf/go-cty v1.10.0
