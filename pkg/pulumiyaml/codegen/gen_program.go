@@ -16,7 +16,6 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
-	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
@@ -133,37 +132,45 @@ func mustCoerceBoolean(n syn.Node) *syn.BooleanNode {
 	}
 }
 
-func (g *generator) genResource(n *pcl.Resource) {
-	rOpts := []syn.ObjectPropertyDef{}
-	if opts := n.Options; opts != nil {
-		if opts.Provider != nil {
-			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				g.expr(opts.Provider)))
-		}
-		if opts.Parent != nil {
-			rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
-				g.expr(opts.Parent)))
-		}
-		if opts.DependsOn != nil {
-			elems := g.expr(opts.DependsOn)
-			_, ok := elems.(*syn.ListNode)
-			contract.Assert(ok)
-			rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependson"), elems))
-		}
-		if opts.IgnoreChanges != nil {
-			elems := g.expr(opts.IgnoreChanges).(*syn.ListNode)
-			ignoreChanges := make([]syn.Node, elems.Len())
-			for i := range ignoreChanges {
-				ignoreChanges[i] = unquoteInterpolation(elems.Index(i))
-			}
-			list := syn.ListSyntax(elems.Syntax(), ignoreChanges...)
-			rOpts = append(rOpts, syn.ObjectProperty(syn.String("ignorechanges"), list))
-		}
-		if opts.Protect != nil {
-			expr := mustCoerceBoolean(g.expr(opts.Protect))
-			rOpts = append(rOpts, syn.ObjectProperty(syn.String("protect"), expr))
-		}
+// genResourceOpts converts pcl.ResourceOptions to an YAML Object for use in genResource.
+func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
+	if opts == nil {
+		return nil
 	}
+
+	rOpts := []syn.ObjectPropertyDef{}
+	if opts.Provider != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
+			g.expr(opts.Provider)))
+	}
+	if opts.Parent != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
+			g.expr(opts.Parent)))
+	}
+	if opts.DependsOn != nil {
+		elems := g.expr(opts.DependsOn)
+		_, ok := elems.(*syn.ListNode)
+		contract.Assert(ok)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependson"), elems))
+	}
+	if opts.IgnoreChanges != nil {
+		elems := g.expr(opts.IgnoreChanges).(*syn.ListNode)
+		ignoreChanges := make([]syn.Node, elems.Len())
+		for i := range ignoreChanges {
+			ignoreChanges[i] = unquoteInterpolation(elems.Index(i))
+		}
+		list := syn.ListSyntax(elems.Syntax(), ignoreChanges...)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("ignorechanges"), list))
+	}
+	if opts.Protect != nil {
+		expr := mustCoerceBoolean(g.expr(opts.Protect))
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("protect"), expr))
+	}
+
+	return syn.Object(rOpts...)
+}
+
+func (g *generator) genResource(n *pcl.Resource) {
 	properties := make([]syn.ObjectPropertyDef, len(n.Inputs))
 	var additionalSecrets []*syn.StringNode
 	for i, input := range n.Inputs {
@@ -178,23 +185,19 @@ func (g *generator) genResource(n *pcl.Resource) {
 	}
 	if n.Schema == nil {
 		g.missingSchema()
-		n.Schema = &schema.Resource{}
 	}
-	typ := n.Token
-	if n.Schema != nil && n.Schema.Token != "" {
-		typ = n.Schema.Token
-	}
+
 	entries := []syn.ObjectPropertyDef{
-		g.TypeProperty(typ),
+		g.TypeProperty(collapseToken(n.Token)),
 	}
-	if n.Schema.IsComponent {
+	if n.Schema != nil && n.Schema.IsComponent {
 		entries = append(entries, syn.ObjectProperty(syn.String("component"), syn.Boolean(true)))
 	}
 	if len(properties) > 0 {
 		entries = append(entries, syn.ObjectProperty(syn.String("properties"), syn.Object(properties...)))
 	}
-	if len(rOpts) > 0 {
-		entries = append(entries, syn.ObjectProperty(syn.String("options"), syn.Object(rOpts...)))
+	if opts := g.genResourceOpts(n.Options); opts != nil {
+		entries = append(entries, syn.ObjectProperty(syn.String("options"), opts))
 	}
 	r := syn.Object(entries...)
 
@@ -637,18 +640,8 @@ type Invoke struct {
 func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn.ObjectNode {
 	contract.Assert(f.Name == pcl.Invoke)
 	contract.Assert(len(f.Args) > 0)
-	name := g.expr(f.Args[0])
-	if segments := strings.Split(name.(*syn.StringNode).Value(), ":"); len(segments) == 3 && !strings.Contains(segments[1], "/") {
-		if segments[1] == "" {
-			segments[1] = "index"
-		}
-		t := segments[2]
-		if len(t) > 0 {
-			t = strings.ToLower(t[:1]) + t[1:]
-		}
-		segments[1] = segments[1] + "/" + t
-		name = syn.String(strings.Join(segments, ":"))
-	}
+	name := collapseToken(g.expr(f.Args[0]).(*syn.StringNode).Value())
+
 	var arguments syn.Node
 	if len(f.Args) > 1 {
 		_, ok := f.Args[1].(*model.ObjectConsExpression)
@@ -657,7 +650,7 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn
 	}
 
 	properties := []syn.ObjectPropertyDef{
-		syn.ObjectProperty(syn.String("Function"), name),
+		syn.ObjectProperty(syn.String("Function"), syn.String(name)),
 		syn.ObjectProperty(syn.String("Arguments"), arguments),
 	}
 
@@ -675,4 +668,40 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn
 
 func (g *generator) TypeProperty(s string) syn.ObjectPropertyDef {
 	return syn.ObjectProperty(syn.String("type"), syn.String(s))
+}
+
+// collapseToken converts an exact token to a token more suitable for
+// display. For example, it converts
+//   fizz:index/buzz:Buzz => fizz:Buzz
+//   fizz:mode/buzz:Buzz  => fizz:mode:Buzz
+// 	 foo:index:Bar	      => foo:Bar
+// 	 foo::Bar             => foo:Bar
+// 	 fizz:mod:buzz        => fizz:mod:buzz
+// collapseToken is a partial inverse of `(pulumiyaml.resourcePackage).ResolveResource`.
+func collapseToken(token string) string {
+	tokenParts := strings.Split(token, ":")
+
+	if len(tokenParts) == 3 {
+		title := func(s string) string {
+			r := []rune(s)
+			if len(r) == 0 {
+				return ""
+			}
+			return strings.ToTitle(string(r[0])) + string(r[1:])
+		}
+		if mod := strings.Split(tokenParts[1], "/"); len(mod) == 2 && title(mod[1]) == tokenParts[2] {
+			// aws:s3/bucket:Bucket => aws:s3:Bucket
+			// We recourse to handle the case foo:index/bar:Bar => foo:index:Bar
+			tokenParts = []string{tokenParts[0], mod[0], tokenParts[2]}
+		}
+
+		if tokenParts[1] == "index" || tokenParts[1] == "" {
+			// foo:index:Bar => foo:Bar
+			// or
+			// foo::Bar => foo:Bar
+			tokenParts = []string{tokenParts[0], tokenParts[2]}
+		}
+	}
+
+	return strings.Join(tokenParts, ":")
 }

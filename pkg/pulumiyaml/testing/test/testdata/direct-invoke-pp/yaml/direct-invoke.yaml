@@ -1,12 +1,12 @@
 resources:
     example:
-        type: aws:iam/policy:Policy
+        type: aws:iam:Policy
         properties:
             name: example_policy
             path: /
             policy:
                 Fn::Invoke:
-                    Function: aws:iam/getPolicyDocument:getPolicyDocument
+                    Function: aws:iam:getPolicyDocument
                     Arguments:
                         statements:
                             - sid: 1
