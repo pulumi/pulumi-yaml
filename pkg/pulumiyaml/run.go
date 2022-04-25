@@ -1095,12 +1095,6 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
 }
 
-func (ctx *evalContext) isVariableContext() bool {
-	_, ok := ctx.root.(variableNode)
-
-	return ok
-}
-
 func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
 	var evaluateAccessF func(args ...interface{}) (interface{}, bool)
 	evaluateAccessF = ctx.lift(func(args ...interface{}) (interface{}, bool) {
@@ -1123,12 +1117,10 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				return x, true
 			case resource.PropertyMap:
 				if len(accessors) == 0 {
-					if !ctx.isVariableContext() {
-						if x.ContainsUnknowns() {
-							return unknownOutput(), true
-						}
-						receiver = x.Mappable()
+					if x.ContainsUnknowns() {
+						return unknownOutput(), true
 					}
+					receiver = x.Mappable()
 					break Loop
 				}
 				var k string
@@ -1167,25 +1159,9 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				case x.IsObject():
 					receiver = x.ObjectValue()
 				case x.IsAsset():
-					asset := x.AssetValue()
-					switch {
-					case asset.IsPath():
-						receiver = pulumi.NewFileAsset(asset.Path)
-					case asset.IsText():
-						receiver = pulumi.NewStringAsset(asset.Text)
-					case asset.IsURI():
-						receiver = pulumi.NewRemoteAsset(asset.URI)
-					}
+					receiver = x.AssetValue()
 				case x.IsArchive():
-					archive := x.ArchiveValue()
-					switch {
-					case archive.IsPath():
-						receiver = pulumi.NewFileArchive(archive.Path)
-					case archive.IsURI():
-						receiver = pulumi.NewRemoteArchive(archive.URI)
-					case archive.IsAssets():
-						return x.AssetValue(), true
-					}
+					receiver = x.ArchiveValue()
 				case x.IsResourceReference():
 					return x.ResourceReferenceValue(), true
 				default:
@@ -1193,12 +1169,10 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				}
 			case []resource.PropertyValue:
 				if len(accessors) == 0 {
-					if !ctx.isVariableContext() {
-						if resource.NewArrayProperty(x).ContainsUnknowns() {
-							return unknownOutput(), true
-						}
-						receiver = resource.NewArrayProperty(x).Mappable()
+					if resource.NewArrayProperty(x).ContainsUnknowns() {
+						return unknownOutput(), true
 					}
+					receiver = resource.NewArrayProperty(x).Mappable()
 					break Loop
 				}
 				sub, ok := accessors[0].(*ast.PropertySubscript)

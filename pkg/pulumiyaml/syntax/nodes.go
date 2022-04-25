@@ -16,6 +16,9 @@ type node struct {
 }
 
 func (n *node) Syntax() Syntax {
+	if n == nil {
+		return nil
+	}
 	return n.syntax
 }
 
