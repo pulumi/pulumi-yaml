@@ -39,12 +39,15 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 	// depending on the difference between them.
 	{Package: "aws", Version: "4.15.0"},
 	{Package: "kubernetes", Version: "3.0.0"},
+
+	// not a real plugin, but a real schema
+	{Package: "other", Version: "0.1.0"},
 }
 
 type testPackageLoader struct{ *testing.T }
 
 func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
-	if name == "other" || name == "test" {
+	if name == "test" {
 		return FakePackage{l.T}, nil
 	}
 
@@ -338,6 +341,30 @@ func TestEscapedString(t *testing.T) {
 			s := asEscapedString(tt.input)
 			assert.Equal(t, tt.asEscaped, s)
 			assert.True(t, isEscapedString(s), "A string should always be escaped after we escape it")
+		})
+	}
+}
+
+func TestCollapseToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"aws:s3/bucket:Bucket", "aws:s3:Bucket"},
+		{"foo:index:Bar", "foo:Bar"},
+		{"fizz:mod:buzz", "fizz:mod:buzz"},
+		{"aws:s3/buck:Bucket", "aws:s3/buck:Bucket"},
+		{"too:many:semi:colons", "too:many:semi:colons"},
+		{"foo:index/bar:Bar", "foo:Bar"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, collapseToken(tt.input))
 		})
 	}
 }

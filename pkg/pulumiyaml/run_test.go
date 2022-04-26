@@ -94,6 +94,7 @@ func (m mockInputTypeHint) Element() TypeHint { return nil }
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
+			"aws": MockPackage{},
 			"test": MockPackage{
 				resourceTypeHint: func(typeName string) InputTypeHint {
 					switch typeName {
