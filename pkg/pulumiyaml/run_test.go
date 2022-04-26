@@ -1155,21 +1155,6 @@ func TestSub(t *testing.T) {
 func TestUnicodeLogicalName(t *testing.T) {
 	t.Parallel()
 
-	/*
-
-	   	const text = `
-	   name: test-yaml
-	   runtime: yaml
-	   variables:
-	     "bB-Beta_beta.\U0001F49C⁉":
-	       test: oof
-	   resources:
-	     "aA-Alpha_alpha.\U0001F92F⁉️":
-	       type: test:resource:type
-	       properties:
-	         foo: "${\""bB-Beta_beta.\U0001F49C⁉\".test}"
-	   ` */
-
 	const text = `
 name: test-yaml
 runtime: yaml
