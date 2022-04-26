@@ -94,9 +94,9 @@ resources:
 					"test": "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-a::providerId",
 				}, args.RegisterRPC.GetProviders())
 				assert.Equal(t, "urn:pulumi:stackDev::projectFoo::test:resource:trivial::res-parent", args.RegisterRPC.Parent)
-				assert.Equal(t, []string{
+				assert.Contains(t, args.RegisterRPC.Dependencies,
 					"urn:pulumi:stackDev::projectFoo::test:resource:trivial::res-dependency",
-				}, args.RegisterRPC.Dependencies)
+				)
 
 				return "anID", resource.PropertyMap{}, nil
 			}

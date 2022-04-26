@@ -23,6 +23,9 @@ func decl(node syntax.Node) declNode {
 }
 
 func (x *declNode) Syntax() syntax.Node {
+	if x == nil {
+		return nil
+	}
 	return x.syntax
 }
 
@@ -398,6 +401,9 @@ type TemplateDecl struct {
 }
 
 func (d *TemplateDecl) Syntax() syntax.Node {
+	if d == nil {
+		return nil
+	}
 	return d.syntax
 }
 

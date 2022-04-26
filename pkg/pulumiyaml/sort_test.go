@@ -74,7 +74,7 @@ func TestSortOrdered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	resources, _, diags := topologicallySortedResources(tmpl)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -101,7 +101,7 @@ func TestSortUnordered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	resources, _, diags := topologicallySortedResources(tmpl)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -130,7 +130,7 @@ func TestSortErrorCycle(t *testing.T) {
 			},
 		},
 	})
-	_, err := topologicallySortedResources(tmpl)
+	_, _, err := topologicallySortedResources(tmpl)
 	assert.Error(t, err)
 }
 

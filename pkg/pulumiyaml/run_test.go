@@ -627,6 +627,31 @@ func TestJSONDiags(t *testing.T) {
 	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
 }
 
+func TestPropertyAccessVarMap(t *testing.T) {
+
+	t.Parallel()
+
+	const text = `
+name: aws-eks
+runtime: yaml
+description: An EKS cluster
+variables:
+  test:
+    - foo:
+        bar: notoof
+    - quux:
+        bazz: oof
+resources:
+  r:
+    type: test:resource:type
+    properties:
+      foo: ${test[1].quux.bazz}
+`
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
 func TestSchemaPropertyDiags(t *testing.T) {
 	t.Parallel()
 
@@ -1005,6 +1030,9 @@ func TestSelect(t *testing.T) {
 	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via idx
 	for idx, tt := range tests {
 		tt := tt
+		if idx != 4 {
+			continue
+		}
 		t.Run(fmt.Sprint(idx), func(t *testing.T) {
 			t.Parallel()
 

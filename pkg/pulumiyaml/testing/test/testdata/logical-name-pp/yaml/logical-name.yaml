@@ -1,0 +1,5 @@
+resources:
+    resourceLexicalName:
+        type: random:RandomPet
+outputs:
+    outputLexicalName: ${resourceLexicalName.id}

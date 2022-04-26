@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"gopkg.in/yaml.v3"
@@ -233,13 +234,14 @@ func (d *syncDiags) HasErrors() bool {
 }
 
 type runner struct {
-	ctx       *pulumi.Context
-	t         *ast.TemplateDecl
-	pkgLoader PackageLoader
-	config    map[string]interface{}
-	variables map[string]interface{}
-	resources map[string]lateboundResource
-	stackRefs map[string]*pulumi.StackReference
+	ctx          *pulumi.Context
+	t            *ast.TemplateDecl
+	pkgLoader    PackageLoader
+	config       map[string]interface{}
+	variables    map[string]interface{}
+	resources    map[string]lateboundResource
+	stackRefs    map[string]*pulumi.StackReference
+	dependencies map[string][]graphNode
 
 	sdiags syncDiags
 
@@ -300,6 +302,7 @@ type lateboundResource interface {
 	GetOutputs() pulumi.Output
 	CustomResource() *pulumi.CustomResourceState
 	ProviderResource() *pulumi.ProviderResourceState
+	GetRawOutputs() pulumi.Output
 }
 
 // lateboundCustomResourceState is a resource state that stores all computed outputs into a single
@@ -339,6 +342,10 @@ func (*lateboundCustomResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
 }
 
+func (st *lateboundCustomResourceState) GetRawOutputs() pulumi.Output {
+	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
+}
+
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
 	name    string
@@ -371,6 +378,10 @@ func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderRes
 
 func (*lateboundProviderResourceState) ElementType() reflect.Type {
 	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
+func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
+	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
 }
 
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
@@ -476,10 +487,14 @@ func (r *runner) ensureSetup() {
 		}
 
 		// Topologically sort the intermediates based on implicit and explicit dependencies
-		intermediates, rdiags := topologicallySortedResources(r.t)
+		intermediates, dependencies, rdiags := topologicallySortedResources(r.t)
+
 		r.sdiags.Extend(rdiags...)
 		if rdiags.HasErrors() {
 			return
+		}
+		if dependencies != nil {
+			r.dependencies = dependencies
 		}
 		if intermediates != nil {
 			r.intermediates = intermediates
@@ -734,18 +749,23 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.DeleteBeforeReplace != nil {
 		opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 	}
+
+	var dependsOn []pulumi.Resource
+	dependsOn = ctx.getResourceDependsOn(k)
 	if v.Options.DependsOn != nil {
 		dependOnOpt, ok := ctx.evaluateResourceListValuedOption(v.Options.DependsOn, "dependsOn")
 		if ok {
-			var dependsOn []pulumi.Resource
 			for _, r := range dependOnOpt {
 				dependsOn = append(dependsOn, r.CustomResource())
 			}
-			opts = append(opts, pulumi.DependsOn(dependsOn))
 		} else {
 			overallOk = false
 		}
 	}
+	if dependsOn != nil {
+		opts = append(opts, pulumi.DependsOn(dependsOn))
+	}
+
 	if v.Options.IgnoreChanges != nil {
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
@@ -1060,6 +1080,10 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 	return b.String(), true
 }
 
+// evaluatePropertyAccess evaluates interpolation expressions, `${foo.bar[baz]}`. The first item in
+// the property access list is the head, and must be an identifier for a resource, config, or
+// variable. The tail of property accessors are either: `.foo` string literal property names or
+// `[42]` numeric literal property subscripts.
 func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.Accessors[0].(*ast.PropertyName).Name
 
@@ -1073,11 +1097,41 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 	} else {
 		return ctx.error(expr, fmt.Sprintf("resource or variable named %s could not be found", resourceName))
 	}
+
+	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
+}
+
+func (ctx *evalContext) unknownOutputFrom(expr ast.Expr) pulumi.Output {
+	var deps []*ast.StringExpr
+	getExpressionDependencies(&deps, expr)
+
+	var resources []pulumi.Resource
+	for _, dep := range deps {
+		resources = append(resources, ctx.getResourceDependsOn(dep.Value)...)
+	}
+
+	return pulumi.UnsafeUnknownOutput(resources)
+}
+
+func (ctx *evalContext) getResourceDependsOn(rootName string) []pulumi.Resource {
+	var resources []pulumi.Resource
+	if rDeps, found := ctx.dependencies[rootName]; found {
+		for _, node := range rDeps {
+			if _, isResource := node.(resourceNode); isResource {
+				resources = append(resources, ctx.resources[node.key().Value].CustomResource())
+			}
+		}
+	}
+	return resources
+}
+
+func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
 	var evaluateAccessF func(args ...interface{}) (interface{}, bool)
 	evaluateAccessF = ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		receiver := args[0]
 		accessors := args[1].([]ast.PropertyAccessor)
-		for ; len(accessors) > 0; accessors = accessors[1:] {
+	Loop:
+		for {
 			switch x := receiver.(type) {
 			case lateboundResource:
 				// Peak ahead at the next accessor to implement .urn and .id:
@@ -1088,9 +1142,69 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 					} else if ok && sub.Name == "urn" {
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
+					return evaluateAccessF(x.GetRawOutputs(), accessors)
 				}
-				return evaluateAccessF(x.GetOutputs(), accessors)
-			case []interface{}:
+				return x, true
+			case resource.PropertyMap:
+				if len(accessors) == 0 {
+					if x.ContainsUnknowns() {
+						return ctx.unknownOutputFrom(expr), true
+					}
+					receiver = x.Mappable()
+					break Loop
+				}
+				var k string
+				switch a := accessors[0].(type) {
+				case *ast.PropertyName:
+					k = a.Name
+				case *ast.PropertySubscript:
+					s, ok := a.Index.(string)
+					if !ok {
+						return ctx.error(expr, "cannot access an object property using an integer index")
+					}
+					k = s
+				}
+				prop, ok := x[resource.PropertyKey(k)]
+				if x.ContainsUnknowns() && !ok {
+					return ctx.unknownOutputFrom(expr), true
+				} else if !ok {
+					receiver = nil
+				} else {
+					receiver = prop
+				}
+				accessors = accessors[1:]
+			case resource.PropertyValue:
+				switch {
+				case x.IsComputed():
+					return ctx.unknownOutputFrom(expr), true
+				case x.IsOutput():
+					if !x.OutputValue().Known {
+						return ctx.unknownOutputFrom(expr), true
+					}
+					receiver = x.OutputValue().Element
+				case x.IsSecret():
+					return evaluateAccessF(pulumi.ToSecret(x.SecretValue().Element), accessors)
+				case x.IsArray():
+					receiver = x.ArrayValue()
+				case x.IsObject():
+					receiver = x.ObjectValue()
+				case x.IsAsset():
+					receiver = x.AssetValue()
+				case x.IsArchive():
+					receiver = x.ArchiveValue()
+				case x.IsResourceReference():
+					return x.ResourceReferenceValue(), true
+				default:
+					receiver = x.V
+				}
+			case []resource.PropertyValue:
+				if len(accessors) == 0 {
+					if resource.NewArrayProperty(x).ContainsUnknowns() {
+						return ctx.unknownOutputFrom(expr), true
+					}
+					receiver = resource.NewArrayProperty(x).Mappable()
+					break Loop
+				}
 				sub, ok := accessors[0].(*ast.PropertySubscript)
 				if !ok {
 					return ctx.error(expr, "cannot access a list element using a property name")
@@ -1103,7 +1217,30 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 					return ctx.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, len(x)))
 				}
 				receiver = x[index]
+				accessors = accessors[1:]
+			case []interface{}, []string, []int, []float64, []bool:
+				if len(accessors) == 0 {
+					break Loop
+				}
+				sub, ok := accessors[0].(*ast.PropertySubscript)
+				if !ok {
+					return ctx.error(expr, "cannot access a list element using a property name")
+				}
+				index, ok := sub.Index.(int)
+				if !ok {
+					return ctx.error(expr, "cannot access a list element using a property name")
+				}
+				reflx := reflect.ValueOf(x)
+				length := reflx.Len()
+				if index < 0 || index >= length {
+					return ctx.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, length))
+				}
+				receiver = reflect.Indirect(reflx).Index(index).Interface()
+				accessors = accessors[1:]
 			case map[string]interface{}:
+				if len(accessors) == 0 {
+					break Loop
+				}
 				var k string
 				switch a := accessors[0].(type) {
 				case *ast.PropertyName:
@@ -1116,14 +1253,18 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 					k = s
 				}
 				receiver = x[k]
+				accessors = accessors[1:]
 			default:
+				if len(accessors) == 0 {
+					break Loop
+				}
 				return ctx.error(expr, fmt.Sprintf("receiver must be a list or object, not %v", typeString(receiver)))
 			}
 		}
 		return receiver, true
 	})
 
-	return evaluateAccessF(receiver, access.Accessors[1:])
+	return evaluateAccessF(receiver, accessors)
 }
 
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
@@ -1278,22 +1419,9 @@ func (ctx *evalContext) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, b
 			f := strconv.FormatFloat(index, 'f', -1, 64) // Manual formatting is so -3 does not get formatted as -3.0
 			return ctx.error(v.Index, fmt.Sprintf("index must be a positive integral, not %s", f))
 		}
+		intIndex := int(index)
 
-		// TODO: thread values through with types and simplify
-		switch elems := elemsArg.(type) {
-		case []interface{}:
-			if int(index) >= len(elems) {
-				return ctx.error(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)))
-			}
-			return elems[int(index)], true
-		case []string:
-			if int(index) >= len(elems) {
-				return ctx.error(v, fmt.Sprintf("index out of bounds, values has length %d but index is %d", len(elems), int(index)))
-			}
-			return elems[int(index)], true
-		default:
-			return ctx.error(v.Values, fmt.Sprintf("values must be a list, not %v", typeString(elemsArg)))
-		}
+		return ctx.evaluatePropertyAccessTail(v.Values, elemsArg, []ast.PropertyAccessor{&ast.PropertySubscript{Index: intIndex}})
 	})
 	return selectFn(index, values)
 }
