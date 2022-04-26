@@ -45,7 +45,9 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	w := &bytes.Buffer{}
 
 	out := g.UnifyOutput()
-	diags := encoding.EncodeYAML(yaml.NewEncoder(w), out)
+	encoder := yaml.NewEncoder(w)
+	encoder.SetIndent(2)
+	diags := encoding.EncodeYAML(encoder, out)
 
 	var err error
 	if diags.HasErrors() {

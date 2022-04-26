@@ -1,9 +1,9 @@
 resources:
-    Other:
-        type: other:Thing
-        properties:
-            idea: Support Third Party
-    Question:
-        type: other:module:Object
-        properties:
-            answer: 42
+  Other:
+    type: other:Thing
+    properties:
+      idea: Support Third Party
+  Question:
+    type: other:module:Object
+    properties:
+      answer: 42
