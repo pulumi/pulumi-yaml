@@ -1,6 +1,26 @@
 CHANGELOG
 =========
 
+## 0.2.0 (2022-04-26)
+
+### Improvements
+
+- Finalized expression language and documented built-in functions (`Fn::` items).
+
+- Simplified `configuration` key
+
+- Code generation improvements for conversion to other languages
+
+### Bug Fixes
+
+- Fixed rendering of known resource outputs during preview, secret outputs
+
+- Error on invalid resource and invoke calls
+
+- Support for Kubernetes resource "kind" and "apiVersion" constants
+
+- Improved error messages
+
 ## 0.1.0 (2022-03-25)
 
 First preview release of YAML language support for Pulumi. See README for language specification.
