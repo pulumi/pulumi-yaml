@@ -1,19 +1,19 @@
 resources:
-    example:
-        type: aws:iam:Policy
-        properties:
-            name:
-                Fn::Join:
-                    -
-                    - - Fn::Select:
-                            - 0
-                            - - foo
-                              - bar
-                      - -policy
-            path: /
-            policy:
-                Fn::Select:
-                    - 0
-                    - Fn::Split:
-                        - '-'
-                        - '{}-foo'
+  example:
+    type: aws:iam:Policy
+    properties:
+      name:
+        Fn::Join:
+          -
+          - - Fn::Select:
+                - 0
+                - - foo
+                  - bar
+            - -policy
+      path: /
+      policy:
+        Fn::Select:
+          - 0
+          - Fn::Split:
+              - '-'
+              - '{}-foo'

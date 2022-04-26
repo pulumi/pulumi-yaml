@@ -94,6 +94,7 @@ func (m mockInputTypeHint) Element() TypeHint { return nil }
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
+			"aws": MockPackage{},
 			"test": MockPackage{
 				resourceTypeHint: func(typeName string) InputTypeHint {
 					switch typeName {
@@ -370,7 +371,7 @@ outputs:
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 1)
-	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, `<stdin>:9:8: resource or variable named "res-b" could not be found`, diagString(diags[0]))
 }
 
 func TestConfigTypes(t *testing.T) {
@@ -623,7 +624,32 @@ func TestJSONDiags(t *testing.T) {
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 1)
-	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, `<stdin>:13:10: resource or variable named "res-b" could not be found`, diagString(diags[0]))
+}
+
+func TestPropertyAccessVarMap(t *testing.T) {
+
+	t.Parallel()
+
+	const text = `
+name: aws-eks
+runtime: yaml
+description: An EKS cluster
+variables:
+  test:
+    - foo:
+        bar: notoof
+    - quux:
+        bazz: oof
+resources:
+  r:
+    type: test:resource:type
+    properties:
+      foo: ${test[1].quux.bazz}
+`
+	tmpl := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	requireNoErrors(t, tmpl, diags)
 }
 
 func TestSchemaPropertyDiags(t *testing.T) {
@@ -1004,6 +1030,9 @@ func TestSelect(t *testing.T) {
 	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via idx
 	for idx, tt := range tests {
 		tt := tt
+		if idx != 4 {
+			continue
+		}
 		t.Run(fmt.Sprint(idx), func(t *testing.T) {
 			t.Parallel()
 
@@ -1149,4 +1178,25 @@ func TestSub(t *testing.T) {
 		})
 		r.ctx.Export("out", out)
 	})
+}
+
+func TestUnicodeLogicalName(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  "bB-Beta_beta.💜⁉":
+    test: oof
+resources:
+  "aA-Alpha_alpha.\U0001F92F⁉️":
+    type: test:resource:type
+    properties:
+      foo: "${[\"bB-Beta_beta.💜⁉\"].test}"
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
 }

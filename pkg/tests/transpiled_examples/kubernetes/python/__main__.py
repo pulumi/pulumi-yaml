@@ -5,10 +5,10 @@ config = pulumi.Config()
 hostname = config.get("hostname")
 if hostname is None:
     hostname = "example.com"
-nginxdemo = kubernetes.core.v1.Namespace("nginxdemo")
+nginx_demo = kubernetes.core.v1.Namespace("nginx-demo")
 app = kubernetes.apps.v1.Deployment("app",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        namespace=nginxdemo.metadata.name,
+        namespace=nginx_demo.metadata.name,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -33,7 +33,7 @@ app = kubernetes.apps.v1.Deployment("app",
     ))
 service = kubernetes.core.v1.Service("service",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        namespace=nginxdemo.metadata.name,
+        namespace=nginx_demo.metadata.name,
         labels={
             "app.kubernetes.io/name": "nginx-demo",
         },
@@ -51,7 +51,7 @@ service = kubernetes.core.v1.Service("service",
     ))
 ingress = kubernetes.networking.v1.Ingress("ingress",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        namespace=nginxdemo.metadata.name,
+        namespace=nginx_demo.metadata.name,
     ),
     spec=kubernetes.networking.v1.IngressSpecArgs(
         rules=[kubernetes.networking.v1.IngressRuleArgs(

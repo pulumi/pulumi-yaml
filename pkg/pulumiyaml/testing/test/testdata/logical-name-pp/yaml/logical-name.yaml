@@ -1,0 +1,5 @@
+resources:
+  "aA-Alpha_alpha.\U0001F92F⁉️":
+    type: random:RandomPet
+outputs:
+  "bB-Beta_beta.\U0001F49C⁉": "${[\"aA-Alpha_alpha.\U0001F92F⁉️\"].id}"

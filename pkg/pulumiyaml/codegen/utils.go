@@ -5,39 +5,16 @@ package codegen
 import (
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/zclconf/go-cty/cty"
 )
 
 // camel replaces the first contiguous string of upper case runes in the given string with its lower-case equivalent.
 func camel(s string) string {
-	c, sz := utf8.DecodeRuneInString(s)
-	if sz == 0 || unicode.IsLower(c) {
-		return s
-	}
-
-	// The first rune is not lowercase. Iterate until we find a rune that is.
-	var word []rune
-	for {
-		s = s[sz:]
-
-		n, nsz := utf8.DecodeRuneInString(s)
-		if nsz == 0 {
-			word = append(word, unicode.ToLower(c))
-			return string(word)
-		}
-		if unicode.IsLower(n) {
-			if len(word) == 0 {
-				c = unicode.ToLower(c)
-			}
-			word = append(word, c)
-			return string(word) + s
-		}
-		c, sz, word = n, nsz, append(word, unicode.ToLower(c))
-	}
+	return strcase.ToLowerCamel(s)
 }
 
 // isLegalIdentifierStart returns true if it is legal for c to be the first character of an HCL2 identifier.
@@ -61,6 +38,8 @@ func makeLegalIdentifier(name string) string {
 				builder.WriteRune('_')
 			}
 			builder.WriteRune(c)
+		} else {
+			builder.WriteRune('_')
 		}
 	}
 	if builder.Len() == 0 {

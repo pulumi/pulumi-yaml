@@ -1,7 +1,9 @@
 resource staticsitegroup "azure-native:resources:ResourceGroup" {
+	__logicalName = "staticsitegroup"
 }
 
 resource storageaccount "azure-native:storage:StorageAccount" {
+	__logicalName = "storageaccount"
 	resourceGroupName = staticsitegroup.name
 	kind = "StorageV2"
 	sku = {
@@ -10,13 +12,15 @@ resource storageaccount "azure-native:storage:StorageAccount" {
 }
 
 resource staticwebsite "azure-native:storage:StorageAccountStaticWebsite" {
+	__logicalName = "staticwebsite"
 	resourceGroupName = staticsitegroup.name
 	accountName = storageaccount.name
 	indexDocument = "index.html"
 	error404Document = "404.html"
 }
 
-resource indexhtml "azure-native:storage:Blob" {
+resource indexHtml "azure-native:storage:Blob" {
+	__logicalName = "index.html"
 	resourceGroupName = staticsitegroup.name
 	accountName = storageaccount.name
 	containerName = staticwebsite.containerName
@@ -25,7 +29,8 @@ resource indexhtml "azure-native:storage:Blob" {
 	source = fileAsset("./www/index.html")
 }
 
-resource faviconpng "azure-native:storage:Blob" {
+resource faviconPng "azure-native:storage:Blob" {
+	__logicalName = "favicon.png"
 	resourceGroupName = staticsitegroup.name
 	accountName = storageaccount.name
 	containerName = staticwebsite.containerName
@@ -34,7 +39,8 @@ resource faviconpng "azure-native:storage:Blob" {
 	source = fileAsset("./www/favicon.png")
 }
 
-resource _404html "azure-native:storage:Blob" {
+resource "404Html" "azure-native:storage:Blob" {
+	__logicalName = "404.html"
 	resourceGroupName = staticsitegroup.name
 	accountName = storageaccount.name
 	containerName = staticwebsite.containerName
@@ -44,5 +50,6 @@ resource _404html "azure-native:storage:Blob" {
 }
 
 output endpoint {
+	__logicalName = "endpoint"
 	value = storageaccount.primaryEndpoints.web
 }

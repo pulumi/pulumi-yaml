@@ -30,6 +30,9 @@ func expr(node syntax.Node) exprNode {
 func (*exprNode) isExpr() {}
 
 func (x *exprNode) Syntax() syntax.Node {
+	if x == nil {
+		return nil
+	}
 	return x.syntax
 }
 
@@ -201,7 +204,7 @@ func ListSyntax(node *syntax.ListNode, elements ...Expr) *ListExpr {
 
 // List creates a new list expression with the given elements.
 func List(elements ...Expr) *ListExpr {
-	return ListSyntax(nil, elements...)
+	return ListSyntax(syntax.List(), elements...)
 }
 
 // An ObjectExpr represents an object.
@@ -228,7 +231,7 @@ func ObjectSyntax(node *syntax.ObjectNode, entries ...ObjectProperty) *ObjectExp
 
 // Object creates a new object expression with the given properties.
 func Object(entries ...ObjectProperty) *ObjectExpr {
-	return ObjectSyntax(nil, entries...)
+	return ObjectSyntax(syntax.ObjectSyntax(syntax.NoSyntax), entries...)
 }
 
 // ParseExpr parses an expression from the given syntax tree.

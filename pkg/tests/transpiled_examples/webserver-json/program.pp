@@ -3,6 +3,7 @@ config instanceType string {
 }
 
 resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
+	__logicalName = "WebSecGrp"
 	ingress = [{
 		protocol = "tcp",
 		fromPort = 80,
@@ -12,6 +13,7 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 }
 
 resource webServer "aws:ec2/instance:Instance" {
+	__logicalName = "WebServer"
 	instanceType = instanceType
 	ami = invoke("aws:index/getAmi:getAmi", {
 		filters = [{
@@ -30,13 +32,16 @@ resource webServer "aws:ec2/instance:Instance" {
 }
 
 output instanceId {
+	__logicalName = "InstanceId"
 	value = webServer.id
 }
 
 output publicIp {
+	__logicalName = "PublicIp"
 	value = webServer.publicIp
 }
 
 output publicHostName {
+	__logicalName = "PublicHostName"
 	value = webServer.publicDns
 }
