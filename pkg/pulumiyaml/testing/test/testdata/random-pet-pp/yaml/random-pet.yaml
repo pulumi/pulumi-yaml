@@ -1,5 +1,5 @@
 resources:
     random-pet:
-        type: random:index/randomPet:RandomPet
+        type: random:RandomPet
         properties:
             prefix: doggo
