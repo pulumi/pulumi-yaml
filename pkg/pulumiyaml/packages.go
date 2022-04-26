@@ -215,10 +215,9 @@ var disallowedResourceNames = map[string]string{
 	"kubernetes:yaml:ConfigGroup":                    "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 }
 
-var exists = struct{}{}
 var helmResourceNames = map[string]struct{}{
-	"kubernetes:helm.sh/v2:Chart": exists,
-	"kubernetes:helm.sh/v3:Chart": exists,
+	"kubernetes:helm.sh/v2:Chart": {},
+	"kubernetes:helm.sh/v3:Chart": {},
 }
 
 // ResolveResource determines the appropriate package for a resource, loads that package, then calls
