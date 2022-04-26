@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/zclconf/go-cty/cty"
 
@@ -569,7 +570,13 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 		"token(%s) was obtained by the same ResolveResource call as pkg(%s),"+
 			" so must produce a non nil value", token.String(), pkg.Name())
 	var diags syntax.Diagnostics
-	var items []model.BodyItem
+	items := []model.BodyItem{
+		&model.Attribute{
+			Name:  pcl.LogicalNamePropertyKey,
+			Value: quotedLit(name),
+		},
+	}
+
 	hints := props.InputProperties()
 	for _, kvp := range resource.Properties.Entries {
 		v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
@@ -683,6 +690,10 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 		Labels: []string{outputVar.Name},
 		Body: &model.Body{
 			Items: []model.BodyItem{
+				&model.Attribute{
+					Name:  pcl.LogicalNamePropertyKey,
+					Value: quotedLit(name),
+				},
 				&model.Attribute{
 					Name:  "value",
 					Value: x,
