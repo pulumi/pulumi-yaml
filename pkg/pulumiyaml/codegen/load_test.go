@@ -36,9 +36,12 @@ resources:
       provider: ${prov.outputField[0].outputProvider}
 `,
 			expected: `resource prov "test:mod:prov" {
+	__logicalName = "prov"
 }
 
 resource bar "test:mod:typ" {
+	__logicalName = "bar"
+
 	options {
 		provider = prov.outputField[0].outputProvider
 	}
@@ -54,14 +57,17 @@ outputs:
   project: "${pulumi.project}"
 `,
 			expected: `output cwd0 {
+	__logicalName = "cwd"
 	value = cwd()
 }
 
 output stack0 {
+	__logicalName = "stack"
 	value = stack()
 }
 
 output project0 {
+	__logicalName = "project"
 	value = project()
 }
 `,
@@ -76,6 +82,7 @@ resources:
       foo: ${pulumi.cwd}
 `,
 			expected: `resource bar "test:mod:typ" {
+	__logicalName = "bar"
 	foo = cwd()
 }
 `,
@@ -97,6 +104,7 @@ outputs:
   foo: ${pulumi.cwd}/folder
 `,
 			expected: `output foo {
+	__logicalName = "foo"
 	value = "${cwd()}/folder"
 }
 `,
@@ -111,7 +119,8 @@ resources:
       website:
         indexDocument: index.html
 `,
-			expected: `resource mybucket "aws:s3/bucket:Bucket" {
+			expected: `resource myBucket "aws:s3/bucket:Bucket" {
+	__logicalName = "my-bucket"
 	website = {
 		indexDocument = "index.html"
 	}

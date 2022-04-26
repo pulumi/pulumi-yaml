@@ -6,6 +6,7 @@ subnetIds = invoke("aws:ec2/getSubnetIds:getSubnetIds", {
 }).ids
 
 resource cluster "eks:index:Cluster" {
+	__logicalName = "cluster"
 	vpcId = vpcId
 	subnetIds = subnetIds
 	instanceType = "t2.medium"
@@ -15,5 +16,6 @@ resource cluster "eks:index:Cluster" {
 }
 
 output kubeconfig {
+	__logicalName = "kubeconfig"
 	value = cluster.kubeconfig
 }

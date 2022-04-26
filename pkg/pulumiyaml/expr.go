@@ -56,7 +56,7 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 			}
 		}
 	case *ast.SymbolExpr:
-		name := x.Property.Accessors[0].(*ast.PropertyName).Name
+		name := x.Property.RootName()
 		sx := ast.StringSyntax(syntax.StringSyntax(x.Syntax().Syntax(), name))
 		*deps = append(*deps, sx)
 	case ast.BuiltinExpr:

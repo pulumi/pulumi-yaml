@@ -2,12 +2,14 @@ config hostname string {
 	default = "example.com"
 }
 
-resource nginxdemo "kubernetes:core/v1:Namespace" {
+resource nginxDemo "kubernetes:core/v1:Namespace" {
+	__logicalName = "nginx-demo"
 }
 
 resource app "kubernetes:apps/v1:Deployment" {
+	__logicalName = "app"
 	metadata = {
-		namespace = nginxdemo.metadata.name
+		namespace = nginxDemo.metadata.name
 	}
 	spec = {
 		selector = {
@@ -33,8 +35,9 @@ resource app "kubernetes:apps/v1:Deployment" {
 }
 
 resource service "kubernetes:core/v1:Service" {
+	__logicalName = "service"
 	metadata = {
-		namespace = nginxdemo.metadata.name,
+		namespace = nginxDemo.metadata.name,
 		labels = {
 			"app.kubernetes.io/name" = "nginx-demo"
 		}
@@ -53,8 +56,9 @@ resource service "kubernetes:core/v1:Service" {
 }
 
 resource ingress "kubernetes:networking.k8s.io/v1:Ingress" {
+	__logicalName = "ingress"
 	metadata = {
-		namespace = nginxdemo.metadata.name
+		namespace = nginxDemo.metadata.name
 	}
 	spec = {
 		rules = [{

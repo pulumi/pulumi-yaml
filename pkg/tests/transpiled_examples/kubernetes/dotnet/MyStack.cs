@@ -7,14 +7,14 @@ class MyStack : Stack
     {
         var config = new Config();
         var hostname = config.Get("hostname") ?? "example.com";
-        var nginxdemo = new Kubernetes.Core.V1.Namespace("nginxdemo", new Kubernetes.Types.Inputs.Core.V1.NamespaceArgs
+        var nginxDemo = new Kubernetes.Core.V1.Namespace("nginx-demo", new Kubernetes.Types.Inputs.Core.V1.NamespaceArgs
         {
         });
         var app = new Kubernetes.Apps.V1.Deployment("app", new Kubernetes.Types.Inputs.Apps.V1.DeploymentArgs
         {
             Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
             {
-                Namespace = nginxdemo.Metadata.Apply(metadata => metadata?.Name),
+                Namespace = nginxDemo.Metadata.Apply(metadata => metadata?.Name),
             },
             Spec = new Kubernetes.Types.Inputs.Apps.V1.DeploymentSpecArgs
             {
@@ -53,7 +53,7 @@ class MyStack : Stack
         {
             Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
             {
-                Namespace = nginxdemo.Metadata.Apply(metadata => metadata?.Name),
+                Namespace = nginxDemo.Metadata.Apply(metadata => metadata?.Name),
                 Labels = 
                 {
                     { "app.kubernetes.io/name", "nginx-demo" },
@@ -81,7 +81,7 @@ class MyStack : Stack
         {
             Metadata = new Kubernetes.Types.Inputs.Meta.V1.ObjectMetaArgs
             {
-                Namespace = nginxdemo.Metadata.Apply(metadata => metadata?.Name),
+                Namespace = nginxDemo.Metadata.Apply(metadata => metadata?.Name),
             },
             Spec = new Kubernetes.Types.Inputs.Networking.V1.IngressSpecArgs
             {

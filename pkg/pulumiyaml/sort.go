@@ -117,7 +117,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %s not found", name.Value), ""))
+			diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
 			return false
 		}
 		kind := e.valueKind()

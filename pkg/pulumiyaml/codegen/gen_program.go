@@ -24,6 +24,16 @@ import (
 func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
 	g := generator{}
 
+	g.logicalNames = map[string]string{}
+	for _, n := range program.Nodes {
+		switch n := n.(type) {
+		case *pcl.Resource:
+			g.logicalNames[n.Name()] = n.LogicalName()
+		case *pcl.OutputVariable:
+			g.logicalNames[n.Name()] = n.LogicalName()
+		}
+	}
+
 	for _, n := range program.Nodes {
 		g.genNode(n)
 	}
@@ -50,6 +60,7 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 type generator struct {
 	diags hcl.Diagnostics
 
+	logicalNames map[string]string
 	// These values can be assembled into a template
 	config    []syn.ObjectPropertyDef
 	resources []syn.ObjectPropertyDef
@@ -204,11 +215,11 @@ func (g *generator) genResource(n *pcl.Resource) {
 	}
 	r := syn.Object(entries...)
 
-	g.resources = append(g.resources, syn.ObjectProperty(syn.String(n.Name()), r))
+	g.resources = append(g.resources, syn.ObjectProperty(syn.String(n.LogicalName()), r))
 }
 
 func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
-	k := syn.String(n.Name())
+	k := syn.String(n.LogicalName())
 	v := g.expr(n.Value)
 	g.outputs = append(g.outputs, syn.ObjectProperty(k, v))
 }
@@ -327,7 +338,7 @@ func (t Traversal) String() string {
 
 func (t Traversal) WithRoot(s string, hclRange *hcl.Range) Traversal {
 	if checked := t.g.checkPropertyName(s, hclRange); checked != "" {
-		s = checked
+		s = fmt.Sprintf("[%s]", checked)
 	}
 	t.root = s
 	return t
@@ -500,7 +511,11 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		return syn.String("Unimplemented Expression")
 
 	case *model.ScopeTraversalExpression:
-		traversal := g.Traversal(e.Traversal).WithRoot(e.RootName, e.Tokens.Root.Range().Ptr())
+		rootName := e.RootName
+		if logicalName, found := g.logicalNames[rootName]; found {
+			rootName = logicalName
+		}
+		traversal := g.Traversal(e.Traversal).WithRoot(rootName, e.Tokens.Root.Range().Ptr())
 		s := fmt.Sprintf("${%s}", traversal)
 		return syn.String(s)
 
