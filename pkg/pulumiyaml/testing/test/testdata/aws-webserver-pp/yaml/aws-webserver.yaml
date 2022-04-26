@@ -1,6 +1,6 @@
 resources:
     securityGroup:
-        type: aws:ec2/securityGroup:SecurityGroup
+        type: aws:ec2:SecurityGroup
         properties:
             ingress:
                 - protocol: tcp
@@ -9,7 +9,7 @@ resources:
                   cidrBlocks:
                     - 0.0.0.0/0
     server:
-        type: aws:ec2/instance:Instance
+        type: aws:ec2:Instance
         properties:
             tags:
                 Name: web-server-www
@@ -24,7 +24,7 @@ resources:
 variables:
     ami:
         Fn::Invoke:
-            Function: aws:index/getAmi:getAmi
+            Function: aws:getAmi
             Arguments:
                 filters:
                     - name: name

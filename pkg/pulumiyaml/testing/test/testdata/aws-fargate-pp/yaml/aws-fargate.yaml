@@ -1,6 +1,6 @@
 resources:
     webSecurityGroup:
-        type: aws:ec2/securityGroup:SecurityGroup
+        type: aws:ec2:SecurityGroup
         properties:
             vpcId: ${vpc.id}
             egress:
@@ -16,9 +16,9 @@ resources:
                   cidrBlocks:
                     - 0.0.0.0/0
     cluster:
-        type: aws:ecs/cluster:Cluster
+        type: aws:ecs:Cluster
     taskExecRole:
-        type: aws:iam/role:Role
+        type: aws:iam:Role
         properties:
             assumeRolePolicy:
                 Fn::ToJSON:
@@ -30,25 +30,25 @@ resources:
                             Service: ecs-tasks.amazonaws.com
                           Action: sts:AssumeRole
     taskExecRolePolicyAttachment:
-        type: aws:iam/rolePolicyAttachment:RolePolicyAttachment
+        type: aws:iam:RolePolicyAttachment
         properties:
             role: ${taskExecRole.name}
             policyArn: arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
     webLoadBalancer:
-        type: aws:elasticloadbalancingv2/loadBalancer:LoadBalancer
+        type: aws:elasticloadbalancingv2:LoadBalancer
         properties:
             subnets: ${subnets.ids}
             securityGroups:
                 - ${webSecurityGroup.id}
     webTargetGroup:
-        type: aws:elasticloadbalancingv2/targetGroup:TargetGroup
+        type: aws:elasticloadbalancingv2:TargetGroup
         properties:
             port: 80
             protocol: HTTP
             targetType: ip
             vpcId: ${vpc.id}
     webListener:
-        type: aws:elasticloadbalancingv2/listener:Listener
+        type: aws:elasticloadbalancingv2:Listener
         properties:
             loadBalancerArn: ${webLoadBalancer.arn}
             port: 80
@@ -56,7 +56,7 @@ resources:
                 - type: forward
                   targetGroupArn: ${webTargetGroup.arn}
     appTask:
-        type: aws:ecs/taskDefinition:TaskDefinition
+        type: aws:ecs:TaskDefinition
         properties:
             family: fargate-task-definition
             cpu: 256
@@ -74,7 +74,7 @@ resources:
                           hostPort: 80
                           protocol: tcp
     appService:
-        type: aws:ecs/service:Service
+        type: aws:ecs:Service
         properties:
             cluster: ${cluster.arn}
             desiredCount: 5
@@ -95,12 +95,12 @@ resources:
 variables:
     vpc:
         Fn::Invoke:
-            Function: aws:ec2/getVpc:getVpc
+            Function: aws:ec2:getVpc
             Arguments:
                 default: true
     subnets:
         Fn::Invoke:
-            Function: aws:ec2/getSubnetIds:getSubnetIds
+            Function: aws:ec2:getSubnetIds
             Arguments:
                 vpcId: ${vpc.id}
 outputs:
