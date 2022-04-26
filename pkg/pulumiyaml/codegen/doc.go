@@ -8,10 +8,6 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 )
 
-func unimplimented() string {
-	panic("Unimplemented")
-}
-
 // DocLanguageHelper is the YAML-specific implementation of the DocLanguageHelper.
 type DocLanguageHelper struct{}
 
@@ -30,37 +26,44 @@ func (d DocLanguageHelper) GetMethodResultName(pkg *schema.Package, modName stri
 }
 
 func (d DocLanguageHelper) GetLanguageTypeString(pkg *schema.Package, moduleName string, t schema.Type, input bool) string {
-	return unimplimented()
+	switch t := t.(type) {
+	case *schema.ResourceType:
+		return collapseToken(t.Token)
+	default:
+		return ""
+	}
 }
 
 func (d DocLanguageHelper) GetFunctionName(modName string, f *schema.Function) string {
-	return unimplimented()
+	return collapseToken(f.Token)
 }
 
 func (d DocLanguageHelper) GetResourceFunctionResultName(modName string, f *schema.Function) string {
-	return unimplimented()
+	return ""
 }
 
 func (d DocLanguageHelper) GetMethodName(m *schema.Method) string {
 	return ""
 }
 
+// Doc links
+
 func (d DocLanguageHelper) GetModuleDocLink(pkg *schema.Package, modName string) (string, string) {
-	return unimplimented(), unimplimented()
+	return fmt.Sprintf("%s:%s", pkg.Name, modName), ""
 }
 
 func (d DocLanguageHelper) GetDocLinkForResourceType(pkg *schema.Package, moduleName, typeName string) string {
-	return unimplimented()
+	return ""
 }
 
 func (d DocLanguageHelper) GetDocLinkForPulumiType(pkg *schema.Package, typeName string) string {
-	return unimplimented()
+	return ""
 }
 
 func (d DocLanguageHelper) GetDocLinkForResourceInputOrOutputType(pkg *schema.Package, moduleName, typeName string, input bool) string {
-	return unimplimented()
+	return ""
 }
 
 func (d DocLanguageHelper) GetDocLinkForFunctionInputOrOutputType(pkg *schema.Package, moduleName, typeName string, input bool) string {
-	return unimplimented()
+	return ""
 }
