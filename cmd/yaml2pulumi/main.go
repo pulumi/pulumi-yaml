@@ -21,6 +21,7 @@ import (
 )
 
 var yamlPath string
+var outPath string
 
 func loadTemplate() (*ast.TemplateDecl, hcl.Diagnostics, error) {
 	if yamlPath == "" {
@@ -30,6 +31,44 @@ func loadTemplate() (*ast.TemplateDecl, hcl.Diagnostics, error) {
 	t, diags, err := yaml.LoadFile(yamlPath)
 	return t, hcl.Diagnostics(diags), err
 }
+
+var ejectCmd *cobra.Command = &cobra.Command{
+	Use:           "eject",
+	Short:         "convert Pulumi YAML to Pulumi IL",
+	Long:          "convert Pulumi YAML to Pulumi IL",
+	Args:          cobra.NoArgs,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Version:       version.Version,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		template, diags, err := loadTemplate()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			if len(diags) != 0 {
+				//nolint:errcheck // in defer, lack a proper recourse for an error here.
+				template.NewDiagnosticWriter(os.Stderr, 0, true).WriteDiagnostics(diags)
+			}
+		}()
+
+		if diags.HasErrors() {
+			return diags
+		}
+
+		il, cdiags, err := codegen.ConvertTemplateIL(template, nil)
+		diags = diags.Extend(cdiags)
+		if err != nil {
+			return err
+		}
+		if diags.HasErrors() {
+			return diags
+		}
+
+		fmt.Printf("%v", il)
+		return nil
+	}}
 
 func generateCmd(name, friendlyName string, generate codegen.GenerateFunc) *cobra.Command {
 	return &cobra.Command{
@@ -87,12 +126,14 @@ func main() {
 	}
 
 	cmd.PersistentFlags().StringVarP(&yamlPath, "file", "f", "", "the path of the YAML file to convert")
+	cmd.PersistentFlags().StringVarP(&outPath, "out", "o", "", "the path of the file to write")
 
 	cmd.AddCommand(
 		generateCmd("csharp", "C#", dotnet.GenerateProgram),
 		generateCmd("go", "Go", gogen.GenerateProgram),
 		generateCmd("python", "Python", python.GenerateProgram),
-		generateCmd("typescript", "TypeScript", nodejs.GenerateProgram))
+		generateCmd("typescript", "TypeScript", nodejs.GenerateProgram),
+		ejectCmd)
 
 	if err := cmd.Execute(); err != nil {
 		if _, ok := err.(hcl.Diagnostics); !ok {
