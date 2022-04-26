@@ -1,20 +1,20 @@
 resources:
     aws_vpc:
-        type: aws:ec2/vpc:Vpc
+        type: aws:ec2:Vpc
         properties:
             cidrBlock: 10.0.0.0/16
             instanceTenancy: default
     privateS3VpcEndpoint:
-        type: aws:ec2/vpcEndpoint:VpcEndpoint
+        type: aws:ec2:VpcEndpoint
         properties:
             vpcId: ${aws_vpc.id}
             serviceName: com.amazonaws.us-west-2.s3
     bar:
-        type: aws:ec2/networkAcl:NetworkAcl
+        type: aws:ec2:NetworkAcl
         properties:
             vpcId: ${aws_vpc.id}
     privateS3NetworkAclRule:
-        type: aws:ec2/networkAclRule:NetworkAclRule
+        type: aws:ec2:NetworkAclRule
         properties:
             networkAclId: ${bar.id}
             ruleNumber: 200
@@ -27,12 +27,12 @@ resources:
 variables:
     privateS3PrefixList:
         Fn::Invoke:
-            Function: aws:ec2/getPrefixList:getPrefixList
+            Function: aws:ec2:getPrefixList
             Arguments:
                 prefixListId: ${privateS3VpcEndpoint.prefixListId}
     amis:
         Fn::Invoke:
-            Function: aws:ec2/getAmiIds:getAmiIds
+            Function: aws:ec2:getAmiIds
             Arguments:
                 owners:
                     - ${bar.id}
