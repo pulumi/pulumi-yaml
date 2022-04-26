@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -38,21 +39,25 @@ const MainTemplate = "Main"
 
 // Load a template from the current working directory
 func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	return load(true)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, nil, err
+	}
+	return LoadDir(cwd, true)
 }
 
 // Load a template from the current working directory.
-func load(allowMain bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func LoadDir(cwd string, allowMain bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
 	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	var filename string
 	var bs []byte
-	if b, err := ioutil.ReadFile(MainTemplate + ".json"); err == nil {
+	if b, err := ioutil.ReadFile(path.Join(cwd, MainTemplate+".json")); err == nil {
 		filename, bs = MainTemplate+".json", b
-	} else if b, err := ioutil.ReadFile(MainTemplate + ".yaml"); err == nil {
+	} else if b, err := ioutil.ReadFile(path.Join(cwd, MainTemplate+".yaml")); err == nil {
 		filename, bs = MainTemplate+".yaml", b
-	} else if b, err := ioutil.ReadFile("Pulumi.yaml"); err == nil {
+	} else if b, err := ioutil.ReadFile(path.Join(cwd, "Pulumi.yaml")); err == nil {
 		filename, bs = "Pulumi.yaml", b
 	} else {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
@@ -117,14 +122,10 @@ func LoadYAMLBytes(filename string, source []byte, allowMain bool) (*ast.Templat
 	case 0:
 		// No main specified, so we do nothing
 	case 1:
-		err := os.Chdir(mains[0].Value.(*syntax.StringNode).Value())
-		// Other error messages won't be correct, so we exit early.
-		if err != nil {
-			diags.Extend(syntax.NodeError(mains[0].Value,
-				fmt.Sprintf("Cannot set main directory: %s", err.Error()), ""))
-			return nil, diags, err
-		}
-		te, d, e := load(false)
+		currentDir := path.Dir(filename)
+		mainPath := mains[0].Value.(*syntax.StringNode).Value()
+		dir := path.Join(currentDir, mainPath)
+		te, d, e := LoadDir(dir, false)
 		diags.Extend(d...)
 		return te, diags, e
 	default:
