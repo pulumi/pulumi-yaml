@@ -1,15 +1,15 @@
 resources:
-    provider:
-        type: pulumi:providers:aws
-        properties:
-            region: us-west-2
-    bucket1:
-        type: aws:s3:Bucket
-        options:
-            provider: ${provider}
-            dependson:
-                - ${provider}
-            ignorechanges:
-                - bucket
-                - lifecycleRules[0]
-            protect: true
+  provider:
+    type: pulumi:providers:aws
+    properties:
+      region: us-west-2
+  bucket1:
+    type: aws:s3:Bucket
+    options:
+      provider: ${provider}
+      dependson:
+        - ${provider}
+      ignorechanges:
+        - bucket
+        - lifecycleRules[0]
+      protect: true
