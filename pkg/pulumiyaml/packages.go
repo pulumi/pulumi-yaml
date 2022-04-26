@@ -52,6 +52,8 @@ type Package interface {
 	ResourceTypeHint(typeName ResourceTypeToken) InputTypeHint
 	// Information on the argument to a function.
 	FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint
+	// Gets properties with constant values that must be added to the register resource API call.
+	ResourceConstants(typeName ResourceTypeToken) map[string]interface{}
 }
 
 type TypeHint interface {
@@ -366,6 +368,30 @@ func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeH
 		TypeHint:   fieldTypeHint{append(f.Outputs.Properties, f.Inputs.Properties...)},
 		inputProps: f.Inputs.Properties,
 	}
+}
+
+func (p resourcePackage) ResourceConstants(typeName ResourceTypeToken) map[string]interface{} {
+	_, ok := p.resolveProvider(typeName.String())
+	if ok {
+		return getResourceConstants(p.Provider.Properties)
+	}
+	res, ok := p.GetResource(typeName.String())
+	if ok {
+		return getResourceConstants(res.Properties)
+	}
+
+	return nil
+}
+
+func getResourceConstants(props []*schema.Property) map[string]interface{} {
+	constantProps := map[string]interface{}{}
+	for _, v := range props {
+		if v.ConstValue != nil {
+			constantProps[v.Name] = v.ConstValue
+		}
+	}
+
+	return constantProps
 }
 
 type fieldTypeHint struct {

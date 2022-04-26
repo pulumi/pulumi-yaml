@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ettle/strcase"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
@@ -590,14 +591,20 @@ func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
 	g.variables = append(g.variables, entry)
 }
 
-func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
+func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
+	getRange := func() hcl.Range {
+		if s := f.Syntax; s != nil {
+			return s.Range()
+		}
+		var rng hcl.Range
+		return rng
+	}
 	switch f.Name {
 	case pcl.Invoke:
 		return g.MustInvoke(f, "")
-	case "fileAsset":
-		return wrapFn("Asset", syn.Object(
-			syn.ObjectProperty(syn.String("File"), g.expr(f.Args[0])),
-		))
+	case "fileArchive", "remoteArchive", "assetArchive",
+		"fileAsset", "stringAsset", "remoteAsset":
+		return wrapFn(strcase.ToPascal(f.Name), g.expr(f.Args[0]))
 	case "join":
 		args := make([]syn.Node, len(f.Args))
 		for i, arg := range f.Args {
@@ -616,11 +623,23 @@ func (g *generator) function(f *model.FunctionCallExpression) *syn.ObjectNode {
 			args[i] = g.expr(arg)
 		}
 		return wrapFn("Select", syn.List(args[1], args[0]))
+	case pcl.IntrinsicConvert:
+		// We can't perform the convert, but it might happen automatically.
+		// This works for enums, as well as number -> strings.
+		if len(f.Args) > 0 {
+			return g.expr(f.Args[0])
+		}
+		YAMLError{
+			kind:   "Malformed Convert Intrinsic",
+			detail: "Missing arguments",
+			rng:    getRange(),
+		}.AppendTo(g)
+		return wrapFn(f.Name, syn.Null())
 	default:
 		YAMLError{
 			kind:   "Unknown Function",
 			detail: fmt.Sprintf("YAML does not support Fn::%s.", f.Name),
-			rng:    f.Syntax.Range(),
+			rng:    getRange(),
 		}.AppendTo(g)
 		return wrapFn(f.Name, syn.Null())
 	}
