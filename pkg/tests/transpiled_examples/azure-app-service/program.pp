@@ -18,9 +18,11 @@ blobAccessToken = invoke("azure-native:storage:listStorageAccountServiceSAS", {
 }).serviceSasToken
 
 resource appservicegroup "azure-native:resources:ResourceGroup" {
+	__logicalName = "appservicegroup"
 }
 
 resource sa "azure-native:storage:StorageAccount" {
+	__logicalName = "sa"
 	resourceGroupName = appservicegroup.name
 	kind = "StorageV2"
 	sku = {
@@ -29,6 +31,7 @@ resource sa "azure-native:storage:StorageAccount" {
 }
 
 resource appserviceplan "azure-native:web:AppServicePlan" {
+	__logicalName = "appserviceplan"
 	resourceGroupName = appservicegroup.name
 	kind = "App"
 	sku = {
@@ -38,12 +41,14 @@ resource appserviceplan "azure-native:web:AppServicePlan" {
 }
 
 resource container "azure-native:storage:BlobContainer" {
+	__logicalName = "container"
 	resourceGroupName = appservicegroup.name
 	accountName = sa.name
 	publicAccess = "None"
 }
 
 resource blob "azure-native:storage:Blob" {
+	__logicalName = "blob"
 	resourceGroupName = appservicegroup.name
 	accountName = sa.name
 	containerName = container.name
@@ -52,17 +57,20 @@ resource blob "azure-native:storage:Blob" {
 }
 
 resource appInsights "azure-native:insights:Component" {
+	__logicalName = "appInsights"
 	resourceGroupName = appservicegroup.name
 	applicationType = "web"
 	kind = "web"
 }
 
 resource sqlPassword "random:index/randomPassword:RandomPassword" {
+	__logicalName = "sqlPassword"
 	length = 16
 	special = true
 }
 
 resource sqlServer "azure-native:sql:Server" {
+	__logicalName = "sqlServer"
 	resourceGroupName = appservicegroup.name
 	administratorLogin = sqlAdmin
 	administratorLoginPassword = sqlPassword.result
@@ -70,6 +78,7 @@ resource sqlServer "azure-native:sql:Server" {
 }
 
 resource db "azure-native:sql:Database" {
+	__logicalName = "db"
 	resourceGroupName = appservicegroup.name
 	serverName = sqlServer.name
 	sku = {
@@ -78,6 +87,7 @@ resource db "azure-native:sql:Database" {
 }
 
 resource app "azure-native:web:WebApp" {
+	__logicalName = "app"
 	resourceGroupName = appservicegroup.name
 	serverFarmId = appserviceplan.id
 	siteConfig = {
@@ -108,5 +118,6 @@ resource app "azure-native:web:WebApp" {
 }
 
 output endpoint {
+	__logicalName = "endpoint"
 	value = app.defaultHostName
 }

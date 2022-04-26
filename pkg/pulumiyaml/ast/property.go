@@ -36,8 +36,14 @@ func (p *PropertyAccess) String() string {
 	return str.String()
 }
 
+func (p *PropertyAccess) RootName() string {
+	return p.Accessors[0].rootName()
+}
+
 type PropertyAccessor interface {
 	isAccessor()
+
+	rootName() string
 }
 
 type PropertyName struct {
@@ -45,6 +51,10 @@ type PropertyName struct {
 }
 
 func (p *PropertyName) isAccessor() {}
+
+func (p *PropertyName) rootName() string {
+	return p.Name
+}
 
 type PropertySubscript struct {
 	Index interface{}
@@ -54,6 +64,10 @@ type PropertySubscript struct {
 var PropertyNameRegexp = regexp.MustCompile("^[a-zA-Z_$][a-zA-Z0-9_$]*$")
 
 func (p *PropertySubscript) isAccessor() {}
+
+func (p *PropertySubscript) rootName() string {
+	return p.Index.(string)
+}
 
 // parsePropertyAccess parses a property access into a PropertyAccess value.
 //

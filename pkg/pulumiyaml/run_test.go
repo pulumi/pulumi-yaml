@@ -371,7 +371,7 @@ outputs:
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 1)
-	assert.Equal(t, "<stdin>:9:8: resource or variable named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, `<stdin>:9:8: resource or variable named "res-b" could not be found`, diagString(diags[0]))
 }
 
 func TestConfigTypes(t *testing.T) {
@@ -624,7 +624,7 @@ func TestJSONDiags(t *testing.T) {
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	assert.Len(t, diags, 1)
-	assert.Equal(t, "<stdin>:13:10: resource or variable named res-b could not be found", diagString(diags[0]))
+	assert.Equal(t, `<stdin>:13:10: resource or variable named "res-b" could not be found`, diagString(diags[0]))
 }
 
 func TestPropertyAccessVarMap(t *testing.T) {
@@ -1178,4 +1178,25 @@ func TestSub(t *testing.T) {
 		})
 		r.ctx.Export("out", out)
 	})
+}
+
+func TestUnicodeLogicalName(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  "bB-Beta_beta.💜⁉":
+    test: oof
+resources:
+  "aA-Alpha_alpha.\U0001F92F⁉️":
+    type: test:resource:type
+    properties:
+      foo: "${[\"bB-Beta_beta.💜⁉\"].test}"
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
 }

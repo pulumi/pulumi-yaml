@@ -1085,7 +1085,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 // variable. The tail of property accessors are either: `.foo` string literal property names or
 // `[42]` numeric literal property subscripts.
 func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
-	resourceName := access.Accessors[0].(*ast.PropertyName).Name
+	resourceName := access.RootName()
 
 	var receiver interface{}
 	if res, ok := ctx.resources[resourceName]; ok {
@@ -1095,7 +1095,7 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 	} else if v, ok := ctx.variables[resourceName]; ok {
 		receiver = v
 	} else {
-		return ctx.error(expr, fmt.Sprintf("resource or variable named %s could not be found", resourceName))
+		return ctx.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))
 	}
 
 	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])

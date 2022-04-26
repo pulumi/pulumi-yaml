@@ -3,10 +3,10 @@ import * as kubernetes from "@pulumi/kubernetes";
 
 const config = new pulumi.Config();
 const hostname = config.get("hostname") || "example.com";
-const nginxdemo = new kubernetes.core.v1.Namespace("nginxdemo", {});
+const nginxDemo = new kubernetes.core.v1.Namespace("nginx-demo", {});
 const app = new kubernetes.apps.v1.Deployment("app", {
     metadata: {
-        namespace: nginxdemo.metadata.apply(metadata => metadata?.name),
+        namespace: nginxDemo.metadata.apply(metadata => metadata?.name),
     },
     spec: {
         selector: {
@@ -32,7 +32,7 @@ const app = new kubernetes.apps.v1.Deployment("app", {
 });
 const service = new kubernetes.core.v1.Service("service", {
     metadata: {
-        namespace: nginxdemo.metadata.apply(metadata => metadata?.name),
+        namespace: nginxDemo.metadata.apply(metadata => metadata?.name),
         labels: {
             "app.kubernetes.io/name": "nginx-demo",
         },
@@ -51,7 +51,7 @@ const service = new kubernetes.core.v1.Service("service", {
 });
 const ingress = new kubernetes.networking.v1.Ingress("ingress", {
     metadata: {
-        namespace: nginxdemo.metadata.apply(metadata => metadata?.name),
+        namespace: nginxDemo.metadata.apply(metadata => metadata?.name),
     },
     spec: {
         rules: [{
