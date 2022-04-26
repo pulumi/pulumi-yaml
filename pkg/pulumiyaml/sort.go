@@ -134,6 +134,9 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 			transitiveDependencies[name.Value] = map[string]struct{}{}
 			visiting[name.Value] = true
 			for _, mname := range dependencies[name.Value] {
+				if mname.Value == PulumiVarName {
+					continue
+				}
 				if !visit(mname) {
 					return false
 				}
