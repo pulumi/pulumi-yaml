@@ -549,7 +549,7 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry) (model.BodyItem, 
 		return nil, diags
 	}
 	return &model.Attribute{
-		Name:  name,
+		Name:  imp.variables[name].Name,
 		Value: v,
 	}, diags
 }

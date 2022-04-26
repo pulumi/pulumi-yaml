@@ -3,13 +3,13 @@ import * as aws from "@pulumi/aws";
 
 const config = new pulumi.Config();
 const instanceType = config.get("instanceType") || "t3.micro";
-const webSecGrp = new aws.ec2.SecurityGroup("webSecGrp", {ingress: [{
+const webSecGrp = new aws.ec2.SecurityGroup("WebSecGrp", {ingress: [{
     protocol: "tcp",
     fromPort: 80,
     toPort: 80,
     cidrBlocks: ["0.0.0.0/0"],
 }]});
-const webServer = new aws.ec2.Instance("webServer", {
+const webServer = new aws.ec2.Instance("WebServer", {
     instanceType: instanceType,
     ami: aws.getAmi({
         filters: [{

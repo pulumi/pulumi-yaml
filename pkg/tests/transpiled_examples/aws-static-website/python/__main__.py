@@ -2,22 +2,22 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_aws_native as aws_native
 
-sitebucket = aws_native.s3.Bucket("sitebucket", website_configuration=aws_native.s3.BucketWebsiteConfigurationArgs(
+site_bucket = aws_native.s3.Bucket("site-bucket", website_configuration=aws_native.s3.BucketWebsiteConfigurationArgs(
     index_document="index.html",
 ))
-indexhtml = aws.s3.BucketObject("indexhtml",
-    bucket=sitebucket.id,
+index_html = aws.s3.BucketObject("index.html",
+    bucket=site_bucket.id,
     source=pulumi.FileAsset("./www/index.html"),
     acl="public-read",
     content_type="text/html")
-faviconpng = aws.s3.BucketObject("faviconpng",
-    bucket=sitebucket.id,
+favicon_png = aws.s3.BucketObject("favicon.png",
+    bucket=site_bucket.id,
     source=pulumi.FileAsset("./www/favicon.png"),
     acl="public-read",
     content_type="image/png")
 bucket_policy = aws.s3.BucketPolicy("bucketPolicy",
-    bucket=sitebucket.id,
-    policy=sitebucket.arn.apply(lambda arn: f"""{{
+    bucket=site_bucket.id,
+    policy=site_bucket.arn.apply(lambda arn: f"""{{
   "Version": "2012-10-17",
   "Statement": [
     {{
@@ -29,5 +29,5 @@ bucket_policy = aws.s3.BucketPolicy("bucketPolicy",
   ]
 }}
 """))
-pulumi.export("bucketName", sitebucket.bucket_name)
-pulumi.export("websiteUrl", sitebucket.website_url)
+pulumi.export("bucketName", site_bucket.bucket_name)
+pulumi.export("websiteUrl", site_bucket.website_url)
