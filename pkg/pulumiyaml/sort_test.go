@@ -44,6 +44,7 @@ func requireNoErrors(t *testing.T, tmpl *ast.TemplateDecl, diags syntax.Diagnost
 
 func yamlTemplate(t *testing.T, source string) *ast.TemplateDecl {
 	pt, diags, err := LoadYAMLBytes("<stdin>", []byte(source), true)
+	pt.Cwd = "/home/test/test-project"
 	require.NoError(t, err)
 	requireNoErrors(t, pt, diags)
 	return pt

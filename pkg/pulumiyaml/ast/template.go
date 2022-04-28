@@ -393,6 +393,9 @@ type TemplateDecl struct {
 
 	syntax syntax.Node
 
+	// current working directory of the parsed template, necessary if "main" places in separate dir.
+	Cwd string
+
 	Description   *StringExpr
 	Configuration ConfigMapDecl
 	Variables     VariablesMapDecl

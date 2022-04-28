@@ -98,6 +98,7 @@ func LoadYAMLBytes(filename string, source []byte, allowMain bool) (*ast.Templat
 	}
 
 	t, tdiags := ast.ParseTemplate(source, syn)
+	t.Cwd = path.Dir(filename)
 	diags.Extend(tdiags...)
 
 	mains := []syntax.ObjectPropertyDef{}
@@ -126,6 +127,7 @@ func LoadYAMLBytes(filename string, source []byte, allowMain bool) (*ast.Templat
 		mainPath := mains[0].Value.(*syntax.StringNode).Value()
 		dir := path.Join(currentDir, mainPath)
 		te, d, e := LoadDir(dir, false)
+		te.Cwd = dir
 		diags.Extend(d...)
 		return te, diags, e
 	default:
@@ -476,13 +478,8 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 func (r *runner) ensureSetup() {
 	if r.intermediates == nil {
 		r.intermediates = []graphNode{}
-		cwd, err := os.Getwd()
-		if err != nil {
-			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-			return
-		}
 		r.variables[PulumiVarName] = map[string]interface{}{
-			"cwd":     cwd,
+			"cwd":     r.t.Cwd,
 			"project": r.ctx.Project(),
 			"stack":   r.ctx.Stack(),
 		}

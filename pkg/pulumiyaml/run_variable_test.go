@@ -4,7 +4,6 @@ package pulumiyaml
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,20 +26,18 @@ outputs:
   project: ${pulumi.project}
   stack: ${pulumi.stack}
 `
-	cwd, err := os.Getwd()
-	assert.NoError(t, err)
 
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
 	mocks := &testMonitor{}
-	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		ectx := runner.newContext(nil)
 		cwdOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.cwd}"))
 		assert.True(t, ok)
-		assert.Equal(t, cwd, cwdOutput)
+		assert.Equal(t, "/home/test/test-project", cwdOutput)
 
 		projectOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.project}"))
 		assert.True(t, ok)
