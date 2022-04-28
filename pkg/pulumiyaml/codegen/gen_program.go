@@ -7,6 +7,8 @@ package codegen
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path"
 	"strings"
 
 	"github.com/ettle/strcase"
@@ -19,7 +21,10 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+
+	enc "github.com/pulumi/pulumi/sdk/v3/go/common/encoding"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
 // Generate a serializable YAML template.
@@ -57,6 +62,34 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	}
 
 	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
+}
+
+func GenerateProject(directory string, project workspace.Project, program *pcl.Program) error {
+	files, diagnostics, err := GenerateProgram(program)
+	if err != nil {
+		return err
+	}
+	if diagnostics.HasErrors() {
+		return diagnostics
+	}
+
+	// Set the runtime to "yaml" then marshal to Pulumi.yaml
+	project.Runtime = workspace.NewProjectRuntimeInfo("yaml", nil)
+	projectBytes, err := enc.YAML.Marshal(project)
+	if err != nil {
+		return err
+	}
+	files["Pulumi.yaml"] = projectBytes
+
+	for filename, data := range files {
+		outPath := path.Join(directory, filename)
+		err := ioutil.WriteFile(outPath, data, 0600)
+		if err != nil {
+			return fmt.Errorf("could not write output program: %w", err)
+		}
+	}
+
+	return nil
 }
 
 type generator struct {
