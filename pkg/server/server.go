@@ -93,6 +93,9 @@ func loadFromCompiler(compiler string) (*ast.TemplateDecl, syntax.Diagnostics, e
 	if err != nil {
 		return nil, nil, fmt.Errorf("error running compiler %v: %v, stderr follows: %v", name, err, stderr.String())
 	}
+	if stderr.Len() != 0 {
+		os.Stderr.Write(stderr.Bytes())
+	}
 	templateStr := stdout.String()
 	return pulumiyaml.LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 }
