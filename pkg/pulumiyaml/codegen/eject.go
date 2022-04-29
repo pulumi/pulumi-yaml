@@ -24,7 +24,7 @@ func Eject(dir string, loader schema.Loader) (*workspace.Project, *pcl.Program, 
 	proj, template, diags, err := loadTemplate(dir)
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
-		err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+		err := diagWriter.WriteDiagnostics(diags)
 		if err != nil {
 			return nil, nil, err
 		}
