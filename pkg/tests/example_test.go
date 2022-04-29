@@ -144,7 +144,6 @@ func TestExampleWebserverJson(t *testing.T) {
 //nolint:paralleltest // uses parallel programtest
 func TestExamplePulumiVariable(t *testing.T) {
 	testWrapper(t, exampleDir("pulumi-variable"),
-		RequireLiveRun,
 		Validator{func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cwdOutput, isString := stack.Outputs["cwd"].(string)
 			assert.True(t, isString)
