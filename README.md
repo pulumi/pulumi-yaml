@@ -378,3 +378,15 @@ variables:
 ```
 
 The expression `${reference}` will have the value of the `outputName` output from the stack `org/project/stack`.
+
+#### `Fn::Secret`
+
+Constructs a [Secret](https://www.pulumi.com/docs/intro/concepts/secrets/) from an existing value.
+
+``` yaml
+variables:
+  secret:
+    Fn::Secret:
+      Fn::Invoke:
+        Function: my:pkg:GetSecretValue
+```
