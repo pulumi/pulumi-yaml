@@ -41,6 +41,13 @@ var RequireLiveRun = requireLiveRun{}
 
 func (o requireLiveRun) apply(options *testOptions) {
 	options.requireLiveRun = boolRef(true)
+	dryrun := getDryRun()
+
+	options.programTestOptions.SkipUpdate = dryrun
+	options.programTestOptions.SkipRefresh = dryrun
+	options.programTestOptions.AllowEmptyPreviewChanges = dryrun
+	options.programTestOptions.SkipExportImport = dryrun
+	options.programTestOptions.ExpectRefreshChanges = !dryrun
 }
 
 type noParallel struct{}
@@ -101,7 +108,9 @@ type Validator struct {
 func (o Validator) apply(options *testOptions) {
 	priorFunc := options.programTestOptions.ExtraRuntimeValidation
 	options.programTestOptions.ExtraRuntimeValidation = func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
-		priorFunc(t, stack)
+		if priorFunc != nil {
+			priorFunc(t, stack)
+		}
 		o.f(t, stack)
 	}
 }
@@ -118,12 +127,7 @@ func testWrapper(t *testing.T, dir string, opts ...TestOption) {
 	var testOptions testOptions
 
 	testOptions.programTestOptions = integration.ProgramTestOptions{
-		Dir:                      filepath.Join(getCwd(t), dir),
-		SkipUpdate:               dryrun,
-		SkipRefresh:              dryrun,
-		AllowEmptyPreviewChanges: dryrun,
-		SkipExportImport:         dryrun,
-		ExpectRefreshChanges:     !dryrun,
+		Dir: filepath.Join(getCwd(t), dir),
 
 		PrepareProject: prepareYamlProject,
 	}

@@ -203,7 +203,7 @@ func TestGenerateProgram(t *testing.T) {
 	check := func(t *testing.T, output string, _ codegen.StringSet) {
 		file, err := os.ReadFile(output)
 		assert.NoError(t, err)
-		templateDecl, diags, err := pulumiyaml.LoadYAMLBytes(output, file, true)
+		templateDecl, diags, err := pulumiyaml.LoadYAMLBytes(output, file)
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
 		err = pulumi.RunErr(func(ctx *pulumi.Context) error {

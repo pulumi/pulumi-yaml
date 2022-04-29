@@ -13,7 +13,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/pkg/v3 v3.30.1-0.20220425233152-77eb530a1117
 	github.com/pulumi/pulumi/sdk/v3 v3.30.1-0.20220425233152-77eb530a1117
-	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.1
 	github.com/zclconf/go-cty v1.10.0
 	google.golang.org/grpc v1.44.0
@@ -117,6 +116,7 @@ require (
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/shurcooL/go-goon v0.0.0-20210110234559-7585751d9a17 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
+	github.com/spf13/cobra v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
 	github.com/texttheater/golang-levenshtein v1.0.1 // indirect
