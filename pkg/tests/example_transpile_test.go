@@ -133,9 +133,8 @@ func TestGenerateExamples(t *testing.T) {
 				t.Skip()
 				return
 			}
-			main, err := getMain(filepath.Join(examplesPath, dir.Name()))
-			_, template, diags, err := codegen.LoadTemplate(main)
-			require.NoError(t, err, "Loading file: %s", main)
+			_, template, diags, err := codegen.LoadTemplate(filepath.Join(examplesPath, dir.Name()))
+			require.NoError(t, err, "Loading project %v", dir)
 			require.False(t, diags.HasErrors(), diags.Error())
 			assert.Len(t, diags, 0, "Should have neither warnings nor errors")
 			if t.Failed() {
@@ -154,19 +153,6 @@ func TestGenerateExamples(t *testing.T) {
 			}
 		})
 	}
-}
-
-func getMain(dir string) (string, error) {
-	attempts := []string{"Main.yaml", "Main.json", "Pulumi.yaml"}
-	for _, base := range attempts {
-		path := filepath.Join(dir, base)
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
-		} else if !os.IsNotExist(err) {
-			return "", fmt.Errorf("getMain: %w", err)
-		}
-	}
-	return "", fmt.Errorf("could not find a main file in '%s'", dir)
 }
 
 var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
