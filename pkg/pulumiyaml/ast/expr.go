@@ -668,6 +668,19 @@ func StackReference(stackName string, propertyName Expr) *StackReferenceExpr {
 	}
 }
 
+type SecretExpr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func SecretSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *SecretExpr {
+	return &SecretExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
 func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) {
 	if node.Len() != 1 {
 		return nil, nil, false
@@ -693,6 +706,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseStackReference
 	case "Fn::AssetArchive":
 		parse = parseAssetArchive
+	case "Fn::Secret":
+		parse = parseSecret
 	default:
 		return nil, nil, false
 	}
@@ -825,6 +840,10 @@ func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (
 	}
 
 	return StackReferenceSyntax(node, name, list, stackName, list.Elements[1]), nil
+}
+
+func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return SecretSyntax(node, name, args), nil
 }
 
 // We expect the following format
