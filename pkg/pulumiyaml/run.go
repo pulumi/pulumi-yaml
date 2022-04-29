@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -49,11 +48,11 @@ func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	var filename string
 	var bs []byte
-	if b, err := ioutil.ReadFile(path.Join(cwd, MainTemplate+".json")); err == nil {
+	if b, err := ioutil.ReadFile(filepath.Join(cwd, MainTemplate+".json")); err == nil {
 		filename, bs = MainTemplate+".json", b
-	} else if b, err := ioutil.ReadFile(path.Join(cwd, MainTemplate+".yaml")); err == nil {
+	} else if b, err := ioutil.ReadFile(filepath.Join(cwd, MainTemplate+".yaml")); err == nil {
 		filename, bs = MainTemplate+".yaml", b
-	} else if b, err := ioutil.ReadFile(path.Join(cwd, "Pulumi.yaml")); err == nil {
+	} else if b, err := ioutil.ReadFile(filepath.Join(cwd, "Pulumi.yaml")); err == nil {
 		filename, bs = "Pulumi.yaml", b
 	} else {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
