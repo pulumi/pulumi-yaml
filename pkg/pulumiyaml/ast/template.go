@@ -291,6 +291,7 @@ type ResourceOptionsDecl struct {
 	Version                 *StringExpr
 	PluginDownloadURL       *StringExpr
 	ReplaceOnChanges        *StringListDecl
+	RetainOnDelete          *BooleanExpr
 }
 
 func (d *ResourceOptionsDecl) defaultValue() interface{} {

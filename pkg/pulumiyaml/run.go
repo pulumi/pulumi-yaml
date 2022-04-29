@@ -819,6 +819,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.ReplaceOnChanges != nil {
 		opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
 	}
+	if b := v.Options.RetainOnDelete; b != nil {
+		opts = append(opts, pulumi.RetainOnDelete(b.Value))
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
