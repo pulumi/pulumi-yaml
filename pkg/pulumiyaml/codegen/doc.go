@@ -26,9 +26,66 @@ func (d DocLanguageHelper) GetMethodResultName(pkg *schema.Package, modName stri
 }
 
 func (d DocLanguageHelper) GetLanguageTypeString(pkg *schema.Package, moduleName string, t schema.Type, input bool) string {
+	getType := func(t schema.Type) string {
+		return d.GetLanguageTypeString(pkg, moduleName, t, input)
+	}
+	if schema.IsPrimitiveType(t) {
+		switch t {
+		case schema.NumberType, schema.IntType:
+			return "Number"
+		case schema.StringType:
+			return "String"
+		case schema.BoolType:
+			return "Boolean"
+		case schema.ArchiveType:
+			return "Archive"
+		case schema.AssetType:
+			return "Asset"
+		case schema.JSONType:
+			return "JSON"
+		case schema.AnyType:
+			return "Any"
+		}
+	}
 	switch t := t.(type) {
 	case *schema.ResourceType:
 		return collapseToken(t.Token)
+	case *schema.ArrayType:
+		return fmt.Sprintf("List<%s>", getType(t.ElementType))
+	case *schema.InputType:
+		return getType(t.ElementType)
+	case *schema.MapType:
+		return fmt.Sprintf("Map<%s>", getType(t.ElementType))
+	case *schema.UnionType:
+		if len(t.ElementTypes) == 0 {
+			return ""
+		}
+		types := getType(t.ElementTypes[0])
+		for i := 1; i < len(t.ElementTypes); i++ {
+			types += " | " + getType(t.ElementTypes[i])
+		}
+		return types
+	case *schema.EnumType:
+		if len(t.Elements) == 0 {
+			return ""
+		}
+		toString := func(v interface{}) string {
+			switch v := v.(type) {
+			case string:
+				return fmt.Sprintf("%q", v)
+			default:
+				return fmt.Sprintf("%v", v)
+			}
+		}
+		values := toString(t.Elements[0].Value)
+		for i := 1; i < len(t.Elements); i++ {
+			values += " | " + toString(t.Elements[i].Value)
+		}
+		return values
+	case *schema.OptionalType:
+		return getType(t.ElementType)
+	case *schema.ObjectType:
+		return "Property Map"
 	default:
 		return ""
 	}
