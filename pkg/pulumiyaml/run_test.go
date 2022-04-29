@@ -1180,6 +1180,32 @@ func TestSub(t *testing.T) {
 	})
 }
 
+func TestSecret(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-secret
+runtime: yaml
+variables:
+  mySecret:
+    Fn::Secret: my-special-secret
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	var hasRun = false
+	testTemplate(t, tmpl, func(r *evalContext) {
+		assert.False(t, r.Evaluate().HasErrors())
+		s := r.variables["mySecret"].(pulumi.Output)
+		require.True(t, pulumi.IsSecret(s))
+		out := s.ApplyT(func(x interface{}) (interface{}, error) {
+			hasRun = true
+			assert.Equal(t, "my-special-secret", x)
+			return nil, nil
+		})
+		r.ctx.Export("out", out)
+	})
+	assert.True(t, hasRun)
+}
+
 func TestUnicodeLogicalName(t *testing.T) {
 	t.Parallel()
 

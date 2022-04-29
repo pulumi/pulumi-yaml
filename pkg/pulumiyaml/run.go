@@ -991,6 +991,8 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return ctx.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
 		return ctx.evaluateBuiltinStackReference(x)
+	case *ast.SecretExpr:
+		return ctx.evaluateBuiltinSecret(x)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
@@ -1497,6 +1499,14 @@ func (ctx *evalContext) evaluateBuiltinStackReference(v *ast.StackReferenceExpr)
 	}).(pulumi.StringOutput)
 
 	return stackRef.GetOutput(propertyStringOutput), true
+}
+
+func (ctx *evalContext) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {
+	e, ok := ctx.evaluateExpr(s.Value)
+	if !ok {
+		return nil, false
+	}
+	return pulumi.ToSecret(e), true
 }
 
 func hasOutputs(v interface{}) bool {
