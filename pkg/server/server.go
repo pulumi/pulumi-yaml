@@ -75,8 +75,6 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
 func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
-	// Ensure we're in the right directory so files, etc, are in the expected place.
-	// TODO: ignoring main for now until we figure out what this means.
 	if pwd := req.GetPwd(); pwd != "" {
 		err := os.Chdir(pwd)
 		if err != nil {
