@@ -17,10 +17,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
+	"os/exec"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/google/shlex"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
@@ -28,6 +32,8 @@ import (
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
 // yamlLanguageHost implements the LanguageRuntimeServer interface
@@ -35,27 +41,74 @@ import (
 type yamlLanguageHost struct {
 	engineAddress string
 	tracing       string
+	compiler      string
+	template      *ast.TemplateDecl
 }
 
-func NewLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeServer {
+func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.LanguageRuntimeServer {
 	return &yamlLanguageHost{
 		engineAddress: engineAddress,
 		tracing:       tracing,
+		compiler:      compiler,
 	}
+}
+
+func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	if host.template != nil {
+		return host.template, nil, nil
+	}
+
+	var template *ast.TemplateDecl
+	var diags syntax.Diagnostics
+	var err error
+	if host.compiler == "" {
+		template, diags, err = pulumiyaml.Load()
+	} else {
+		template, diags, err = loadFromCompiler(host.compiler)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if diags.HasErrors() {
+		return nil, diags, nil
+	}
+	host.template = template
+
+	return host.template, nil, nil
+}
+
+func loadFromCompiler(compiler string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	argv, err := shlex.Split(compiler)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error parsing compiler argument: %v", err)
+	}
+
+	name := argv[0]
+	cmd := exec.Command(name, argv[1:]...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error running compiler %v: %v, stderr follows: %v", name, err, stderr.String())
+	}
+	templateStr := stdout.String()
+	return pulumiyaml.LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	tmpl, diags, err := pulumiyaml.Load()
+	template, diags, err := host.loadTemplate()
 	if err != nil {
 		return nil, err
 	}
-	if diags.HasErrors() {
+	if diags != nil {
 		return nil, diags
 	}
 
-	pkgs, diags := pulumiyaml.GetReferencedPlugins(tmpl)
+	pkgs, diags := pulumiyaml.GetReferencedPlugins(template)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -82,7 +135,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		}
 	}
 
-	template, diags, err := pulumiyaml.Load()
+	template, diags, err := host.loadTemplate()
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -115,7 +168,16 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	defer pctx.Close()
 
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
-	if err := pulumi.RunWithContext(pctx, pulumiyaml.Run); err != nil {
+	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
+		loader, err := pulumiyaml.NewPackageLoader()
+		if err != nil {
+			return err
+		}
+		defer loader.Close()
+
+		// Now "evaluate" the template.
+		return pulumiyaml.RunTemplate(ctx, template, loader)
+	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
 			if err != nil {

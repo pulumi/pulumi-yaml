@@ -2,7 +2,9 @@
   "Configuration": {
     "InstanceType": {
       "type": "String",
-      "default": "t3.micro"
+      "default": "t3.micro",
+      "allowedValues": ["t3.micro", "t3.small", "m4.large"],
+      "description": "Enter t3.micro, t3.small, or m4.large. Default is t3.micro."
     }
   },
   "Resources": {

@@ -143,23 +143,6 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-// Run loads and evaluates a template using the given request/settings.
-func Run(ctx *pulumi.Context) error {
-	t, diags, err := Load()
-	if err != nil {
-		return multierror.Append(err, diags)
-	}
-
-	loader, err := NewPackageLoader()
-	if err != nil {
-		return err
-	}
-	defer loader.Close()
-
-	// Now "evaluate" the template.
-	return RunTemplate(ctx, t, loader)
-}
-
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	runner := newRunner(ctx, t, loader)
