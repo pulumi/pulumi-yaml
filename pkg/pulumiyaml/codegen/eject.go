@@ -21,7 +21,7 @@ import (
 // If no loader is provided (nil argument), a new plugin host will be spawned to obtain resource
 // provider schemas.
 func Eject(dir string, loader schema.Loader) (*workspace.Project, *pcl.Program, error) {
-	proj, template, diags, err := loadTemplate(dir)
+	proj, template, diags, err := LoadTemplate(dir)
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
 		err := diagWriter.WriteDiagnostics(diags)
@@ -71,7 +71,7 @@ func getProjectPath(dir string) (string, error) {
 	return path, nil
 }
 
-func loadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagnostics, error) {
+func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagnostics, error) {
 	projectPath, err := getProjectPath(dir)
 	if err != nil {
 		return nil, nil, nil, err

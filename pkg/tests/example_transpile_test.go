@@ -134,23 +134,7 @@ func TestGenerateExamples(t *testing.T) {
 				return
 			}
 			main, err := getMain(filepath.Join(examplesPath, dir.Name()))
-			require.NoError(t, err, "Could not get file path")
-
-			// Set the correct working directory. This is needed for the `main`
-			// key in `Pulumi.yaml`.
-			cwd, err := os.Getwd()
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				err := os.Chdir(cwd)
-				assert.NoError(t, err)
-			})
-			err = os.Chdir(filepath.Join(examplesPath, dir.Name()))
-			require.NoError(t, err)
-
-			template, diags, err := pulumiyaml.LoadFile(main)
-			if err == os.ErrNotExist {
-				template, diags, err = pulumiyaml.LoadFile(main)
-			}
+			_, template, diags, err := codegen.LoadTemplate(main)
 			require.NoError(t, err, "Loading file: %s", main)
 			require.False(t, diags.HasErrors(), diags.Error())
 			assert.Len(t, diags, 0, "Should have neither warnings nor errors")
