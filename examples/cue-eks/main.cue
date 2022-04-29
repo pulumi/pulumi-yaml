@@ -8,6 +8,7 @@ resources: {
 		properties: {
 			instanceType:    "t2.medium"
 			desiredCapacity: 4
+			maxSize:         8
 		}
 	}
 }

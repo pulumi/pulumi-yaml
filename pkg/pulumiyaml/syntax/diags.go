@@ -9,6 +9,14 @@ import (
 // A Diagnostic represents a warning or an error to be presented to the user.
 type Diagnostic = hcl.Diagnostic
 
+// Warning creates a new warning-level diagnostic from the given subject, summary, and detail.
+func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
+	if detail == "" {
+		detail = summary
+	}
+	return &Diagnostic{Severity: hcl.DiagWarning, Subject: rng, Summary: summary, Detail: detail}
+}
+
 // Error creates a new error-level diagnostic from the given subject, summary, and detail.
 func Error(rng *hcl.Range, summary, detail string) *Diagnostic {
 	if detail == "" {

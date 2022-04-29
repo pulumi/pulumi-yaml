@@ -17,14 +17,10 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/google/shlex"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
@@ -64,7 +60,7 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 	if host.compiler == "" {
 		template, diags, err = pulumiyaml.Load()
 	} else {
-		template, diags, err = loadFromCompiler(host.compiler)
+		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "")
 	}
 	if err != nil {
 		return nil, nil, err
@@ -75,29 +71,6 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 	host.template = template
 
 	return host.template, nil, nil
-}
-
-func loadFromCompiler(compiler string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	argv, err := shlex.Split(compiler)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing compiler argument: %v", err)
-	}
-
-	name := argv[0]
-	cmd := exec.Command(name, argv[1:]...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error running compiler %v: %v, stderr follows: %v", name, err, stderr.String())
-	}
-	if stderr.Len() != 0 {
-		os.Stderr.Write(stderr.Bytes())
-	}
-	templateStr := stdout.String()
-	return pulumiyaml.LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.

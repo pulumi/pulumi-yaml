@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -39,6 +41,31 @@ const MainTemplate = "Main"
 // Load a template from the current working directory
 func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	return LoadDir(".")
+}
+
+func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	var diags syntax.Diagnostics
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	argv, err := shlex.Split(compiler)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error parsing compiler argument: %v", err)
+	}
+
+	name := argv[0]
+	cmd := exec.Command(name, argv[1:]...)
+	cmd.Dir = workingDirectory
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error running compiler %v: %v, stderr follows: %v", name, err, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		diags = append(diags, syntax.Warning(nil, fmt.Sprintf("compiler %v warnings: %v", name, stdout.String()), ""))
+	}
+	templateStr := stdout.String()
+	return LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 }
 
 // Load a template from the current working directory.

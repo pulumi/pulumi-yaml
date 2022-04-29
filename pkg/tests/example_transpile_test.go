@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -58,7 +59,8 @@ var (
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
 		"webserver-json":          AllLanguages().Except(Nodejs),
-		"aws-eks":                 AllLanguages().Except(Python),
+		"aws-eks":                 AllLanguages().Except(Python), // plain inputs
+		"cue-eks":                 AllLanguages().Except(Python), // plain inputs
 		"azure-app-service":       Dotnet.And(Golang),
 		"pulumi-variable":         AllLanguages().Except(Python),
 		"kubernetes":              Golang, // returning string instead of *string in ApplyT
@@ -122,6 +124,11 @@ func TestGenerateExamples(t *testing.T) {
 	var generateLock sync.Mutex
 	for _, dir := range examples {
 		dir := dir
+
+		if _, err := os.Stat(filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")); errors.Is(err, os.ErrNotExist) {
+			t.Skip()
+		}
+
 		t.Run(dir.Name(), func(t *testing.T) {
 			var skip bool
 			for _, ex := range failingExamples {
