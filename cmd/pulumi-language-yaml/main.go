@@ -36,7 +36,7 @@ func main() {
 	var tracing string
 	var root string
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
-	flag.StringVar(&root, "root", "", "Root of the program execition")
+	flag.StringVar(&root, "root", "", "Root of the program execution")
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
