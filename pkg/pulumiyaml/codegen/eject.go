@@ -94,5 +94,8 @@ func loadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 		main = path.Join(projectDir, main)
 	}
 	t, diags, err := pulumiyaml.LoadDir(main)
+
+	// unset this, as we've already parsed the YAML program in "main" and it won't be valid for convert
+	proj.Main = ""
 	return proj, t, hcl.Diagnostics(diags), err
 }
