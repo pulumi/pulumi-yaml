@@ -239,9 +239,6 @@ func (g *generator) genResource(n *pcl.Resource) {
 	entries := []syn.ObjectPropertyDef{
 		g.TypeProperty(collapseToken(n.Token)),
 	}
-	if n.Schema != nil && n.Schema.IsComponent {
-		entries = append(entries, syn.ObjectProperty(syn.String("component"), syn.Boolean(true)))
-	}
 	if len(properties) > 0 {
 		entries = append(entries, syn.ObjectProperty(syn.String("properties"), syn.Object(properties...)))
 	}
