@@ -24,15 +24,15 @@ import (
 // provider schemas.
 func Eject(dir string, loader schema.Loader) (*workspace.Project, *pcl.Program, error) {
 	proj, template, diags, err := LoadTemplate(dir)
+	if err != nil {
+		return nil, nil, err
+	}
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
 		err := diagWriter.WriteDiagnostics(diags)
 		if err != nil {
 			return nil, nil, err
 		}
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load YAML program")
 	}
 
 	if loader == nil {
@@ -77,7 +77,6 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 	projectPath, err := getProjectPath(dir)
 	if err != nil {
 		return nil, nil, nil, err
-
 	} else if projectPath == "" {
 		return nil, nil, nil, fmt.Errorf(
 			"no Pulumi.yaml project file found (searching upwards from %s)", dir)
