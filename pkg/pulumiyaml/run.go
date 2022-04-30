@@ -65,7 +65,10 @@ func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDe
 		diags = append(diags, syntax.Warning(nil, fmt.Sprintf("compiler %v warnings: %v", name, stdout.String()), ""))
 	}
 	templateStr := stdout.String()
-	return LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
+	template, tdiags, err := LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
+	diags.Extend(tdiags...)
+
+	return template, tdiags, err
 }
 
 // Load a template from the current working directory.
