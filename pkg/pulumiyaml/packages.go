@@ -142,6 +142,10 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 		version := res.Options.Version.GetValue()
 		pluginDownloadURL := res.Options.PluginDownloadURL.GetValue()
 
+		if res.Type == nil {
+			diags.Extend(syntax.NodeError(kvp.Value.Syntax(), fmt.Sprintf("Resource declared without a 'type': %q", kvp.Key.Value), ""))
+			continue
+		}
 		pkg := resolvePkgName(res.Type.Value)
 		if entry, found := pluginMap[pkg]; found {
 			if version != "" && entry.version != version {

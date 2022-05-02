@@ -35,8 +35,10 @@ func main() {
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
 	var root string
+	var compiler string
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
 	flag.StringVar(&root, "root", "", "Root of the program execution")
+	flag.StringVar(&compiler, "compiler", "", "Compiler to use to pre-process YAML")
 	flag.Parse()
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
@@ -51,7 +53,7 @@ func main() {
 	// Fire up a gRPC server, letting the kernel choose a free port.
 	port, done, err := rpcutil.Serve(0, nil, []func(*grpc.Server) error{
 		func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, tracing)
+			host := server.NewLanguageHost(engineAddress, tracing, compiler)
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
 			return nil
 		},

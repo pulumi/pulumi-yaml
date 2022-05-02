@@ -6,13 +6,14 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/ettle/strcase v0.1.1
 	github.com/golang/protobuf v1.5.2
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/hcl/v2 v2.11.1
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.30.1-0.20220425233152-77eb530a1117
-	github.com/pulumi/pulumi/sdk/v3 v3.30.1-0.20220425233152-77eb530a1117
+	github.com/pulumi/pulumi/pkg/v3 v3.31.1-0.20220429232336-81582c4dcb93
+	github.com/pulumi/pulumi/sdk/v3 v3.31.0
 	github.com/stretchr/testify v1.7.1
 	github.com/zclconf/go-cty v1.10.0
 	google.golang.org/grpc v1.44.0
