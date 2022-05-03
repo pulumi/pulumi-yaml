@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+## 0.3.0 (2022-05-03)
+
+### Improvements
+
+* [language] integrated support for using another program or script to generate YAML
+
+* [CLI] full `pulumi convert` support including support for "compilers"
+
+* [codegen] Docs generation
+
 ## 0.2.0 (2022-04-26)
 
 ### Improvements
