@@ -10,6 +10,7 @@ resources:
       resourceGroupName: ${resourceGroup.name}
       accountTier: Standard
       accountReplicationType: LRS
+
 outputs:
   # Export the connection string for the storage account
   connectionString: ${account.primaryConnectionString}

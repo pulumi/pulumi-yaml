@@ -21,6 +21,7 @@ resources:
       sku:
         name: Standard_LRS
       kind: StorageV2
+
 variables:
   storageAccountKeys:
     Fn::Invoke:
@@ -28,6 +29,7 @@ variables:
       Arguments:
         resourceGroupName: ${resourceGroup.name}
         accountName: ${storageAccount.name}
+
 outputs:
   # Export the primary key of the Storage Account
   primaryStorageKey: ${storageAccountKeys.keys[0].value}

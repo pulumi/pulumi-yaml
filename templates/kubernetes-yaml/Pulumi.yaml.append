@@ -2,6 +2,7 @@
 variables:
   appLabels:
     app: nginx
+
 resources:
   deployment:
     type: kubernetes:apps/v1:Deployment
