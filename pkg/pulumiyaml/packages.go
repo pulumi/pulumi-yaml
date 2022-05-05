@@ -251,8 +251,8 @@ func ResolveResource(loader PackageLoader, typeString string) (Package, Resource
 	return pkg, canonicalName, nil
 }
 
-// ResolveResource determines the appropriate package for a function, loads that package, then calls
-// the package's ResolveResource method to determine the canonical name of the resource, returning
+// ResolveFunction determines the appropriate package for a function, loads that package, then calls
+// the package's ResolveFunction method to determine the canonical name of the function, returning
 // both the package and the canonical name.
 func ResolveFunction(loader PackageLoader, typeString string) (Package, FunctionTypeToken, error) {
 	pkg, err := loadPackage(loader, typeString)
@@ -287,18 +287,14 @@ func (p resourcePackage) resolveProvider(typeName string) (ResourceTypeToken, bo
 	return "", false
 }
 
-func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
+func resolveToken(typeName string, resolve func(string) (string, bool)) (string, bool, error) {
 	typeParts := strings.Split(typeName, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
-		return "", fmt.Errorf("invalid type token %q", typeName)
+		return "", false, fmt.Errorf("invalid type token %q", typeName)
 	}
 
-	if tk, ok := p.resolveProvider(typeName); ok {
-		return tk, nil
-	}
-
-	if res, found := p.GetResource(typeName); found {
-		return ResourceTypeToken(res.Token), nil
+	if token, found := resolve(typeName); found {
+		return token, true, nil
 	}
 
 	// If the provided type token is `$pkg:type`, expand it to `$pkg:index:type` automatically. We
@@ -306,8 +302,8 @@ func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, er
 	// `:index:` ceremony quite generally.
 	if len(typeParts) == 2 {
 		alternateName := fmt.Sprintf("%s:index:%s", typeParts[0], typeParts[1])
-		if res, found := p.GetResource(alternateName); found {
-			return ResourceTypeToken(res.Token), nil
+		if token, found := resolve(alternateName); found {
+			return token, true, nil
 		}
 		typeParts = []string{typeParts[0], "index", typeParts[1]}
 	}
@@ -317,12 +313,34 @@ func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, er
 	if len(typeParts) == 3 {
 		repeatedSection := strcase.ToLowerCamel(typeParts[2])
 		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
-		if res, found := p.GetResource(alternateName); found {
-			return ResourceTypeToken(res.Token), nil
+		if token, found := resolve(alternateName); found {
+			return token, true, nil
 		}
 	}
 
-	return "", fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
+	return "", false, nil
+}
+
+func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
+	if tk, ok := p.resolveProvider(typeName); ok {
+		return tk, nil
+	}
+
+	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool) {
+		res, found := p.GetResource(tk)
+		if found {
+			return res.Token, true
+		}
+		return "", false
+	})
+
+	if err != nil {
+		return "", err
+	} else if !ok {
+		return "", fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
+	}
+
+	return ResourceTypeToken(tk), nil
 }
 
 func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, error) {
@@ -331,32 +349,20 @@ func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, er
 		return "", fmt.Errorf("invalid type token %q", typeName)
 	}
 
-	if res, found := p.GetFunction(typeName); found {
-		return FunctionTypeToken(res.Token), nil
-	}
-
-	// If the provided type token is `$pkg:type`, expand it to `$pkg:index:type` automatically. We
-	// may well want to handle this more fundamentally in Pulumi itself to avoid the need for
-	// `:index:` ceremony quite generally.
-	if len(typeParts) == 2 {
-		alternateName := fmt.Sprintf("%s:index:%s", typeParts[0], typeParts[1])
-		if res, found := p.GetFunction(alternateName); found {
-			return FunctionTypeToken(res.Token), nil
+	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool) {
+		if res, found := p.GetFunction(tk); found {
+			return res.Token, true
 		}
-		typeParts = []string{typeParts[0], "index", typeParts[1]}
+		return "", false
+	})
+
+	if err != nil {
+		return "", err
+	} else if !ok {
+		return "", fmt.Errorf("unable to find function %q in resource provider %q", typeName, p.Name())
 	}
 
-	// A legacy of classic providers is resources with names like `aws:s3/bucket:Bucket`. Here, we
-	// allow the user to enter `aws:s3:Bucket`, and we interpolate in the 3rd label, camel cased.
-	if len(typeParts) == 3 {
-		repeatedSection := strcase.ToLowerCamel(typeParts[2])
-		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
-		if res, found := p.GetFunction(alternateName); found {
-			return FunctionTypeToken(res.Token), nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to find function %q in resource provider %q", typeName, p.Name())
+	return FunctionTypeToken(tk), nil
 }
 
 func (p resourcePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
