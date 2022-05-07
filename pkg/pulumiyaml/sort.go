@@ -47,7 +47,7 @@ func (e configNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string][]graphNode, syntax.Diagnostics) {
+func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -99,12 +99,8 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 	}
 
 	if diags.HasErrors() {
-		return nil, nil, diags
+		return nil, diags
 	}
-
-	// Compute transitive dependencies for resources:
-	exists := struct{}{}
-	transitiveDependencies := map[string]map[string]struct{}{}
 
 	// Depth-first visit each node
 	var visit func(name *ast.StringExpr) bool
@@ -131,7 +127,6 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 			return false
 		}
 		if !visited[name.Value] {
-			transitiveDependencies[name.Value] = map[string]struct{}{}
 			visiting[name.Value] = true
 			for _, mname := range dependencies[name.Value] {
 				if mname.Value == PulumiVarName {
@@ -139,13 +134,6 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 				}
 				if !visit(mname) {
 					return false
-				}
-				if intermediates[mname.Value].valueKind() == "resource" {
-					transitiveDependencies[name.Value][mname.Value] = exists
-				} else {
-					for tDep := range transitiveDependencies[mname.Value] {
-						transitiveDependencies[name.Value][tDep] = exists
-					}
 				}
 			}
 			visited[name.Value] = true
@@ -171,18 +159,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, map[string]
 			break
 		}
 	}
-
-	allDependencies := map[string][]graphNode{}
-
-	for nodeName, dependencySet := range transitiveDependencies {
-		var dependencyList []graphNode
-		for dependencyName := range dependencySet {
-			dependencyList = append(dependencyList, intermediates[dependencyName])
-		}
-		allDependencies[nodeName] = dependencyList
-	}
-
-	return sorted, allDependencies, diags
+	return sorted, diags
 }
 
 func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.Diagnostics {
