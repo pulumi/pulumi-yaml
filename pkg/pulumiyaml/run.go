@@ -1175,7 +1175,25 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				case x.IsArchive():
 					receiver = x.ArchiveValue()
 				case x.IsResourceReference():
-					return x.ResourceReferenceValue(), true
+					ref := x.ResourceReferenceValue()
+					var state lateboundResource
+					var res pulumi.Resource
+					if strings.HasPrefix(string(ref.URN.Type()), "pulumi:providers:") {
+						r := lateboundProviderResourceState{name: ""}
+						state = &r
+						res = &r
+					} else {
+						r := lateboundCustomResourceState{name: ""}
+						state = &r
+						res = &r
+					}
+					// Use the `getResource` invoke to get and deserialize the resource from state:
+					err := ctx.ctx.RegisterResource("_", "_", nil, res, pulumi.URN_(string(ref.URN)))
+					if err != nil {
+						ctx.error(expr, fmt.Sprintf("Failed to get resource %q: %v", ref.URN, err))
+						return nil, false
+					}
+					return evaluateAccessF(state, accessors)
 				default:
 					receiver = x.V
 				}
