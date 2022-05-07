@@ -55,6 +55,7 @@ var (
 		"stackreference-consumer": AllLanguages().Except(Python),
 		"random":                  Dotnet.And(Nodejs),
 		"azure-static-website":    AllLanguages(),
+		"awsx-fargate":            AllLanguages(), // blocked on https://github.com/pulumi/pulumi-yaml/issues/185
 		"aws-static-website":      AllLanguages().Except(Python),
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
