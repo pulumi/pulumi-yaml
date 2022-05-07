@@ -951,7 +951,7 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		if x != nil {
 			entries = x.Entries
 		}
-		return ctx.evaluateObject(x, map[string]interface{}{}, entries)
+		return ctx.evaluateObject(x, entries)
 	case *ast.InterpolateExpr:
 		return ctx.evaluateInterpolate(x)
 	case *ast.SymbolExpr:
@@ -1001,44 +1001,54 @@ func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	return xs, true
 }
 
-func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, m map[string]interface{}, entries []ast.ObjectProperty) (interface{}, bool) {
+func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
 	if len(entries) == 0 {
-		return m, true
+		return map[string]interface{}{}, true
 	}
 
-	kvp := entries[0]
+	allOk := true
+	var keys []interface{}
+	var keyExprs []ast.Expr
+	var values []interface{}
+	for _, op := range entries {
+		k, ok := ctx.evaluateExpr(op.Key)
+		if !ok {
+			allOk = false
+		}
+		keys = append(keys, k)
+		keyExprs = append(keyExprs, op.Key)
 
-	kv, ok := ctx.evaluateExpr(kvp.Key)
-	if !ok {
+		v, ok := ctx.evaluateExpr(op.Value)
+		if !ok {
+			allOk = false
+		}
+		values = append(values, v)
+	}
+
+	if !allOk {
 		return nil, false
 	}
 
-	if o, ok := kv.(pulumi.Output); ok {
-		return o.ApplyT(func(kv interface{}) (interface{}, error) {
-			v, ok := ctx.continueObject(x, m, kvp, kv, entries)
-			if !ok {
-				return nil, fmt.Errorf("runtime error")
+	evalObjectF := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+		returnMap := map[string]interface{}{}
+		allOk := true
+		for i, arg := range args {
+			if k, ok := arg.(string); ok {
+				returnMap[k] = values[i]
+			} else {
+				ctx.error(keyExprs[i], fmt.Sprintf("object key must evaluate to a string, not %v", typeString(k)))
+				allOk = false
 			}
-			return v, nil
-		}), true
-	}
+		}
 
-	return ctx.continueObject(x, m, kvp, kv, entries)
-}
+		if !allOk {
+			return nil, false
+		}
 
-func (ctx *evalContext) continueObject(x *ast.ObjectExpr, m map[string]interface{}, kvp ast.ObjectProperty, kv interface{}, entries []ast.ObjectProperty) (interface{}, bool) {
-	k, ok := kv.(string)
-	if !ok {
-		return ctx.error(kvp.Key, fmt.Sprintf("object key must evaluate to a string, not %v", typeString(kv)))
-	}
+		return returnMap, true
+	})
 
-	v, ok := ctx.evaluateExpr(kvp.Value)
-	if !ok {
-		return nil, false
-	}
-
-	m[k] = v
-	return ctx.evaluateObject(x, m, entries[1:])
+	return evalObjectF(keys...)
 }
 
 func (ctx *evalContext) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
@@ -1083,7 +1093,6 @@ func unknownOutput() pulumi.Output {
 // `[42]` numeric literal property subscripts.
 func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.RootName()
-
 	var receiver interface{}
 	if res, ok := ctx.resources[resourceName]; ok {
 		receiver = res
