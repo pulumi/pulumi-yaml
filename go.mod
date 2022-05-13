@@ -12,8 +12,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.31.1-0.20220429232336-81582c4dcb93
-	github.com/pulumi/pulumi/sdk/v3 v3.31.0
+	github.com/pulumi/pulumi/pkg/v3 v3.32.1
+	github.com/pulumi/pulumi/sdk/v3 v3.32.1
 	github.com/stretchr/testify v1.7.1
 	github.com/zclconf/go-cty v1.10.0
 	google.golang.org/grpc v1.44.0
