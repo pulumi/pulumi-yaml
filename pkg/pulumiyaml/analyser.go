@@ -78,7 +78,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				prop := o.Index(i)
 				key := prop.Key.Value()
 				keyLower := strings.ToLower(key)
-				if keyLower == "type" || keyLower == "properties" || keyLower == "options" {
+				if keyLower == "type" || keyLower == "properties" || keyLower == "options" ||
+					keyLower == "condition" || keyLower == "metadata" {
 					// This is a valid option, so we don't error
 					continue
 				}
