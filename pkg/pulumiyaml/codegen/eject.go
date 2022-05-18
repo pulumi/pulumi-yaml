@@ -110,5 +110,5 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 
 	// unset this, as we've already parsed the YAML program in "main" and it won't be valid for convert
 	proj.Main = ""
-	return proj, t, hcl.Diagnostics(diags), err
+	return proj, t, diags.HCL(), err
 }

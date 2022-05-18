@@ -50,7 +50,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.Loader) (string
 	}
 
 	templateBody, tdiags := ImportTemplate(template, pulumiyaml.NewPackageLoaderFromSchemaLoader(loader))
-	diags = diags.Extend(hcl.Diagnostics(tdiags))
+	diags = diags.Extend(tdiags.HCL())
 	if diags.HasErrors() {
 		return "", diags, nil
 	}

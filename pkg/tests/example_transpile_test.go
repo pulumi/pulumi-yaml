@@ -207,7 +207,7 @@ func (l mockPackageLoader) Close() {}
 
 func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
-	diags := hcl.Diagnostics(tdiags)
+	diags := tdiags.HCL()
 	if tdiags.HasErrors() {
 		return nil, diags, nil
 	}
