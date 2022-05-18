@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
 // A formatter for when a field or property is used that does not exist.
@@ -136,9 +134,8 @@ func (e InvalidFieldBagFormatter) MessageWithDetail(field string) (string, strin
 		addBag(bags[0])
 	} else {
 		detail += "one of the following:\n"
-		contract.Assertf(len(bags) <= 26, "You need to letter more items then exist letters")
-		for i, bag := range bags {
-			detail += fmt.Sprintf("  %c) ", i+'a')
+		for _, bag := range bags {
+			detail += fmt.Sprintf("  * ")
 			addBag(bag)
 			detail += "\n"
 		}
