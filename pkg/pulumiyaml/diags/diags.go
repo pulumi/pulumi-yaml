@@ -55,6 +55,8 @@ type InvalidFieldBagFormatter struct {
 	Bags        []TypeBag
 	// The maximum number of fields to return. `MaxListed` <= 0 implies return all fields.
 	MaxListed int
+	// The degree of (edit) distance between the field typed and suggested.
+	DistanceLimit int
 }
 
 type TypeBag struct {
@@ -64,6 +66,17 @@ type TypeBag struct {
 
 func (e InvalidFieldBagFormatter) BagList(field string) []BagOrdering {
 	bags := suggestBag(field, e.Bags)
+
+	if e.DistanceLimit != 0 {
+		b := []BagOrdering{}
+		for _, bag := range bags {
+			if bag.rank > e.DistanceLimit {
+				break
+			}
+			b = append(b, bag)
+		}
+		bags = b
+	}
 
 	if e.MaxListed > 0 {
 		b := []BagOrdering{}
@@ -114,7 +127,7 @@ func (e InvalidFieldBagFormatter) MessageWithDetail(field string) (string, strin
 		if len(bag.BagName) == 1 {
 			detail += fmt.Sprintf("%s under %s", bag.Property, bag.BagName[0])
 		} else {
-			detail += fmt.Sprintf("%s under either %s", bag.Property, OrList(bag.BagName))
+			detail += fmt.Sprintf("%s under keys %s", bag.Property, AndList(bag.BagName))
 		}
 	}
 	if len(bags) == 1 {
