@@ -2,7 +2,10 @@
 
 package diags
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // editDistance calculates the Levenshtein distance between words a and b.
 func editDistance(a, b string) int {
@@ -58,4 +61,20 @@ func sortByEditDistance(words []string, comparedTo string) []string {
 		return v(w[i]) < v(w[j])
 	})
 	return w
+}
+
+// A list that displays in a human readable format.
+type HumanList []string
+
+func (h HumanList) String() string {
+	switch len(h) {
+	case 0:
+		return ""
+	case 1:
+		return h[0]
+	case 2:
+		return fmt.Sprintf("%s and %s", h[0], h[1])
+	default:
+		return fmt.Sprintf("%s, %s", h[0], HumanList(h[1:]))
+	}
 }
