@@ -66,14 +66,14 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 	if s := v.Syntax(); s != nil {
 		if o, ok := s.(*syntax.ObjectNode); ok {
-			valid := []string{"type", "properties", "options", "condition", "metadata"}
+			validKeys := []string{"type", "properties", "options", "condition", "metadata"}
 			fmtr := yamldiags.InvalidFieldBagFormatter{
 				ParentLabel: fmt.Sprintf("Resource %s", typ.String()),
 				MaxListed:   5,
 				Bags: []yamldiags.TypeBag{
 					{Name: "properties", Properties: allProperties},
 					{Name: "options", Properties: allOptions},
-					{Name: k, Properties: valid},
+					{Name: k, Properties: validKeys},
 				},
 				DistanceLimit: 3,
 			}
@@ -81,14 +81,14 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				prop := o.Index(i)
 				key := prop.Key.Value()
 				keyLower := strings.ToLower(key)
-				isValid := false
-				for _, k := range valid {
+				valid := false
+				for _, k := range validKeys {
 					if k == keyLower {
-						isValid = true
+						valid = true
 						break
 					}
 				}
-				if isValid {
+				if valid {
 					// This is a valid option, so we don't error
 					continue
 				}
