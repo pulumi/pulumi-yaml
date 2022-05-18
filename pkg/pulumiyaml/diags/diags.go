@@ -104,13 +104,29 @@ func (e InvalidFieldBagFormatter) MessageWithDetail(field string) (string, strin
 	// We have an exact match, so only show exact matches.
 	if bags[0].rank == 0 {
 		names := e.ExactMatching(field)
-		detail := fmt.Sprintf("'%s' exists under %s", field, HumanList(names))
+		detail := fmt.Sprintf("'%s' exists under %s", field, AndList(names))
 		return summary, detail
 	}
 
 	// We have matches but none are exact
-	// TODO
 	detail := fmt.Sprintf("Did you mean ")
+	addBag := func(bag BagOrdering) {
+		if len(bag.BagName) == 1 {
+			detail += fmt.Sprintf("%s under %s", bag.Property, bag.BagName[0])
+		} else {
+			detail += fmt.Sprintf("%s under either %s", bag.Property, OrList(bag.BagName))
+		}
+	}
+	if len(bags) == 1 {
+		addBag(bags[0])
+	} else {
+		detail += "any of:\n"
+		for _, bag := range bags {
+			detail += "  - "
+			addBag(bag)
+			detail += "\n"
+		}
+	}
 	return summary, detail
 }
 
