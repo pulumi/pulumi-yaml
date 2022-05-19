@@ -31,7 +31,7 @@ func Schema(decl *ast.TemplateDecl) schema.PackageSpec {
 		ObjectTypeSpec: schema.ObjectTypeSpec{
 			Description: pkg.Description,
 			Properties:  map[string]schema.PropertySpec{},
-			Type:        pkg.Name + ":" + pkg.Name,
+			Type:        pkg.Name + ":Component",
 			Required:    []string{},
 		},
 		InputProperties: map[string]schema.PropertySpec{},

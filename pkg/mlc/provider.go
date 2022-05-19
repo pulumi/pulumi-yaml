@@ -28,9 +28,6 @@ import (
 	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 )
 
-// Install by sticking the file in the normal ~/.pulumi/plugins
-// With #!/bin/env -S pulumi-language-yaml -serve ${NAME} at the top
-
 // Serve launches the gRPC server for the resource provider.
 func Serve(name string) error {
 	path := execPath(name)
