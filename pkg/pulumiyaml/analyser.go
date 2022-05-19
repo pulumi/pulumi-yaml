@@ -97,6 +97,33 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 			}
 		}
 	}
+
+	if s := v.Options.Syntax(); s != nil {
+		if o, ok := s.(*syntax.ObjectNode); ok {
+			fmtr := yamldiags.NonExistantFieldFormatter{
+				ParentLabel:         "resource options",
+				Fields:              allOptions,
+				MaxElements:         5,
+				FieldsAreProperties: false,
+			}
+			optionsLower := map[string]struct{}{}
+			for k := range options {
+				optionsLower[strings.ToLower(k)] = struct{}{}
+			}
+			for i := 0; i < o.Len(); i++ {
+				prop := o.Index(i)
+				key := prop.Key.Value()
+				keyLower := strings.ToLower(key)
+				if _, has := optionsLower[keyLower]; has {
+					continue
+				}
+				summary, detail := fmtr.MessageWithDetail(key, key)
+				subject := prop.Key.Syntax().Range()
+				ctx.addDiag(syntax.Error(subject, summary, detail))
+			}
+		}
+	}
+
 	return true
 }
 
@@ -369,7 +396,11 @@ func ResourceOptionsTypeHint() FieldsTypeHint {
 		if !f.IsExported() {
 			continue
 		}
-		m[f.Name] = nil
+		name := f.Name
+		if name != "" {
+			name = strings.ToLower(name[:1]) + name[1:]
+		}
+		m[name] = nil
 	}
 	return m
 }
