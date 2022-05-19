@@ -76,14 +76,13 @@ func (d Diagnostics) HasErrors() bool {
 
 // Error implements the error interface so that Diagnostics values may interoperate with APIs that use errors.
 func (d Diagnostics) Error() string {
-	count := len(d)
-	switch {
-	case count == 0:
+	switch len(d) {
+	case 0:
 		return "no diagnostics"
-	case count == 1:
+	case 1:
 		return d[0].Error()
 	default:
-		return fmt.Sprintf("%s, and %d other diagnostic(s)", d[0].Error(), count-1)
+		return fmt.Sprintf("%s, and %d other diagnostic(s)", d[0].Error(), len(d)-1)
 	}
 }
 

@@ -255,7 +255,6 @@ func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	if err != nil {
 		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
 	} else {
-		diag.Shown = true
 		s := buf.String()
 		// We strip off the appropriate HCL error message, since it will be
 		// added back on via the pulumi.Log framework.
@@ -270,6 +269,8 @@ func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	}
 	if err != nil {
 		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
 	}
 }
 
