@@ -189,6 +189,84 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	return nil
 }
 
+func RunComponentTemplate(ctx *pulumi.Context,
+	tk, name string, options pulumi.ResourceOption,
+	t *ast.TemplateDecl, inputs pulumi.Map, loader PackageLoader) (pulumi.URNOutput, pulumi.Map, error) {
+	runner := newRunner(ctx, t, loader)
+
+	diags := TypeCheck(runner)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+
+	component := &componentEvaluator{
+		inputs:  inputs,
+		outputs: pulumi.Map{},
+	}
+
+	if err := ctx.RegisterComponentResource(tk, name, component, options); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+
+	diags.Extend(runner.Run(component)...)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+	if err := ctx.RegisterResourceOutputs(component, component.outputs); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+	return component.URN(), component.outputs, nil
+}
+
+type componentEvaluator struct {
+	pulumi.ResourceState
+
+	inputs  pulumi.Map
+	outputs pulumi.Map
+}
+
+func (m *componentEvaluator) EvalConfig(r *runner, node configNode) bool {
+	k := node.Key.Value
+	v, ok := m.inputs[k]
+	if ok {
+		r.config[k] = v
+		return true
+	}
+	return evaluator{}.EvalConfig(r, node)
+}
+
+func (m *componentEvaluator) EvalVariable(r *runner, node variableNode) bool {
+	return evaluator{}.EvalVariable(r, node)
+}
+func (m *componentEvaluator) EvalResource(r *runner, node resourceNode) bool {
+	ctx := r.newContext(node)
+	res, ok := ctx.registerResourceDefaultParent(node, m)
+	if !ok {
+		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		r.resources[node.Key.Value] = res
+	}
+	return true
+}
+func (m *componentEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+	ctx := r.newContext(node)
+	out, ok := ctx.registerOutput(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		m.outputs[node.Key.Value] = out
+	}
+	return true
+}
+
 type syncDiags struct {
 	diags syntax.Diagnostics
 	mutex sync.Mutex
@@ -429,7 +507,6 @@ func (evaluator) EvalResource(r *runner, node resourceNode) bool {
 		r.resources[node.Key.Value] = res
 	}
 	return true
-
 }
 
 func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
@@ -677,6 +754,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 }
 
 func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, bool) {
+	return ctx.registerResourceDefaultParent(kvp, nil)
+}
+
+func (ctx *evalContext) registerResourceDefaultParent(kvp resourceNode, parent pulumi.Resource) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
@@ -755,6 +836,8 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		} else {
 			overallOk = false
 		}
+	} else {
+		opts = append(opts, pulumi.Parent(parent))
 	}
 	if v.Options.Protect != nil {
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))

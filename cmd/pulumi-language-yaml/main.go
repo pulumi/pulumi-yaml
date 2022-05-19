@@ -19,8 +19,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/pulumi/pulumi-yaml/pkg/mlc"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
@@ -32,6 +35,32 @@ import (
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the
 // LanguageRuntimeServer RPC endpoint.
 func main() {
+	var serve string
+	flag.StringVar(&serve, "serve", "", "Host a Pulumi YAML program as a Pulumi Component Provider")
+	// We need to do this before interacting with the flags since that alters
+	// global state, and mlc.Serve also calls flag.Parse().
+	for i := 0; i < len(os.Args); i++ {
+		if os.Args[i] == "-serve" {
+			if i+1 == len(os.Args) {
+				cmdutil.ExitError("the -serve flag needs an argument")
+			}
+			serve = os.Args[i+1]
+			pluginDir := filepath.Join(os.Getenv("HOME"), ".pulumi", "plugins")
+			folder := fmt.Sprintf("resource-%s-v1.0.0", serve)
+			file := fmt.Sprintf("pulumi-resource-%s", serve)
+			path := filepath.Join(pluginDir, folder, file)
+
+			// Remove the serve flag
+			os.Args = append(os.Args[:i], os.Args[i+2:]...)
+			// Remove the host location flag flag
+			os.Args = append(os.Args[:1], os.Args[2:]...)
+			if err := mlc.Serve(path); err != nil {
+				fmt.Fprintf(os.Stderr, "Found arguments: %q\n", os.Args)
+				cmdutil.Exit(err)
+			}
+			return
+		}
+	}
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
 	var root string

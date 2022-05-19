@@ -396,6 +396,7 @@ type TemplateDecl struct {
 
 	syntax syntax.Node
 
+	Name          *StringExpr
 	Description   *StringExpr
 	Configuration ConfigMapDecl
 	Variables     VariablesMapDecl
