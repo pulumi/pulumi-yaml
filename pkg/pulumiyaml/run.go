@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -243,19 +244,33 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 }
 
 func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
-	ctx.sdiags.Extend(diag)
-	ctx.runner.sdiags.Extend(diag)
+	defer func() {
+		ctx.sdiags.Extend(diag)
+		ctx.runner.sdiags.Extend(diag)
+	}()
 
 	var buf bytes.Buffer
 	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
-	err := w.WriteDiagnostic(diag)
+	err := w.WriteDiagnostic(diag.HCL())
 	if err != nil {
 		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
 	} else {
-		err = ctx.ctx.Log.Error(buf.String(), &pulumi.LogArgs{})
+		s := buf.String()
+		// We strip off the appropriate HCL error message, since it will be
+		// added back on via the pulumi.Log framework.
+		switch diag.Severity {
+		case hcl.DiagWarning:
+			s = strings.TrimPrefix(s, "Warning: ")
+			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
+		default:
+			s = strings.TrimPrefix(s, "Error: ")
+			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
+		}
 	}
 	if err != nil {
 		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
 	}
 }
 

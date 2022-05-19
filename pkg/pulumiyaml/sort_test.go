@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-func diagString(d *hcl.Diagnostic) string {
+func diagString(d *syntax.Diagnostic) string {
 	if d.Subject != nil {
 		return fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
 	} else if d.Context != nil {
@@ -31,7 +30,7 @@ func requireNoErrors(t *testing.T, tmpl *ast.TemplateDecl, diags syntax.Diagnost
 			if tmpl != nil {
 				var buf bytes.Buffer
 				w := tmpl.NewDiagnosticWriter(&buf, 0, true)
-				err := w.WriteDiagnostic(d)
+				err := w.WriteDiagnostic(d.HCL())
 				assert.NoError(t, err)
 				t.Log(buf.String())
 			} else {

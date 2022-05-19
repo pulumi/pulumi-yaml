@@ -45,14 +45,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 			subject := kvp.Key.Syntax().Syntax().Range()
 			valueRange := kvp.Value.Syntax().Syntax().Range()
 			context := hcl.RangeOver(*subject, *valueRange)
-			ctx.addDiag(&syntax.Diagnostic{
-				Severity:    hcl.DiagError,
-				Summary:     summary,
-				Detail:      detail,
-				Subject:     subject,
-				Context:     &context,
-				EvalContext: &hcl.EvalContext{},
-			})
+			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
 		} else {
 			tc.exprs[kvp.Value] = typ
 		}
@@ -99,12 +92,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 						k, match[0], key, prop.Value)
 				}
 
-				ctx.addDiag(&syntax.Diagnostic{
-					Severity: hcl.DiagError,
-					Summary:  summary,
-					Detail:   detail,
-					Subject:  prop.Key.Syntax().Range(),
-				})
+				subject := prop.Key.Syntax().Range()
+				ctx.addDiag(syntax.Error(subject, summary, detail))
 			}
 		}
 	}
@@ -131,14 +120,10 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	for _, prop := range t.CallArgs.Entries {
 		k := prop.Key.(*ast.StringExpr).Value
 		if typ, ok := inputs[k]; !ok {
-			msg, detail := fmtr.MessageWithDetail(k, k)
-			ctx.addDiag(&syntax.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  msg,
-				Detail:   detail,
-				Subject:  prop.Key.Syntax().Syntax().Range(),
-				Context:  t.Syntax().Syntax().Range(),
-			})
+			summary, detail := fmtr.MessageWithDetail(k, k)
+			subject := prop.Key.Syntax().Syntax().Range()
+			context := t.Syntax().Syntax().Range()
+			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
 		} else {
 			tc.exprs[prop.Value] = typ
 		}

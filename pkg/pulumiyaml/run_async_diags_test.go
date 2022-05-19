@@ -92,7 +92,7 @@ resources:
 	assert.Equal(t, "<stdin>:9:12: list index 1 out-of-bounds for list of length 1", diagString(hoistedRunner.sdiags.diags[0]))
 
 	// 4. We have rich logs sent to Pulumi:
-	richError := `Error: list index 1 out-of-bounds for list of length 1
+	richError := `list index 1 out-of-bounds for list of length 1
 
   on <stdin> line 9:
    1: name: test-yaml
