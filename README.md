@@ -149,7 +149,7 @@ To specify resources in `dependsOn`, `parent`, `provider`, and `providers`, use
 | Property        | Type | Required           | Expressions  | Description |
 | ------------- |---|-------------| -----|---|
 | `additionalSecretOutputs`      | string[] | No | No | AdditionalSecretOutputs specifies properties that must be encrypted as secrets |
-| `aliases`      | string[] | No | No | Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it |
+| `aliases`      | string[] | No | No | Aliases specifies names that this resource used to have, so that renaming or refactoring doesn’t replace it |
 | `customTimeouts`      | [Custom Timeout](#custom-timeout) | No | No | CustomTimeouts overrides the default retry/timeout behavior for resource provisioning |
 | `deleteBeforeReplace`      | bool | No | No | DeleteBeforeReplace  overrides the default create-before-delete behavior when replacing |
 | `dependsOn`      | Expression[] | No | Yes | DependsOn makes this resource explicitly depend on another resource, by name, so that it won't be created before the dependent finishes being created (and the reverse for destruction). Normally, Pulumi automatically tracks implicit dependencies through inputs/outputs, but this can be used when dependencies aren't captured purely from input/output edges.|
