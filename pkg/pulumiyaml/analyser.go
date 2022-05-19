@@ -4,6 +4,8 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -25,9 +27,9 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
-	fields := hint.InputProperties()
+	properties := hint.InputProperties()
 	var allProperties []string
-	for k := range fields {
+	for k := range properties {
 		allProperties = append(allProperties, k)
 	}
 	fmtr := yamldiags.NonExistantFieldFormatter{
@@ -38,7 +40,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 
 	for _, kvp := range v.Properties.Entries {
-		if typ, hasField := fields[kvp.Key.Value]; !hasField {
+		if typ, hasField := properties[kvp.Key.Value]; !hasField {
 			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
 			subject := kvp.Key.Syntax().Syntax().Range()
 			valueRange := kvp.Value.Syntax().Syntax().Range()
@@ -49,7 +51,6 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				Detail:      detail,
 				Subject:     subject,
 				Context:     &context,
-				Expression:  nil,
 				EvalContext: &hcl.EvalContext{},
 			})
 		} else {
@@ -57,6 +58,56 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		}
 	}
 	tc.resources[node.Value] = hint.Fields()
+
+	options := ResourceOptionsTypeHint()
+	allOptions := make([]string, 0, len(options))
+	for k := range options {
+		allOptions = append(allOptions, k)
+	}
+	if s := v.Syntax(); s != nil {
+		if o, ok := s.(*syntax.ObjectNode); ok {
+			validKeys := []string{"type", "properties", "options", "condition", "metadata"}
+			fmtr := yamldiags.InvalidFieldBagFormatter{
+				ParentLabel: fmt.Sprintf("Resource %s", typ.String()),
+				MaxListed:   5,
+				Bags: []yamldiags.TypeBag{
+					{Name: "properties", Properties: allProperties},
+					{Name: "options", Properties: allOptions},
+					{Name: k, Properties: validKeys},
+				},
+				DistanceLimit: 3,
+			}
+			for i := 0; i < o.Len(); i++ {
+				prop := o.Index(i)
+				key := prop.Key.Value()
+				keyLower := strings.ToLower(key)
+				valid := false
+				for _, k := range validKeys {
+					if k == keyLower {
+						valid = true
+						break
+					}
+				}
+				if valid {
+					// This is a valid option, so we don't error
+					continue
+				}
+
+				summary, detail := fmtr.MessageWithDetail(key)
+				if match := fmtr.ExactMatching(key); len(match) == 1 {
+					detail += fmt.Sprintf(", e.g.\n\n%s:\n  # ...\n  %s:\n    %s: %s",
+						k, match[0], key, prop.Value)
+				}
+
+				ctx.addDiag(&syntax.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  summary,
+					Detail:   detail,
+					Subject:  prop.Key.Syntax().Range(),
+				})
+			}
+		}
+	}
 	return true
 }
 
@@ -322,4 +373,18 @@ func (e walker) walkStringList(ctx *evalContext, l *ast.StringListDecl) bool {
 		}
 	}
 	return true
+}
+
+// Compute the set of fields valid for the resource options.
+func ResourceOptionsTypeHint() FieldsTypeHint {
+	typ := reflect.TypeOf(ast.ResourceOptionsDecl{})
+	m := FieldsTypeHint{}
+	for i := 0; i < typ.NumField(); i++ {
+		f := typ.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		m[f.Name] = nil
+	}
+	return m
 }
