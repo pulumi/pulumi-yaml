@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-yaml/pkg/mlc"
@@ -39,36 +38,37 @@ func main() {
 	flag.StringVar(&serve, "serve", "", "Host a Pulumi YAML program as a Pulumi Component Provider")
 	// We need to do this before interacting with the flags since that alters
 	// global state, and mlc.Serve also calls flag.Parse().
-	for i := 0; i < len(os.Args); i++ {
-		if os.Args[i] == "-serve" {
-			if i+1 == len(os.Args) {
-				cmdutil.ExitError("the -serve flag needs an argument")
-			}
-			serve = os.Args[i+1]
-			pluginDir := filepath.Join(os.Getenv("HOME"), ".pulumi", "plugins")
-			folder := fmt.Sprintf("resource-%s-v1.0.0", serve)
-			file := fmt.Sprintf("pulumi-resource-%s", serve)
-			path := filepath.Join(pluginDir, folder, file)
-
-			// Remove the serve flag
-			os.Args = append(os.Args[:i], os.Args[i+2:]...)
-			// Remove the host location flag flag
-			os.Args = append(os.Args[:1], os.Args[2:]...)
-			if err := mlc.Serve(path); err != nil {
-				fmt.Fprintf(os.Stderr, "Found arguments: %q\n", os.Args)
-				cmdutil.Exit(err)
-			}
-			return
+	if mlc.ShouldServe(os.Args) {
+		serve, err := mlc.GetAndCleanArgs()
+		if err != nil {
+			cmdutil.Exit(err)
 		}
+		if err := mlc.Serve(serve); err != nil {
+			fmt.Fprintf(os.Stderr, "Found arguments: %q\n", os.Args)
+			cmdutil.Exit(err)
+		}
+		return
 	}
+
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
 	var root string
 	var compiler string
+	var install string
 	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
 	flag.StringVar(&root, "root", "", "Root of the program execution")
 	flag.StringVar(&compiler, "compiler", "", "Compiler to use to pre-process YAML")
+	flag.StringVar(&install, "install", "", "Install the file as a component resource plugin")
 	flag.Parse()
+
+	if install != "" {
+		err := mlc.InstallPlugin(install)
+		if err != nil {
+			cmdutil.Exit(err)
+		}
+		return
+	}
+
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
 	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
