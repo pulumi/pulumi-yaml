@@ -1425,6 +1425,25 @@ func (ctx *evalContext) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, b
 	return selectFn(index, values)
 }
 
+func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interface{}, bool) {
+	str, ok := ctx.evaluateExpr(v.Value)
+	if !ok {
+		return nil, false
+	}
+	fromBase64 := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+		s, ok := args[0].(string)
+		if !ok {
+			return nil, false
+		}
+		b, err := b64.StdEncoding.DecodeString(s)
+		if err != nil {
+			return nil, false
+		}
+		return b, true
+	})
+	return fromBase64(str)
+}
+
 func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, bool) {
 	str, ok := ctx.evaluateExpr(v.Value)
 	if !ok {

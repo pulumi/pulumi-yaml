@@ -715,6 +715,7 @@ func (imp *importer) assignNames() {
 		"fileAsset",
 		"filebase64",
 		"filebase64sha256",
+		"fromBase64",
 		"invoke",
 		"join",
 		"length",

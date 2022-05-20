@@ -540,6 +540,19 @@ func Select(index Expr, values Expr) *SelectExpr {
 	}
 }
 
+type FromBase64Expr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func FromBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value Expr) *FromBase64Expr {
+	return &FromBase64Expr{
+		builtinNode: builtin(node, name, args),
+		Value:       value,
+	}
+}
+
 type ToBase64Expr struct {
 	builtinNode
 

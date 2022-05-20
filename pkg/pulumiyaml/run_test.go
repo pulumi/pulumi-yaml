@@ -1069,6 +1069,75 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestFromBase64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    *ast.FromBase64Expr
+		expected string
+		isOutput bool
+	}{
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("dGhpcyBpcyBhIHRlc3Q="),
+			},
+			expected: "this is a test",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: &ast.JoinExpr{
+					Delimiter: ast.String(""),
+					Values: ast.List(
+						ast.String("My4xN"),
+						ast.String("DE1OTI="),
+					),
+				}},
+			expected: "3.141592",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: &ast.ToBase64Expr{
+					Value: ast.String("test"),
+				},
+			},
+			expected: "test",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *evalContext) {
+				v, ok := r.evaluateBuiltinFromBase64(tt.input)
+				assert.True(t, ok)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						s := b64.StdEncoding.EncodeToString([]byte(tt.expected))
+						assert.Equal(t, s, v)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, string(v.([]byte)))
+				}
+			})
+		})
+	}
+
+}
+
 func TestToBase64(t *testing.T) {
 	t.Parallel()
 
