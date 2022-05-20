@@ -1,0 +1,9 @@
+name: random
+runtime: yaml
+outputs:
+  strVar: "foo"
+  arrVar:
+  - fizz
+  - buzz
+  readme:
+    Fn::ReadFile: ./Pulumi.README.md

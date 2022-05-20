@@ -65,6 +65,7 @@ var (
 		"azure-app-service":       Dotnet.And(Golang),
 		"pulumi-variable":         AllLanguages().Except(Python),
 		"kubernetes":              Golang, // returning string instead of *string in ApplyT
+		"readme":                  Dotnet, // https://github.com/pulumi/pulumi/issues/9642
 	}
 
 	failingTypecheck = map[string]LanguageList{

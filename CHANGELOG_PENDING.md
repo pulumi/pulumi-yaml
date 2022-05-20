@@ -11,6 +11,9 @@
 - Add `Fn::FromBase64`
   [#218](https://github.com/pulumi/pulumi-yaml/pull/218)
 
+- Add support for Fn::ReadFile, enabling [Stack README](https://www.pulumi.com/blog/stack-readme/) support.
+  [#217](https://github.com/pulumi/pulumi-yaml/pull/217)
+
 ### Bug Fixes
 
 - De-duplicate error message added during pre-eval checking.

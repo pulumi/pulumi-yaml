@@ -694,6 +694,22 @@ func SecretSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *SecretE
 	}
 }
 
+type ReadFileExpr struct {
+	builtinNode
+	Path Expr
+}
+
+func ReadFileSyntax(node syntax.Node, name *StringExpr, path Expr) *ReadFileExpr {
+	return &ReadFileExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: path},
+		Path:        path,
+	}
+}
+
+func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, syntax.Diagnostics) {
+	return ReadFileSyntax(node, name, path), nil
+}
+
 func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) {
 	if node.Len() != 1 {
 		return nil, nil, false
@@ -702,29 +718,36 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	kvp := node.Index(0)
 
 	var parse func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)
-	switch kvp.Key.Value() {
-	case "Fn::Invoke":
-		parse = parseInvoke
-	case "Fn::Join":
-		parse = parseJoin
-	case "Fn::ToJSON":
-		parse = parseToJSON
-	case "Fn::ToBase64":
-		parse = parseToBase64
-	case "Fn::FromBase64":
-		parse = parseFromBase64
-	case "Fn::Select":
-		parse = parseSelect
-	case "Fn::Split":
-		parse = parseSplit
-	case "Fn::StackReference":
-		parse = parseStackReference
-	case "Fn::AssetArchive":
-		parse = parseAssetArchive
-	case "Fn::Secret":
-		parse = parseSecret
-	default:
-		return nil, nil, false
+
+	key := kvp.Key.Value()
+
+	if strings.HasPrefix(key, "Fn::") {
+		switch key {
+		case "Fn::Invoke":
+			parse = parseInvoke
+		case "Fn::Join":
+			parse = parseJoin
+		case "Fn::ToJSON":
+			parse = parseToJSON
+		case "Fn::ToBase64":
+			parse = parseToBase64
+		case "Fn::FromBase64":
+			parse = parseFromBase64
+		case "Fn::Select":
+			parse = parseSelect
+		case "Fn::Split":
+			parse = parseSplit
+		case "Fn::StackReference":
+			parse = parseStackReference
+		case "Fn::AssetArchive":
+			parse = parseAssetArchive
+		case "Fn::Secret":
+			parse = parseSecret
+		case "Fn::ReadFile":
+			parse = parseReadFile
+		default:
+			return nil, nil, false
+		}
 	}
 
 	var diags syntax.Diagnostics

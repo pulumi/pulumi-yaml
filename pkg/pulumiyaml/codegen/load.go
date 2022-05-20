@@ -322,6 +322,16 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			},
 			Key: propertyName,
 		}, diags
+	case *ast.ReadFileExpr:
+		var diags syntax.Diagnostics
+
+		path, pdiags := imp.importExpr(node.Path, nil)
+		diags.Extend(pdiags...)
+
+		return &model.FunctionCallExpression{
+			Name: "readFile",
+			Args: []model.Expression{path},
+		}, pdiags
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil
