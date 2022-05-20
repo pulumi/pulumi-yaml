@@ -718,36 +718,31 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	kvp := node.Index(0)
 
 	var parse func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)
-
-	key := kvp.Key.Value()
-
-	if strings.HasPrefix(key, "Fn::") {
-		switch key {
-		case "Fn::Invoke":
-			parse = parseInvoke
-		case "Fn::Join":
-			parse = parseJoin
-		case "Fn::ToJSON":
-			parse = parseToJSON
-		case "Fn::ToBase64":
-			parse = parseToBase64
-		case "Fn::FromBase64":
-			parse = parseFromBase64
-		case "Fn::Select":
-			parse = parseSelect
-		case "Fn::Split":
-			parse = parseSplit
-		case "Fn::StackReference":
-			parse = parseStackReference
-		case "Fn::AssetArchive":
-			parse = parseAssetArchive
-		case "Fn::Secret":
-			parse = parseSecret
-		case "Fn::ReadFile":
-			parse = parseReadFile
-		default:
-			return nil, nil, false
-		}
+	switch kvp.Key.Value() {
+	case "Fn::Invoke":
+		parse = parseInvoke
+	case "Fn::Join":
+		parse = parseJoin
+	case "Fn::ToJSON":
+		parse = parseToJSON
+	case "Fn::ToBase64":
+		parse = parseToBase64
+	case "Fn::FromBase64":
+		parse = parseFromBase64
+	case "Fn::Select":
+		parse = parseSelect
+	case "Fn::Split":
+		parse = parseSplit
+	case "Fn::StackReference":
+		parse = parseStackReference
+	case "Fn::AssetArchive":
+		parse = parseAssetArchive
+	case "Fn::Secret":
+		parse = parseSecret
+	case "Fn::ReadFile":
+		parse = parseReadFile
+	default:
+		return nil, nil, false
 	}
 
 	var diags syntax.Diagnostics
