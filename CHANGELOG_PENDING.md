@@ -12,3 +12,6 @@
 
 - De-duplicate error message added during pre-eval checking.  
   [#207](https://github.com/pulumi/pulumi-yaml/pull/207)
+
+- Prevent invokes without inputs from crashing `pulumi-language-yaml`.  
+  [#216](https://github.com/pulumi/pulumi-yaml/pull/216)
