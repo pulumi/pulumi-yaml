@@ -18,4 +18,4 @@
 
 - Allow Fn::ToBase64 to take expressions as inputs, was previously constrained to only allow a
   string constant.
-  [#216](https://github.com/pulumi/pulumi-yaml/pull/216)
+  [#221](https://github.com/pulumi/pulumi-yaml/pull/221)
