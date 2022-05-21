@@ -33,6 +33,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
 var (
@@ -55,7 +56,6 @@ var (
 		"stackreference-consumer": AllLanguages().Except(Python),
 		"random":                  Dotnet.And(Nodejs),
 		"azure-static-website":    AllLanguages(),
-		"awsx-fargate":            AllLanguages(), // blocked on https://github.com/pulumi/pulumi-yaml/issues/185
 		"aws-static-website":      AllLanguages().Except(Python),
 		"webserver":               AllLanguages().Except(Nodejs),
 		"azure-container-apps":    AllLanguages(),
@@ -67,18 +67,22 @@ var (
 		"kubernetes":              Golang, // returning string instead of *string in ApplyT
 	}
 
+	failingTypecheck = map[string]LanguageList{
+		"awsx-fargate": Nodejs, // https://github.com/pulumi/pulumi-awsx/issues/853
+	}
+
 	langTests = []ConvertFunc{
-		convertTo("nodejs", nodejs.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			nodejs.Check(t, filepath.Join(dir, "index.ts"), deps, false)
+		convertTo("nodejs", nodejs.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			nodejs.TypeCheck(t, filepath.Join(dir, "index.ts"), deps, false)
 		}),
-		convertTo("python", python.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+		convertTo("python", python.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
 			python.Check(t, filepath.Join(dir, "__main__.py"), deps)
 		}),
-		convertTo("go", gogen.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			gogen.Check(t, filepath.Join(dir, "main.go"), deps, "")
+		convertTo("go", gogen.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			gogen.TypeCheck(t, filepath.Join(dir, "main.go"), deps, "")
 		}),
-		convertTo("dotnet", dotnet.GenerateProgram, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			dotnet.Check(t, filepath.Join(dir, "Program.cs"), deps, "")
+		convertTo("dotnet", dotnet.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			dotnet.TypeCheck(t, filepath.Join(dir, "Program.cs"), deps, "")
 		}),
 	}
 )
@@ -109,8 +113,9 @@ func makeAbs(path string) string {
 // ```
 //
 // This will add the current transpile result to the known results.
-//nolint:paralleltest // yarn install concurrency bug if two "yarn" executions try to cache a file
 func TestGenerateExamples(t *testing.T) {
+	t.Parallel()
+
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
 	// The various generate functions are not thread safe, and several mutate
@@ -126,7 +131,9 @@ func TestGenerateExamples(t *testing.T) {
 	for _, dir := range examples {
 		dir := dir
 
-		if _, err := os.Stat(filepath.Join(examplesPath, dir.Name(), "Pulumi.yaml")); errors.Is(err, os.ErrNotExist) {
+		exampleProjectDir := filepath.Join(examplesPath, dir.Name())
+
+		if _, err := os.Stat(filepath.Join(exampleProjectDir, "Pulumi.yaml")); errors.Is(err, os.ErrNotExist) {
 			t.Skip()
 		}
 
@@ -141,7 +148,7 @@ func TestGenerateExamples(t *testing.T) {
 				t.Skip()
 				return
 			}
-			_, template, diags, err := codegen.LoadTemplate(filepath.Join(examplesPath, dir.Name()))
+			_, template, diags, err := codegen.LoadTemplate(exampleProjectDir)
 			require.NoError(t, err, "Loading project %v", dir)
 			require.False(t, diags.HasErrors(), diags.Error())
 			assert.Len(t, diags, 0, "Should have neither warnings nor errors")
@@ -156,27 +163,27 @@ func TestGenerateExamples(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
-			for _, f := range langTests {
-				f(t, template, dir.Name(), &generateLock)
+			for _, testLang := range langTests {
+				testLang(t, exampleProjectDir, &generateLock)
 			}
 		})
 	}
 }
 
 var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
-	{Package: "aws", Version: "4.26.0"},
+	{Package: "aws", Version: "5.4.0"},
 	{Package: "azure-native", Version: "1.56.0"},
 	{Package: "azure", Version: "4.18.0"},
 	{Package: "kubernetes", Version: "3.7.2"},
 	{Package: "random", Version: "4.2.0"},
-	{Package: "eks", Version: "0.37.1"},
+	{Package: "eks", Version: "0.40.0"},
 	{Package: "aws-native", Version: "0.13.0"},
 	{Package: "docker", Version: "3.1.0"},
+	{Package: "awsx", Version: "1.0.0-beta.5"},
 
 	// Extra packages are to satisfy the versioning requirement of aws-eks.
 	// While the schemas are not the correct version, we rely on not
 	// depending on the difference between them.
-	{Package: "aws", Version: "4.15.0"},
 	{Package: "kubernetes", Version: "3.0.0"},
 }
 
@@ -230,8 +237,8 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnost
 
 }
 
-type ConvertFunc = func(t *testing.T, template *ast.TemplateDecl, dir string, lock *sync.Mutex)
-type CheckFunc = func(t *testing.T, dir string, deps pcodegen.StringSet)
+type ConvertFunc = func(t *testing.T, projectDir string, lock *sync.Mutex)
+type CheckFunc = func(t *testing.T, projectDir string, deps pcodegen.StringSet)
 
 func shouldBeParallel() bool {
 	v := os.Getenv("PULUMI_TEST_PARALLEL")
@@ -255,15 +262,18 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 	}
 }
 
-func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) ConvertFunc {
-	return func(t *testing.T, template *ast.TemplateDecl, name string, lock *sync.Mutex) {
+type projectGeneratorFunc func(directory string, project workspace.Project, p *pcl.Program) error
+
+func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) ConvertFunc {
+	return func(t *testing.T, projectDir string, lock *sync.Mutex) {
+		name := filepath.Base(projectDir)
 		writeTo := filepath.Join(outDir, name, lang)
 		t.Run(lang, func(t *testing.T) {
 			if failingCompile[name].Has(lang) {
 				t.Skipf("%s/%s is known to not produce valid code", name, lang)
 				return
 			}
-			if shouldBeParallel() {
+			if shouldBeParallel() && lang != "nodejs" {
 				t.Parallel()
 			}
 			var (
@@ -271,16 +281,17 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 				diags hcl.Diagnostics
 				err   error
 			)
-			func() {
-				// We embed the lock and generate in a lambda so we can
-				// a. use a defer to guarantee unlocking
-				// b. ensure the critical section is as short as possible
-				lock.Lock()
-				defer lock.Unlock()
-				files, diags, err = codegen.ConvertTemplate(template, generator, rootPluginLoader.Loader)
-			}()
+			err = os.MkdirAll(writeTo, 0700)
+			require.NoError(t, err, "Failed to create target dir")
+			_, template, diags, err := codegen.LoadTemplate(projectDir)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
+			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.Loader)
+			require.NoError(t, err, "Failed to eject program")
+
+			err = generator(writeTo, *proj, pclProgram)
+			require.NoError(t, err, "Failed to generate project")
+
 			writeOrCompare(t, writeTo, files)
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
@@ -291,6 +302,10 @@ func convertTo(lang string, generator codegen.GenerateFunc, check CheckFunc) Con
 				} else {
 					deps.Add(urn[0])
 				}
+			}
+
+			if failingTypecheck[name].Has(lang) {
+				return
 			}
 
 			check(t, writeTo, deps)

@@ -7,9 +7,10 @@ export PULUMI_TEST_OWNER
 CONCURRENCY       := 10
 SHELL := sh
 
-PLUGIN_VERSION_AWS          := 4.37.3
+PLUGIN_VERSION_AWS          := 5.4.0
 PLUGIN_VERSION_AWS_NATIVE   := 0.11.0
-PLUGIN_VERSION_AWSX         := 1.0.0-beta.1
+PLUGIN_VERSION_EKS          := 0.4.0
+PLUGIN_VERSION_AWSX         := 1.0.0-beta.5
 PLUGIN_VERSION_AZURE_NATIVE := 1.56.0
 PLUGIN_VERSION_RANDOM       := 4.3.1
 GO                          := go
@@ -23,6 +24,9 @@ get_plugins::
 	pulumi plugin install resource aws ${PLUGIN_VERSION_AWS}
 	pulumi plugin install resource random ${PLUGIN_VERSION_RANDOM}
 	pulumi plugin install resource aws-native ${PLUGIN_VERSION_AWS_NATIVE}
+	# Required for eks:
+	pulumi plugin install resource aws 4.15.0
+	pulumi plugin install resource eks # version fails
 	pulumi plugin install resource azure-native ${PLUGIN_VERSION_AZURE_NATIVE}
 	pulumi plugin install resource awsx ${PLUGIN_VERSION_AWSX}
 
@@ -30,6 +34,7 @@ update_plugin_docs::
 	./scripts/update_plugin_docs.sh aws ${PLUGIN_VERSION_AWS}
 	./scripts/update_plugin_docs.sh random ${PLUGIN_VERSION_RANDOM}
 	./scripts/update_plugin_docs.sh aws-native ${PLUGIN_VERSION_AWS_NATIVE}
+	./scripts/update_plugin_docs.sh eks ${PLUGIN_VERSION_EKS}
 	./scripts/update_plugin_docs.sh azure-native ${PLUGIN_VERSION_AZURE_NATIVE}
 	./scripts/update_plugin_docs.sh awsx ${PLUGIN_VERSION_AWSX}
 
@@ -76,22 +81,8 @@ endif
 test_gen: get_schemas
 	${GO} test --run=TestGenerate ./...
 
-name=$(subst schema-,,$(word 1,$(subst !, ,$@)))
-version=$(word 2,$(subst !, ,$@))
-schema-%:
-	@echo "Ensuring $@ => ${name}, ${version}"
-	@[ -f pkg/pulumiyaml/testing/test/testdata/${name}.json ] || \
-		curl "https://raw.githubusercontent.com/pulumi/pulumi-${name}/v${version}/provider/cmd/pulumi-resource-${name}/schema.json" \
-	 	| jq '.version = "${version}"' >  pkg/pulumiyaml/testing/test/testdata/${name}.json
-	@FOUND="$$(jq -r '.version' pkg/pulumiyaml/testing/test/testdata/${name}.json)" &&     \
-		if ! [ "$$FOUND" = "${version}" ]; then									           \
-			echo "${name} required version ${version} but found existing version $$FOUND"; \
-			exit 1;																		   \
-		fi
-get_schemas: schema-aws!4.26.0 schema-azure-native!1.56.0 \
-			 schema-azure!4.18.0 schema-kubernetes!3.7.2  \
-			 schema-random!4.2.0 schema-eks!0.37.1        \
-			 schema-aws-native!0.13.0 schema-docker!3.1.0
+get_schemas:
+	./scripts/get_schemas.sh
 
 # assuming both repos follow gopath conventions, copy *.pp files into testdata
 PULUMI_DIR := ../pulumi

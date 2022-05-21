@@ -19,7 +19,7 @@ To deploy your infrastructure, follow the below steps.
 1.  Install required plugins:
 
     ```bash
-    $ pulumi plugin install resource awsx 1.0.0-beta.1
+    $ pulumi plugin install resource awsx 1.0.0-beta.5
     ```
 
 1.  Create a new stack:
