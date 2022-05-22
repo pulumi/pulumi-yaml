@@ -8,16 +8,19 @@ import (
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
 type typeCache struct {
 	exprs         map[ast.Expr]schema.Type
 	resources     map[*ast.ResourceDecl]schema.Type
+	configuration map[string]schema.Type
 	resourceNames map[string]*ast.ResourceDecl
 	variableNames map[string]ast.Expr
 }
@@ -27,44 +30,165 @@ func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, t
 	tc.resources[resource] = typ
 }
 
-func isAssignable(from, to schema.Type) bool {
-	to = codegen.UnwrapType(to)
-	from = codegen.UnwrapType(from)
-	if schema.IsPrimitiveType(to) {
-		switch to {
-		case schema.NumberType, schema.IntType:
-			return from == schema.NumberType || from == schema.IntType
-		case schema.AnyType:
+// notAssignable represents the logic chain for why an assignment is not possible.
+type notAssignable struct {
+	reason   string
+	because  []*notAssignable
+	internal bool
+}
+
+func (n notAssignable) String() string {
+	return n.string(0)
+}
+
+func (n notAssignable) string(indent int) string {
+	s := strings.Repeat("  ", indent) + n.reason
+	if len(n.because) > 0 {
+		s += ":"
+	}
+	for _, arg := range n.because {
+		s += "\n" + arg.string(indent+1)
+	}
+	return s
+
+}
+
+func (n notAssignable) IsInternal() bool {
+	if n.internal {
+		return true
+	}
+	for _, b := range n.because {
+		if b.IsInternal() {
 			return true
-		default:
-			return from == to
 		}
 	}
-
-	switch from := from.(type) {
-	case *schema.ArrayType:
-		to, ok := to.(*schema.ArrayType)
-		if !ok {
-			return false
-		}
-		return isAssignable(from.ElementType, to.ElementType)
-	case *schema.MapType:
-		to, ok := to.(*schema.MapType)
-		if !ok {
-			return false
-		}
-		return isAssignable(from.ElementType, to.ElementType)
-	}
-
-	// TODO
 	return false
 }
 
+func (n notAssignable) Because(b ...*notAssignable) *notAssignable {
+	n.because = b
+	return &n
+}
+
+// isAssignable determines if the type `from` is assignable to the type `to`.
+func isAssignable(from, to schema.Type) *notAssignable {
+	to = codegen.UnwrapType(to)
+	from = codegen.UnwrapType(from)
+	fail := &notAssignable{
+		reason:   fmt.Sprintf("Cannot assign %s to type %s", from, to),
+		internal: false,
+	}
+	okIf := func(cond bool) *notAssignable {
+		if !cond {
+			return fail
+		}
+		return nil
+	}
+	okIfAssignable := func(s *notAssignable) *notAssignable {
+		if s == nil {
+			return nil
+		}
+		return fail.Because(s)
+	}
+	if schema.IsPrimitiveType(to) {
+		switch to {
+		case schema.NumberType, schema.IntType:
+			return okIf(from == schema.NumberType || from == schema.IntType)
+		case schema.AnyType:
+			return okIf(true)
+		case schema.StringType:
+			// Resources can coerce into strings (by implicitly calling urn)
+			_, isResource := from.(*schema.ResourceType)
+			return okIf(isResource || from == schema.StringType)
+		default:
+			return okIf(from == to)
+		}
+	}
+
+	switch to := to.(type) {
+	case *schema.UnionType:
+		reasons := []*notAssignable{}
+		for _, subtype := range to.ElementTypes {
+			because := isAssignable(from, subtype)
+			if because == nil {
+				return nil
+			}
+			reasons = append(reasons, because)
+		}
+		return fail.Because(reasons...)
+	case *schema.ArrayType:
+		from, ok := from.(*schema.ArrayType)
+		if !ok {
+			return fail
+		}
+		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
+	case *schema.MapType:
+		from, ok := from.(*schema.MapType)
+		if !ok {
+			return fail
+		}
+		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
+	case *schema.ResourceType:
+		from, ok := from.(*schema.ResourceType)
+		return okIf(ok && to.Token == from.Token)
+	case *schema.EnumType:
+		notAssignable := isAssignable(from, to.ElementType)
+		if notAssignable != nil {
+			return fail
+		}
+		// TODO: check that known enum values are type checked against valid
+		// values e.g. string "Foo" should not be assignable to
+		// type Enum { Type: string, Elements: ["fizz", "buzz"] }
+		return nil
+	case *schema.ObjectType:
+		// We implement structural typing for objects.
+		from, ok := from.(*schema.ObjectType)
+		if !ok {
+			return fail
+		}
+		for _, prop := range to.Properties {
+			fromProp, ok := from.Property(prop.Name)
+			if prop.IsRequired() && !ok {
+				return fail.Because(&notAssignable{reason: fmt.Sprintf("Missing required property '%s'", prop.Name)})
+			}
+			if !ok {
+				// We don't have an optional property, which is ok
+				continue
+			}
+			// We have a matching property, so the type must agree
+			notAssignable := isAssignable(fromProp.Type, prop.Type)
+			if notAssignable != nil {
+				return fail.Because(notAssignable)
+			}
+		}
+		return nil
+	case *schema.TokenType:
+		if to.UnderlyingType != nil {
+			return isAssignable(from, to.UnderlyingType)
+		}
+		return &notAssignable{reason: fmt.Sprintf("Unknown opaque type: %s", to.Token), internal: true}
+	default:
+		// We mark this an internal error since we don't recognize the type.
+		// This means we are missing a type, not that the user has an invalid
+		// program.
+		return &notAssignable{reason: fmt.Sprintf("Unknown type: %[1]s (%[1]T)", to), internal: true}
+	}
+}
+
 func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type) {
-	if isAssignable(from, to) {
+	result := isAssignable(from, to)
+	if result == nil {
 		return
 	}
-	ctx.addDiag(syntax.Error(loc, fmt.Sprintf("%s is not assignable from %s", to, from), " "))
+	summary := fmt.Sprintf("%s is not assignable from %s", to, from)
+	if result.IsInternal() {
+		ctx.addDiag(syntax.Warning(loc,
+			fmt.Sprintf("internal error: %s", summary),
+			result.String(),
+		))
+		return
+	}
+	ctx.addDiag(syntax.Error(loc, summary, result.String()))
 }
 
 func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
@@ -271,6 +395,9 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	if root, ok := tc.variableNames[t.Property.RootName()]; ok {
 		typ = tc.exprs[root]
 	}
+	if root, ok := tc.configuration[t.Property.RootName()]; ok {
+		typ = root
+	}
 	// TODO handle config here
 	runningName := t.Property.RootName()
 	for _, accessor := range t.Property.Accessors[1:] {
@@ -286,6 +413,8 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 				for _, prop := range typ.Resource.Properties {
 					properties[prop.Name] = prop.Type
 				}
+				properties["id"] = schema.StringType
+				properties["urn"] = schema.StringType
 			case *schema.InvalidType:
 				break
 			default:
@@ -370,9 +499,44 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
 		tc.exprs[t] = schema.StringType
 	case *ast.ListExpr:
-		// TODO: make this a union type
+		types := map[schema.Type]struct{}{}
+		for _, typ := range t.Elements {
+			types[tc.exprs[typ]] = struct{}{}
+		}
+		typeList := make([]schema.Type, 0, len(types))
+		for k := range types {
+			typeList = append(typeList, k)
+		}
+		var elementType schema.Type
+		switch len(typeList) {
+		case 0:
+			elementType = &schema.InvalidType{}
+		case 1:
+			elementType = typeList[0]
+		default:
+			elementType = &schema.UnionType{
+				ElementTypes: typeList,
+			}
+		}
+
 		tc.exprs[t] = &schema.ArrayType{
-			ElementType: schema.AnyType,
+			ElementType: elementType,
+		}
+	case *ast.ObjectExpr:
+		// This is an add hock object
+		properties := make([]*schema.Property, 0, len(t.Entries))
+		propNames := make([]string, 0, len(t.Entries))
+		for _, entry := range t.Entries {
+			k, v := entry.Key.(*ast.StringExpr), entry.Value
+			properties = append(properties, &schema.Property{
+				Name: k.Value,
+				Type: tc.exprs[v],
+			})
+			propNames = append(propNames, k.Value)
+		}
+		tc.exprs[t] = &schema.ObjectType{
+			Token:      "pulumi:adhock:" + strings.Join(propNames, "•"),
+			Properties: properties,
 		}
 	case *ast.NullExpr:
 		tc.exprs[t] = &schema.InvalidType{}
@@ -386,10 +550,48 @@ func (tc *typeCache) typeVariable(r *runner, node variableNode) bool {
 	return true
 }
 
+func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
+	k, v := node.Key.Value, node.Value
+	var typ schema.Type = &schema.InvalidType{}
+	switch {
+	case v.Default != nil:
+		typ = tc.exprs[v.Default]
+	case v.Type != nil:
+		ctype, ok := ctypes.Parse(v.Type.Value)
+		if ok {
+			typ = configTypeToSchema(ctype)
+		}
+	}
+	tc.configuration[k] = typ
+	return true
+}
+
+func configTypeToSchema(t ctypes.Type) schema.Type {
+	// TODO: remove config/config types. Replace them with schema types.
+	switch t := t.(type) {
+	case *ctypes.Primitive:
+		switch t {
+		case &ctypes.String:
+			return schema.StringType
+		case &ctypes.Boolean:
+			return schema.BoolType
+		case &ctypes.Number:
+			return schema.NumberType
+		}
+	case *ctypes.List:
+		return &schema.ArrayType{
+			ElementType: configTypeToSchema(t.Element()),
+		}
+	}
+
+	panic("Unexpected config type")
+}
+
 func newTypeCache() *typeCache {
 	return &typeCache{
 		exprs:         map[ast.Expr]schema.Type{},
 		resources:     map[*ast.ResourceDecl]schema.Type{},
+		configuration: map[string]schema.Type{},
 		resourceNames: map[string]*ast.ResourceDecl{},
 		variableNames: map[string]ast.Expr{},
 	}
@@ -403,6 +605,7 @@ func TypeCheck(r *runner) syntax.Diagnostics {
 		VisitResource: types.typeResource,
 		VisitExpr:     types.typeExpr,
 		VisitVariable: types.typeVariable,
+		VisitConfig:   types.typeConfig,
 	})
 
 	return diags
@@ -456,11 +659,6 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 }
 
 func (e walker) EvalConfig(r *runner, node configNode) bool {
-	if e.VisitConfig != nil {
-		if !e.VisitConfig(r, node) {
-			return false
-		}
-	}
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -470,6 +668,11 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 			return false
 		}
 		if !e.walk(ctx, node.Value.Secret) {
+			return false
+		}
+	}
+	if e.VisitConfig != nil {
+		if !e.VisitConfig(r, node) {
 			return false
 		}
 	}
