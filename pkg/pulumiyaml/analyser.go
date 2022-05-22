@@ -569,31 +569,47 @@ func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 func configTypeToSchema(t ctypes.Type) schema.Type {
 	// TODO: remove config/config types. Replace them with schema types.
 	switch t := t.(type) {
-	case *ctypes.Primitive:
+	case ctypes.Primitive:
 		switch t {
-		case &ctypes.String:
+		case ctypes.String:
 			return schema.StringType
-		case &ctypes.Boolean:
+		case ctypes.Boolean:
 			return schema.BoolType
-		case &ctypes.Number:
+		case ctypes.Number:
 			return schema.NumberType
 		}
-	case *ctypes.List:
+	case ctypes.List:
 		return &schema.ArrayType{
 			ElementType: configTypeToSchema(t.Element()),
 		}
 	}
 
-	panic("Unexpected config type")
+	panic(fmt.Sprintf("Unexpected config type: %[1] (%[1]T)", t))
 }
 
 func newTypeCache() *typeCache {
+	pulumiExpr := ast.Object(
+		ast.ObjectProperty{Key: ast.String("cwd")},
+		ast.ObjectProperty{Key: ast.String("project")},
+		ast.ObjectProperty{Key: ast.String("stack")},
+	)
 	return &typeCache{
-		exprs:         map[ast.Expr]schema.Type{},
+		exprs: map[ast.Expr]schema.Type{
+			pulumiExpr: &schema.ObjectType{
+				Token: "pulumi:builtin:pulumi",
+				Properties: []*schema.Property{
+					{Name: "cwd", Type: schema.StringType},
+					{Name: "project", Type: schema.StringType},
+					{Name: "stack", Type: schema.StringType},
+				},
+			},
+		},
 		resources:     map[*ast.ResourceDecl]schema.Type{},
 		configuration: map[string]schema.Type{},
 		resourceNames: map[string]*ast.ResourceDecl{},
-		variableNames: map[string]ast.Expr{},
+		variableNames: map[string]ast.Expr{
+			PulumiVarName: pulumiExpr,
+		},
 	}
 }
 
