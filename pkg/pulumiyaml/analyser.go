@@ -11,11 +11,60 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/pkg/v3/codegen"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 )
 
 type typeCache struct {
-	exprs     map[ast.Expr]TypeHint
-	resources map[*ast.ResourceDecl]TypeHint
+	exprs         map[ast.Expr]schema.Type
+	resources     map[*ast.ResourceDecl]schema.Type
+	resourceNames map[string]*ast.ResourceDecl
+	variableNames map[string]ast.Expr
+}
+
+func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, typ schema.Type) {
+	tc.resourceNames[name] = resource
+	tc.resources[resource] = typ
+}
+
+func isAssignable(from, to schema.Type) bool {
+	to = codegen.UnwrapType(to)
+	from = codegen.UnwrapType(from)
+	if schema.IsPrimitiveType(to) {
+		switch to {
+		case schema.NumberType, schema.IntType:
+			return from == schema.NumberType || from == schema.IntType
+		case schema.AnyType:
+			return true
+		default:
+			return from == to
+		}
+	}
+
+	switch from := from.(type) {
+	case *schema.ArrayType:
+		to, ok := to.(*schema.ArrayType)
+		if !ok {
+			return false
+		}
+		return isAssignable(from.ElementType, to.ElementType)
+	case *schema.MapType:
+		to, ok := to.(*schema.MapType)
+		if !ok {
+			return false
+		}
+		return isAssignable(from.ElementType, to.ElementType)
+	}
+
+	// TODO
+	return false
+}
+
+func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type) {
+	if isAssignable(from, to) {
+		return
+	}
+	ctx.addDiag(syntax.Error(loc, fmt.Sprintf("%s is not assignable from %s", to, from), " "))
 }
 
 func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
@@ -27,7 +76,10 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
-	properties := hint.InputProperties()
+	properties := map[string]*schema.Property{}
+	for _, prop := range hint.Resource.InputProperties {
+		properties[prop.Name] = prop
+	}
 	var allProperties []string
 	for k := range properties {
 		allProperties = append(allProperties, k)
@@ -47,11 +99,22 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 			context := hcl.RangeOver(*subject, *valueRange)
 			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
 		} else {
-			tc.exprs[kvp.Value] = typ
+			existing, ok := tc.exprs[kvp.Value]
+			rng := kvp.Key.Syntax().Syntax().Range()
+			if !ok {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: untyped input for %s.%s", k, kvp.Key.Value),
+					fmt.Sprintf("expected type %s", typ.Type)))
+			} else {
+				assertTypeAssignable(ctx, rng, existing, typ.Type)
+			}
 		}
 	}
-	tc.resources[node.Value] = hint.Fields()
+	tc.registerResource(k, node.Value, hint)
 
+	// TODO: type check resource options
+
+	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
 	allOptions := make([]string, 0, len(options))
 	for k := range options {
@@ -135,9 +198,12 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	}
 	var existing []string
 	hint := pkg.FunctionTypeHint(functionName)
-	inputs := hint.InputProperties()
-	for k := range inputs {
-		existing = append(existing, k)
+	inputs := map[string]schema.Type{}
+	if hint.Inputs != nil {
+		for _, input := range hint.Inputs.Properties {
+			existing = append(existing, input.Name)
+			inputs[input.Name] = input.Type
+		}
 	}
 	fmtr := yamldiags.NonExistantFieldFormatter{
 		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
@@ -157,7 +223,125 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 			}
 		}
 	}
-	tc.exprs[t] = hint.Fields()
+	if t.Return != nil {
+		fields := []string{}
+		var (
+			returnType  schema.Type
+			validReturn bool
+		)
+		if o := hint.Outputs; o != nil {
+			for _, output := range o.Properties {
+				fields = append(fields, output.Name)
+				if strings.ToLower(t.Return.Value) == strings.ToLower(output.Name) {
+					returnType = output.Type
+					validReturn = true
+				}
+			}
+		}
+		fmtr := yamldiags.NonExistantFieldFormatter{
+			ParentLabel:         t.Token.Value,
+			Fields:              fields,
+			MaxElements:         5,
+			FieldsAreProperties: true,
+		}
+		if hint.Outputs == nil || !validReturn {
+			summary, detail := fmtr.MessageWithDetail(t.Return.Value, t.Return.Value)
+			ctx.addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
+		} else {
+			tc.exprs[t] = returnType
+		}
+	} else {
+		tc.exprs[t] = hint.Outputs
+	}
+	return true
+}
+
+func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
+	var typ schema.Type = &schema.InvalidType{}
+	setType := func(t schema.Type) { typ = t }
+	setError := func(diag *syntax.Diagnostic) {
+		ctx.addDiag(diag)
+		typ = &schema.InvalidType{
+			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
+		}
+	}
+	if root, ok := tc.resourceNames[t.Property.RootName()]; ok {
+		typ = tc.resources[root]
+	}
+	if root, ok := tc.variableNames[t.Property.RootName()]; ok {
+		typ = tc.exprs[root]
+	}
+	// TODO handle config here
+	runningName := t.Property.RootName()
+	for _, accessor := range t.Property.Accessors[1:] {
+		switch accessor := accessor.(type) {
+		case *ast.PropertyName:
+			properties := map[string]schema.Type{}
+			switch typ := codegen.UnwrapType(typ).(type) {
+			case *schema.ObjectType:
+				for _, prop := range typ.Properties {
+					properties[prop.Name] = prop.Type
+				}
+			case *schema.ResourceType:
+				for _, prop := range typ.Resource.Properties {
+					properties[prop.Name] = prop.Type
+				}
+			case *schema.InvalidType:
+				break
+			default:
+				setError(syntax.Error(t.Syntax().Syntax().Range(),
+					fmt.Sprintf("cannot access a property on '%s' (type %s)", runningName, codegen.UnwrapType(typ)),
+					"Property access is only allowed on Resources and Objects"))
+				break
+			}
+			// We handle the actual property access here
+			newType, ok := properties[accessor.Name]
+			if !ok {
+				propertyList := make([]string, 0, len(properties))
+				for k := range properties {
+					propertyList = append(propertyList, k)
+				}
+				fmtr := yamldiags.NonExistantFieldFormatter{
+					ParentLabel:         runningName,
+					Fields:              propertyList,
+					MaxElements:         5,
+					FieldsAreProperties: true,
+				}
+				summary, detail := fmtr.MessageWithDetail(accessor.Name, accessor.Name)
+				setError(syntax.Error(t.Syntax().Syntax().Range(), summary, detail))
+				break
+			}
+			runningName += "." + accessor.Name
+			setType(newType)
+		case *ast.PropertySubscript:
+			err := func(msg string) {
+				setError(syntax.Error(t.Syntax().Syntax().Range(),
+					fmt.Sprintf("cannot index into '%s' (type %s)", runningName, codegen.UnwrapType(typ)), msg))
+			}
+			switch typ := codegen.UnwrapType(typ).(type) {
+			case *schema.ArrayType:
+				if _, ok := accessor.Index.(string); ok {
+					err("Index via string is only allowed on Maps")
+				}
+				runningName += fmt.Sprintf("[%d]", accessor.Index.(int))
+				setType(typ.ElementType)
+			case *schema.MapType:
+				if _, ok := accessor.Index.(int); ok {
+					err("Index via number is only allowed on Arrays")
+				}
+				runningName += fmt.Sprintf("[%q]", accessor.Index.(string))
+				setType(typ.ElementType)
+			case *schema.InvalidType:
+				break
+			default:
+				err("Index property access is only allowed on Maps and Lists")
+				break
+			}
+		default:
+			panic(fmt.Sprintf("Unknown property type: %T", accessor))
+		}
+	}
+	tc.exprs[t] = typ
 	return true
 }
 
@@ -165,15 +349,49 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	switch t := t.(type) {
 	case *ast.InvokeExpr:
 		return tc.typeInvoke(ctx, t)
-	default:
-		return true
+	case *ast.SymbolExpr:
+		return tc.typeSymbol(ctx, t)
+	case *ast.StringExpr:
+		tc.exprs[t] = schema.StringType
+	case *ast.NumberExpr:
+		tc.exprs[t] = schema.NumberType
+	case *ast.BooleanExpr:
+		tc.exprs[t] = schema.BoolType
+	case *ast.AssetArchiveExpr, *ast.FileArchiveExpr, *ast.RemoteArchiveExpr:
+		tc.exprs[t] = schema.ArchiveType
+	case *ast.FileAssetExpr, *ast.RemoteAssetExpr, *ast.StringAssetExpr:
+		tc.exprs[t] = schema.AssetType
+	case *ast.InterpolateExpr:
+		// TODO: verify that internal access can be coerced into a string
+		tc.exprs[t] = schema.StringType
+	case *ast.ToJSONExpr:
+		tc.exprs[t] = schema.StringType
+	case *ast.JoinExpr:
+		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
+		tc.exprs[t] = schema.StringType
+	case *ast.ListExpr:
+		// TODO: make this a union type
+		tc.exprs[t] = &schema.ArrayType{
+			ElementType: schema.AnyType,
+		}
+	case *ast.NullExpr:
+		tc.exprs[t] = &schema.InvalidType{}
 	}
+	return true
+}
+
+func (tc *typeCache) typeVariable(r *runner, node variableNode) bool {
+	k, v := node.Key.Value, node.Value
+	tc.variableNames[k] = v
+	return true
 }
 
 func newTypeCache() *typeCache {
 	return &typeCache{
-		exprs:     map[ast.Expr]TypeHint{},
-		resources: map[*ast.ResourceDecl]TypeHint{},
+		exprs:         map[ast.Expr]schema.Type{},
+		resources:     map[*ast.ResourceDecl]schema.Type{},
+		resourceNames: map[string]*ast.ResourceDecl{},
+		variableNames: map[string]ast.Expr{},
 	}
 }
 
@@ -184,6 +402,7 @@ func TypeCheck(r *runner) syntax.Diagnostics {
 	diags := r.Run(walker{
 		VisitResource: types.typeResource,
 		VisitExpr:     types.typeExpr,
+		VisitVariable: types.typeVariable,
 	})
 
 	return diags
@@ -201,10 +420,6 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	if x == nil {
 		return true
 	}
-	if !e.VisitExpr(ctx, x) {
-		return false
-	}
-
 	switch x := x.(type) {
 	case *ast.NullExpr, *ast.BooleanExpr, *ast.NumberExpr, *ast.StringExpr:
 	case *ast.ListExpr:
@@ -233,6 +448,10 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %T", x))
 	}
+	if !e.VisitExpr(ctx, x) {
+		return false
+	}
+
 	return true
 }
 
@@ -257,17 +476,17 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 	return true
 }
 func (e walker) EvalVariable(r *runner, node variableNode) bool {
-	if e.VisitVariable != nil {
-		if !e.VisitVariable(r, node) {
-			return false
-		}
-	}
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
 		}
 		if !e.walk(ctx, node.Value) {
+			return false
+		}
+	}
+	if e.VisitVariable != nil {
+		if !e.VisitVariable(r, node) {
 			return false
 		}
 	}
@@ -291,11 +510,6 @@ func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	return true
 }
 func (e walker) EvalResource(r *runner, node resourceNode) bool {
-	if e.VisitResource != nil {
-		if !e.VisitResource(r, node) {
-			return false
-		}
-	}
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -314,6 +528,12 @@ func (e walker) EvalResource(r *runner, node resourceNode) bool {
 			}
 		}
 		if !e.walkResourceOptions(ctx, v.Options) {
+			return false
+		}
+	}
+	// We visit the expressions in a resource before we visit the resource itself
+	if e.VisitResource != nil {
+		if !e.VisitResource(r, node) {
 			return false
 		}
 	}
@@ -390,9 +610,9 @@ func (e walker) walkStringList(ctx *evalContext, l *ast.StringListDecl) bool {
 }
 
 // Compute the set of fields valid for the resource options.
-func ResourceOptionsTypeHint() FieldsTypeHint {
+func ResourceOptionsTypeHint() map[string]struct{} {
 	typ := reflect.TypeOf(ast.ResourceOptionsDecl{})
-	m := FieldsTypeHint{}
+	m := map[string]struct{}{}
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
 		if !f.IsExported() {
@@ -402,7 +622,7 @@ func ResourceOptionsTypeHint() FieldsTypeHint {
 		if name != "" {
 			name = strings.ToLower(name[:1]) + name[1:]
 		}
-		m[name] = nil
+		m[name] = struct{}{}
 	}
 	return m
 }

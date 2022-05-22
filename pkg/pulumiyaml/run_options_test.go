@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +39,7 @@ func (m FakePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	}
 }
 
-func (m FakePackage) ResourceTypeHint(typeName ResourceTypeToken) TypeHint {
+func (m FakePackage) ResourceTypeHint(typeName ResourceTypeToken) *schema.ResourceType {
 	switch typeName.String() {
 	case fakeName:
 		return nil

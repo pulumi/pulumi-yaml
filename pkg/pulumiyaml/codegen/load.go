@@ -11,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/zclconf/go-cty/cty"
 
@@ -258,8 +259,8 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 
 		invokeArgs := []model.Expression{function}
 		if node.CallArgs != nil {
-			args, adiags := imp.importExpr(node.CallArgs,
-				pkg.FunctionTypeHint(functionName).InputProperties())
+			inputs := pkg.FunctionTypeHint(functionName).Inputs
+			args, adiags := imp.importExpr(node.CallArgs, inputs)
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
@@ -330,7 +331,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 //
 // Because yaml does not distinguish between maps (string to value) and objects (known keys and
 // value heterogeneous values), we also pass a type hint where possible.
-func (imp *importer) importExpr(node ast.Expr, hint pulumiyaml.TypeHint) (model.Expression, syntax.Diagnostics) {
+func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.NullExpr:
 		return model.VariableReference(null), nil
@@ -348,9 +349,9 @@ func (imp *importer) importExpr(node ast.Expr, hint pulumiyaml.TypeHint) (model.
 		var diags syntax.Diagnostics
 		var expressions []model.Expression
 		for _, v := range node.Elements {
-			var eHint pulumiyaml.TypeHint
-			if hint != nil {
-				eHint = hint.Element()
+			var eHint schema.Type
+			if l, ok := codegen.UnwrapType(hint).(*schema.ArrayType); ok {
+				eHint = l.ElementType
 			}
 			e, ediags := imp.importExpr(v, eHint)
 			diags.Extend(ediags...)
@@ -363,13 +364,16 @@ func (imp *importer) importExpr(node ast.Expr, hint pulumiyaml.TypeHint) (model.
 	case *ast.ObjectExpr:
 		var diags syntax.Diagnostics
 		var items []model.ObjectConsItem
-		var fieldHints map[string]pulumiyaml.TypeHint
-		if hint != nil {
-			fieldHints = hint.Fields()
+		var fieldHints map[string]schema.Type
+		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok {
+			fieldHints = map[string]schema.Type{}
+			for _, prop := range obj.Properties {
+				fieldHints[prop.Name] = prop.Type
+			}
 		}
 		for _, kvp := range node.Entries {
 			var k model.Expression
-			var hint pulumiyaml.TypeHint
+			var hint schema.Type
 			// We have a type hint, so this will be a plain string, not a quoted string
 			// (template expression).
 			if fieldHints != nil {
@@ -577,7 +581,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 		},
 	}
 
-	hints := props.InputProperties()
+	hints := map[string]schema.Type{}
+	if props.Resource != nil {
+		for _, input := range props.Resource.InputProperties {
+			hints[input.Name] = input.Type
+		}
+	}
 	for _, kvp := range resource.Properties.Entries {
 		v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
 		diags.Extend(vdiags...)

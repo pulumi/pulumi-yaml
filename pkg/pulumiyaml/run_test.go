@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
@@ -38,8 +39,8 @@ type MockPackage struct {
 	isComponent      func(typeName string) (bool, error)
 	resolveResource  func(typeName string) (ResourceTypeToken, error)
 	resolveFunction  func(typeName string) (FunctionTypeToken, error)
-	resourceTypeHint func(typeName string) InputTypeHint
-	functionTypeHint func(typeName string) InputTypeHint
+	resourceTypeHint func(typeName string) *schema.ResourceType
+	functionTypeHint func(typeName string) *schema.Function
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -60,11 +61,11 @@ func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(typeName.String())
 }
 
-func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) InputTypeHint {
+func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) *schema.ResourceType {
 	return m.resourceTypeHint(typeName.String())
 }
 
-func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint {
+func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) *schema.Function {
 	return m.functionTypeHint(typeName.String())
 }
 
@@ -76,42 +77,55 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
-type mockInputTypeHint []string
-
-func (m mockInputTypeHint) InputProperties() FieldsTypeHint {
-	return m.Fields()
-}
-
-func (m mockInputTypeHint) Fields() FieldsTypeHint {
-	o := FieldsTypeHint{}
-	for _, f := range m {
-		o[f] = nil
+func inputProperties(token string, props ...string) *schema.ResourceType {
+	p := make([]*schema.Property, 0, len(props))
+	for _, prop := range props {
+		p = append(p, &schema.Property{
+			Name: prop,
+		})
 	}
-	return o
+	return &schema.ResourceType{
+		Resource: &schema.Resource{
+			InputProperties: p,
+			Properties:      p,
+		},
+	}
 }
-func (m mockInputTypeHint) Element() TypeHint { return nil }
+
+func function(token string, inputs ...string) *schema.Function {
+	p := make([]*schema.Property, 0, len(inputs))
+	for _, prop := range inputs {
+		p = append(p, &schema.Property{
+			Name: prop,
+		})
+	}
+	return &schema.Function{
+		Token:  testComponentToken,
+		Inputs: &schema.ObjectType{Properties: p},
+	}
+}
 
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"aws": MockPackage{},
 			"test": MockPackage{
-				resourceTypeHint: func(typeName string) InputTypeHint {
+				resourceTypeHint: func(typeName string) *schema.ResourceType {
 					switch typeName {
 					case testResourceToken:
-						return mockInputTypeHint{"foo"}
+						return inputProperties(typeName, "foo")
 					case testComponentToken:
-						return mockInputTypeHint{"foo"}
+						return inputProperties(typeName, "foo")
 					default:
-						return mockInputTypeHint{}
+						return inputProperties(typeName)
 					}
 				},
-				functionTypeHint: func(typeName string) InputTypeHint {
+				functionTypeHint: func(typeName string) *schema.Function {
 					switch typeName {
 					case "test:fn":
-						return mockInputTypeHint{"yesArg", "someSuchArg"}
+						return function(typeName, "yesArg", "someSuchArg")
 					default:
-						return mockInputTypeHint{}
+						return function(typeName)
 					}
 				},
 				isComponent: func(typeName string) (bool, error) {
