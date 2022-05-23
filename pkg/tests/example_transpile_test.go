@@ -68,7 +68,8 @@ var (
 	}
 
 	failingTypecheck = map[string]LanguageList{
-		"awsx-fargate": Nodejs, // https://github.com/pulumi/pulumi-awsx/issues/853
+		"awsx-fargate": (Nodejs.And( // https://github.com/pulumi/pulumi-awsx/issues/853
+			Golang)), // https://github.com/pulumi/pulumi/issues/9664
 	}
 
 	yarnLock  sync.Mutex
