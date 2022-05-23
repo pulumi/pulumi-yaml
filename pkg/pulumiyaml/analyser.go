@@ -139,7 +139,10 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		case schema.StringType:
 			// Resources can coerce into strings (by implicitly calling urn)
 			_, isResource := from.(*schema.ResourceType)
-			return okIf(isResource || from == schema.StringType)
+			return okIf(isResource || from == schema.StringType ||
+				// Since we don't have a fn(number) -> string function, we coerce numbers to strings
+				from == schema.NumberType ||
+				from == schema.IntType)
 		default:
 			return okIf(from == to)
 		}
@@ -474,6 +477,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		return root
 	}
 	if root, ok := root.(*schema.UnionType); ok {
+		// TODO: make the error messages better here
 		possibilities := map[schema.Type]struct{}{}
 		for _, subtypes := range root.ElementTypes {
 			t := typePropertyAccess(ctx, subtypes, runningName, accessors, setError)
