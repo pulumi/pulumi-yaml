@@ -559,10 +559,10 @@ type ToBase64Expr struct {
 	Value Expr
 }
 
-func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value Expr) *ToBase64Expr {
+func ToBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *ToBase64Expr {
 	return &ToBase64Expr{
 		builtinNode: builtin(node, name, args),
-		Value:       value,
+		Value:       args,
 	}
 }
 
@@ -834,11 +834,7 @@ func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syn
 }
 
 func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	str, ok := args.(*StringExpr)
-	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::ToBase64 must be a string", "")}
-	}
-	return ToBase64Syntax(node, name, args, str), nil
+	return ToBase64Syntax(node, name, args), nil
 }
 
 func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

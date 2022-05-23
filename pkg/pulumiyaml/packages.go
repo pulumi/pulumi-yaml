@@ -397,9 +397,18 @@ func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeH
 	if !ok {
 		return nil
 	}
+	hints := []*schema.Property{}
+	inputs := []*schema.Property{}
+	if f.Outputs != nil {
+		hints = append(hints, f.Outputs.Properties...)
+	}
+	if f.Inputs != nil {
+		hints = append(hints, f.Inputs.Properties...)
+		inputs = f.Inputs.Properties
+	}
 	return inputTypeHint{
-		TypeHint:   fieldTypeHint{append(f.Outputs.Properties, f.Inputs.Properties...)},
-		inputProps: f.Inputs.Properties,
+		TypeHint:   fieldTypeHint{hints},
+		inputProps: inputs,
 	}
 }
 

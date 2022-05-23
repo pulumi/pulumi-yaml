@@ -15,3 +15,10 @@
 
 - De-duplicate error message added during pre-eval checking.  
   [#207](https://github.com/pulumi/pulumi-yaml/pull/207)
+
+- Prevent invokes without inputs from crashing `pulumi-language-yaml`.
+  [#216](https://github.com/pulumi/pulumi-yaml/pull/216)
+
+- Allow Fn::ToBase64 to take expressions as inputs, was previously constrained to only allow a
+  string constant.
+  [#221](https://github.com/pulumi/pulumi-yaml/pull/221)

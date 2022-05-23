@@ -144,15 +144,17 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		Fields:      existing,
 		MaxElements: 5,
 	}
-	for _, prop := range t.CallArgs.Entries {
-		k := prop.Key.(*ast.StringExpr).Value
-		if typ, ok := inputs[k]; !ok {
-			summary, detail := fmtr.MessageWithDetail(k, k)
-			subject := prop.Key.Syntax().Syntax().Range()
-			context := t.Syntax().Syntax().Range()
-			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
-		} else {
-			tc.exprs[prop.Value] = typ
+	if t.CallArgs != nil {
+		for _, prop := range t.CallArgs.Entries {
+			k := prop.Key.(*ast.StringExpr).Value
+			if typ, ok := inputs[k]; !ok {
+				summary, detail := fmtr.MessageWithDetail(k, k)
+				subject := prop.Key.Syntax().Syntax().Range()
+				context := t.Syntax().Syntax().Range()
+				ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
+			} else {
+				tc.exprs[prop.Value] = typ
+			}
 		}
 	}
 	tc.exprs[t] = hint.Fields()

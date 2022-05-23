@@ -957,7 +957,11 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.ListExpr:
 		return ctx.evaluateList(x)
 	case *ast.ObjectExpr:
-		return ctx.evaluateObject(x, map[string]interface{}{}, x.Entries)
+		var entries []ast.ObjectProperty
+		if x != nil {
+			entries = x.Entries
+		}
+		return ctx.evaluateObject(x, map[string]interface{}{}, entries)
 	case *ast.InterpolateExpr:
 		return ctx.evaluateInterpolate(x)
 	case *ast.SymbolExpr:
@@ -1452,7 +1456,7 @@ func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{
 	toBase64 := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return nil, false
+			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
 		}
 		return b64.StdEncoding.EncodeToString([]byte(s)), true
 	})

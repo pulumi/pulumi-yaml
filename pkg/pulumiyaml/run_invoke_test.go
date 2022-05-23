@@ -93,6 +93,25 @@ resources:
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestInvokeNoInputs(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+variables:
+  config:
+    Fn::Invoke:
+      Function: test:invoke:empty
+outputs:
+  v: ${config.subscriptionId}
+name: test-yaml
+runtime: yaml
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
@@ -104,6 +123,8 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				return resource.PropertyMap{
 					"retval": resource.NewStringProperty("oof"),
 				}, nil
+			case "test:invoke:empty":
+				return nil, nil
 			}
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
