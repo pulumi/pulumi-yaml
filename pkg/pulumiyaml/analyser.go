@@ -55,7 +55,6 @@ func (n notAssignable) string(indent int) string {
 		s += "\n" + arg.string(indent+1)
 	}
 	return s
-
 }
 
 func (n notAssignable) IsInternal() bool {
@@ -132,10 +131,10 @@ func isAssignable(from, to schema.Type) *notAssignable {
 
 	if schema.IsPrimitiveType(to) {
 		switch to {
-		case schema.NumberType, schema.IntType:
-			return okIf(from == schema.NumberType || from == schema.IntType)
 		case schema.AnyType:
 			return okIf(true)
+		case schema.NumberType, schema.IntType:
+			return okIf(from == schema.NumberType || from == schema.IntType)
 		case schema.StringType:
 			// Resources can coerce into strings (by implicitly calling urn)
 			_, isResource := from.(*schema.ResourceType)
@@ -143,6 +142,11 @@ func isAssignable(from, to schema.Type) *notAssignable {
 				// Since we don't have a fn(number) -> string function, we coerce numbers to strings
 				from == schema.NumberType ||
 				from == schema.IntType)
+		case schema.AssetType:
+			// Some schema fields with given type Asset actually accept either
+			// Assets or Archives. We accept some invalid inputs instead of
+			// rejecting valid inputs.
+			return okIf(from == schema.AssetType || from == schema.ArchiveType)
 		default:
 			return okIf(from == to)
 		}
