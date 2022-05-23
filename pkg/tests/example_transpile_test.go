@@ -71,8 +71,12 @@ var (
 		"awsx-fargate": Nodejs, // https://github.com/pulumi/pulumi-awsx/issues/853
 	}
 
+	yarnLock  sync.Mutex
 	langTests = []ConvertFunc{
 		convertTo("nodejs", nodejs.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
+			// concurrent yarn install commands can fail
+			yarnLock.Lock()
+			defer yarnLock.Unlock()
 			nodejs.TypeCheck(t, filepath.Join(dir, "index.ts"), deps, false)
 		}),
 		convertTo("python", python.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
@@ -118,16 +122,7 @@ func TestGenerateExamples(t *testing.T) {
 
 	examples, err := ioutil.ReadDir(examplesPath)
 	require.NoError(t, err)
-	// The various generate functions are not thread safe, and several mutate
-	// the *schema.Package that they contain. To avoid parallel iteration, we
-	// lock during the generate function.
-	//
-	// Warning: This is a possible cause of non-determinism in our test suite,
-	// since we don't guarantee the ordering of test execution. Because of the
-	// memory consumption of using independent schema.Package instances, we
-	// decided to maintain a single copy of each schema until non-determinism is
-	// observed.
-	var generateLock sync.Mutex
+	//nolint:paralleltest // not directly using the loop variable, but instead using dir.Name() in subtests
 	for _, dir := range examples {
 		dir := dir
 
@@ -138,6 +133,7 @@ func TestGenerateExamples(t *testing.T) {
 		}
 
 		t.Run(dir.Name(), func(t *testing.T) {
+			t.Parallel()
 			var skip bool
 			for _, ex := range failingExamples {
 				if ex == dir.Name() {
@@ -164,7 +160,7 @@ func TestGenerateExamples(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
 			for _, testLang := range langTests {
-				testLang(t, exampleProjectDir, &generateLock)
+				testLang(t, exampleProjectDir)
 			}
 		})
 	}
@@ -237,13 +233,8 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnost
 
 }
 
-type ConvertFunc = func(t *testing.T, projectDir string, lock *sync.Mutex)
+type ConvertFunc = func(t *testing.T, projectDir string)
 type CheckFunc = func(t *testing.T, projectDir string, deps pcodegen.StringSet)
-
-func shouldBeParallel() bool {
-	v := os.Getenv("PULUMI_TEST_PARALLEL")
-	return v == "" || cmdutil.IsTruthy(v)
-}
 
 func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
@@ -265,7 +256,7 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 type projectGeneratorFunc func(directory string, project workspace.Project, p *pcl.Program) error
 
 func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) ConvertFunc {
-	return func(t *testing.T, projectDir string, lock *sync.Mutex) {
+	return func(t *testing.T, projectDir string) {
 		name := filepath.Base(projectDir)
 		writeTo := filepath.Join(outDir, name, lang)
 		t.Run(lang, func(t *testing.T) {
@@ -273,9 +264,7 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 				t.Skipf("%s/%s is known to not produce valid code", name, lang)
 				return
 			}
-			if shouldBeParallel() && lang != "nodejs" {
-				t.Parallel()
-			}
+			t.Parallel()
 			var (
 				files map[string][]byte
 				diags hcl.Diagnostics
