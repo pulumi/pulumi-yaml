@@ -41,6 +41,7 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 	{Package: "kubernetes", Version: "3.0.0"},
 
 	// not a real plugin, but a real schema
+	{Package: "synthetic", Version: "0.1.0"},
 	{Package: "other", Version: "0.1.0"},
 }
 
@@ -183,6 +184,8 @@ func TestGenerateProgram(t *testing.T) {
 		}
 		for _, tt := range tests {
 			switch tt.Directory {
+			case "synthetic-resource-properties":
+				// https://github.com/pulumi/pulumi-yaml/issues/229
 			case "azure-sa":
 				// Reason: has dependencies between config variables
 			case "aws-eks", "aws-s3-folder":

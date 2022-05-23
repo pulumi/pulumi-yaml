@@ -88,5 +88,6 @@ get_schemas:
 PULUMI_DIR := ../pulumi
 get_testdata:
 	rsync -avm --include='*.pp' --include='*/' --exclude='*' --exclude='.*' \
+		--include="synthetic.json" \
 		'${PULUMI_DIR}/pkg/codegen/testing/test/testdata/' \
 		./pkg/pulumiyaml/testing/test/testdata/
