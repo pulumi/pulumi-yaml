@@ -35,6 +35,7 @@ type notAssignable struct {
 	reason   string
 	because  []*notAssignable
 	internal bool
+	property string
 }
 
 func (n notAssignable) String() string {
@@ -42,7 +43,11 @@ func (n notAssignable) String() string {
 }
 
 func (n notAssignable) string(indent int) string {
-	s := strings.Repeat("  ", indent) + n.reason
+	var prop string
+	if n.property != "" {
+		prop = n.property + ": "
+	}
+	s := strings.Repeat("  ", indent) + prop + n.reason
 	if len(n.because) > 0 {
 		s += ":"
 	}
@@ -70,10 +75,26 @@ func (n notAssignable) Because(b ...*notAssignable) *notAssignable {
 	return &n
 }
 
+func (n notAssignable) Property(propName string) *notAssignable {
+	n.property = propName
+	return &n
+}
+
 // isAssignable determines if the type `from` is assignable to the type `to`.
+// If the assignment is legal, nil is returned.
 func isAssignable(from, to schema.Type) *notAssignable {
 	to = codegen.UnwrapType(to)
 	from = codegen.UnwrapType(from)
+
+	// If either type is invalid, we return. An error message should have
+	// already been generated, we don't need to add another one.
+	if _, ok := from.(*schema.InvalidType); ok {
+		return nil
+	}
+	if _, ok := to.(*schema.InvalidType); ok {
+		return nil
+	}
+
 	fail := &notAssignable{
 		reason:   fmt.Sprintf("Cannot assign %s to type %s", from, to),
 		internal: false,
@@ -90,6 +111,25 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		}
 		return fail.Because(s)
 	}
+
+	// If from is a union type, then it can only assign if every element it contains can
+	// be assigned to `to`.
+	if from, ok := from.(*schema.UnionType); ok {
+		reasons := []*notAssignable{}
+		for _, subtype := range from.ElementTypes {
+			because := isAssignable(subtype, to)
+			if because != nil {
+				reasons = append(reasons, because)
+			}
+		}
+		if len(reasons) == 0 {
+			// every assignment worked
+			return nil
+		}
+		// at least 1 assignment didn't work, so we fail
+		return fail.Because(reasons...)
+	}
+
 	if schema.IsPrimitiveType(to) {
 		switch to {
 		case schema.NumberType, schema.IntType:
@@ -123,11 +163,27 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		}
 		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
 	case *schema.MapType:
-		from, ok := from.(*schema.MapType)
-		if !ok {
+		switch from := from.(type) {
+		case *schema.MapType:
+			return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
+		case *schema.ObjectType:
+			// YAML does not distinguish between maps and arrays, but our type system does.
+			// We allow implicit conversions from YAML objects into maps.
+			if len(from.Properties) == 0 {
+				// The object has no properties, so we coerce it's type to the type of the
+				// map trivially
+				return okIf(true)
+			}
+			for _, prop := range from.Properties {
+				notOk := isAssignable(prop.Type, to.ElementType)
+				if notOk != nil {
+					return fail.Because(notOk)
+				}
+			}
+			return okIf(true)
+		default:
 			return fail
 		}
-		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
 	case *schema.ResourceType:
 		from, ok := from.(*schema.ResourceType)
 		return okIf(ok && to.Token == from.Token)
@@ -139,7 +195,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		// TODO: check that known enum values are type checked against valid
 		// values e.g. string "Foo" should not be assignable to
 		// type Enum { Type: string, Elements: ["fizz", "buzz"] }
-		return nil
+		return okIf(true)
 	case *schema.ObjectType:
 		// We implement structural typing for objects.
 		from, ok := from.(*schema.ObjectType)
@@ -149,7 +205,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		for _, prop := range to.Properties {
 			fromProp, ok := from.Property(prop.Name)
 			if prop.IsRequired() && !ok {
-				return fail.Because(&notAssignable{reason: fmt.Sprintf("Missing required property '%s'", prop.Name)})
+				return fail.Because(&notAssignable{reason: fmt.Sprintf("Missing required property '%s'", prop.Name)}).Property(prop.Name)
 			}
 			if !ok {
 				// We don't have an optional property, which is ok
@@ -158,7 +214,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			// We have a matching property, so the type must agree
 			notAssignable := isAssignable(fromProp.Type, prop.Type)
 			if notAssignable != nil {
-				return fail.Because(notAssignable)
+				return fail.Because(notAssignable).Property(prop.Name)
 			}
 		}
 		return nil
@@ -175,7 +231,12 @@ func isAssignable(from, to schema.Type) *notAssignable {
 	}
 }
 
+// Provides an appropriate diagnostic message if it is illegal to assign `from`
+// to `to`.
 func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type) {
+	if to == nil {
+		return
+	}
 	result := isAssignable(from, to)
 	if result == nil {
 		return
@@ -230,6 +291,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 					fmt.Sprintf("internal error: untyped input for %s.%s", k, kvp.Key.Value),
 					fmt.Sprintf("expected type %s", typ.Type)))
 			} else {
+				// TODO: add check for typ.Type bieng nil
 				assertTypeAssignable(ctx, rng, existing, typ.Type)
 			}
 		}
@@ -382,13 +444,6 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 
 func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	var typ schema.Type = &schema.InvalidType{}
-	setType := func(t schema.Type) { typ = t }
-	setError := func(diag *syntax.Diagnostic) {
-		ctx.addDiag(diag)
-		typ = &schema.InvalidType{
-			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
-		}
-	}
 	if root, ok := tc.resourceNames[t.Property.RootName()]; ok {
 		typ = tc.resources[root]
 	}
@@ -398,80 +453,113 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	if root, ok := tc.configuration[t.Property.RootName()]; ok {
 		typ = root
 	}
-	// TODO handle config here
 	runningName := t.Property.RootName()
-	for _, accessor := range t.Property.Accessors[1:] {
-		switch accessor := accessor.(type) {
-		case *ast.PropertyName:
-			properties := map[string]schema.Type{}
-			switch typ := codegen.UnwrapType(typ).(type) {
-			case *schema.ObjectType:
-				for _, prop := range typ.Properties {
-					properties[prop.Name] = prop.Type
-				}
-			case *schema.ResourceType:
-				for _, prop := range typ.Resource.Properties {
-					properties[prop.Name] = prop.Type
-				}
-				properties["id"] = schema.StringType
-				properties["urn"] = schema.StringType
-			case *schema.InvalidType:
-				break
-			default:
-				setError(syntax.Error(t.Syntax().Syntax().Range(),
-					fmt.Sprintf("cannot access a property on '%s' (type %s)", runningName, codegen.UnwrapType(typ)),
-					"Property access is only allowed on Resources and Objects"))
-				break
-			}
-			// We handle the actual property access here
-			newType, ok := properties[accessor.Name]
-			if !ok {
-				propertyList := make([]string, 0, len(properties))
-				for k := range properties {
-					propertyList = append(propertyList, k)
-				}
-				fmtr := yamldiags.NonExistantFieldFormatter{
-					ParentLabel:         runningName,
-					Fields:              propertyList,
-					MaxElements:         5,
-					FieldsAreProperties: true,
-				}
-				summary, detail := fmtr.MessageWithDetail(accessor.Name, accessor.Name)
-				setError(syntax.Error(t.Syntax().Syntax().Range(), summary, detail))
-				break
-			}
-			runningName += "." + accessor.Name
-			setType(newType)
-		case *ast.PropertySubscript:
-			err := func(msg string) {
-				setError(syntax.Error(t.Syntax().Syntax().Range(),
-					fmt.Sprintf("cannot index into '%s' (type %s)", runningName, codegen.UnwrapType(typ)), msg))
-			}
-			switch typ := codegen.UnwrapType(typ).(type) {
-			case *schema.ArrayType:
-				if _, ok := accessor.Index.(string); ok {
-					err("Index via string is only allowed on Maps")
-				}
-				runningName += fmt.Sprintf("[%d]", accessor.Index.(int))
-				setType(typ.ElementType)
-			case *schema.MapType:
-				if _, ok := accessor.Index.(int); ok {
-					err("Index via number is only allowed on Arrays")
-				}
-				runningName += fmt.Sprintf("[%q]", accessor.Index.(string))
-				setType(typ.ElementType)
-			case *schema.InvalidType:
-				break
-			default:
-				err("Index property access is only allowed on Maps and Lists")
-				break
-			}
-		default:
-			panic(fmt.Sprintf("Unknown property type: %T", accessor))
+	setError := func(summary, detail string) *schema.InvalidType {
+		diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
+		ctx.addDiag(diag)
+		typ := &schema.InvalidType{
+			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
 		}
+		return typ
 	}
-	tc.exprs[t] = typ
+
+	tc.exprs[t] = typePropertyAccess(ctx, typ, runningName, t.Property.Accessors[1:], setError)
 	return true
+}
+
+func typePropertyAccess(ctx *evalContext, root schema.Type,
+	runningName string, accessors []ast.PropertyAccessor,
+	setError func(summary, detail string) *schema.InvalidType) schema.Type {
+	if len(accessors) == 0 {
+		return root
+	}
+	if root, ok := root.(*schema.UnionType); ok {
+		possibilities := map[schema.Type]struct{}{}
+		for _, subtypes := range root.ElementTypes {
+			t := typePropertyAccess(ctx, subtypes, runningName, accessors, setError)
+			if _, ok := t.(*schema.InvalidType); ok {
+				return t
+			}
+		}
+		arr := make([]schema.Type, 0, len(possibilities))
+		for k := range possibilities {
+			arr = append(arr, k)
+		}
+		if len(arr) == 1 {
+			return arr[0]
+		}
+		return &schema.UnionType{ElementTypes: arr}
+	}
+	switch accessor := accessors[0].(type) {
+	case *ast.PropertyName:
+		properties := map[string]schema.Type{}
+		switch root := codegen.UnwrapType(root).(type) {
+		case *schema.ObjectType:
+			for _, prop := range root.Properties {
+				properties[prop.Name] = prop.Type
+			}
+		case *schema.ResourceType:
+			for _, prop := range root.Resource.Properties {
+				properties[prop.Name] = prop.Type
+			}
+			properties["id"] = schema.StringType
+			properties["urn"] = schema.StringType
+		case *schema.InvalidType:
+			return root
+		default:
+			return setError(
+				fmt.Sprintf("cannot access a property on '%s' (type %s)", runningName, codegen.UnwrapType(root)),
+				"Property access is only allowed on Resources and Objects",
+			)
+		}
+		// We handle the actual property access here
+		newType, ok := properties[accessor.Name]
+		if !ok {
+			propertyList := make([]string, 0, len(properties))
+			for k := range properties {
+				propertyList = append(propertyList, k)
+			}
+			fmtr := yamldiags.NonExistantFieldFormatter{
+				ParentLabel:         runningName,
+				Fields:              propertyList,
+				MaxElements:         5,
+				FieldsAreProperties: true,
+			}
+			summary, detail := fmtr.MessageWithDetail(accessor.Name, accessor.Name)
+			return setError(summary, detail)
+		}
+		return typePropertyAccess(ctx, newType, runningName+"."+accessor.Name, accessors[1:], setError)
+	case *ast.PropertySubscript:
+		err := func(msg string) *schema.InvalidType {
+			return setError(
+				fmt.Sprintf("cannot index into '%s' (type %s)", runningName, codegen.UnwrapType(root)),
+				msg,
+			)
+		}
+		switch root := codegen.UnwrapType(root).(type) {
+		case *schema.ArrayType:
+			if _, ok := accessor.Index.(string); ok {
+				err("Index via string is only allowed on Maps")
+			}
+			runningName += fmt.Sprintf("[%d]", accessor.Index.(int))
+			return typePropertyAccess(ctx, root.ElementType,
+				runningName+fmt.Sprintf("[%d]", accessor.Index.(int)),
+				accessors[1:], setError)
+		case *schema.MapType:
+			if _, ok := accessor.Index.(int); ok {
+				err("Index via number is only allowed on Arrays")
+			}
+			return typePropertyAccess(ctx, root.ElementType,
+				runningName+fmt.Sprintf("[%q]", accessor.Index.(string)),
+				accessors[1:], setError)
+		case *schema.InvalidType:
+			return &schema.InvalidType{}
+		default:
+			return err("Index property access is only allowed on Maps and Lists")
+		}
+	default:
+		panic(fmt.Sprintf("Unknown property type: %T", accessor))
+	}
 }
 
 func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
@@ -540,6 +628,10 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		}
 	case *ast.NullExpr:
 		tc.exprs[t] = &schema.InvalidType{}
+	default:
+		tc.exprs[t] = &schema.InvalidType{
+			Diagnostics: []*hcl.Diagnostic{{Summary: fmt.Sprintf("Hit unknown type: %T", t)}},
+		}
 	}
 	return true
 }
