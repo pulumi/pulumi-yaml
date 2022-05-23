@@ -186,7 +186,7 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 	{Package: "kubernetes", Version: "3.0.0"},
 }
 
-func newPluginLoader() schema.Loader {
+func newPluginLoader() schema.ReferenceLoader {
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
@@ -200,10 +200,10 @@ func newPluginLoader() schema.Loader {
 	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
 }
 
-type mockPackageLoader struct{ schema.Loader }
+type mockPackageLoader struct{ schema.ReferenceLoader }
 
 func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
-	pkg, err := l.Loader.LoadPackage(name, nil)
+	pkg, err := schema.LoadPackageReference(l.ReferenceLoader, name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnost
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.Loader(rootPluginLoader.Loader))
+	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.Loader(rootPluginLoader.ReferenceLoader))
 	if err != nil {
 		return []byte(program), diags, err
 	}
@@ -278,7 +278,7 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 			_, template, diags, err := codegen.LoadTemplate(projectDir)
 			require.NoError(t, err, "Failed to convert")
 			require.False(t, diags.HasErrors(), diags.Error())
-			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.Loader)
+			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.ReferenceLoader)
 			require.NoError(t, err, "Failed to eject program")
 
 			err = generator(writeTo, *proj, pclProgram)

@@ -38,7 +38,7 @@ func newPluginHost() (plugin.Host, error) {
 	return pluginCtx.Host, nil
 }
 
-func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.Loader) (string, hcl.Diagnostics, error) {
+func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader) (string, hcl.Diagnostics, error) {
 	var diags hcl.Diagnostics
 
 	if loader == nil {
@@ -59,7 +59,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.Loader) (string
 	return programText, nil, nil
 }
 
-func EjectProgram(template *ast.TemplateDecl, loader schema.Loader) (*pcl.Program, hcl.Diagnostics, error) {
+func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*pcl.Program, hcl.Diagnostics, error) {
 	programText, diags, err := ConvertTemplateIL(template, loader)
 	if err != nil {
 		return nil, diags, err
@@ -95,7 +95,7 @@ func EjectProgram(template *ast.TemplateDecl, loader schema.Loader) (*pcl.Progra
 // ConvertTemplate converts a Pulumi YAML template to a target language using PCL as an intermediate representation.
 //
 // loader is the schema.Loader used when binding the the PCL program. If `nil`, a `schema.Loader` will be created from `newPluginHost()`.
-func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, loader schema.Loader) (map[string][]byte, hcl.Diagnostics, error) {
+func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, loader schema.ReferenceLoader) (map[string][]byte, hcl.Diagnostics, error) {
 	program, diags, err := EjectProgram(template, loader)
 	if err != nil {
 		return nil, diags, err
