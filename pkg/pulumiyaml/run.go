@@ -1443,12 +1443,10 @@ func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interf
 		if err != nil {
 			return ctx.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
 		}
-
 		decoded := string(b)
 		if !utf8.ValidString(decoded) {
 			return ctx.error(v.Value, "Fn::FromBase64 does not support decoding to invalid UTF-8")
 		}
-
 		return decoded, true
 	})
 	return fromBase64(str)
@@ -1464,8 +1462,7 @@ func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{
 		if !ok {
 			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
 		}
-		val := b64.StdEncoding.EncodeToString([]byte(s))
-		return val, true
+		return b64.StdEncoding.EncodeToString([]byte(s)), true
 	})
 	return toBase64(str)
 }

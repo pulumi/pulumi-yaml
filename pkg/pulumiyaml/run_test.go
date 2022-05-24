@@ -1069,7 +1069,7 @@ func TestSelect(t *testing.T) {
 	}
 }
 
-func TestFromBase64BinaryErrors(t *testing.T) {
+func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -1185,7 +1185,6 @@ func TestBase64Roundtrip(t *testing.T) {
 	tToFrom := struct {
 		input    *ast.ToBase64Expr
 		expected string
-		isOutput bool
 	}{
 		input: &ast.ToBase64Expr{
 			Value: &ast.FromBase64Expr{
@@ -1211,7 +1210,6 @@ func TestBase64Roundtrip(t *testing.T) {
 	tFromTo := struct {
 		input    *ast.FromBase64Expr
 		expected string
-		isOutput bool
 	}{
 		input: &ast.FromBase64Expr{
 			Value: &ast.ToBase64Expr{
