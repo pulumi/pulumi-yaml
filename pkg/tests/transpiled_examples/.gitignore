@@ -4,8 +4,11 @@
 tmp/
 
 Program.cs
-dotnet.csproj
+*.csproj
 go.mod
 go.sum
 package.json
 yarn.lock
+Pulumi.yaml
+requirements.txt
+**/.gitignore
