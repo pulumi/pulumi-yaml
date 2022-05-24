@@ -297,15 +297,16 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				ctx.addDiag(syntax.Warning(rng,
 					fmt.Sprintf("internal error: untyped input for %s.%s", k, kvp.Key.Value),
 					fmt.Sprintf("expected type %s", typ.Type)))
+			} else if typ.Type == nil {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", k, kvp.Key.Value),
+					fmt.Sprintf("got type %s", existing)))
 			} else {
-				// TODO: add check for typ.Type bieng nil
 				assertTypeAssignable(ctx, rng, existing, typ.Type)
 			}
 		}
 	}
 	tc.registerResource(k, node.Value, hint)
-
-	// TODO: type check resource options
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
