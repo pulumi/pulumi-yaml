@@ -482,13 +482,29 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		return root
 	}
 	if root, ok := root.(*schema.UnionType); ok {
-		// TODO: make the error messages better here
 		possibilities := map[schema.Type]struct{}{}
+		errs := []*notAssignable{}
 		for _, subtypes := range root.ElementTypes {
-			t := typePropertyAccess(ctx, subtypes, runningName, accessors, setError)
-			if _, ok := t.(*schema.InvalidType); ok {
-				return t
+			t := typePropertyAccess(ctx, subtypes, runningName, accessors,
+				func(summary, detail string) *schema.InvalidType {
+					errs = append(errs, &notAssignable{reason: summary, property: subtypes.String()})
+					return &schema.InvalidType{}
+				})
+			if _, ok := t.(*schema.InvalidType); !ok {
+				possibilities[t] = struct{}{}
 			}
+		}
+		if len(errs) > 0 {
+			op := "access"
+			if _, ok := accessors[0].(*ast.PropertySubscript); ok {
+				op = "index"
+			}
+			setError(fmt.Sprintf("Cannot %s into %s of type %s", op, runningName, root),
+				notAssignable{
+					reason:  fmt.Sprintf("'%s' could be a type that does not support %sing", runningName, op),
+					because: errs,
+				}.String())
+			return &schema.InvalidType{}
 		}
 		arr := make([]schema.Type, 0, len(possibilities))
 		for k := range possibilities {
@@ -637,6 +653,34 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		}
 	case *ast.NullExpr:
 		tc.exprs[t] = &schema.InvalidType{}
+	case *ast.SecretExpr:
+		// The type of a secret is the type of its argument
+		tc.exprs[t] = tc.exprs[t.Value]
+	case *ast.SplitExpr:
+		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
+		assertTypeAssignable(ctx, t.Source.Syntax().Syntax().Range(), tc.exprs[t.Source], schema.StringType)
+		tc.exprs[t] = schema.StringType
+	case *ast.SelectExpr:
+		assertTypeAssignable(ctx, t.Index.Syntax().Syntax().Range(), tc.exprs[t.Index], schema.IntType)
+		assertTypeAssignable(ctx, t.Values.Syntax().Syntax().Range(), tc.exprs[t.Values],
+			&schema.ArrayType{ElementType: schema.AnyType}) // We accept an array of any type
+		if valuesType, ok := tc.exprs[t.Values]; ok {
+			arr, ok := codegen.UnwrapType(valuesType).(*schema.ArrayType)
+			if ok {
+				tc.exprs[t] = arr.ElementType
+			} else {
+				tc.exprs[t] = &schema.InvalidType{
+					Diagnostics: []*hcl.Diagnostic{
+						{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", arr)},
+					}}
+
+			}
+		} else {
+			tc.exprs[t] = &schema.InvalidType{
+				Diagnostics: []*hcl.Diagnostic{
+					{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", t.Values)},
+				}}
+		}
 	default:
 		tc.exprs[t] = &schema.InvalidType{
 			Diagnostics: []*hcl.Diagnostic{{Summary: fmt.Sprintf("Hit unknown type: %T", t)}},
