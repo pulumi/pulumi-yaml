@@ -1448,7 +1448,11 @@ func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interf
 		}
 
 		decoded := string(b)
-		return decoded, utf8.ValidString(decoded)
+		if !utf8.ValidString(decoded) {
+			return ctx.error(v.Value, "Fn::FromBase64 does not support decoding to invalid UTF-8")
+		}
+
+		return decoded, true
 	})
 	return fromBase64(str)
 }
