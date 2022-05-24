@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver"
@@ -45,9 +46,14 @@ var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
 	{Package: "other", Version: "0.1.0"},
 }
 
+var globalPackageMutex sync.Mutex
+
 type testPackageLoader struct{ *testing.T }
 
 func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+	globalPackageMutex.Lock()
+	defer globalPackageMutex.Unlock()
+
 	if name == "test" {
 		return FakePackage{l.T}, nil
 	}
