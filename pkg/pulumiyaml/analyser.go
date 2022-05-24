@@ -659,7 +659,7 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	case *ast.SplitExpr:
 		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
 		assertTypeAssignable(ctx, t.Source.Syntax().Syntax().Range(), tc.exprs[t.Source], schema.StringType)
-		tc.exprs[t] = schema.StringType
+		tc.exprs[t] = &schema.ArrayType{ElementType: schema.StringType}
 	case *ast.SelectExpr:
 		assertTypeAssignable(ctx, t.Index.Syntax().Syntax().Range(), tc.exprs[t.Index], schema.IntType)
 		assertTypeAssignable(ctx, t.Values.Syntax().Syntax().Range(), tc.exprs[t.Values],
