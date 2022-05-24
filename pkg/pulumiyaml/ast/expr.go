@@ -546,10 +546,10 @@ type FromBase64Expr struct {
 	Value Expr
 }
 
-func FromBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr, value Expr) *FromBase64Expr {
+func FromBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *FromBase64Expr {
 	return &FromBase64Expr{
 		builtinNode: builtin(node, name, args),
-		Value:       value,
+		Value:       args,
 	}
 }
 
@@ -711,6 +711,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseToJSON
 	case "Fn::ToBase64":
 		parse = parseToBase64
+	case "Fn::FromBase64":
+		parse = parseFromBase64
 	case "Fn::Select":
 		parse = parseSelect
 	case "Fn::Split":
@@ -835,6 +837,10 @@ func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syn
 
 func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	return ToBase64Syntax(node, name, args), nil
+}
+
+func parseFromBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return FromBase64Syntax(node, name, args), nil
 }
 
 func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

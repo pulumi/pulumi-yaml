@@ -978,6 +978,8 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return ctx.evaluateBuiltinSelect(x)
 	case *ast.ToBase64Expr:
 		return ctx.evaluateBuiltinToBase64(x)
+	case *ast.FromBase64Expr:
+		return ctx.evaluateBuiltinFromBase64(x)
 	case *ast.FileAssetExpr:
 		return pulumi.NewFileAsset(x.Source.Value), true
 	case *ast.StringAssetExpr:
@@ -1437,13 +1439,14 @@ func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interf
 	fromBase64 := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return nil, false
+			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::FromBase64 to be a string, got %v", typeString(args[0])))
 		}
 		b, err := b64.StdEncoding.DecodeString(s)
 		if err != nil {
-			return nil, false
+			return ctx.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
 		}
-		return b, true
+
+		return string(b), true
 	})
 	return fromBase64(str)
 }
@@ -1458,7 +1461,8 @@ func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{
 		if !ok {
 			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
 		}
-		return b64.StdEncoding.EncodeToString([]byte(s)), true
+		val := b64.StdEncoding.EncodeToString([]byte(s))
+		return val, true
 	})
 	return toBase64(str)
 }

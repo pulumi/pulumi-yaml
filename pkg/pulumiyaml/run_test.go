@@ -1069,6 +1069,90 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestFromBase64Binary(t *testing.T) {
+	t.Parallel()
+
+	tBinary := struct {
+		input    *ast.FromBase64Expr
+		expected string
+		isOutput bool
+	}{
+		input: &ast.FromBase64Expr{
+			Value: ast.String("WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY="),
+		},
+		expected: "Z\x82q\xb4\xa6\xb6\r9\x8b2\x9f\x8f7\x8d\r,f\"\x8c\xaf\xc5*Φ@2\x8b\x83\x98<\xeb\xc8S]8l\xe9\x10\xedm\xa1i\xd1b\xc8[\xbd\x17ʖ",
+	}
+
+	t.Run(tBinary.expected, func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := template(t, &Template{
+			Resources: map[string]*Resource{},
+		})
+		testTemplate(t, tmpl, func(r *evalContext) {
+			v, ok := r.evaluateBuiltinFromBase64(tBinary.input)
+			assert.True(t, ok)
+			assert.Equal(t, tBinary.expected, v)
+		})
+	})
+}
+
+func TestBase64Roundtrip(t *testing.T) {
+	t.Parallel()
+
+	tToFrom := struct {
+		input    *ast.ToBase64Expr
+		expected string
+		isOutput bool
+	}{
+		input: &ast.ToBase64Expr{
+			Value: &ast.FromBase64Expr{
+				Value: ast.String("WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY="),
+			},
+		},
+		expected: "WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY=",
+	}
+
+	t.Run(tToFrom.expected, func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := template(t, &Template{
+			Resources: map[string]*Resource{},
+		})
+		testTemplate(t, tmpl, func(r *evalContext) {
+			v, ok := r.evaluateBuiltinToBase64(tToFrom.input)
+			assert.True(t, ok)
+			assert.Equal(t, tToFrom.expected, v)
+		})
+	})
+
+	tFromTo := struct {
+		input    *ast.FromBase64Expr
+		expected string
+		isOutput bool
+	}{
+		input: &ast.FromBase64Expr{
+			Value: &ast.ToBase64Expr{
+				Value: ast.String("Hello, World!"),
+			},
+		},
+		expected: "Hello, World!",
+	}
+
+	t.Run(tFromTo.expected, func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := template(t, &Template{
+			Resources: map[string]*Resource{},
+		})
+		testTemplate(t, tmpl, func(r *evalContext) {
+			v, ok := r.evaluateBuiltinFromBase64(tFromTo.input)
+			assert.True(t, ok)
+			assert.Equal(t, tFromTo.expected, v)
+		})
+	})
+}
+
 func TestFromBase64(t *testing.T) {
 	t.Parallel()
 
