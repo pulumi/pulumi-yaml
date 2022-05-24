@@ -1069,32 +1069,114 @@ func TestSelect(t *testing.T) {
 	}
 }
 
-func TestFromBase64Binary(t *testing.T) {
+func TestFromBase64BinaryErrors(t *testing.T) {
 	t.Parallel()
 
-	tBinary := struct {
-		input    *ast.FromBase64Expr
-		expected string
-		isOutput bool
+	tests := []struct {
+		input *ast.FromBase64Expr
+		name  string
 	}{
-		input: &ast.FromBase64Expr{
-			Value: ast.String("WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY="),
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("a"),
+			},
+			name: "Valid ASCII",
 		},
-		expected: "Z\x82q\xb4\xa6\xb6\r9\x8b2\x9f\x8f7\x8d\r,f\"\x8c\xaf\xc5*Φ@2\x8b\x83\x98<\xeb\xc8S]8l\xe9\x10\xedm\xa1i\xd1b\xc8[\xbd\x17ʖ",
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xc3\xb1"),
+			},
+			name: "Valid 2 Octet Sequence",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xe2\x82\xa1"),
+			},
+			name: "Valid 3 Octet Sequence",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xf0\x90\x8c\xbc"),
+			},
+			name: "Valid 4 Octet Sequence",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xf8\xa1\xa1\xa1\xa1"),
+			},
+			name: "Valid 5 Octet Sequence (but not Unicode!)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xfc\xa1\xa1\xa1\xa1\xa1"),
+			},
+			name: "Valid 6 Octet Sequence (but not Unicode!)",
+		},
+
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xfc\xa1\xa1\xa1\xa1\xa1"),
+			},
+			name: "Valid 6 Octet Sequence (but not Unicode!)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xc3\x28"),
+			},
+			name: "Invalid 2 Octet Sequence",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xa0\xa1"),
+			},
+			name: "Invalid Sequence Identifier",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xe2\x28\xa1"),
+			},
+			name: "Invalid 3 Octet Sequence (in 2nd Octet)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xe2\x82\x28"),
+			},
+			name: "Invalid 3 Octet Sequence (in 3rd Octet)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xf0\x28\x8c\xbc"),
+			},
+			name: "Invalid 4 Octet Sequence (in 2nd Octet)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xf0\x90\x28\xbc"),
+			},
+			name: "Invalid 4 Octet Sequence (in 3rd Octet)",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("\xf0\x28\x8c\x28"),
+			},
+			name: "Invalid 4 Octet Sequence (in 4th Octet)",
+		},
 	}
 
-	t.Run(tBinary.expected, func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		tmpl := template(t, &Template{
-			Resources: map[string]*Resource{},
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{},
+			})
+			testTemplate(t, tmpl, func(r *evalContext) {
+				_, ok := r.evaluateBuiltinFromBase64(tt.input)
+				assert.False(t, ok)
+			})
 		})
-		testTemplate(t, tmpl, func(r *evalContext) {
-			v, ok := r.evaluateBuiltinFromBase64(tBinary.input)
-			assert.True(t, ok)
-			assert.Equal(t, tBinary.expected, v)
-		})
-	})
+	}
 }
 
 func TestBase64Roundtrip(t *testing.T) {
@@ -1107,10 +1189,10 @@ func TestBase64Roundtrip(t *testing.T) {
 	}{
 		input: &ast.ToBase64Expr{
 			Value: &ast.FromBase64Expr{
-				Value: ast.String("WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY="),
+				Value: ast.String("SGVsbG8sIFdvcmxk"),
 			},
 		},
-		expected: "WoJxtKa2DTmLMp+PN40NLGYijK/FKs6mQDKLg5g868hTXThs6RDtbaFp0WLIW70XypY=",
+		expected: "SGVsbG8sIFdvcmxk",
 	}
 
 	t.Run(tToFrom.expected, func(t *testing.T) {
@@ -1214,7 +1296,7 @@ func TestFromBase64(t *testing.T) {
 					})
 					r.ctx.Export("out", out)
 				} else {
-					assert.Equal(t, tt.expected, string(v.([]byte)))
+					assert.Equal(t, tt.expected, v)
 				}
 			})
 		})

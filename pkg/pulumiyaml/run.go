@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
@@ -1446,7 +1447,8 @@ func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interf
 			return ctx.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
 		}
 
-		return string(b), true
+		decoded := string(b)
+		return decoded, utf8.ValidString(decoded)
 	})
 	return fromBase64(str)
 }
