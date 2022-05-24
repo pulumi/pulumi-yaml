@@ -174,7 +174,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		case *schema.MapType:
 			return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
 		case *schema.ObjectType:
-			// YAML does not distinguish between maps and arrays, but our type system does.
+			// YAML does not distinguish between maps and objects, but our type system does.
 			// We allow implicit conversions from YAML objects into maps.
 			if len(from.Properties) == 0 {
 				// The object has no properties, so we coerce it's type to the type of the
