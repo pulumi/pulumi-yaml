@@ -214,14 +214,13 @@ func (d *syncDiags) HasErrors() bool {
 }
 
 type runner struct {
-	ctx          *pulumi.Context
-	t            *ast.TemplateDecl
-	pkgLoader    PackageLoader
-	config       map[string]interface{}
-	variables    map[string]interface{}
-	resources    map[string]lateboundResource
-	stackRefs    map[string]*pulumi.StackReference
-	dependencies map[string][]graphNode
+	ctx       *pulumi.Context
+	t         *ast.TemplateDecl
+	pkgLoader PackageLoader
+	config    map[string]interface{}
+	variables map[string]interface{}
+	resources map[string]lateboundResource
+	stackRefs map[string]*pulumi.StackReference
 
 	sdiags syncDiags
 
@@ -481,14 +480,10 @@ func (r *runner) ensureSetup() {
 		}
 
 		// Topologically sort the intermediates based on implicit and explicit dependencies
-		intermediates, dependencies, rdiags := topologicallySortedResources(r.t)
-
+		intermediates, rdiags := topologicallySortedResources(r.t)
 		r.sdiags.Extend(rdiags...)
 		if rdiags.HasErrors() {
 			return
-		}
-		if dependencies != nil {
-			r.dependencies = dependencies
 		}
 		if intermediates != nil {
 			r.intermediates = intermediates
@@ -743,23 +738,18 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.DeleteBeforeReplace != nil {
 		opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 	}
-
-	var dependsOn []pulumi.Resource
-	dependsOn = ctx.getResourceDependsOn(k)
 	if v.Options.DependsOn != nil {
 		dependOnOpt, ok := ctx.evaluateResourceListValuedOption(v.Options.DependsOn, "dependsOn")
 		if ok {
+			var dependsOn []pulumi.Resource
 			for _, r := range dependOnOpt {
 				dependsOn = append(dependsOn, r.CustomResource())
 			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
 		} else {
 			overallOk = false
 		}
 	}
-	if dependsOn != nil {
-		opts = append(opts, pulumi.DependsOn(dependsOn))
-	}
-
 	if v.Options.IgnoreChanges != nil {
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
@@ -961,7 +951,7 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		if x != nil {
 			entries = x.Entries
 		}
-		return ctx.evaluateObject(x, map[string]interface{}{}, entries)
+		return ctx.evaluateObject(x, entries)
 	case *ast.InterpolateExpr:
 		return ctx.evaluateInterpolate(x)
 	case *ast.SymbolExpr:
@@ -1011,44 +1001,54 @@ func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	return xs, true
 }
 
-func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, m map[string]interface{}, entries []ast.ObjectProperty) (interface{}, bool) {
+func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
 	if len(entries) == 0 {
-		return m, true
+		return map[string]interface{}{}, true
 	}
 
-	kvp := entries[0]
+	allOk := true
+	var keys []interface{}
+	var keyExprs []ast.Expr
+	var values []interface{}
+	for _, op := range entries {
+		k, ok := ctx.evaluateExpr(op.Key)
+		if !ok {
+			allOk = false
+		}
+		keys = append(keys, k)
+		keyExprs = append(keyExprs, op.Key)
 
-	kv, ok := ctx.evaluateExpr(kvp.Key)
-	if !ok {
+		v, ok := ctx.evaluateExpr(op.Value)
+		if !ok {
+			allOk = false
+		}
+		values = append(values, v)
+	}
+
+	if !allOk {
 		return nil, false
 	}
 
-	if o, ok := kv.(pulumi.Output); ok {
-		return o.ApplyT(func(kv interface{}) (interface{}, error) {
-			v, ok := ctx.continueObject(x, m, kvp, kv, entries)
-			if !ok {
-				return nil, fmt.Errorf("runtime error")
+	evalObjectF := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+		returnMap := map[string]interface{}{}
+		allOk := true
+		for i, arg := range args {
+			if k, ok := arg.(string); ok {
+				returnMap[k] = values[i]
+			} else {
+				ctx.error(keyExprs[i], fmt.Sprintf("object key must evaluate to a string, not %v", typeString(k)))
+				allOk = false
 			}
-			return v, nil
-		}), true
-	}
+		}
 
-	return ctx.continueObject(x, m, kvp, kv, entries)
-}
+		if !allOk {
+			return nil, false
+		}
 
-func (ctx *evalContext) continueObject(x *ast.ObjectExpr, m map[string]interface{}, kvp ast.ObjectProperty, kv interface{}, entries []ast.ObjectProperty) (interface{}, bool) {
-	k, ok := kv.(string)
-	if !ok {
-		return ctx.error(kvp.Key, fmt.Sprintf("object key must evaluate to a string, not %v", typeString(kv)))
-	}
+		return returnMap, true
+	})
 
-	v, ok := ctx.evaluateExpr(kvp.Value)
-	if !ok {
-		return nil, false
-	}
-
-	m[k] = v
-	return ctx.evaluateObject(x, m, entries[1:])
+	return evalObjectF(keys...)
 }
 
 func (ctx *evalContext) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
@@ -1083,13 +1083,16 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 	return b.String(), true
 }
 
+func unknownOutput() pulumi.Output {
+	return pulumi.UnsafeUnknownOutput(nil)
+}
+
 // evaluatePropertyAccess evaluates interpolation expressions, `${foo.bar[baz]}`. The first item in
 // the property access list is the head, and must be an identifier for a resource, config, or
 // variable. The tail of property accessors are either: `.foo` string literal property names or
 // `[42]` numeric literal property subscripts.
 func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.RootName()
-
 	var receiver interface{}
 	if res, ok := ctx.resources[resourceName]; ok {
 		receiver = res
@@ -1102,30 +1105,6 @@ func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.Proper
 	}
 
 	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
-}
-
-func (ctx *evalContext) unknownOutputFrom(expr ast.Expr) pulumi.Output {
-	var deps []*ast.StringExpr
-	getExpressionDependencies(&deps, expr)
-
-	var resources []pulumi.Resource
-	for _, dep := range deps {
-		resources = append(resources, ctx.getResourceDependsOn(dep.Value)...)
-	}
-
-	return pulumi.UnsafeUnknownOutput(resources)
-}
-
-func (ctx *evalContext) getResourceDependsOn(rootName string) []pulumi.Resource {
-	var resources []pulumi.Resource
-	if rDeps, found := ctx.dependencies[rootName]; found {
-		for _, node := range rDeps {
-			if _, isResource := node.(resourceNode); isResource {
-				resources = append(resources, ctx.resources[node.key().Value].CustomResource())
-			}
-		}
-	}
-	return resources
 }
 
 func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
@@ -1151,7 +1130,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 			case resource.PropertyMap:
 				if len(accessors) == 0 {
 					if x.ContainsUnknowns() {
-						return ctx.unknownOutputFrom(expr), true
+						return unknownOutput(), true
 					}
 					receiver = x.Mappable()
 					break Loop
@@ -1169,7 +1148,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				}
 				prop, ok := x[resource.PropertyKey(k)]
 				if x.ContainsUnknowns() && !ok {
-					return ctx.unknownOutputFrom(expr), true
+					return unknownOutput(), true
 				} else if !ok {
 					receiver = nil
 				} else {
@@ -1179,10 +1158,10 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 			case resource.PropertyValue:
 				switch {
 				case x.IsComputed():
-					return ctx.unknownOutputFrom(expr), true
+					return unknownOutput(), true
 				case x.IsOutput():
 					if !x.OutputValue().Known {
-						return ctx.unknownOutputFrom(expr), true
+						return unknownOutput(), true
 					}
 					receiver = x.OutputValue().Element
 				case x.IsSecret():
@@ -1196,14 +1175,32 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				case x.IsArchive():
 					receiver = x.ArchiveValue()
 				case x.IsResourceReference():
-					return x.ResourceReferenceValue(), true
+					ref := x.ResourceReferenceValue()
+					var state lateboundResource
+					var res pulumi.Resource
+					if strings.HasPrefix(string(ref.URN.Type()), "pulumi:providers:") {
+						r := lateboundProviderResourceState{name: ""}
+						state = &r
+						res = &r
+					} else {
+						r := lateboundCustomResourceState{name: ""}
+						state = &r
+						res = &r
+					}
+					// Use the `getResource` invoke to get and deserialize the resource from state:
+					err := ctx.ctx.RegisterResource("_", "_", nil, res, pulumi.URN_(string(ref.URN)))
+					if err != nil {
+						ctx.error(expr, fmt.Sprintf("Failed to get resource %q: %v", ref.URN, err))
+						return nil, false
+					}
+					return evaluateAccessF(state, accessors)
 				default:
 					receiver = x.V
 				}
 			case []resource.PropertyValue:
 				if len(accessors) == 0 {
 					if resource.NewArrayProperty(x).ContainsUnknowns() {
-						return ctx.unknownOutputFrom(expr), true
+						return unknownOutput(), true
 					}
 					receiver = resource.NewArrayProperty(x).Mappable()
 					break Loop
