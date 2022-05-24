@@ -1,0 +1,21 @@
+name: awsx
+runtime: yaml
+resources:
+  cluster:
+    type: aws:ecs:Cluster
+  lb:
+    type: awsx:lb:ApplicationLoadBalancer
+  nginx:
+    type: awsx:ecs:FargateService
+    properties:
+      cluster: ${cluster.arn}
+      taskDefinitionArgs:
+        container:
+          image: nginx:latest
+          cpu: 512
+          memory: 128
+          portMappings:
+            - containerPort: 80
+              targetGroup: ${lb.defaultTargetGroup}
+outputs:
+  url: ${lb.loadBalancer.dnsName}

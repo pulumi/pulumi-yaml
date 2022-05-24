@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver"
@@ -25,28 +26,34 @@ import (
 )
 
 var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
-	{Package: "aws", Version: "4.26.0"},
+	{Package: "aws", Version: "5.4.0"},
 	{Package: "azure-native", Version: "1.56.0"},
 	{Package: "azure", Version: "4.18.0"},
 	{Package: "kubernetes", Version: "3.7.2"},
 	{Package: "random", Version: "4.2.0"},
-	{Package: "eks", Version: "0.37.1"},
+	{Package: "eks", Version: "0.40.0"},
 	{Package: "aws-native", Version: "0.13.0"},
 	{Package: "docker", Version: "3.1.0"},
+	{Package: "awsx", Version: "1.0.0-beta.5"},
 
 	// Extra packages are to satisfy the versioning requirement of aws-eks.
 	// While the schemas are not the correct version, we rely on not
 	// depending on the difference between them.
-	{Package: "aws", Version: "4.15.0"},
 	{Package: "kubernetes", Version: "3.0.0"},
 
 	// not a real plugin, but a real schema
+	{Package: "synthetic", Version: "0.1.0"},
 	{Package: "other", Version: "0.1.0"},
 }
+
+var globalPackageMutex sync.Mutex
 
 type testPackageLoader struct{ *testing.T }
 
 func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+	globalPackageMutex.Lock()
+	defer globalPackageMutex.Unlock()
+
 	if name == "test" {
 		return FakePackage{l.T}, nil
 	}
@@ -185,6 +192,8 @@ func TestGenerateProgram(t *testing.T) {
 		}
 		for _, tt := range tests {
 			switch tt.Directory {
+			case "synthetic-resource-properties":
+				// https://github.com/pulumi/pulumi-yaml/issues/229
 			case "azure-sa":
 				// Reason: has dependencies between config variables
 			case "aws-eks", "aws-s3-folder":

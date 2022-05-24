@@ -17,7 +17,7 @@ with `***`.
 1.  Install required plugins:
 
     ```bash
-    $ pulumi plugin install resource aws 4.37.3
+    $ pulumi plugin install resource aws 5.4.0
     $ pulumi plugin install resource aws-native 0.11.0
     ```
 

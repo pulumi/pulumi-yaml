@@ -164,7 +164,7 @@ outputs:
 	})
 	wantPlugins.Equal(t, gotPlugins)
 
-	_, _, diags = topologicallySortedResources(tmpl)
+	_, diags = topologicallySortedResources(tmpl)
 	requireNoErrors(t, tmpl, diags)
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -66,7 +67,13 @@ type packageLoader struct {
 	host plugin.Host
 }
 
+var globalPackageMutex sync.Mutex
+
 func (l packageLoader) LoadPackage(name string) (Package, error) {
+	// Defensive
+	globalPackageMutex.Lock()
+	defer globalPackageMutex.Unlock()
+
 	pkg, err := l.Loader.LoadPackage(name, nil)
 	if err != nil {
 		return nil, err
