@@ -17,10 +17,56 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
+// Query the typing of a typed program.
+//
+// If the program failed to establish the type of a variable, then `*schema.InvalidType`
+// is returned. If the the variable/expr is unknown to the typed program, `nil` is
+// returned.
+type Typing interface {
+	TypeResource(name string) schema.Type
+	TypeVariable(name string) schema.Type
+	TypeConfig(name string) schema.Type
+	TypeOutput(name string) schema.Type
+
+	// TypeExpr can compare `ast.Expr` by pointer, so only expressions taken directly from
+	// the program will return non-nil results.
+	TypeExpr(expr ast.Expr) schema.Type
+}
+
+func (tc *typeCache) TypeResource(name string) schema.Type {
+	decl, ok := tc.resourceNames[name]
+	if !ok {
+		return nil
+	}
+	return tc.resources[decl]
+}
+
+func (tc *typeCache) TypeVariable(name string) schema.Type {
+	expr, ok := tc.variableNames[name]
+	if !ok {
+		return nil
+	}
+	return tc.exprs[expr]
+}
+
+func (tc *typeCache) TypeConfig(name string) schema.Type {
+	return tc.configuration[name]
+}
+
+func (tc *typeCache) TypeOutput(name string) schema.Type {
+	return tc.outputs[name]
+}
+
+func (tc *typeCache) TypeExpr(expr ast.Expr) schema.Type {
+	return tc.exprs[expr]
+
+}
+
 type typeCache struct {
-	exprs         map[ast.Expr]schema.Type
 	resources     map[*ast.ResourceDecl]schema.Type
 	configuration map[string]schema.Type
+	outputs       map[string]schema.Type
+	exprs         map[ast.Expr]schema.Type
 	resourceNames map[string]*ast.ResourceDecl
 	variableNames map[string]ast.Expr
 }
@@ -776,6 +822,11 @@ func configTypeToSchema(t ctypes.Type) schema.Type {
 	panic(fmt.Sprintf("Unexpected config type: %[1] (%[1]T)", t))
 }
 
+func (tc *typeCache) typeOutput(r *runner, node ast.PropertyMapEntry) bool {
+	tc.outputs[node.Key.Value] = tc.exprs[node.Value]
+	return true
+}
+
 func newTypeCache() *typeCache {
 	pulumiExpr := ast.Object(
 		ast.ObjectProperty{Key: ast.String("cwd")},
@@ -802,7 +853,7 @@ func newTypeCache() *typeCache {
 	}
 }
 
-func TypeCheck(r *runner) syntax.Diagnostics {
+func TypeCheck(r *runner) (Typing, syntax.Diagnostics) {
 	types := newTypeCache()
 
 	// Set roots
@@ -811,9 +862,10 @@ func TypeCheck(r *runner) syntax.Diagnostics {
 		VisitExpr:     types.typeExpr,
 		VisitVariable: types.typeVariable,
 		VisitConfig:   types.typeConfig,
+		VisitOutput:   types.typeOutput,
 	})
 
-	return diags
+	return types, diags
 }
 
 type walker struct {
