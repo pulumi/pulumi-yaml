@@ -954,17 +954,18 @@ func (e walker) EvalVariable(r *runner, node variableNode) bool {
 	return true
 }
 func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	if e.VisitOutput != nil {
-		if !e.VisitOutput(r, node) {
-			return false
-		}
-	}
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
 			return false
 		}
 		if !e.walk(ctx, node.Value) {
+			return false
+		}
+	}
+
+	if e.VisitOutput != nil {
+		if !e.VisitOutput(r, node) {
 			return false
 		}
 	}
