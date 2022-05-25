@@ -57,6 +57,10 @@ func (n notAssignable) string(indent int) string {
 	return s
 }
 
+func (n notAssignable) Error() string {
+	return strings.ReplaceAll(n.String(), "\n", ";")
+}
+
 func (n notAssignable) IsInternal() bool {
 	if n.internal {
 		return true
@@ -79,6 +83,37 @@ func (n notAssignable) Property(propName string) *notAssignable {
 	return &n
 }
 
+func displayType(t schema.Type) string {
+	switch t := codegen.UnwrapType(t).(type) {
+	case *schema.ObjectType:
+		if !strings.HasPrefix(t.Token, adhockObjectToken) {
+			return t.Token
+		}
+		// The token is useless to display the fields
+		props := []string{}
+		for _, prop := range t.Properties {
+			props = append(props, fmt.Sprintf("%s: %s", prop.Name, displayType(prop.Type)))
+		}
+		return fmt.Sprintf("{%s}", strings.Join(props, ", "))
+	case *schema.ArrayType:
+		return fmt.Sprintf("List<%s>", displayType(t.ElementType))
+	case *schema.MapType:
+		return fmt.Sprintf("Map<%s>", displayType(t.ElementType))
+	case *schema.UnionType:
+		inner := make([]string, len(t.ElementTypes))
+		for i, t := range t.ElementTypes {
+			inner[i] = displayType(t)
+		}
+		return fmt.Sprintf("Union<%s>", strings.Join(inner, ", "))
+	default:
+		return t.String()
+	}
+}
+
+const (
+	adhockObjectToken = "pulumi:adhock:"
+)
+
 // isAssignable determines if the type `from` is assignable to the type `to`.
 // If the assignment is legal, nil is returned.
 func isAssignable(from, to schema.Type) *notAssignable {
@@ -95,7 +130,8 @@ func isAssignable(from, to schema.Type) *notAssignable {
 	}
 
 	fail := &notAssignable{
-		reason:   fmt.Sprintf("Cannot assign %s to type %s", from, to),
+		reason: fmt.Sprintf("Cannot assign %s to type %s",
+			displayType(from), displayType(to)),
 		internal: false,
 	}
 	okIf := func(cond bool) *notAssignable {
@@ -141,7 +177,8 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			return okIf(isResource || from == schema.StringType ||
 				// Since we don't have a fn(number) -> string function, we coerce numbers to strings
 				from == schema.NumberType ||
-				from == schema.IntType)
+				from == schema.IntType ||
+				from == schema.BoolType)
 		case schema.AssetType:
 			// Some schema fields with given type Asset actually accept either
 			// Assets or Archives. We accept some invalid inputs instead of
@@ -184,7 +221,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			for _, prop := range from.Properties {
 				notOk := isAssignable(prop.Type, to.ElementType)
 				if notOk != nil {
-					return fail.Because(notOk)
+					return fail.Because(notOk.Property(prop.Name))
 				}
 			}
 			return okIf(true)
@@ -209,10 +246,14 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		if !ok {
 			return fail
 		}
+		failures := []*notAssignable{}
 		for _, prop := range to.Properties {
 			fromProp, ok := from.Property(prop.Name)
 			if prop.IsRequired() && !ok {
-				return fail.Because(&notAssignable{reason: fmt.Sprintf("Missing required property '%s'", prop.Name)}).Property(prop.Name)
+				failures = append(failures, notAssignable{
+					reason: fmt.Sprintf("Missing required property '%s'", prop.Name),
+				}.Property(prop.Name))
+				continue
 			}
 			if !ok {
 				// We don't have an optional property, which is ok
@@ -221,8 +262,12 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			// We have a matching property, so the type must agree
 			notAssignable := isAssignable(fromProp.Type, prop.Type)
 			if notAssignable != nil {
-				return fail.Because(notAssignable).Property(prop.Name)
+				failures = append(failures, notAssignable.Property(prop.Name))
+				continue
 			}
+		}
+		if len(failures) > 0 {
+			return fail.Because(failures...)
 		}
 		return nil
 	case *schema.TokenType:
@@ -248,7 +293,7 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	if result == nil {
 		return
 	}
-	summary := fmt.Sprintf("%s is not assignable from %s", to, from)
+	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
 		ctx.addDiag(syntax.Warning(loc,
 			fmt.Sprintf("internal error: %s", summary),
@@ -499,7 +544,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			if _, ok := accessors[0].(*ast.PropertySubscript); ok {
 				op = "index"
 			}
-			setError(fmt.Sprintf("Cannot %s into %s of type %s", op, runningName, root),
+			setError(fmt.Sprintf("Cannot %s into %s of type %s", op, runningName, displayType(root)),
 				notAssignable{
 					reason:  fmt.Sprintf("'%s' could be a type that does not support %sing", runningName, op),
 					because: errs,
@@ -533,7 +578,8 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			return root
 		default:
 			return setError(
-				fmt.Sprintf("cannot access a property on '%s' (type %s)", runningName, codegen.UnwrapType(root)),
+				fmt.Sprintf("cannot access a property on '%s' (type %s)", runningName,
+					displayType(codegen.UnwrapType(root))),
 				"Property access is only allowed on Resources and Objects",
 			)
 		}
@@ -557,7 +603,8 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 	case *ast.PropertySubscript:
 		err := func(msg string) *schema.InvalidType {
 			return setError(
-				fmt.Sprintf("cannot index into '%s' (type %s)", runningName, codegen.UnwrapType(root)),
+				fmt.Sprintf("cannot index into '%s' (type %s)", runningName,
+					displayType(codegen.UnwrapType(root))),
 				msg,
 			)
 		}
@@ -648,7 +695,7 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 			propNames = append(propNames, k.Value)
 		}
 		tc.exprs[t] = &schema.ObjectType{
-			Token:      "pulumi:adhock:" + strings.Join(propNames, "•"),
+			Token:      adhockObjectToken + strings.Join(propNames, "•"),
 			Properties: properties,
 		}
 	case *ast.NullExpr:
