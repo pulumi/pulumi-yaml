@@ -21,4 +21,7 @@
   [#221](https://github.com/pulumi/pulumi-yaml/pull/221)
 
 - [expr] Fix handling of "plain" input maps when sending properties to component providers such as AWSX.
-  https://github.com/pulumi/pulumi-yaml/pull/195
+  [#195](https://github.com/pulumi/pulumi-yaml/pull/195)
+
+- Do not panic when converting functions without `Return` fields.
+  [#233](https://github.com/pulumi/pulumi-yaml/pull/234)
