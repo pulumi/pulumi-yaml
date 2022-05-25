@@ -850,6 +850,7 @@ func newTypeCache() *typeCache {
 		variableNames: map[string]ast.Expr{
 			PulumiVarName: pulumiExpr,
 		},
+		outputs: map[string]schema.Type{},
 	}
 }
 
