@@ -1075,91 +1075,106 @@ func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
 	tests := []struct {
 		input *ast.FromBase64Expr
 		name  string
+		valid bool
 	}{
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("a")),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("a"))),
 			},
-			name: "Valid ASCII",
+			name:  "Valid ASCII",
+			valid: true,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xc3\xb1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xc3\xb1"))),
 			},
-			name: "Valid 2 Octet Sequence",
+			name:  "Valid 2 Octet Sequence",
+			valid: true,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xe2\x82\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x82\xa1"))),
 			},
-			name: "Valid 3 Octet Sequence",
+			name:  "Valid 3 Octet Sequence",
+			valid: true,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xf0\x90\x8c\xbc"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x90\x8c\xbc"))),
 			},
-			name: "Valid 4 Octet Sequence",
+			name:  "Valid 4 Octet Sequence",
+			valid: true,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xf8\xa1\xa1\xa1\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf8\xa1\xa1\xa1\xa1"))),
 			},
-			name: "Valid 5 Octet Sequence (but not Unicode!)",
+			name:  "Valid 5 Octet Sequence (but not Unicode!)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xfc\xa1\xa1\xa1\xa1\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xfc\xa1\xa1\xa1\xa1\xa1"))),
 			},
-			name: "Valid 6 Octet Sequence (but not Unicode!)",
+			name:  "Valid 6 Octet Sequence (but not Unicode!)",
+			valid: false,
 		},
 
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xfc\xa1\xa1\xa1\xa1\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xfc\xa1\xa1\xa1\xa1\xa1"))),
 			},
-			name: "Valid 6 Octet Sequence (but not Unicode!)",
+			name:  "Valid 6 Octet Sequence (but not Unicode!)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xc3\x28"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xc3\x28"))),
 			},
-			name: "Invalid 2 Octet Sequence",
+			name:  "Invalid 2 Octet Sequence",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xa0\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xa0\xa1"))),
 			},
-			name: "Invalid Sequence Identifier",
+			name:  "Invalid Sequence Identifier",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xe2\x28\xa1"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x28\xa1"))),
 			},
-			name: "Invalid 3 Octet Sequence (in 2nd Octet)",
+			name:  "Invalid 3 Octet Sequence (in 2nd Octet)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xe2\x82\x28"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x82\x28"))),
 			},
-			name: "Invalid 3 Octet Sequence (in 3rd Octet)",
+			name:  "Invalid 3 Octet Sequence (in 3rd Octet)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xf0\x28\x8c\xbc"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x28\x8c\xbc"))),
 			},
-			name: "Invalid 4 Octet Sequence (in 2nd Octet)",
+			name:  "Invalid 4 Octet Sequence (in 2nd Octet)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xf0\x90\x28\xbc"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x90\x28\xbc"))),
 			},
-			name: "Invalid 4 Octet Sequence (in 3rd Octet)",
+			name:  "Invalid 4 Octet Sequence (in 3rd Octet)",
+			valid: false,
 		},
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("\xf0\x28\x8c\x28"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x28\x8c\x28"))),
 			},
-			name: "Invalid 4 Octet Sequence (in 4th Octet)",
+			name:  "Invalid 4 Octet Sequence (in 4th Octet)",
+			valid: false,
 		},
 	}
 
@@ -1173,7 +1188,7 @@ func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
 			})
 			testTemplate(t, tmpl, func(r *evalContext) {
 				_, ok := r.evaluateBuiltinFromBase64(tt.input)
-				assert.False(t, ok)
+				assert.Equal(t, tt.valid, ok)
 			})
 		})
 	}
