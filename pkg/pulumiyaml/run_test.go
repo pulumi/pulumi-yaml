@@ -1078,7 +1078,7 @@ func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
 	}{
 		{
 			input: &ast.FromBase64Expr{
-				Value: ast.String("a"),
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("a")),
 			},
 			name: "Valid ASCII",
 		},
