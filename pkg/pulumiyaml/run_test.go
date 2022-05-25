@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
@@ -38,8 +39,8 @@ type MockPackage struct {
 	isComponent      func(typeName string) (bool, error)
 	resolveResource  func(typeName string) (ResourceTypeToken, error)
 	resolveFunction  func(typeName string) (FunctionTypeToken, error)
-	resourceTypeHint func(typeName string) InputTypeHint
-	functionTypeHint func(typeName string) InputTypeHint
+	resourceTypeHint func(typeName string) *schema.ResourceType
+	functionTypeHint func(typeName string) *schema.Function
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -60,11 +61,11 @@ func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 	return m.isComponent(typeName.String())
 }
 
-func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) InputTypeHint {
+func (m MockPackage) ResourceTypeHint(typeName ResourceTypeToken) *schema.ResourceType {
 	return m.resourceTypeHint(typeName.String())
 }
 
-func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeHint {
+func (m MockPackage) FunctionTypeHint(typeName FunctionTypeToken) *schema.Function {
 	return m.functionTypeHint(typeName.String())
 }
 
@@ -76,42 +77,75 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
-type mockInputTypeHint []string
-
-func (m mockInputTypeHint) InputProperties() FieldsTypeHint {
-	return m.Fields()
-}
-
-func (m mockInputTypeHint) Fields() FieldsTypeHint {
-	o := FieldsTypeHint{}
-	for _, f := range m {
-		o[f] = nil
+func inputProperties(token string, props ...schema.Property) *schema.ResourceType {
+	p := make([]*schema.Property, 0, len(props))
+	for _, prop := range props {
+		prop := prop
+		p = append(p, &prop)
 	}
-	return o
+	return &schema.ResourceType{
+		Resource: &schema.Resource{
+			InputProperties: p,
+			Properties:      p,
+		},
+	}
 }
-func (m mockInputTypeHint) Element() TypeHint { return nil }
+
+func function(token string, inputs, outputs []schema.Property) *schema.Function {
+	pIn := make([]*schema.Property, 0, len(inputs))
+	pOut := make([]*schema.Property, 0, len(outputs))
+	for _, prop := range inputs {
+		prop := prop
+		pIn = append(pIn, &prop)
+	}
+	for _, prop := range outputs {
+		prop := prop
+		pOut = append(pOut, &prop)
+	}
+	return &schema.Function{
+		Token:   testComponentToken,
+		Inputs:  &schema.ObjectType{Properties: pIn},
+		Outputs: &schema.ObjectType{Properties: pOut},
+	}
+}
 
 func newMockPackageMap() PackageLoader {
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"aws": MockPackage{},
 			"test": MockPackage{
-				resourceTypeHint: func(typeName string) InputTypeHint {
+				resourceTypeHint: func(typeName string) *schema.ResourceType {
 					switch typeName {
 					case testResourceToken:
-						return mockInputTypeHint{"foo"}
+						return inputProperties(typeName, schema.Property{
+							Name: "foo",
+							Type: schema.StringType,
+						}, schema.Property{
+							Name: "bar",
+							Type: schema.StringType,
+						})
 					case testComponentToken:
-						return mockInputTypeHint{"foo"}
+						return inputProperties(typeName, schema.Property{
+							Name: "foo",
+							Type: schema.StringType,
+						})
 					default:
-						return mockInputTypeHint{}
+						return inputProperties(typeName)
 					}
 				},
-				functionTypeHint: func(typeName string) InputTypeHint {
+				functionTypeHint: func(typeName string) *schema.Function {
 					switch typeName {
 					case "test:fn":
-						return mockInputTypeHint{"yesArg", "someSuchArg"}
+						return function(typeName,
+							[]schema.Property{
+								{Name: "yesArg", Type: schema.StringType},
+								{Name: "someSuchArg", Type: schema.StringType},
+							},
+							[]schema.Property{
+								{Name: "outString", Type: schema.StringType},
+							})
 					default:
-						return mockInputTypeHint{}
+						return function(typeName, nil, nil)
 					}
 				},
 				isComponent: func(typeName string) (bool, error) {
@@ -635,8 +669,8 @@ runtime: yaml
 description: An EKS cluster
 variables:
   test:
-    - foo:
-        bar: notoof
+    - quux:
+        bazz: notoof
     - quux:
         bazz: oof
 resources:
@@ -668,8 +702,8 @@ resources:
   r:
     type: test:resource:type
     properties:
-      foo: ${vpcId} # order to ensure determinism
-      bar: does not exist
+      foo: ${vpcId.outString} # order to ensure determinism
+      buzz: does not exist
 `
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
@@ -677,7 +711,7 @@ resources:
 	assert.Len(t, diags, 2)
 	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
 		diagString(diags[0]))
-	assert.Equal(t, "<stdin>:17:7: Property bar does not exist on Resource test:resource:type",
+	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on Resource test:resource:type",
 		diagString(diags[1]))
 
 }
