@@ -72,7 +72,7 @@ func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.Pac
 		if typ == nil {
 			return schema.PackageSpec{}, fmt.Errorf("configuration type of '%s' unknown", k)
 		}
-		spec, err := typeSpec(typ)
+		spec, _, err := typeSpec(typ)
 		if err != nil {
 			return schema.PackageSpec{}, err
 		}
@@ -97,9 +97,13 @@ func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.Pac
 		if typ == nil {
 			return schema.PackageSpec{}, fmt.Errorf("output type of '%s' unknown", k)
 		}
-		spec, err := typeSpec(typ)
+		spec, required, err := typeSpec(typ)
 		if err != nil {
 			return schema.PackageSpec{}, err
+		}
+
+		if required {
+			r.Required = append(r.Required, k)
 		}
 
 		r.Properties[k] = schema.PropertySpec{
@@ -111,8 +115,61 @@ func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.Pac
 	return pkg, nil
 }
 
-func typeSpec(t schema.Type) (schema.TypeSpec, error) {
-	spec := schema.TypeSpec{}
+func typeSpec(t schema.Type) (schema.TypeSpec, bool, error) {
+	wrapInner := func(t schema.Type, wrap func(inner schema.TypeSpec) schema.TypeSpec) (schema.TypeSpec, bool, error) {
+		inner, required, err := typeSpec(t)
+		if err != nil {
+			return schema.TypeSpec{}, false, err
+		}
+
+		return wrap(inner), required, nil
+	}
+	switch t := t.(type) {
+	case *schema.ArrayType:
+		return wrapInner(t.ElementType, func(inner schema.TypeSpec) schema.TypeSpec {
+			return schema.TypeSpec{
+				Type:  "array",
+				Items: &inner,
+			}
+		})
+	case *schema.MapType:
+		return wrapInner(t.ElementType, func(inner schema.TypeSpec) schema.TypeSpec {
+			return schema.TypeSpec{
+				Type:                 "object",
+				AdditionalProperties: &inner,
+			}
+		})
+	case *schema.InputType:
+		inner, required, err := typeSpec(t.ElementType)
+		if err != nil {
+			return schema.TypeSpec{}, false, err
+		}
+		inner.Plain = false
+		return inner, required, nil
+	case *schema.OptionalType:
+		inner, _, err := typeSpec(t.ElementType)
+		if err != nil {
+			return schema.TypeSpec{}, false, err
+		}
+		return inner, false, nil
+
+	case *schema.ObjectType:
+		if strings.HasPrefix(t.Token, "pulumi:adhock:") {
+			// Give the ad hock token a name, and then export it
+		} else {
+			pkg := t.Package.Name
+			if t.Package.Version == nil {
+				return schema.TypeSpec{}, false, fmt.Errorf("package '%s' missing version", pkg)
+			}
+			version := t.Package.Version.String()
+			return schema.TypeSpec{
+				Ref: fmt.Sprintf("/%s/v%s/schema.json#/types/%s", pkg, version, t.Token),
+			}, true, nil
+		}
+	}
+	spec := schema.TypeSpec{
+		Plain: true,
+	}
 	if schema.IsPrimitiveType(t) {
 		switch t {
 		case schema.BoolType, schema.IntType, schema.NumberType, schema.StringType:
@@ -120,9 +177,9 @@ func typeSpec(t schema.Type) (schema.TypeSpec, error) {
 		default:
 			spec.Ref = fmt.Sprintf("pulumi.json#/%s", strings.TrimPrefix(t.String(), "pulumi:pulumi:"))
 		}
-		return spec, nil
+		return spec, true, nil
 	}
-	return schema.TypeSpec{}, fmt.Errorf("can only handle primitive formats")
+	return schema.TypeSpec{}, false, fmt.Errorf("cannot handle %[1]s (%[1]T)", t)
 }
 
 func schemaDefaultValue(e ast.Expr) interface{} {

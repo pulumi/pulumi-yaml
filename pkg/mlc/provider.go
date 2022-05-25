@@ -43,12 +43,15 @@ func Serve(name string) error {
 	if err != nil {
 		return fmt.Errorf("could not generate spec: %w", err)
 	}
+
+	spec.Version = "1.0.0"
+
 	schema, err := json.Marshal(spec)
 	if err != nil {
 		return err
 	}
 
-	err = provider.ComponentMain(decl.Name.Value, "1.0.0", schema,
+	err = provider.ComponentMain(decl.Name.Value, spec.Version, schema,
 		func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
 			options pulumi.ResourceOption) (*providersdk.ConstructResult, error) {
 			if typ == decl.Name.Value+":index:Component" {

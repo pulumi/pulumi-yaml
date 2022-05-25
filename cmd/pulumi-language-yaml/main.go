@@ -44,7 +44,6 @@ func main() {
 			cmdutil.Exit(err)
 		}
 		if err := mlc.Serve(serve); err != nil {
-			fmt.Fprintf(os.Stderr, "Found arguments: %q\n", os.Args)
 			cmdutil.Exit(err)
 		}
 		return
