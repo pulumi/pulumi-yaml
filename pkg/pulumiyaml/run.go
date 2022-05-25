@@ -178,7 +178,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	runner := newRunner(ctx, t, loader)
 
-	diags := TypeCheck(runner)
+	_, diags := TypeCheck(runner)
 	if diags.HasErrors() {
 		return diags
 	}

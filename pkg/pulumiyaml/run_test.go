@@ -250,7 +250,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
-		diags := TypeCheck(runner)
+		_, diags := TypeCheck(runner)
 		if diags.HasErrors() {
 			return diags
 		}
