@@ -8,6 +8,9 @@
 - Add errors when hanging invalid fields off of resource options.
   [#211](https://github.com/pulumi/pulumi-yaml/pull/211)
 
+- Add `Fn::FromBase64`
+  [#218](https://github.com/pulumi/pulumi-yaml/pull/218)
+
 ### Bug Fixes
 
 - De-duplicate error message added during pre-eval checking.
