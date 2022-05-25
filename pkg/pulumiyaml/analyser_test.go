@@ -1,3 +1,5 @@
+// Copyright 2022, Pulumi Corporation.  All rights reserved.
+
 package pulumiyaml
 
 import (
@@ -110,7 +112,8 @@ func TestTypeError(t *testing.T) {
 		},
 	}
 
-	for i, c := range cases {
+	for i, c := range cases { //nolint:paralleltest
+		// false positive. The parallel call is below
 		c := c
 
 		name := c.message
@@ -118,6 +121,7 @@ func TestTypeError(t *testing.T) {
 			name = fmt.Sprintf("no-error%d", i)
 		}
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := isAssignable(c.from, c.to)
 			if c.message == "" {
 				assert.Nil(t, result)
@@ -203,7 +207,9 @@ func TestTypePropertyAccess(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for _, c := range cases { //nolint:paralleltest
+		// false positive. The parallel call is below
+
 		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()

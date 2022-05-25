@@ -110,9 +110,7 @@ func displayType(t schema.Type) string {
 	}
 }
 
-const (
-	adhockObjectToken = "pulumi:adhock:"
-)
+const adhockObjectToken = "pulumi:adhock:" //nolint:gosec
 
 // isAssignable determines if the type `from` is assignable to the type `to`.
 // If the assignment is legal, nil is returned.
