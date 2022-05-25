@@ -4,7 +4,6 @@ package pulumiyaml
 
 import (
 	"bytes"
-	"context"
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
@@ -191,11 +190,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	return nil
 }
 
-func TypeDecl(t *ast.TemplateDecl, loader PackageLoader) (Typing, error) {
-	ctx, err := pulumi.NewContext(context.TODO(), pulumi.RunInfo{})
-	if err != nil {
-		return nil, err
-	}
+func TypeDecl(t *ast.TemplateDecl, ctx *pulumi.Context, loader PackageLoader) (Typing, error) {
 	runner := newRunner(ctx, t, loader)
 	typing, diags := TypeCheck(runner)
 	if diags.HasErrors() {

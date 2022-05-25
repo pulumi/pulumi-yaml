@@ -86,7 +86,7 @@ func getDecl(path string) ([]byte, *ast.TemplateDecl, error) {
 	}
 
 	if decl.Name == nil || decl.Name.Value == "" {
-		return nil, nil, fmt.Errorf("Name needed for MLC")
+		return nil, nil, fmt.Errorf("name must be specified for a component provider")
 	}
 
 	return bytes, decl, nil

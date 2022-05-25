@@ -15,10 +15,12 @@
 package mlc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -26,7 +28,12 @@ import (
 
 func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.PackageSpec, error) {
 	var pkg schema.PackageSpec
-	pkg.Description = decl.Description.Value
+	if decl.Description != nil {
+		pkg.Description = decl.Description.Value
+	}
+	if decl.Name == nil {
+		return schema.PackageSpec{}, fmt.Errorf("name not specified on decl")
+	}
 	pkg.Name = decl.Name.Value
 
 	r := schema.ResourceSpec{
@@ -41,7 +48,20 @@ func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.Pac
 		IsComponent:     true,
 	}
 
-	typing, err := pulumiyaml.TypeDecl(decl, loader)
+	ctx, err := pulumi.NewContext(context.TODO(), pulumi.RunInfo{
+		Project:          decl.Name.Value,
+		Stack:            "Component",
+		Config:           map[string]string{},
+		ConfigSecretKeys: []string{},
+		Parallel:         1,
+		DryRun:           true,
+	})
+	if err != nil {
+		return schema.PackageSpec{}, fmt.Errorf("could not make context: %w", err)
+	}
+	ctx.Log = &logEmpty{}
+
+	typing, err := pulumiyaml.TypeDecl(decl, ctx, loader)
 	if err != nil {
 		return schema.PackageSpec{}, err
 	}
