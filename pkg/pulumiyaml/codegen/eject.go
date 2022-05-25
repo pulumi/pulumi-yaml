@@ -52,7 +52,7 @@ func Eject(dir string, loader schema.Loader) (*workspace.Project, *pcl.Program, 
 		}
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load YAML program")
+		return nil, nil, fmt.Errorf("failed to load YAML program, %v", err)
 	}
 
 	return proj, program, nil
@@ -109,6 +109,7 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 	}
 
 	// unset this, as we've already parsed the YAML program in "main" and it won't be valid for convert
-	proj.Main = ""
-	return proj, t, hcl.Diagnostics(diags), err
+	cleanedProj := *proj
+	cleanedProj.Main = ""
+	return &cleanedProj, t, diags.HCL(), err
 }

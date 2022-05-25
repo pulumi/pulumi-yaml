@@ -21,7 +21,6 @@ import (
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -118,7 +117,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
-		err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+		err := diagWriter.WriteDiagnostics(diags.HCL())
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +154,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return pulumiyaml.RunTemplate(ctx, template, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
-			err := diagWriter.WriteDiagnostics(hcl.Diagnostics(diags))
+			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
 			if err != nil {
 				return nil, err
 			}

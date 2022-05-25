@@ -40,6 +40,11 @@ func TestExampleAwsStaticWebsite(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
+func TestExampleAwsx(t *testing.T) {
+	testWrapper(t, exampleDir("awsx-fargate"), RequireLiveRun, awsConfig)
+}
+
+//nolint:paralleltest // uses parallel programtest
 func TestExampleAzureStaticWebsite(t *testing.T) {
 	t.Skip()
 	testWrapper(t, exampleDir("azure-static-website"), RequireLiveRun, azureConfig)

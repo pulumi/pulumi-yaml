@@ -291,7 +291,6 @@ resources:
       foo: oof
   comp-a:
     type: test:component:type
-    component: true
     properties:
       foo: ${res-a.bar}
 outputs:
@@ -584,7 +583,6 @@ func TestJSON(t *testing.T) {
 		},
 		"comp-a": {
 			"type": "test:component:type",
-			"component": true,
 			"properties": {
 				"foo": "${res-a.bar}"
 			}

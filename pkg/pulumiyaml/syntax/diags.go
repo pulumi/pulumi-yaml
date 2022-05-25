@@ -3,18 +3,42 @@
 package syntax
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/hcl/v2"
 )
 
 // A Diagnostic represents a warning or an error to be presented to the user.
-type Diagnostic = hcl.Diagnostic
+type Diagnostic struct {
+	hcl.Diagnostic
+
+	// Whether the diagnostic has been shown to the user
+	Shown bool
+}
+
+// WithContext adds context without mutating the receiver.
+func (d Diagnostic) WithContext(rng *hcl.Range) *Diagnostic {
+	d.Context = rng
+	return &d
+}
+
+func (d Diagnostic) HCL() *hcl.Diagnostic {
+	return &d.Diagnostic
+}
 
 // Warning creates a new warning-level diagnostic from the given subject, summary, and detail.
 func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
 	if detail == "" {
 		detail = summary
 	}
-	return &Diagnostic{Severity: hcl.DiagWarning, Subject: rng, Summary: summary, Detail: detail}
+	return &Diagnostic{
+		Diagnostic: hcl.Diagnostic{
+			Severity: hcl.DiagWarning,
+			Subject:  rng,
+			Summary:  summary,
+			Detail:   detail,
+		},
+	}
 }
 
 // Error creates a new error-level diagnostic from the given subject, summary, and detail.
@@ -22,7 +46,9 @@ func Error(rng *hcl.Range, summary, detail string) *Diagnostic {
 	if detail == "" {
 		detail = summary
 	}
-	return &Diagnostic{Severity: hcl.DiagError, Subject: rng, Summary: summary, Detail: detail}
+	return &Diagnostic{
+		Diagnostic: hcl.Diagnostic{Severity: hcl.DiagError, Subject: rng, Summary: summary, Detail: detail},
+	}
 }
 
 // NodeError creates a new error-level diagnostic from the given node, summary, and detail. If the node is non-nil,
@@ -36,16 +62,28 @@ func NodeError(node Node, summary, detail string) *Diagnostic {
 }
 
 // Diagnostics is a list of diagnostics.
-type Diagnostics hcl.Diagnostics
+type Diagnostics []*Diagnostic
 
 // HasErrors returns true if the list of diagnostics contains any error-level diagnostics.
 func (d Diagnostics) HasErrors() bool {
-	return hcl.Diagnostics(d).HasErrors()
+	for _, diag := range d {
+		if diag.Severity == hcl.DiagError {
+			return true
+		}
+	}
+	return false
 }
 
 // Error implements the error interface so that Diagnostics values may interoperate with APIs that use errors.
 func (d Diagnostics) Error() string {
-	return hcl.Diagnostics(d).Error()
+	switch len(d) {
+	case 0:
+		return "no diagnostics"
+	case 1:
+		return d[0].Error()
+	default:
+		return fmt.Sprintf("%s, and %d other diagnostic(s)", d[0].Error(), len(d)-1)
+	}
 }
 
 // Extend appends the given list of diagnostics to the list.
@@ -53,4 +91,25 @@ func (d *Diagnostics) Extend(diags ...*Diagnostic) {
 	if len(diags) != 0 {
 		*d = append(*d, diags...)
 	}
+}
+
+func (d *Diagnostics) HCL() hcl.Diagnostics {
+	if d == nil {
+		return nil
+	}
+	a := make(hcl.Diagnostics, 0, len(*d))
+	for _, diag := range *d {
+		a = append(a, diag.HCL())
+	}
+	return a
+}
+
+func (d Diagnostics) Unshown() *Diagnostics {
+	diags := Diagnostics{}
+	for _, diag := range d {
+		if !diag.Shown {
+			diags = append(diags, diag)
+		}
+	}
+	return &diags
 }

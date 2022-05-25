@@ -12,6 +12,7 @@ import (
 
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
 type declNode struct {
@@ -298,7 +299,7 @@ func (d *ResourceOptionsDecl) defaultValue() interface{} {
 	return &ResourceOptionsDecl{}
 }
 
-func (d ResourceOptionsDecl) recordSyntax() *syntax.Node {
+func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
@@ -525,6 +526,7 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", objName), "")}
 	}
 	*dest.recordSyntax() = obj
+	contract.Assertf(*dest.recordSyntax() == obj, "%s.recordSyntax took by value, so the assignment failed", objName)
 
 	v := reflect.ValueOf(dest).Elem()
 	t := v.Type()

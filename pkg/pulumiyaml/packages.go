@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -89,7 +90,13 @@ type packageLoader struct {
 	host plugin.Host
 }
 
+var globalPackageMutex sync.Mutex
+
 func (l packageLoader) LoadPackage(name string) (Package, error) {
+	// Defensive
+	globalPackageMutex.Lock()
+	defer globalPackageMutex.Unlock()
+
 	pkg, err := l.Loader.LoadPackage(name, nil)
 	if err != nil {
 		return nil, err
@@ -397,9 +404,18 @@ func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) InputTypeH
 	if !ok {
 		return nil
 	}
+	hints := []*schema.Property{}
+	inputs := []*schema.Property{}
+	if f.Outputs != nil {
+		hints = append(hints, f.Outputs.Properties...)
+	}
+	if f.Inputs != nil {
+		hints = append(hints, f.Inputs.Properties...)
+		inputs = f.Inputs.Properties
+	}
 	return inputTypeHint{
-		TypeHint:   fieldTypeHint{append(f.Outputs.Properties, f.Inputs.Properties...)},
-		inputProps: f.Inputs.Properties,
+		TypeHint:   fieldTypeHint{hints},
+		inputProps: inputs,
 	}
 }
 
