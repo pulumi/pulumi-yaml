@@ -125,6 +125,10 @@ func (m FakePackage) ResourceConstants(typeName pulumiyaml.ResourceTypeToken) ma
 }
 
 func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeToken, error) {
+	switch typeName {
+	case "test:mod:fn":
+		return pulumiyaml.FunctionTypeToken(typeName), nil
+	}
 	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
 	m.t.Logf(msg)
 	return "", fmt.Errorf(msg)

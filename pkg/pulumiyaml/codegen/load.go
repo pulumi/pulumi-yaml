@@ -265,10 +265,14 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			invokeArgs = append(invokeArgs, args)
 		}
 
-		return relativeTraversal(&model.FunctionCallExpression{
+		fn := &model.FunctionCallExpression{
 			Name: "invoke",
 			Args: invokeArgs,
-		}, node.Return.Value), diags
+		}
+		if node.Return == nil {
+			return fn, diags
+		}
+		return relativeTraversal(fn, node.Return.Value), diags
 	case *ast.JoinExpr:
 		return imp.importJoin(node)
 	case *ast.SelectExpr:

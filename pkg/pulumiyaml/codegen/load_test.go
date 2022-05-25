@@ -127,6 +127,21 @@ resources:
 }
 `,
 		},
+		{
+			name: "invokes",
+			input: `
+variables:
+  ret:
+    Fn::Invoke:
+      Function: test:mod:fn
+      Return: foo
+  noRet:
+    Fn::Invoke:
+      Function: test:mod:fn`,
+			expected: `ret = invoke("test:mod:fn").foo
+noRet = invoke("test:mod:fn")
+`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
