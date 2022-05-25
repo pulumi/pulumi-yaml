@@ -601,9 +601,9 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		}
 		return typePropertyAccess(ctx, newType, runningName+"."+accessor.Name, accessors[1:], setError)
 	case *ast.PropertySubscript:
-		err := func(msg string) *schema.InvalidType {
+		err := func(typ, msg string) *schema.InvalidType {
 			return setError(
-				fmt.Sprintf("cannot index into '%s' (type %s)", runningName,
+				fmt.Sprintf("Cannot index%s into '%s' (type %s)", typ, runningName,
 					displayType(codegen.UnwrapType(root))),
 				msg,
 			)
@@ -611,15 +611,14 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		switch root := codegen.UnwrapType(root).(type) {
 		case *schema.ArrayType:
 			if _, ok := accessor.Index.(string); ok {
-				err("Index via string is only allowed on Maps")
+				return err(" via string", "Index via string is only allowed on Maps")
 			}
-			runningName += fmt.Sprintf("[%d]", accessor.Index.(int))
 			return typePropertyAccess(ctx, root.ElementType,
 				runningName+fmt.Sprintf("[%d]", accessor.Index.(int)),
 				accessors[1:], setError)
 		case *schema.MapType:
 			if _, ok := accessor.Index.(int); ok {
-				err("Index via number is only allowed on Arrays")
+				return err(" via number", "Index via number is only allowed on Arrays")
 			}
 			return typePropertyAccess(ctx, root.ElementType,
 				runningName+fmt.Sprintf("[%q]", accessor.Index.(string)),
@@ -627,7 +626,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		case *schema.InvalidType:
 			return &schema.InvalidType{}
 		default:
-			return err("Index property access is only allowed on Maps and Lists")
+			return err("", "Index property access is only allowed on Maps and Lists")
 		}
 	default:
 		panic(fmt.Sprintf("Unknown property type: %T", accessor))

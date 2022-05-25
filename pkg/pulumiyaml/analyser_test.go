@@ -2,8 +2,10 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,6 +128,93 @@ func TestTypeError(t *testing.T) {
 				require.Error(t, result)
 				assert.Equal(t, c.message, result.String())
 			}
+		})
+	}
+}
+
+func TestTypePropertyAccess(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		root         schema.Type
+		list         []ast.PropertyAccessor
+		expectedType string
+		errMsg       string
+	}{
+		{
+			root: &schema.MapType{ElementType: &schema.ArrayType{ElementType: schema.AnyType}},
+			list: []ast.PropertyAccessor{
+				&ast.PropertySubscript{Index: "foo"},
+				&ast.PropertySubscript{Index: 7},
+				&ast.PropertySubscript{Index: "foo"},
+			},
+			expectedType: "Invalid",
+			errMsg:       `Cannot index into 'start["foo"][7]' (type pulumi:pulumi:Any):Index property access is only allowed on Maps and Lists`,
+		},
+		{
+			root: &schema.ResourceType{
+				Token: "pkg:mod:Token",
+				Resource: &schema.Resource{
+					Properties: []*schema.Property{
+						{Name: "fizz", Type: schema.StringType},
+						{Name: "buzz", Type: schema.StringType},
+					},
+				},
+			},
+			list: []ast.PropertyAccessor{
+				&ast.PropertyName{Name: "fizzbuzz"},
+			},
+			expectedType: "Invalid",
+			errMsg:       `fizzbuzz does not exist on start:Existing properties are: buzz, fizz, id, urn`,
+		},
+		{
+			root: &schema.UnionType{
+				ElementTypes: []schema.Type{
+					&schema.ArrayType{ElementType: schema.StringType},
+					&schema.ArrayType{ElementType: schema.NumberType},
+				},
+			},
+			list: []ast.PropertyAccessor{
+				&ast.PropertySubscript{Index: 0},
+			},
+			expectedType: "Union<string, number>",
+			errMsg:       ``,
+		},
+		{
+			root: &schema.UnionType{
+				ElementTypes: []schema.Type{
+					&schema.ArrayType{ElementType: schema.StringType},
+					&schema.MapType{ElementType: schema.NumberType},
+					&schema.ObjectType{
+						Properties: []*schema.Property{
+							{Name: "foo", Type: &schema.ArrayType{ElementType: schema.AnyType}},
+						},
+					},
+				},
+			},
+			list: []ast.PropertyAccessor{
+				&ast.PropertyName{Name: "foo"},
+				&ast.PropertySubscript{Index: "bar"},
+			},
+			expectedType: "Invalid",
+			errMsg: `Cannot access into start of type Union<List<string>, Map<number>, >:'start' could be a type that does not support accessing:
+  Array<string>: cannot access a property on 'start' (type List<string>)
+  Map<number>: cannot access a property on 'start' (type Map<number>)
+  Cannot index via string into 'start.foo' (type List<pulumi:pulumi:Any>)`,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+			var actualMsg string
+			setError := func(m, s string) *schema.InvalidType {
+				actualMsg += m + ":" + s + "\n"
+				return &schema.InvalidType{}
+			}
+			actualType := typePropertyAccess(nil, c.root, "start", c.list, setError)
+			assert.Equal(t, c.expectedType, displayType(actualType))
+			assert.Equal(t, c.errMsg, strings.TrimSuffix(actualMsg, "\n"))
 		})
 	}
 }
