@@ -16,13 +16,15 @@ package mlc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 )
 
-func Schema(decl *ast.TemplateDecl) schema.PackageSpec {
+func Schema(decl *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (schema.PackageSpec, error) {
 	var pkg schema.PackageSpec
 	pkg.Description = decl.Description.Value
 	pkg.Name = decl.Name.Value
@@ -31,7 +33,7 @@ func Schema(decl *ast.TemplateDecl) schema.PackageSpec {
 		ObjectTypeSpec: schema.ObjectTypeSpec{
 			Description: pkg.Description,
 			Properties:  map[string]schema.PropertySpec{},
-			Type:        pkg.Name + ":Component",
+			Type:        pkg.Name + ":index:Component",
 			Required:    []string{},
 		},
 		InputProperties: map[string]schema.PropertySpec{},
@@ -39,33 +41,22 @@ func Schema(decl *ast.TemplateDecl) schema.PackageSpec {
 		IsComponent:     true,
 	}
 
+	typing, err := pulumiyaml.TypeDecl(decl, loader)
+	if err != nil {
+		return schema.PackageSpec{}, err
+	}
+
 	for _, input := range decl.Configuration.Entries {
 		k, v := input.Key.Value, input.Value
-		spec := schema.TypeSpec{}
-		def := schemaDefaultValue(v.Default)
-		if v.Type != nil {
-			switch v.Type.Value {
-			case "String":
-				spec.Type = "string"
-			case "Number":
-				spec.Type = "number" //nolint:goconst
-			case "Boolean":
-				spec.Type = "boolean"
-			default:
-				switch def.(type) {
-				case string:
-					spec.Type = "string"
-				case float64:
-					spec.Type = "number"
-				case int:
-					spec.Type = "number"
-				case bool:
-					spec.Type = "boolean"
-				default:
-					spec.Ref = "pulumi.json#/Any"
-				}
-			}
+		typ := typing.TypeConfig(k)
+		if typ == nil {
+			return schema.PackageSpec{}, fmt.Errorf("configuration type of '%s' unknown", k)
 		}
+		spec, err := typeSpec(typ)
+		if err != nil {
+			return schema.PackageSpec{}, err
+		}
+		def := schemaDefaultValue(v.Default)
 
 		r.InputProperties[k] = schema.PropertySpec{
 			TypeSpec: spec,
@@ -82,17 +73,36 @@ func Schema(decl *ast.TemplateDecl) schema.PackageSpec {
 
 	for _, output := range decl.Outputs.Entries {
 		k := output.Key.Value
+		typ := typing.TypeOutput(k)
+		if typ == nil {
+			return schema.PackageSpec{}, fmt.Errorf("output type of '%s' unknown", k)
+		}
+		spec, err := typeSpec(typ)
+		if err != nil {
+			return schema.PackageSpec{}, err
+		}
+
 		r.Properties[k] = schema.PropertySpec{
-			TypeSpec: schema.TypeSpec{
-				// Anything better would require typing the whole program (which
-				// we should do eventually)
-				Ref: "pulumi.json#/Any",
-			},
+			TypeSpec: spec,
 		}
 	}
 
 	pkg.Resources = map[string]schema.ResourceSpec{pkg.Name + ":index:Component": r}
-	return pkg
+	return pkg, nil
+}
+
+func typeSpec(t schema.Type) (schema.TypeSpec, error) {
+	spec := schema.TypeSpec{}
+	if schema.IsPrimitiveType(t) {
+		switch t {
+		case schema.BoolType, schema.IntType, schema.NumberType, schema.StringType:
+			spec.Type = t.String()
+		default:
+			spec.Ref = fmt.Sprintf("pulumi.json#/%s", strings.TrimPrefix(t.String(), "pulumi:pulumi:"))
+		}
+		return spec, nil
+	}
+	return schema.TypeSpec{}, fmt.Errorf("can only handle primitive formats")
 }
 
 func schemaDefaultValue(e ast.Expr) interface{} {

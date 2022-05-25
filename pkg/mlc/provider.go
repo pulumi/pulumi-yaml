@@ -35,12 +35,15 @@ func Serve(name string) error {
 	if err != nil {
 		return err
 	}
-	schema, err := json.Marshal(Schema(decl))
-	if err != nil {
-		return err
-	}
-
 	loader, err := pulumiyaml.NewPackageLoader()
+	if err != nil {
+		return fmt.Errorf("could not get package loader: %w", err)
+	}
+	spec, err := Schema(decl, loader)
+	if err != nil {
+		return fmt.Errorf("could not generate spec: %w", err)
+	}
+	schema, err := json.Marshal(spec)
 	if err != nil {
 		return err
 	}
