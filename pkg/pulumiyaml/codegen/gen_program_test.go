@@ -110,14 +110,41 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 	}
 }
 
-func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) pulumiyaml.InputTypeHint {
+func (m FakePackage) ResourceTypeHint(typeName pulumiyaml.ResourceTypeToken) *schema.ResourceType {
 	switch typeName {
-	case "test:mod:prov", "test:mod:typ",
+	case "test:mod:prov", "test:mod:typ":
 		// third-party-package fakes:
-		OtherThing, OtherModule:
-		return FakeTypeHint{typeName}
+		return &schema.ResourceType{Token: typeName.String()}
+	case OtherThing:
+		return &schema.ResourceType{
+			Token: OtherThing,
+			Resource: &schema.Resource{
+				Token: OtherThing,
+				InputProperties: []*schema.Property{
+					{Name: "idea"},
+				},
+				Properties: []*schema.Property{
+					{Name: "idea"},
+				},
+			},
+		}
+	case OtherModule:
+		return &schema.ResourceType{
+			Token: OtherModule,
+			Resource: &schema.Resource{
+				Token: OtherModule,
+				InputProperties: []*schema.Property{
+					{Name: "answer"},
+				},
+				Properties: []*schema.Property{
+					{Name: "answer"},
+				},
+			},
+		}
+
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (m FakePackage) ResourceConstants(typeName pulumiyaml.ResourceTypeToken) map[string]interface{} {
@@ -134,7 +161,7 @@ func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeTo
 	return "", fmt.Errorf(msg)
 }
 
-func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) pulumiyaml.InputTypeHint {
+func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) *schema.Function {
 	return nil
 }
 
@@ -152,31 +179,6 @@ func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, e
 
 func (m FakePackage) Name() string {
 	return "fake"
-}
-
-type FakeTypeHint struct {
-	resourceName pulumiyaml.ResourceTypeToken
-}
-
-func (fth FakeTypeHint) Fields() pulumiyaml.FieldsTypeHint {
-	return nil
-}
-func (fth FakeTypeHint) Element() pulumiyaml.TypeHint {
-	return nil
-}
-func (fth FakeTypeHint) InputProperties() pulumiyaml.FieldsTypeHint {
-	switch fth.resourceName {
-	case OtherThing:
-		return pulumiyaml.FieldsTypeHint{
-			"idea": nil,
-		}
-	case OtherModule:
-		return pulumiyaml.FieldsTypeHint{
-			"answer": nil,
-		}
-	default:
-		return nil
-	}
 }
 
 //nolint:paralleltest // mutates environment variables

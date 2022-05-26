@@ -8,6 +8,9 @@
 - Add errors when hanging invalid fields off of resource options.
   [#211](https://github.com/pulumi/pulumi-yaml/pull/211)
 
+- Add a type checker.
+  [#228](https://github.com/pulumi/pulumi-yaml/pull/228)
+
 - Add `Fn::FromBase64`
   [#218](https://github.com/pulumi/pulumi-yaml/pull/218)
 
