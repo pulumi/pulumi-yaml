@@ -202,12 +202,7 @@ func newPluginLoader() schema.Loader {
 
 type mockPackageLoader struct{ schema.Loader }
 
-var globalPackageMutex sync.Mutex
-
 func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
-	globalPackageMutex.Lock()
-	defer globalPackageMutex.Unlock()
-
 	pkg, err := l.Loader.LoadPackage(name, nil)
 	if err != nil {
 		return nil, err
