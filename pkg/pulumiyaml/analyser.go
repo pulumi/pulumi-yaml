@@ -130,6 +130,20 @@ func (n notAssignable) Property(propName string) *notAssignable {
 }
 
 func displayType(t schema.Type) string {
+	if schema.IsPrimitiveType(codegen.UnwrapType(t)) {
+		switch codegen.UnwrapType(t) {
+		case schema.ArchiveType:
+			return "archive"
+		case schema.AssetType:
+			return "asset"
+		case schema.JSONType:
+			fallthrough
+		case schema.AnyType:
+			return "any"
+		}
+
+		return codegen.UnwrapType(t).String()
+	}
 	switch t := codegen.UnwrapType(t).(type) {
 	case *schema.ObjectType:
 		if !strings.HasPrefix(t.Token, adhockObjectToken) {
@@ -174,7 +188,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 	}
 
 	fail := &notAssignable{
-		reason: fmt.Sprintf("Cannot assign %s to type %s",
+		reason: fmt.Sprintf("Cannot assign '%s' to type '%s'",
 			displayType(from), displayType(to)),
 		internal: false,
 	}

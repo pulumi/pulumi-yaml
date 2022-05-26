@@ -27,8 +27,8 @@ func TestTypeError(t *testing.T) {
 				},
 			},
 			to: schema.NumberType,
-			message: `Cannot assign Union<string, number> to type number:
-  Cannot assign string to type number`,
+			message: `Cannot assign 'Union<string, number>' to type 'number':
+  Cannot assign 'string' to type 'number'`,
 		},
 		{
 			from: &schema.UnionType{
@@ -48,7 +48,7 @@ func TestTypeError(t *testing.T) {
 			to: &schema.ResourceType{
 				Token: "some:other:Token",
 			},
-			message: "Cannot assign some:resource:Token to type some:other:Token",
+			message: "Cannot assign 'some:resource:Token' to type 'some:other:Token'",
 		},
 		{
 			from: &schema.ArrayType{ElementType: &schema.ObjectType{
@@ -68,9 +68,9 @@ func TestTypeError(t *testing.T) {
 				},
 			}},
 			to: &schema.ArrayType{ElementType: &schema.MapType{ElementType: schema.StringType}},
-			message: `Cannot assign List<{foo: string, bar: pulumi:pulumi:Any}> to type List<Map<string>>:
-  Cannot assign {foo: string, bar: pulumi:pulumi:Any} to type Map<string>:
-    bar: Cannot assign pulumi:pulumi:Any to type string`,
+			message: `Cannot assign 'List<{foo: string, bar: any}>' to type 'List<Map<string>>':
+  Cannot assign '{foo: string, bar: any}' to type 'Map<string>':
+    bar: Cannot assign 'any' to type 'string'`,
 		},
 		{
 			from: &schema.ObjectType{
@@ -105,10 +105,10 @@ func TestTypeError(t *testing.T) {
 					{Name: "prop3", Type: &schema.OptionalType{ElementType: schema.StringType}},
 				},
 			},
-			message: `Cannot assign {prop1: pulumi:pulumi:Asset, prop3: pulumi:pulumi:Any} to type {prop1: pulumi:pulumi:Archive, prop2: boolean, prop3: string}:
-  prop1: Cannot assign pulumi:pulumi:Asset to type pulumi:pulumi:Archive
+			message: `Cannot assign '{prop1: asset, prop3: any}' to type '{prop1: archive, prop2: boolean, prop3: string}':
+  prop1: Cannot assign 'asset' to type 'archive'
   prop2: Missing required property 'prop2'
-  prop3: Cannot assign pulumi:pulumi:Any to type string`,
+  prop3: Cannot assign 'any' to type 'string'`,
 		},
 	}
 
@@ -152,7 +152,7 @@ func TestTypePropertyAccess(t *testing.T) {
 				&ast.PropertySubscript{Index: "foo"},
 			},
 			expectedType: "Invalid",
-			errMsg:       `Cannot index into 'start["foo"][7]' (type pulumi:pulumi:Any):Index property access is only allowed on Maps and Lists`,
+			errMsg:       `Cannot index into 'start["foo"][7]' (type any):Index property access is only allowed on Maps and Lists`,
 		},
 		{
 			root: &schema.ResourceType{
@@ -203,7 +203,7 @@ func TestTypePropertyAccess(t *testing.T) {
 			errMsg: `Cannot access into start of type Union<List<string>, Map<number>, >:'start' could be a type that does not support accessing:
   Array<string>: cannot access a property on 'start' (type List<string>)
   Map<number>: cannot access a property on 'start' (type Map<number>)
-  Cannot index via string into 'start.foo' (type List<pulumi:pulumi:Any>)`,
+  Cannot index via string into 'start.foo' (type List<any>)`,
 		},
 	}
 
