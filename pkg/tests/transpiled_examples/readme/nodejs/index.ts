@@ -1,5 +1,5 @@
 import * as pulumi from "@pulumi/pulumi";
-import * from "fs";
+import * as fs from "fs";
 
 export const strVar = "foo";
 export const arrVar = [
