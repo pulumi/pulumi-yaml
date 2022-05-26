@@ -391,7 +391,7 @@ variables:
 
 The expression `${reference}` will have the value of the `outputName` output from the stack `org/project/stack`.
 
-#### `Fn::Secret`
+##### `Fn::Secret`
 
 Constructs a [Secret](https://www.pulumi.com/docs/intro/concepts/secrets/) from an existing value.
 
@@ -402,3 +402,34 @@ variables:
       Fn::Invoke:
         Function: my:pkg:GetSecretValue
 ```
+
+##### `Fn::ReadFile`
+
+Reads a file from disk and returns the contents as a string, must be utf-8. This function has
+special rules for its behavior.
+
+``` yaml
+variables:
+  someText:
+    Fn::ReadFile: ./README.md
+```
+
+Any subpath of the Pulumi project directory is allowed, whether it is absolute, relative, constant,
+or an expression:
+
+ * `Fn::ReadFile: ./README.md`, a relative subpath
+ * `Fn::ReadFile: ${pulumi.cwd}/example.txt`, an absolute subpath
+ * `Fn::ReadFile: /opt/project-dir/example.json`, an absolute subpath if the program is in /opt/project-dir
+
+Absolute paths to any location are allowed if they are constants:
+
+ * `Fn::ReadFile: /etc/lsb-release`
+ * `Fn::ReadFile: /usr/share/nginx/html`
+ * `Fn::ReadFile: /var/run/secrets/kubernetes.io/serviceaccount/token`
+
+Relative paths that escape the project directory and absolute paths that are non-constant are
+forbidden to prevent path traversals.
+
+ * `Fn::ReadFile: ../../etc/shadow`, a relative path that escapes the project
+ * `Fn::ReadFile: ${pulumi.cwd}/../../.ssh/id_rsa.pub`, an expression that returns an absolute path
+   that escapes the project

@@ -694,6 +694,22 @@ func SecretSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *SecretE
 	}
 }
 
+type ReadFileExpr struct {
+	builtinNode
+	Path Expr
+}
+
+func ReadFileSyntax(node syntax.Node, name *StringExpr, path Expr) *ReadFileExpr {
+	return &ReadFileExpr{
+		builtinNode: builtinNode{exprNode: expr(node), name: name, args: path},
+		Path:        path,
+	}
+}
+
+func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, syntax.Diagnostics) {
+	return ReadFileSyntax(node, name, path), nil
+}
+
 func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) {
 	if node.Len() != 1 {
 		return nil, nil, false
@@ -723,6 +739,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		parse = parseAssetArchive
 	case "Fn::Secret":
 		parse = parseSecret
+	case "Fn::ReadFile":
+		parse = parseReadFile
 	default:
 		return nil, nil, false
 	}

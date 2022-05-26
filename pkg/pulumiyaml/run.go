@@ -223,6 +223,8 @@ type runner struct {
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 
+	cwd string
+
 	sdiags syncDiags
 
 	// Used to store sorted nodes. A non `nil` value indicates that the runner
@@ -479,6 +481,7 @@ func (r *runner) ensureSetup() {
 			"project": r.ctx.Project(),
 			"stack":   r.ctx.Stack(),
 		}
+		r.cwd = cwd
 
 		// Topologically sort the intermediates based on implicit and explicit dependencies
 		intermediates, rdiags := topologicallySortedResources(r.t)
@@ -987,6 +990,8 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return ctx.evaluateBuiltinStackReference(x)
 	case *ast.SecretExpr:
 		return ctx.evaluateBuiltinSecret(x)
+	case *ast.ReadFileExpr:
+		return ctx.evaluateBuiltinReadFile(x)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
@@ -1531,6 +1536,73 @@ func (ctx *evalContext) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, b
 		return nil, false
 	}
 	return pulumi.ToSecret(e), true
+}
+
+func (ctx *evalContext) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
+	e, ok := ctx.evaluateExpr(s.Path)
+	if !ok {
+		return nil, false
+	}
+
+	_, isConstant := s.Path.(*ast.StringExpr)
+
+	readFileF := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+		path, ok := args[0].(string)
+		if !ok {
+			return ctx.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
+		}
+
+		path = filepath.Clean(path)
+		isAbsolute := filepath.IsAbs(path)
+		path, err := filepath.EvalSymlinks(path) // Evaluate symlinks to ensure we don't escape the current project dir
+		if err != nil {
+			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+		}
+		path, err = filepath.Abs(path) // Compute the absolute path to use a prefix to check if we're relative
+		if err != nil {
+			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+		}
+		isSubdirectory := false
+		relPath, err := filepath.Rel(ctx.runner.cwd, path)
+		if err != nil {
+			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+		}
+
+		if !strings.HasPrefix(relPath, "../") {
+			isSubdirectory = true
+		}
+
+		// Security, defense in depth: prevent path traversal exploits from leaking any information
+		// (secrets, tokens, ...) from outside the project directory.
+		//
+		// Allow subdirectory paths, these are valid constructions of the form:
+		//
+		//  * "./README.md"
+		//  * "${pulumi.cwd}/README.md"
+		//  * ... etc
+		//
+		// Allow constant paths that are absolute, therefore reviewable:
+		//
+		//  * /etc/lsb-release
+		//  * /usr/share/nginx/html
+		//  * /var/run/secrets/kubernetes.io/serviceaccount/token
+		//
+		// Forbidding parent directory path traversals (Path Traversal vulnerability):
+		//
+		//  * ../../etc/shadow
+		//  * ../../.ssh/id_rsa.pub
+		if isSubdirectory || (isConstant && isAbsolute) {
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+			}
+			return string(data), true
+		}
+
+		return ctx.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a constant or contained in the project dir"))
+	})
+
+	return readFileF(e)
 }
 
 func hasOutputs(v interface{}) bool {

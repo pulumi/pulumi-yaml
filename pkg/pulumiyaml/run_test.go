@@ -3,6 +3,10 @@
 package pulumiyaml
 
 import (
+	_ "embed"
+	"os"
+	"path/filepath"
+
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -18,6 +22,9 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
+
+//go:embed README.md
+var packageReadmeFile string
 
 const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
@@ -1484,6 +1491,78 @@ variables:
 		r.ctx.Export("out", out)
 	})
 	assert.True(t, hasRun)
+}
+
+func TestReadFile(t *testing.T) {
+	t.Parallel()
+
+	repoReadmePath, err := filepath.Abs("../../README.md")
+	assert.NoError(t, err)
+
+	repoReadmeText, err := os.ReadFile(repoReadmePath)
+	assert.NoError(t, err)
+
+	text := fmt.Sprintf(`
+name: test-readfile
+runtime: yaml
+variables:
+  textData:
+    Fn::ReadFile: ./README.md
+  absInDirData:
+    Fn::ReadFile: ${pulumi.cwd}/README.md
+  absOutOfDirData:
+    Fn::ReadFile: %v
+`, repoReadmePath)
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	testTemplate(t, tmpl, func(r *evalContext) {
+		diags := r.Evaluate()
+		requireNoErrors(t, tmpl, diags)
+		result, ok := r.variables["textData"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, packageReadmeFile, result)
+
+		result, ok = r.variables["absInDirData"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, packageReadmeFile, result)
+
+		result, ok = r.variables["absOutOfDirData"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, string(repoReadmeText), result)
+	})
+}
+
+// TestReadFileForbidsPathTraversal ensures that we forbid certain malicious path behaviors which
+// allow escaping the project directory in static YAML.
+//
+// The example program uses a non-constant path which escapes the project directory.
+//
+// Non-constant paths which read from the project dir are considered safe, likely as uses of
+// ${pulumi.cwd}, see above. Constant, absolute path are also permitted, sometimes necessary to use
+// a secret or token.
+func TestReadFileForbidsPathTraversal(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-readfile
+runtime: yaml
+outputs:
+  readme:
+    Fn::ReadFile: ${pulumi.cwd}/../../go.mod # imagine this is /etc/shadow, /var/run/secrets/tokens, etc.
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	assert.ElementsMatch(t, diagStrings,
+		[]string{
+			"<stdin>:5:19: Argument to Fn::ReadFile must be a constant or contained in the project dir",
+		},
+	)
 }
 
 func TestUnicodeLogicalName(t *testing.T) {
