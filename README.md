@@ -271,6 +271,18 @@ The last two lines are equivalent as if the variable were substituted for its va
 
 In any expression location, an object containing a single key beginning with "Fn::" calls a built-in function.
 
+##### `Fn::FromBase64`
+
+Converts a Base64 encoded string into a UTF-8 string. **This will fail if the result is not a valid UTF-8 string**
+
+```yaml
+variables:
+  greeting:
+    Fn::FromBase64: SGVsbG8sIFdvcmxkIQ==
+```
+
+The expression `${greeting}` will return `Hello, World!`
+
 ##### `Fn::Invoke`
 
 Calls a function from a package and returns either the whole object or a single key if given the "Return" property. The schema is:

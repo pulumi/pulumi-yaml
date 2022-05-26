@@ -11,6 +11,9 @@
 - Add a type checker.
   [#228](https://github.com/pulumi/pulumi-yaml/pull/228)
 
+- Add `Fn::FromBase64`
+  [#218](https://github.com/pulumi/pulumi-yaml/pull/218)
+
 ### Bug Fixes
 
 - De-duplicate error message added during pre-eval checking.
@@ -24,4 +27,7 @@
   [#221](https://github.com/pulumi/pulumi-yaml/pull/221)
 
 - [expr] Fix handling of "plain" input maps when sending properties to component providers such as AWSX.
-  https://github.com/pulumi/pulumi-yaml/pull/195
+  [#195](https://github.com/pulumi/pulumi-yaml/pull/195)
+
+- Do not panic when converting functions without `Return` fields.
+  [#233](https://github.com/pulumi/pulumi-yaml/pull/234)

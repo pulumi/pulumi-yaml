@@ -1103,6 +1103,254 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input *ast.FromBase64Expr
+		name  string
+		valid bool
+	}{
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("a"))),
+			},
+			name:  "Valid ASCII",
+			valid: true,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xc3\xb1"))),
+			},
+			name:  "Valid 2 Octet Sequence",
+			valid: true,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x82\xa1"))),
+			},
+			name:  "Valid 3 Octet Sequence",
+			valid: true,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x90\x8c\xbc"))),
+			},
+			name:  "Valid 4 Octet Sequence",
+			valid: true,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf8\xa1\xa1\xa1\xa1"))),
+			},
+			name:  "Valid 5 Octet Sequence (but not Unicode!)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xfc\xa1\xa1\xa1\xa1\xa1"))),
+			},
+			name:  "Valid 6 Octet Sequence (but not Unicode!)",
+			valid: false,
+		},
+
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xfc\xa1\xa1\xa1\xa1\xa1"))),
+			},
+			name:  "Valid 6 Octet Sequence (but not Unicode!)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xc3\x28"))),
+			},
+			name:  "Invalid 2 Octet Sequence",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xa0\xa1"))),
+			},
+			name:  "Invalid Sequence Identifier",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x28\xa1"))),
+			},
+			name:  "Invalid 3 Octet Sequence (in 2nd Octet)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xe2\x82\x28"))),
+			},
+			name:  "Invalid 3 Octet Sequence (in 3rd Octet)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x28\x8c\xbc"))),
+			},
+			name:  "Invalid 4 Octet Sequence (in 2nd Octet)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x90\x28\xbc"))),
+			},
+			name:  "Invalid 4 Octet Sequence (in 3rd Octet)",
+			valid: false,
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String(b64.StdEncoding.EncodeToString([]byte("\xf0\x28\x8c\x28"))),
+			},
+			name:  "Invalid 4 Octet Sequence (in 4th Octet)",
+			valid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{},
+			})
+			testTemplate(t, tmpl, func(r *evalContext) {
+				_, ok := r.evaluateBuiltinFromBase64(tt.input)
+				assert.Equal(t, tt.valid, ok)
+			})
+		})
+	}
+}
+
+func TestBase64Roundtrip(t *testing.T) {
+	t.Parallel()
+
+	tToFrom := struct {
+		input    *ast.ToBase64Expr
+		expected string
+	}{
+		input: &ast.ToBase64Expr{
+			Value: &ast.FromBase64Expr{
+				Value: ast.String("SGVsbG8sIFdvcmxk"),
+			},
+		},
+		expected: "SGVsbG8sIFdvcmxk",
+	}
+
+	t.Run(tToFrom.expected, func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := template(t, &Template{
+			Resources: map[string]*Resource{},
+		})
+		testTemplate(t, tmpl, func(r *evalContext) {
+			v, ok := r.evaluateBuiltinToBase64(tToFrom.input)
+			assert.True(t, ok)
+			assert.Equal(t, tToFrom.expected, v)
+		})
+	})
+
+	tFromTo := struct {
+		input    *ast.FromBase64Expr
+		expected string
+	}{
+		input: &ast.FromBase64Expr{
+			Value: &ast.ToBase64Expr{
+				Value: ast.String("Hello, World!"),
+			},
+		},
+		expected: "Hello, World!",
+	}
+
+	t.Run(tFromTo.expected, func(t *testing.T) {
+		t.Parallel()
+
+		tmpl := template(t, &Template{
+			Resources: map[string]*Resource{},
+		})
+		testTemplate(t, tmpl, func(r *evalContext) {
+			v, ok := r.evaluateBuiltinFromBase64(tFromTo.input)
+			assert.True(t, ok)
+			assert.Equal(t, tFromTo.expected, v)
+		})
+	})
+}
+
+func TestFromBase64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    *ast.FromBase64Expr
+		expected string
+		isOutput bool
+	}{
+		{
+			input: &ast.FromBase64Expr{
+				Value: ast.String("dGhpcyBpcyBhIHRlc3Q="),
+			},
+			expected: "this is a test",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: &ast.JoinExpr{
+					Delimiter: ast.String(""),
+					Values: ast.List(
+						ast.String("My4xN"),
+						ast.String("DE1OTI="),
+					),
+				}},
+			expected: "3.141592",
+		},
+		{
+			input: &ast.FromBase64Expr{
+				Value: &ast.ToBase64Expr{
+					Value: ast.String("test"),
+				},
+			},
+			expected: "test",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
+
+			tmpl := template(t, &Template{
+				Resources: map[string]*Resource{
+					"resA": {
+						Type: "test:resource:type",
+						Properties: map[string]interface{}{
+							"foo": "oof",
+						},
+					},
+				},
+			})
+			testTemplate(t, tmpl, func(r *evalContext) {
+				v, ok := r.evaluateBuiltinFromBase64(tt.input)
+				assert.True(t, ok)
+				if tt.isOutput {
+					out := v.(pulumi.Output).ApplyT(func(x interface{}) (interface{}, error) {
+						s := b64.StdEncoding.EncodeToString([]byte(tt.expected))
+						assert.Equal(t, s, v)
+						return nil, nil
+					})
+					r.ctx.Export("out", out)
+				} else {
+					assert.Equal(t, tt.expected, v)
+				}
+			})
+		})
+	}
+
+}
+
 func TestToBase64(t *testing.T) {
 	t.Parallel()
 
