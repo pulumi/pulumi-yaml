@@ -788,14 +788,21 @@ func (tc *typeCache) typeVariable(r *runner, node variableNode) bool {
 func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 	k, v := node.Key.Value, node.Value
 	var typ schema.Type = &schema.InvalidType{}
+	var optional bool
 	switch {
 	case v.Default != nil:
+		// We have a default, so the type is optional
 		typ = tc.exprs[v.Default]
+		optional = true
 	case v.Type != nil:
 		ctype, ok := ctypes.Parse(v.Type.Value)
 		if ok {
 			typ = configTypeToSchema(ctype)
 		}
+	}
+	typ = &schema.InputType{ElementType: typ}
+	if optional {
+		typ = &schema.OptionalType{ElementType: typ}
 	}
 	tc.configuration[k] = typ
 	return true
