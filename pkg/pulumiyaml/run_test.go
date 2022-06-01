@@ -1607,6 +1607,10 @@ variables:
     Fn::Join:
       - "-"
       - ${inputs}
+  foo-err:
+    Fn::Join:
+      - "-"
+      - ${inputs[1]}
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -1622,6 +1626,8 @@ variables:
 			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found an object at index 1",
 			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a list at index 2",
 			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a boolean at index 3",
+
+			"<stdin>:16:9: the second argument to Fn::Join must be a list, found an object",
 		},
 	)
 }

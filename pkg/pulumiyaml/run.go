@@ -1323,17 +1323,27 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 	}
 
 	join := ctx.lift(func(args ...interface{}) (interface{}, bool) {
-		delim, parts := args[0], args[1].([]interface{})
+		overallOk := true
 
+		delim := args[0]
 		if delim == nil {
 			delim = ""
 		}
 		delimStr, ok := delim.(string)
+		overallOk = overallOk && ok
 		if !ok {
-			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(delimStr)))
+			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(args[0])))
 		}
 
-		overallOk := true
+		parts, ok := args[1].([]interface{})
+		overallOk = overallOk && ok
+		if !ok {
+			ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list, found %v", typeString(args[1])))
+		}
+
+		if !overallOk {
+			return nil, false
+		}
 
 		strs := make([]string, len(parts))
 		for i, p := range parts {
