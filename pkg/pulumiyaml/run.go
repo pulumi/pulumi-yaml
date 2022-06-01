@@ -1310,21 +1310,13 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 }
 
 func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
-	delim, ok := ctx.evaluateExpr(v.Delimiter)
-	if !ok {
-		return nil, false
-	}
-
 	overallOk := true
 
-	parts := make([]interface{}, len(v.Values.Elements))
-	for i, e := range v.Values.Elements {
-		part, ok := ctx.evaluateExpr(e)
-		if !ok {
-			overallOk = false
-		}
-		parts[i] = part
-	}
+	delim, ok := ctx.evaluateExpr(v.Delimiter)
+	overallOk = overallOk && ok
+
+	items, ok := ctx.evaluateExpr(v.Values)
+	overallOk = overallOk && ok
 
 	if !overallOk {
 		return nil, false
@@ -1347,7 +1339,7 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 		for i, p := range parts {
 			str, ok := p.(string)
 			if !ok {
-				ctx.error(v.Values.Elements[i], fmt.Sprintf("element must be a string, not %v", typeString(p)))
+				ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list of strings, found %v at index %v", typeString(p), i))
 				overallOk = false
 			} else {
 				strs[i] = str
@@ -1360,7 +1352,7 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 
 		return strings.Join(strs, delimStr), true
 	})
-	return join(delim, parts)
+	return join(delim, items)
 }
 
 func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
