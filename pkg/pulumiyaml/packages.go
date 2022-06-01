@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -182,8 +183,10 @@ func loadPackage(loader PackageLoader, typeString string) (Package, error) {
 
 	packageName := resolvePkgName(typeString)
 	pkg, err := loader.LoadPackage(packageName)
-	if err != nil {
-		return nil, fmt.Errorf("internal error loading package %q: %v", packageName, err)
+	if errors.Is(err, schema.ErrGetSchemaNotImplemented) {
+		return nil, fmt.Errorf("error loading schema for %q: %w", packageName, err)
+	} else if err != nil {
+		return nil, fmt.Errorf("internal error loading package %q: %w", packageName, err)
 	}
 
 	return pkg, nil
