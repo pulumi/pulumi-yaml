@@ -585,7 +585,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		return root
 	}
 	if root, ok := root.(*schema.UnionType); ok {
-		possibilities := map[schema.Type]struct{}{}
+		var possibilities OrderedTypeSet
 		errs := []*notAssignable{}
 		for _, subtypes := range root.ElementTypes {
 			t := typePropertyAccess(ctx, subtypes, runningName, accessors,
@@ -594,7 +594,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 					return &schema.InvalidType{}
 				})
 			if _, ok := t.(*schema.InvalidType); !ok {
-				possibilities[t] = struct{}{}
+				possibilities.Add(t)
 			}
 		}
 		if len(errs) > 0 {
@@ -609,14 +609,11 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 				}.String())
 			return &schema.InvalidType{}
 		}
-		arr := make([]schema.Type, 0, len(possibilities))
-		for k := range possibilities {
-			arr = append(arr, k)
+		if possibilities.Len() == 1 {
+			return possibilities.First()
 		}
-		if len(arr) == 1 {
-			return arr[0]
-		}
-		return &schema.UnionType{ElementTypes: arr}
+
+		return &schema.UnionType{ElementTypes: possibilities.Values()}
 	}
 	switch accessor := accessors[0].(type) {
 	case *ast.PropertyName:
@@ -716,23 +713,20 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
 		tc.exprs[t] = schema.StringType
 	case *ast.ListExpr:
-		types := map[schema.Type]struct{}{}
+		var types OrderedTypeSet
 		for _, typ := range t.Elements {
-			types[tc.exprs[typ]] = struct{}{}
+			types.Add(tc.exprs[typ])
 		}
-		typeList := make([]schema.Type, 0, len(types))
-		for k := range types {
-			typeList = append(typeList, k)
-		}
+
 		var elementType schema.Type
-		switch len(typeList) {
+		switch types.Len() {
 		case 0:
 			elementType = &schema.InvalidType{}
 		case 1:
-			elementType = typeList[0]
+			elementType = types.First()
 		default:
 			elementType = &schema.UnionType{
-				ElementTypes: typeList,
+				ElementTypes: types.Values(),
 			}
 		}
 
@@ -1108,4 +1102,39 @@ func ResourceOptionsTypeHint() map[string]struct{} {
 		m[name] = struct{}{}
 	}
 	return m
+}
+
+type OrderedTypeSet struct {
+	// Provide O(1) existence checking
+	existance map[schema.Type]struct{}
+	// Provide ordering
+	order []schema.Type
+}
+
+func (o *OrderedTypeSet) Add(t schema.Type) bool {
+	if o.existance == nil {
+		o.existance = map[schema.Type]struct{}{}
+	}
+	_, ok := o.existance[t]
+	if ok {
+		return false
+	}
+	o.existance[t] = struct{}{}
+	o.order = append(o.order, t)
+	return true
+}
+
+func (o *OrderedTypeSet) Values() []schema.Type {
+	a := make([]schema.Type, 0, len(o.order))
+	return append(a, o.order...)
+}
+
+func (o *OrderedTypeSet) Len() int {
+	// This will equal len(o.existence) assuming that the internals have not been messed with.
+	return len(o.order)
+}
+
+// First returns the first element added, panicking if no element exists.
+func (o *OrderedTypeSet) First() schema.Type {
+	return o.order[0]
 }
