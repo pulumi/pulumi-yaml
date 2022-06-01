@@ -1106,20 +1106,20 @@ func ResourceOptionsTypeHint() map[string]struct{} {
 
 type OrderedTypeSet struct {
 	// Provide O(1) existence checking
-	existance map[schema.Type]struct{}
+	existence map[schema.Type]struct{}
 	// Provide ordering
 	order []schema.Type
 }
 
 func (o *OrderedTypeSet) Add(t schema.Type) bool {
-	if o.existance == nil {
-		o.existance = map[schema.Type]struct{}{}
+	if o.existence == nil {
+		o.existence = map[schema.Type]struct{}{}
 	}
-	_, ok := o.existance[t]
+	_, ok := o.existence[t]
 	if ok {
 		return false
 	}
-	o.existance[t] = struct{}{}
+	o.existence[t] = struct{}{}
 	o.order = append(o.order, t)
 	return true
 }
