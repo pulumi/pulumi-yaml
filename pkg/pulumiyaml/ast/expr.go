@@ -467,11 +467,10 @@ type JoinExpr struct {
 	builtinNode
 
 	Delimiter Expr
-	// TODO: CloudFormation allows nested functions to produce the Values - so this should be an Expr
-	Values *ListExpr
+	Values    Expr
 }
 
-func JoinSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delimiter Expr, values *ListExpr) *JoinExpr {
+func JoinSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delimiter Expr, values Expr) *JoinExpr {
 	return &JoinExpr{
 		builtinNode: builtin(node, name, args),
 		Delimiter:   delimiter,
@@ -821,12 +820,7 @@ func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, synt
 		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Join must be a two-valued list", "")}
 	}
 
-	values, ok := list.Elements[1].(*ListExpr)
-	if !ok {
-		return nil, syntax.Diagnostics{ExprError(list.Elements[1], "the second argument to Fn::Join must be a list", "")}
-	}
-
-	return JoinSyntax(node, name, list, list.Elements[0], values), nil
+	return JoinSyntax(node, name, list, list.Elements[0], list.Elements[1]), nil
 }
 
 func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

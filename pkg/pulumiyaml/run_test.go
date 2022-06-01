@@ -1565,6 +1565,73 @@ outputs:
 	)
 }
 
+func TestJoinTemplate(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-readfile
+runtime: yaml
+variables:
+  inputs:
+    - "foo"
+    - "bar"
+  foo-bar:
+    Fn::Join:
+      - "-"
+      - ${inputs}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	testTemplate(t, tmpl, func(r *evalContext) {
+		diags := r.Evaluate()
+		requireNoErrors(t, tmpl, diags)
+		result, ok := r.variables["foo-bar"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, "foo-bar", result)
+	})
+}
+
+func TestJoinForbidsNonStringArgs(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-readfile
+runtime: yaml
+variables:
+  inputs:
+    - 1
+    - { "foo": "bar" }
+    - [1, 2, 3]
+    - true
+  foo-bar:
+    Fn::Join:
+      - "-"
+      - ${inputs}
+  foo-err:
+    Fn::Join:
+      - "-"
+      - ${inputs[1]}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	assert.ElementsMatch(t, diagStrings,
+		[]string{
+			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a number at index 0",
+			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found an object at index 1",
+			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a list at index 2",
+			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a boolean at index 3",
+
+			"<stdin>:16:9: the second argument to Fn::Join must be a list, found an object",
+		},
+	)
+}
+
 func TestUnicodeLogicalName(t *testing.T) {
 	t.Parallel()
 

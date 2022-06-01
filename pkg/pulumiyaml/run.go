@@ -1310,44 +1310,46 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 }
 
 func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
-	delim, ok := ctx.evaluateExpr(v.Delimiter)
-	if !ok {
-		return nil, false
-	}
-
 	overallOk := true
 
-	parts := make([]interface{}, len(v.Values.Elements))
-	for i, e := range v.Values.Elements {
-		part, ok := ctx.evaluateExpr(e)
-		if !ok {
-			overallOk = false
-		}
-		parts[i] = part
-	}
+	delim, ok := ctx.evaluateExpr(v.Delimiter)
+	overallOk = overallOk && ok
+
+	items, ok := ctx.evaluateExpr(v.Values)
+	overallOk = overallOk && ok
 
 	if !overallOk {
 		return nil, false
 	}
 
 	join := ctx.lift(func(args ...interface{}) (interface{}, bool) {
-		delim, parts := args[0], args[1].([]interface{})
+		overallOk := true
 
+		delim := args[0]
 		if delim == nil {
 			delim = ""
 		}
 		delimStr, ok := delim.(string)
+		overallOk = overallOk && ok
 		if !ok {
-			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(delimStr)))
+			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(args[0])))
 		}
 
-		overallOk := true
+		parts, ok := args[1].([]interface{})
+		overallOk = overallOk && ok
+		if !ok {
+			ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list, found %v", typeString(args[1])))
+		}
+
+		if !overallOk {
+			return nil, false
+		}
 
 		strs := make([]string, len(parts))
 		for i, p := range parts {
 			str, ok := p.(string)
 			if !ok {
-				ctx.error(v.Values.Elements[i], fmt.Sprintf("element must be a string, not %v", typeString(p)))
+				ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list of strings, found %v at index %v", typeString(p), i))
 				overallOk = false
 			} else {
 				strs[i] = str
@@ -1360,7 +1362,7 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 
 		return strings.Join(strs, delimStr), true
 	})
-	return join(delim, parts)
+	return join(delim, items)
 }
 
 func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
