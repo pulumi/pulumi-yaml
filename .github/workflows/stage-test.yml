@@ -114,8 +114,5 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.17.x]
+        go-version: [1.17.x, 1.18.x]
         go-stable: [true]
-        include:
-          - go-version: 1.18.0-beta2
-            go-stable: false
