@@ -22,7 +22,7 @@ import (
 //
 // If no loader is provided (nil argument), a new plugin host will be spawned to obtain resource
 // provider schemas.
-func Eject(dir string, loader schema.Loader) (*workspace.Project, *pcl.Program, error) {
+func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.Program, error) {
 	proj, template, diags, err := LoadTemplate(dir)
 	if err != nil {
 		return nil, nil, err

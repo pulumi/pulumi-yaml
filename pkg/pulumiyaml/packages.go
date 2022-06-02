@@ -62,13 +62,13 @@ type PackageLoader interface {
 }
 
 type packageLoader struct {
-	schema.Loader
+	schema.ReferenceLoader
 
 	host plugin.Host
 }
 
 func (l packageLoader) LoadPackage(name string) (Package, error) {
-	pkg, err := l.Loader.LoadPackage(name, nil)
+	pkg, err := l.ReferenceLoader.LoadPackageReference(name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func NewPackageLoader() (PackageLoader, error) {
 
 // Unsafely create a PackageLoader from a schema.Loader, forfeiting the ability to close the host
 // and clean up plugins when finished. Useful for test cases.
-func NewPackageLoaderFromSchemaLoader(loader schema.Loader) PackageLoader {
+func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoader {
 	return packageLoader{loader, nil}
 }
 
@@ -248,10 +248,10 @@ func ResolveFunction(loader PackageLoader, typeString string) (Package, Function
 }
 
 type resourcePackage struct {
-	*schema.Package
+	schema.PackageReference
 }
 
-func NewResourcePackage(pkg *schema.Package) Package {
+func NewResourcePackage(pkg schema.PackageReference) Package {
 	return resourcePackage{pkg}
 }
 
@@ -261,20 +261,22 @@ func (p resourcePackage) resolveProvider(typeName string) (ResourceTypeToken, bo
 	if len(typeParts) == 3 &&
 		typeParts[0] == "pulumi" &&
 		typeParts[1] == "providers" &&
-		typeParts[2] == p.Package.Name {
-		return ResourceTypeToken(p.Provider.Token), true
+		typeParts[2] == p.Name() {
+		return ResourceTypeToken(typeName), true
 	}
 	return "", false
 }
 
-func resolveToken(typeName string, resolve func(string) (string, bool)) (string, bool, error) {
+func resolveToken(typeName string, resolve func(string) (string, bool, error)) (string, bool, error) {
 	typeParts := strings.Split(typeName, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return "", false, fmt.Errorf("invalid type token %q", typeName)
 	}
 
-	if token, found := resolve(typeName); found {
+	if token, found, err := resolve(typeName); found {
 		return token, true, nil
+	} else if err != nil {
+		return "", false, err
 	}
 
 	// If the provided type token is `$pkg:type`, expand it to `$pkg:index:type` automatically. We
@@ -282,8 +284,10 @@ func resolveToken(typeName string, resolve func(string) (string, bool)) (string,
 	// `:index:` ceremony quite generally.
 	if len(typeParts) == 2 {
 		alternateName := fmt.Sprintf("%s:index:%s", typeParts[0], typeParts[1])
-		if token, found := resolve(alternateName); found {
+		if token, found, err := resolve(alternateName); found {
 			return token, true, nil
+		} else if err != nil {
+			return "", false, err
 		}
 		typeParts = []string{typeParts[0], "index", typeParts[1]}
 	}
@@ -293,8 +297,10 @@ func resolveToken(typeName string, resolve func(string) (string, bool)) (string,
 	if len(typeParts) == 3 {
 		repeatedSection := strcase.ToLowerCamel(typeParts[2])
 		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
-		if token, found := resolve(alternateName); found {
+		if token, found, err := resolve(alternateName); found {
 			return token, true, nil
+		} else if err != nil {
+			return "", false, err
 		}
 	}
 
@@ -306,12 +312,13 @@ func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, er
 		return tk, nil
 	}
 
-	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool) {
-		res, found := p.GetResource(tk)
-		if found {
-			return res.Token, true
+	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool, error) {
+		if res, found, err := p.Resources().Get(tk); found {
+			return res.Token, true, nil
+		} else if err != nil {
+			return "", false, err
 		}
-		return "", false
+		return "", false, nil
 	})
 
 	if err != nil {
@@ -329,11 +336,13 @@ func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, er
 		return "", fmt.Errorf("invalid type token %q", typeName)
 	}
 
-	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool) {
-		if res, found := p.GetFunction(tk); found {
-			return res.Token, true
+	tk, ok, err := resolveToken(typeName, func(tk string) (string, bool, error) {
+		if fn, found, err := p.Functions().Get(tk); found {
+			return fn.Token, true, nil
+		} else if err != nil {
+			return "", false, err
 		}
-		return "", false
+		return "", false, nil
 	})
 
 	if err != nil {
@@ -346,26 +355,31 @@ func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, er
 }
 
 func (p resourcePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
-	if res, found := p.GetResource(string(typeName)); found {
+	if res, found, err := p.Resources().Get(string(typeName)); found {
 		return res.IsComponent, nil
+	} else if err != nil {
+		return false, err
 	}
 	return false, fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
 }
 
 func (p resourcePackage) Name() string {
-	return p.Provider.Package.Name
+	return p.PackageReference.Name()
 }
 
 func (p resourcePackage) ResourceTypeHint(typeName ResourceTypeToken) *schema.ResourceType {
 	if _, ok := p.resolveProvider(typeName.String()); ok {
-		prov := p.Package.Provider
+		prov, err := p.Provider()
+		if err != nil {
+			return nil
+		}
 		return &schema.ResourceType{
 			Token:    typeName.String(),
 			Resource: prov,
 		}
 	}
-	r, ok := p.GetResource(typeName.String())
-	if !ok {
+	r, ok, err := p.Resources().Get(typeName.String())
+	if !ok || err != nil {
 		return nil
 	}
 	return &schema.ResourceType{
@@ -375,8 +389,8 @@ func (p resourcePackage) ResourceTypeHint(typeName ResourceTypeToken) *schema.Re
 }
 
 func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) *schema.Function {
-	f, ok := p.GetFunction(typeName.String())
-	if !ok {
+	f, ok, err := p.Functions().Get(typeName.String())
+	if !ok || err != nil {
 		return nil
 	}
 	return f
@@ -385,13 +399,16 @@ func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) *schema.Fu
 func (p resourcePackage) ResourceConstants(typeName ResourceTypeToken) map[string]interface{} {
 	_, ok := p.resolveProvider(typeName.String())
 	if ok {
-		return getResourceConstants(p.Provider.Properties)
+		prov, err := p.Provider()
+		if err != nil {
+			return nil
+		}
+		return getResourceConstants(prov.Properties)
 	}
-	res, ok := p.GetResource(typeName.String())
+	res, ok, _ := p.Resources().Get(typeName.String())
 	if ok {
 		return getResourceConstants(res.Properties)
 	}
-
 	return nil
 }
 
