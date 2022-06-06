@@ -269,11 +269,11 @@ The last two lines are equivalent as if the variable were substituted for its va
 
 #### Built-in Functions
 
-In any expression location, an object containing a single key beginning with "Fn::" calls a built-in function.
+In any expression location, an object containing a single key beginning with `Fn::` calls a built-in function.
 
 ##### `Fn::ToBase64`
 
-This function encodes a UTF-8 string with the base64-encoding using the [standard base-64 encoding](https://pkg.go.dev/encoding/base64#pkg-variables). **This will fail if the result is not a valid UTF-8 string**
+Converts a UTF-8 string into a Base64 encoded string using the [standard encoding](https://pkg.go.dev/encoding/base64#pkg-variables).
 
 ```yaml
 variables:

@@ -22,9 +22,6 @@
 
 ### Bug Fixes
 
-- Document Fn::ToBase64 in README.
-  [#245](https://github.com/pulumi/pulumi-yaml/pull/245)
-
 - De-duplicate error message added during pre-eval checking.
   [#207](https://github.com/pulumi/pulumi-yaml/pull/207)
 
