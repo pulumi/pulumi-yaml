@@ -119,14 +119,32 @@ func (n notAssignable) IsInternal() bool {
 	return false
 }
 
-func (n notAssignable) Because(b ...*notAssignable) *notAssignable {
-	n.because = b
-	return &n
+func (n *notAssignable) Because(b ...*notAssignable) *notAssignable {
+	if n == nil {
+		return nil
+	}
+	c := *n
+	c.because = b
+	return &c
 }
 
-func (n notAssignable) Property(propName string) *notAssignable {
-	n.property = propName
-	return &n
+func (n *notAssignable) Property(propName string) *notAssignable {
+	if n == nil {
+		return nil
+	}
+	c := *n
+	c.property = propName
+	return &c
+}
+
+func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignable {
+	if n == nil {
+		return nil
+	}
+
+	c := *n
+	c.reason += fmt.Sprintf(reason, a...)
+	return &c
 }
 
 func displayType(t schema.Type) string {
@@ -165,6 +183,12 @@ func displayType(t schema.Type) string {
 			inner[i] = displayType(t)
 		}
 		return fmt.Sprintf("Union<%s>", strings.Join(inner, ", "))
+	case *schema.TokenType:
+		underlying := displayType(schema.AnyType)
+		if t.UnderlyingType != nil {
+			underlying = displayType(t.UnderlyingType)
+		}
+		return fmt.Sprintf("%s<type = %s>", t.Token, underlying)
 	default:
 		return t.String()
 	}
@@ -187,9 +211,17 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		return nil
 	}
 
+	dispType := func(t schema.Type) string {
+		var maybeType string
+		if schema.IsPrimitiveType(from) {
+			maybeType = "type "
+		}
+		return fmt.Sprintf("%s'%s'", maybeType, displayType(t))
+	}
+
 	fail := &notAssignable{
-		reason: fmt.Sprintf("Cannot assign '%s' to type '%s'",
-			displayType(from), displayType(to)),
+		reason: fmt.Sprintf("Cannot assign %s to %s",
+			dispType(from), dispType(to)),
 		internal: false,
 	}
 	okIf := func(cond bool) *notAssignable {
@@ -207,7 +239,8 @@ func isAssignable(from, to schema.Type) *notAssignable {
 
 	// If from is a union type, then it can only assign if every element it contains can
 	// be assigned to `to`.
-	if from, ok := from.(*schema.UnionType); ok {
+	switch from := from.(type) {
+	case *schema.UnionType:
 		reasons := []*notAssignable{}
 		for _, subtype := range from.ElementTypes {
 			because := isAssignable(subtype, to)
@@ -215,12 +248,16 @@ func isAssignable(from, to schema.Type) *notAssignable {
 				reasons = append(reasons, because)
 			}
 		}
-		if len(reasons) == 0 {
-			// every assignment worked
-			return nil
+		// Every assignment type must be assignable.
+		return okIf(len(reasons) == 0).Because(reasons...)
+
+	case *schema.TokenType:
+		underlying := schema.AnyType
+		if from.UnderlyingType != nil {
+			underlying = from.UnderlyingType
 		}
-		// at least 1 assignment didn't work, so we fail
-		return fail.Because(reasons...)
+		check := isAssignable(underlying, to)
+		return okIfAssignable(check).WithReason(". '%s' is a Token Type. Token types act like their underlying type", displayType(from))
 	}
 
 	if schema.IsPrimitiveType(to) {
@@ -308,9 +345,9 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		for _, prop := range to.Properties {
 			fromProp, ok := from.Property(prop.Name)
 			if prop.IsRequired() && !ok {
-				failures = append(failures, notAssignable{
+				failures = append(failures, (&notAssignable{
 					reason: fmt.Sprintf("Missing required property '%s'", prop.Name),
-				}.Property(prop.Name))
+				}).Property(prop.Name))
 				continue
 			}
 			if !ok {
@@ -324,15 +361,14 @@ func isAssignable(from, to schema.Type) *notAssignable {
 				continue
 			}
 		}
-		if len(failures) > 0 {
-			return fail.Because(failures...)
-		}
-		return nil
+		return okIf(len(failures) == 0).Because(failures...)
+
 	case *schema.TokenType:
 		if to.UnderlyingType != nil {
-			return isAssignable(from, to.UnderlyingType)
+			return okIfAssignable(isAssignable(from, to.UnderlyingType))
 		}
-		return &notAssignable{reason: fmt.Sprintf("Unknown opaque type: %s", to.Token), internal: true}
+		return okIfAssignable(isAssignable(from, schema.AnyType))
+
 	default:
 		// We mark this an internal error since we don't recognize the type.
 		// This means we are missing a type, not that the user has an invalid
