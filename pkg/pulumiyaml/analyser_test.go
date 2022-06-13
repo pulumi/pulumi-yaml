@@ -27,8 +27,8 @@ func TestTypeError(t *testing.T) {
 				},
 			},
 			to: schema.NumberType,
-			message: `Cannot assign 'Union<string, number>' to type 'number':
-  Cannot assign 'string' to type 'number'`,
+			message: `Cannot assign 'Union<string, number>' to 'number':
+  Cannot assign type 'string' to type 'number'`,
 		},
 		{
 			from: &schema.UnionType{
@@ -48,7 +48,7 @@ func TestTypeError(t *testing.T) {
 			to: &schema.ResourceType{
 				Token: "some:other:Token",
 			},
-			message: "Cannot assign 'some:resource:Token' to type 'some:other:Token'",
+			message: "Cannot assign 'some:resource:Token' to 'some:other:Token'",
 		},
 		{
 			from: &schema.ArrayType{ElementType: &schema.ObjectType{
@@ -68,9 +68,9 @@ func TestTypeError(t *testing.T) {
 				},
 			}},
 			to: &schema.ArrayType{ElementType: &schema.MapType{ElementType: schema.StringType}},
-			message: `Cannot assign 'List<{foo: string, bar: any}>' to type 'List<Map<string>>':
-  Cannot assign '{foo: string, bar: any}' to type 'Map<string>':
-    bar: Cannot assign 'any' to type 'string'`,
+			message: `Cannot assign 'List<{foo: string, bar: any}>' to 'List<Map<string>>':
+  Cannot assign '{foo: string, bar: any}' to 'Map<string>':
+    bar: Cannot assign type 'any' to type 'string'`,
 		},
 		{
 			from: &schema.ObjectType{
@@ -105,10 +105,49 @@ func TestTypeError(t *testing.T) {
 					{Name: "prop3", Type: &schema.OptionalType{ElementType: schema.StringType}},
 				},
 			},
-			message: `Cannot assign '{prop1: asset, prop3: any}' to type '{prop1: archive, prop2: boolean, prop3: string}':
-  prop1: Cannot assign 'asset' to type 'archive'
+			message: `Cannot assign '{prop1: asset, prop3: any}' to '{prop1: archive, prop2: boolean, prop3: string}':
+  prop1: Cannot assign type 'asset' to type 'archive'
   prop2: Missing required property 'prop2'
-  prop3: Cannot assign 'any' to type 'string'`,
+  prop3: Cannot assign type 'any' to type 'string'`,
+		},
+
+		// Token Types:
+		{
+			// Can assign between token types with compatible underlying types.
+			from: &schema.TokenType{Token: "foo:bar:baz", UnderlyingType: schema.NumberType},
+			to:   &schema.TokenType{Token: "foo:fizz:buzz", UnderlyingType: schema.StringType},
+		},
+		{
+			// Token types are assignable to the 'any' type
+			from: &schema.TokenType{Token: "foo"},
+			to:   schema.AnyType,
+		},
+		{
+			// Token types are assignable to the 'any' type, and no other type
+			from: &schema.TokenType{Token: "foo"},
+			to:   schema.StringType,
+			message: `Cannot assign 'foo<type = any>' to 'string'. 'foo<type = any>' is a Token Type. Token types act like their underlying type:
+  Cannot assign type 'any' to type 'string'`,
+		},
+		{
+			// Token types are assignable to their underlying types
+			from: &schema.TokenType{Token: "tk:index:Tk", UnderlyingType: schema.StringType},
+			to:   schema.StringType,
+		},
+		{
+			// Token types are assignable to compatible underlying types
+			from: &schema.TokenType{Token: "tk:index:Tk", UnderlyingType: schema.BoolType},
+			to:   schema.StringType,
+		},
+		{
+			// You can assign into token types from compatible plain types
+			from: schema.BoolType,
+			to:   &schema.TokenType{Token: "tk:index:Tk", UnderlyingType: schema.StringType},
+		},
+		{
+			// You can assign into token types the underlying type
+			from: schema.BoolType,
+			to:   &schema.TokenType{Token: "tk:index:Tk", UnderlyingType: schema.BoolType},
 		},
 	}
 

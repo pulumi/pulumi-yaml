@@ -37,3 +37,6 @@
 
 - Do not panic when converting functions without `Return` fields.
   [#233](https://github.com/pulumi/pulumi-yaml/pull/234)
+
+- Handle token types in the type checker.
+  [#248](https://github.com/pulumi/pulumi-yaml/pull/248)
