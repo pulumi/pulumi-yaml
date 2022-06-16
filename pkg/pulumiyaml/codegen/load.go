@@ -333,6 +333,12 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "readFile",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.ToJSONExpr:
+		path, pdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "toJSON",
+			Args: []model.Expression{path},
+		}, pdiags
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil
