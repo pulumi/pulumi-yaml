@@ -380,6 +380,34 @@ func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
 	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
 }
 
+type poisonMarker struct{}
+
+// GetOutputs returns the resource's outputs.
+func (st poisonMarker) GetOutputs() pulumi.Output {
+	return nil
+}
+
+// GetOutput returns the named output of the resource.
+func (st poisonMarker) GetOutput(k string) pulumi.Output {
+	return nil
+}
+
+func (st poisonMarker) CustomResource() *pulumi.CustomResourceState {
+	return nil
+}
+
+func (st poisonMarker) ProviderResource() *pulumi.ProviderResourceState {
+	return nil
+}
+
+func (poisonMarker) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
+func (st poisonMarker) GetRawOutputs() pulumi.Output {
+	return nil
+}
+
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
 	return &runner{
 		ctx:       ctx,
@@ -407,6 +435,7 @@ func (evaluator) EvalConfig(r *runner, node configNode) bool {
 	ctx := r.newContext(node)
 	c, ok := ctx.registerConfig(node)
 	if !ok {
+		r.config[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
@@ -422,6 +451,7 @@ func (evaluator) EvalVariable(r *runner, node variableNode) bool {
 	ctx := r.newContext(node)
 	value, ok := ctx.evaluateExpr(node.Value)
 	if !ok {
+		r.variables[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
@@ -437,6 +467,7 @@ func (evaluator) EvalResource(r *runner, node resourceNode) bool {
 	ctx := r.newContext(node)
 	res, ok := ctx.registerResource(node)
 	if !ok {
+		r.resources[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
@@ -458,7 +489,7 @@ func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 		if err != nil {
 			return false
 		}
-	} else {
+	} else if _, poisoned := out.(poisonMarker); !poisoned {
 		r.ctx.Export(node.Key.Value, out)
 	}
 	return true
@@ -1073,6 +1104,9 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 			if !ok {
 				return nil, false
 			}
+			if p, ok := p.(poisonMarker); ok {
+				return p, true
+			}
 
 			if o, ok := p.(pulumi.Output); ok {
 				return o.ApplyT(func(v interface{}) (interface{}, error) {
@@ -1630,10 +1664,18 @@ func hasOutputs(v interface{}) bool {
 // lift wraps a function s.t. the function is called inside an Apply if any of its arguments contain Outputs.
 // If none of the function's arguments contain Outputs, the function is called directly.
 func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) func(args ...interface{}) (interface{}, bool) {
+	fnOrPoison := func(args ...interface{}) (interface{}, bool) {
+		for _, arg := range args {
+			if p, ok := arg.(poisonMarker); ok {
+				return p, true
+			}
+		}
+		return fn(args...)
+	}
 	return func(args ...interface{}) (interface{}, bool) {
 		if hasOutputs(args) {
 			return pulumi.All(args...).ApplyT(func(resolved []interface{}) (interface{}, error) {
-				v, ok := fn(resolved...)
+				v, ok := fnOrPoison(resolved...)
 				if !ok {
 					// TODO: ensure that these appear in CLI
 					return v, fmt.Errorf("runtime error")
@@ -1641,7 +1683,7 @@ func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) f
 				return v, nil
 			}), true
 		}
-		return fn(args...)
+		return fnOrPoison(args...)
 	}
 }
 
