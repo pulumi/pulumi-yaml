@@ -165,6 +165,9 @@ func (n *ListNode) Index(i int) Node {
 }
 
 func (n *ListNode) String() string {
+	if len(n.elements) == 0 {
+		return "[ ]"
+	}
 	s := make([]string, len(n.elements))
 	for i, v := range n.elements {
 		s[i] = v.String()
@@ -224,6 +227,9 @@ func (n *ObjectNode) Index(i int) ObjectPropertyDef {
 }
 
 func (n *ObjectNode) String() string {
+	if len(n.entries) == 0 {
+		return "{ }"
+	}
 	s := make([]string, len(n.entries))
 	for i, v := range n.entries {
 		s[i] = v.Key.String() + ": " + v.Value.String()

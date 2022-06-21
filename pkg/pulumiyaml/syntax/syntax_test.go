@@ -18,10 +18,10 @@ func TestStringer(t *testing.T) {
 		{Null(), "null"},
 		{Number(3.14159), "3.14159"},
 		{Number(3), "3"},
-		{List(String("e1"), Number(2), List(), Null()), "[ e1, 2, [  ], null ]"},
+		{List(String("e1"), Number(2), List(), Null()), "[ e1, 2, [ ], null ]"},
 		{
 			Object(ObjectProperty(String("fizz"), String("buzz")), ObjectProperty(String("empty"), Object())),
-			"{ fizz: buzz, empty: {  } }",
+			"{ fizz: buzz, empty: { } }",
 		},
 	}
 
