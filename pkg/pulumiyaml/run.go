@@ -408,6 +408,28 @@ func (st poisonMarker) GetRawOutputs() pulumi.Output {
 	return nil
 }
 
+// Check if a value is either a poisonMarker or is a collection that contains a
+// poisonMarker.
+func isPoisoned(v interface{}) (poisonMarker, bool) {
+	switch v := v.(type) {
+	case []interface{}:
+		for _, e := range v {
+			if p, ok := isPoisoned(e); ok {
+				return p, true
+			}
+		}
+	case map[string]interface{}:
+		for _, e := range v {
+			if p, ok := isPoisoned(e); ok {
+				return p, true
+			}
+		}
+	case poisonMarker:
+		return v, true
+	}
+	return poisonMarker{}, false
+}
+
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
 	return &runner{
 		ctx:       ctx,
@@ -739,6 +761,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if !ok {
 			overallOk = false
 		}
+		if p, ok := vv.(poisonMarker); ok {
+			return p, true
+		}
 		props[kvp.Key.Value] = vv
 	}
 
@@ -778,6 +803,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if ok {
 			var dependsOn []pulumi.Resource
 			for _, r := range dependOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
 				dependsOn = append(dependsOn, r.CustomResource())
 			}
 			opts = append(opts, pulumi.DependsOn(dependsOn))
@@ -817,6 +845,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if ok {
 			var providers []pulumi.ProviderResource
 			for _, r := range dependOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
 				provider := r.ProviderResource()
 				if provider == nil {
 					ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as provider was not a provider resource '%s'", r))
@@ -950,6 +981,8 @@ func (ctx *evalContext) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, 
 	}
 
 	switch res := out.(type) {
+	case poisonMarker:
+		return res, true
 	case *lateboundCustomResourceState:
 		return res, true
 	case *lateboundProviderResourceState:
@@ -1034,6 +1067,9 @@ func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 		ev, ok := ctx.evaluateExpr(e)
 		if !ok {
 			return nil, false
+		}
+		if p, ok := ev.(poisonMarker); ok {
+			return p, true
 		}
 		xs[i] = ev
 	}
@@ -1665,10 +1701,8 @@ func hasOutputs(v interface{}) bool {
 // If none of the function's arguments contain Outputs, the function is called directly.
 func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) func(args ...interface{}) (interface{}, bool) {
 	fnOrPoison := func(args ...interface{}) (interface{}, bool) {
-		for _, arg := range args {
-			if p, ok := arg.(poisonMarker); ok {
-				return p, true
-			}
+		if p, ok := isPoisoned(args); ok {
+			return p, true
 		}
 		return fn(args...)
 	}
