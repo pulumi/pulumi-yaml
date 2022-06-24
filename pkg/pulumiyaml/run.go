@@ -819,6 +819,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Parent != nil {
 		parentOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Parent, "parent")
 		if ok {
+			if p, ok := parentOpt.(poisonMarker); ok {
+				return p, true
+			}
 			opts = append(opts, pulumi.Parent(parentOpt.CustomResource()))
 		} else {
 			overallOk = false
@@ -830,6 +833,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
+			if p, ok := providerOpt.(poisonMarker); ok {
+				return p, true
+			}
 			provider := providerOpt.ProviderResource()
 			if provider == nil {
 				ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
