@@ -136,6 +136,11 @@ func newMockPackageMap() PackageLoader {
 							Name: "foo",
 							Type: schema.StringType,
 						})
+					case "test:resource:not-run":
+						return inputProperties("test:resource:not-run", schema.Property{
+							Name: "foo",
+							Type: schema.StringType,
+						})
 					default:
 						return inputProperties(typeName)
 					}
@@ -151,6 +156,10 @@ func newMockPackageMap() PackageLoader {
 							[]schema.Property{
 								{Name: "outString", Type: schema.StringType},
 							})
+					case "test:invoke:poison":
+						return function("test:invoke:poison",
+							[]schema.Property{{Name: "foo", Type: schema.StringType}},
+							[]schema.Property{{Name: "value", Type: schema.StringType}})
 					default:
 						return function(typeName, nil, nil)
 					}
@@ -1651,4 +1660,41 @@ resources:
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
+}
+
+func TestPoisonResult(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-poison
+runtime: yaml
+variables:
+  poisoned:
+    Fn::Invoke:
+      Function: test:invoke:poison
+      Arguments:
+        foo: three
+      return: value
+  never-run:
+    Fn::Invoke:
+      Function: test:invoke:poison
+      Arguments:
+        foo: ${poisoned}
+      return: value
+resources:
+  alsoPoisoned:
+    type: test:resource:not-run
+    properties:
+      foo: ${poisoned}`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+
+	assert.ElementsMatch(t, diagStrings,
+		[]string{
+			"<stdin>:5:5: Don't eat the poison",
+		})
 }
