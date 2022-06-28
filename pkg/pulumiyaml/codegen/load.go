@@ -200,7 +200,7 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 	return call, diags
 }
 
-// importFunctionCall imports a call to an AWS intrinsic function. The way the function is imported depends on the
+// importFunctionCall imports a call to an intrinsic function. The way the function is imported depends on the
 // function:
 //
 // - `Fn::Asset` is imported as a call to the `fileAsset` function
@@ -264,6 +264,8 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
+		} else {
+			invokeArgs = append(invokeArgs, &model.ObjectConsExpression{})
 		}
 
 		fn := &model.FunctionCallExpression{
