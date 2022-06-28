@@ -248,6 +248,12 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "assetArchive",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.SecretExpr:
+		path, pdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "secret",
+			Args: []model.Expression{path},
+		}, pdiags
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
