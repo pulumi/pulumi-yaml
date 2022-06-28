@@ -2,18 +2,18 @@ config sqlAdmin string {
 	default = "pulumi"
 }
 
-sharedKey = invoke("azure-native:operationalinsights:getSharedKeys", {
+sharedKey = secret(invoke("azure-native:operationalinsights:getSharedKeys", {
 	resourceGroupName = resourceGroup.name,
 	workspaceName = workspace.name
-}).primarySharedKey
+}).primarySharedKey)
 adminUsername = invoke("azure-native:containerregistry:listRegistryCredentials", {
 	resourceGroupName = resourceGroup.name,
 	registryName = registry.name
 }).username
-adminPasswords = invoke("azure-native:containerregistry:listRegistryCredentials", {
+adminPasswords = secret(invoke("azure-native:containerregistry:listRegistryCredentials", {
 	resourceGroupName = resourceGroup.name,
 	registryName = registry.name
-}).passwords
+}).passwords)
 
 resource resourceGroup "azure-native:resources:ResourceGroup" {
 	__logicalName = "resourceGroup"
