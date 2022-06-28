@@ -17,7 +17,7 @@ const container = new azure_native.storage.BlobContainer("container", {
     accountName: sa.name,
     publicAccess: azure_native.storage.PublicAccess.None,
 });
-const blobAccessToken = pulumi.all([sa.name, appservicegroup.name, sa.name, container.name]).apply(([saName, appservicegroupName, saName1, containerName]) => azure_native.storage.listStorageAccountServiceSASOutput({
+const blobAccessToken = pulumi.secret(pulumi.all([sa.name, appservicegroup.name, sa.name, container.name]).apply(([saName, appservicegroupName, saName1, containerName]) => azure_native.storage.listStorageAccountServiceSASOutput({
     accountName: saName,
     protocols: azure_native.storage.HttpProtocol.Https,
     sharedAccessStartTime: "2022-01-01",
@@ -30,7 +30,7 @@ const blobAccessToken = pulumi.all([sa.name, appservicegroup.name, sa.name, cont
     cacheControl: "max-age=5",
     contentDisposition: "inline",
     contentEncoding: "deflate",
-})).apply(invoke => invoke.serviceSasToken);
+})).apply(invoke => invoke.serviceSasToken));
 const appserviceplan = new azure_native.web.AppServicePlan("appserviceplan", {
     resourceGroupName: appservicegroup.name,
     kind: "App",
