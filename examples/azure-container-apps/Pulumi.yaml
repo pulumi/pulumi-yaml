@@ -7,12 +7,13 @@ configuration:
     default: pulumi
 variables:
   sharedKey:
-    Fn::Invoke:
-      Function: azure-native:operationalinsights:getSharedKeys
-      Arguments:
-        resourceGroupName: ${resourceGroup.name}
-        workspaceName: ${workspace.name}
-      Return: primarySharedKey
+    Fn::Secret:
+      Fn::Invoke:
+        Function: azure-native:operationalinsights:getSharedKeys
+        Arguments:
+          resourceGroupName: ${resourceGroup.name}
+          workspaceName: ${workspace.name}
+        Return: primarySharedKey
   adminUsername:
     Fn::Invoke:
       Function: azure-native:containerregistry:listRegistryCredentials
@@ -21,12 +22,13 @@ variables:
         registryName: ${registry.name}
       Return: username
   adminPasswords:
-    Fn::Invoke:
-      Function: azure-native:containerregistry:listRegistryCredentials
-      Arguments:
-        resourceGroupName: ${resourceGroup.name}
-        registryName: ${registry.name}
-      Return: passwords
+    Fn::Secret:
+      Fn::Invoke:
+        Function: azure-native:containerregistry:listRegistryCredentials
+        Arguments:
+          resourceGroupName: ${resourceGroup.name}
+          registryName: ${registry.name}
+        Return: passwords
 resources:
   resourceGroup:
     type: azure-native:resources:ResourceGroup
