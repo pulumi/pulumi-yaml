@@ -264,6 +264,8 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
+		} else {
+			invokeArgs = append(invokeArgs, &model.ObjectConsExpression{})
 		}
 
 		fn := &model.FunctionCallExpression{
