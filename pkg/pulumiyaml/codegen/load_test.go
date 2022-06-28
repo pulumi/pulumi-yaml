@@ -138,8 +138,8 @@ variables:
   noRet:
     Fn::Invoke:
       Function: test:mod:fn`,
-			expected: `ret = invoke("test:mod:fn").foo
-noRet = invoke("test:mod:fn")
+			expected: `ret = invoke("test:mod:fn", {}).foo
+noRet = invoke("test:mod:fn", {})
 `,
 		},
 	}
