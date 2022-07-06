@@ -325,58 +325,38 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	}
 }
 
+var assetOrArchiveFunctions = map[string]func(node syntax.Node, k, v *StringExpr) Expr{
+	"Fn::StringAsset":   func(node syntax.Node, k, v *StringExpr) Expr { return StringAssetSyntax(node, k, v) },
+	"Fn::FileAsset":     func(node syntax.Node, k, v *StringExpr) Expr { return FileAssetSyntax(node, k, v) },
+	"Fn::RemoteAsset":   func(node syntax.Node, k, v *StringExpr) Expr { return RemoteAssetSyntax(node, k, v) },
+	"Fn::FileArchive":   func(node syntax.Node, k, v *StringExpr) Expr { return FileArchiveSyntax(node, k, v) },
+	"Fn::RemoteArchive": func(node syntax.Node, k, v *StringExpr) Expr { return RemoteArchiveSyntax(node, k, v) },
+}
+
 // Attempts to parse an asset or archive. These are not normal `Fn::*` objects
 // because they are parsed as part of an `ObjectProperty` instead of an object.
 // Note: because of the difference in parsing, this function does not identify
 // AssetArchive.
 func tryParseAssetOrArchive(k, v Expr) (Expr, syntax.Diagnostics, bool) {
 	diags := syntax.Diagnostics{}
-	checkStringExpr := func(kind string, v Expr) (*StringExpr, bool) {
-		if s, ok := v.(*StringExpr); ok {
-			return s, true
-		}
-		diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("The argument to %s must be a string literal", kind), ""))
-		return nil, false
-	}
+
 	fnName, ok := k.(*StringExpr)
 	if !ok {
 		return nil, nil, false
 	}
-	switch fnName.Value {
-	case "Fn::StringAsset":
-		s, ok := checkStringExpr(fnName.Value, v)
+
+	if fn, ok := assetOrArchiveFunctions[fnName.Value]; ok {
+		s, ok := v.(*StringExpr)
 		if !ok {
+			diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("The argument to %s must be a string literal", fnName.Value), ""))
 			return nil, diags, true
 		}
-		return StringAssetSyntax(k.Syntax(), fnName, s), diags, true
-	case "Fn::FileAsset":
-		s, ok := checkStringExpr(fnName.Value, v)
-		if !ok {
-			return nil, diags, true
-		}
-		return FileAssetSyntax(k.Syntax(), fnName, s), diags, true
-	case "Fn::RemoteAsset":
-		s, ok := checkStringExpr(fnName.Value, v)
-		if !ok {
-			return nil, diags, true
-		}
-		return RemoteAssetSyntax(k.Syntax(), fnName, s), diags, true
-	case "Fn::FileArchive":
-		s, ok := checkStringExpr(fnName.Value, v)
-		if !ok {
-			return nil, diags, true
-		}
-		return FileArchiveSyntax(k.Syntax(), fnName, s), diags, true
-	case "Fn::RemoteArchive":
-		s, ok := checkStringExpr(fnName.Value, v)
-		if !ok {
-			return nil, diags, true
-		}
-		return RemoteArchiveSyntax(k.Syntax(), fnName, s), diags, true
-	default:
-		// Not a asset or archive
-		return nil, nil, false
+		return fn(k.Syntax(), fnName, s), diags, true
+
 	}
+
+	// Not a asset or archive
+	return nil, nil, false
 }
 
 // BuiltinExpr represents a call to a builtin function.
@@ -718,6 +698,11 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	}
 
 	kvp := node.Index(0)
+
+	if _, ok := assetOrArchiveFunctions[kvp.Key.Value()]; ok {
+		// We will parse this node as an asset or archive later, so we don't need to do it now
+		return nil, nil, false
+	}
 
 	var parse func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)
 	switch kvp.Key.Value() {
