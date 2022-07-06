@@ -291,11 +291,11 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 
 		var diags syntax.Diagnostics
 
-		if x, fnDiags, ok := tryParseFunction(node); ok {
+		x, fnDiags, ok := tryParseFunction(node)
+		if ok {
 			return x, fnDiags
-		} else {
-			diags.Extend(fnDiags...)
 		}
+		diags.Extend(fnDiags...)
 
 		kvps := make([]ObjectProperty, node.Len())
 		for i := range kvps {
