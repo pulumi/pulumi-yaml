@@ -27,6 +27,9 @@ func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.
 	if err != nil {
 		return nil, nil, err
 	}
+	if template == nil && diags.HasErrors() {
+		return nil, nil, fmt.Errorf("failed to load the template: %s", diags.Error())
+	}
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
 		err := diagWriter.WriteDiagnostics(diags)

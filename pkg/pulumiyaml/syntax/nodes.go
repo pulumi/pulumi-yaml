@@ -2,10 +2,18 @@
 
 package syntax
 
-import "github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+)
 
 // A Node represents a single node in an object tree.
 type Node interface {
+	fmt.Stringer
+
 	Syntax() Syntax
 
 	isNode()
@@ -40,6 +48,10 @@ func Null() *NullNode {
 	return NullSyntax(NoSyntax)
 }
 
+func (*NullNode) String() string {
+	return "null"
+}
+
 // A BooleanNode represents a boolean literal.
 type BooleanNode struct {
 	node
@@ -55,6 +67,13 @@ func BooleanSyntax(syntax Syntax, value bool) *BooleanNode {
 // Boolean creates a new boolean literal node with the given value.
 func Boolean(value bool) *BooleanNode {
 	return BooleanSyntax(NoSyntax, value)
+}
+
+func (n *BooleanNode) String() string {
+	if n.value {
+		return "true"
+	}
+	return "false"
 }
 
 // Value returns the boolean literal's value.
@@ -82,6 +101,10 @@ func Number(value float64) *NumberNode {
 // Value returns the number literal's value.
 func (n *NumberNode) Value() float64 {
 	return n.value
+}
+
+func (n *NumberNode) String() string {
+	return strconv.FormatFloat(n.value, 'f', -1, 64)
 }
 
 // A StringNode represents a string literal.
@@ -141,6 +164,17 @@ func (n *ListNode) Index(i int) Node {
 	return n.elements[i]
 }
 
+func (n *ListNode) String() string {
+	if len(n.elements) == 0 {
+		return "[ ]"
+	}
+	s := make([]string, len(n.elements))
+	for i, v := range n.elements {
+		s[i] = v.String()
+	}
+	return fmt.Sprintf("[ %s ]", strings.Join(s, ", "))
+}
+
 // An ObjectNode represents an object. An object is a list of key-value pairs where the keys are string literals
 // and the values are arbitrary nodes.
 type ObjectNode struct {
@@ -190,4 +224,15 @@ func (n *ObjectNode) Len() int {
 // Index returns the i'th property of the object.
 func (n *ObjectNode) Index(i int) ObjectPropertyDef {
 	return n.entries[i]
+}
+
+func (n *ObjectNode) String() string {
+	if len(n.entries) == 0 {
+		return "{ }"
+	}
+	s := make([]string, len(n.entries))
+	for i, v := range n.entries {
+		s[i] = v.Key.String() + ": " + v.Value.String()
+	}
+	return fmt.Sprintf("{ %s }", strings.Join(s, ", "))
 }

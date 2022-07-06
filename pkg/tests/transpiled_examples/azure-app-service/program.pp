@@ -2,7 +2,7 @@ config sqlAdmin string {
 	default = "pulumi"
 }
 
-blobAccessToken = invoke("azure-native:storage:listStorageAccountServiceSAS", {
+blobAccessToken = secret(invoke("azure-native:storage:listStorageAccountServiceSAS", {
 	accountName = sa.name,
 	protocols = "https",
 	sharedAccessStartTime = "2022-01-01",
@@ -15,7 +15,7 @@ blobAccessToken = invoke("azure-native:storage:listStorageAccountServiceSAS", {
 	cacheControl = "max-age=5",
 	contentDisposition = "inline",
 	contentEncoding = "deflate"
-}).serviceSasToken
+}).serviceSasToken)
 
 resource appservicegroup "azure-native:resources:ResourceGroup" {
 	__logicalName = "appservicegroup"
