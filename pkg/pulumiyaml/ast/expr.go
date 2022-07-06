@@ -288,11 +288,14 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 		}
 		return ListSyntax(node, elements...), diags
 	case *syntax.ObjectNode:
-		if x, diags, ok := tryParseFunction(node); ok {
-			return x, diags
-		}
 
 		var diags syntax.Diagnostics
+
+		if x, fnDiags, ok := tryParseFunction(node); ok {
+			return x, fnDiags
+		} else {
+			diags.Extend(fnDiags...)
+		}
 
 		kvps := make([]ObjectProperty, node.Len())
 		for i := range kvps {
@@ -741,7 +744,15 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	case "Fn::ReadFile":
 		parse = parseReadFile
 	default:
-		return nil, nil, false
+		var diags syntax.Diagnostics
+		k := kvp.Key.Value()
+		if strings.HasPrefix(k, "Fn::") {
+			diags = append(diags, syntax.Warning(kvp.Key.Syntax().Range(),
+				"'Fn::' is a reserved prefix",
+				fmt.Sprintf("If you need to use the raw key '%s',"+
+					" please open an issue at https://github.com/pulumi/pulumi-yaml/issues", k)))
+		}
+		return nil, diags, false
 	}
 
 	var diags syntax.Diagnostics

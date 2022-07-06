@@ -38,6 +38,7 @@ type yamlLanguageHost struct {
 	tracing       string
 	compiler      string
 	template      *ast.TemplateDecl
+	diags         syntax.Diagnostics
 }
 
 func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.LanguageRuntimeServer {
@@ -50,7 +51,7 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 
 func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	if host.template != nil {
-		return host.template, nil, nil
+		return host.template, host.diags, nil
 	}
 
 	var template *ast.TemplateDecl
@@ -62,14 +63,15 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "")
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, diags, err
 	}
 	if diags.HasErrors() {
 		return nil, diags, nil
 	}
 	host.template = template
+	host.diags = diags
 
-	return host.template, nil, nil
+	return host.template, diags, nil
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
@@ -79,11 +81,12 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if diags != nil {
+	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	pkgs, diags := pulumiyaml.GetReferencedPlugins(template)
+	pkgs, pluginDiags := pulumiyaml.GetReferencedPlugins(template)
+	diags.Extend(pluginDiags...)
 	if diags.HasErrors() {
 		return nil, diags
 	}
