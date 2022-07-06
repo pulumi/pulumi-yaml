@@ -115,6 +115,7 @@ runtime: yaml
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+			t.Logf("Processing call %s.", args.Token)
 			switch args.Token {
 			case "test:invoke:type":
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
@@ -125,6 +126,8 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				}, nil
 			case "test:invoke:empty":
 				return nil, nil
+			case "test:invoke:poison":
+				return nil, fmt.Errorf("Don't eat the poison")
 			}
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
@@ -154,6 +157,9 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				assert.Equal(t, "", args.ID)
 
 				return "", resource.PropertyMap{}, nil
+			case "test:resource:not-run":
+				assert.Fail(t, "The 'not-run' resource was constructed")
+				return "not-run", resource.PropertyMap{}, nil
 			}
 			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
 		},

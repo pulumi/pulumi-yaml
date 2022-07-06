@@ -380,6 +380,56 @@ func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
 	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
 }
 
+type poisonMarker struct{}
+
+// GetOutputs returns the resource's outputs.
+func (st poisonMarker) GetOutputs() pulumi.Output {
+	return nil
+}
+
+// GetOutput returns the named output of the resource.
+func (st poisonMarker) GetOutput(k string) pulumi.Output {
+	return nil
+}
+
+func (st poisonMarker) CustomResource() *pulumi.CustomResourceState {
+	return nil
+}
+
+func (st poisonMarker) ProviderResource() *pulumi.ProviderResourceState {
+	return nil
+}
+
+func (poisonMarker) ElementType() reflect.Type {
+	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+}
+
+func (st poisonMarker) GetRawOutputs() pulumi.Output {
+	return nil
+}
+
+// Check if a value is either a poisonMarker or is a collection that contains a
+// poisonMarker.
+func isPoisoned(v interface{}) (poisonMarker, bool) {
+	switch v := v.(type) {
+	case []interface{}:
+		for _, e := range v {
+			if p, ok := isPoisoned(e); ok {
+				return p, true
+			}
+		}
+	case map[string]interface{}:
+		for _, e := range v {
+			if p, ok := isPoisoned(e); ok {
+				return p, true
+			}
+		}
+	case poisonMarker:
+		return v, true
+	}
+	return poisonMarker{}, false
+}
+
 func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
 	return &runner{
 		ctx:       ctx,
@@ -407,6 +457,7 @@ func (evaluator) EvalConfig(r *runner, node configNode) bool {
 	ctx := r.newContext(node)
 	c, ok := ctx.registerConfig(node)
 	if !ok {
+		r.config[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
@@ -422,6 +473,7 @@ func (evaluator) EvalVariable(r *runner, node variableNode) bool {
 	ctx := r.newContext(node)
 	value, ok := ctx.evaluateExpr(node.Value)
 	if !ok {
+		r.variables[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
@@ -437,6 +489,7 @@ func (evaluator) EvalResource(r *runner, node resourceNode) bool {
 	ctx := r.newContext(node)
 	res, ok := ctx.registerResource(node)
 	if !ok {
+		r.resources[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
@@ -458,7 +511,7 @@ func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 		if err != nil {
 			return false
 		}
-	} else {
+	} else if _, poisoned := out.(poisonMarker); !poisoned {
 		r.ctx.Export(node.Key.Value, out)
 	}
 	return true
@@ -708,6 +761,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if !ok {
 			overallOk = false
 		}
+		if p, ok := vv.(poisonMarker); ok {
+			return p, true
+		}
 		props[kvp.Key.Value] = vv
 	}
 
@@ -747,6 +803,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if ok {
 			var dependsOn []pulumi.Resource
 			for _, r := range dependOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
 				dependsOn = append(dependsOn, r.CustomResource())
 			}
 			opts = append(opts, pulumi.DependsOn(dependsOn))
@@ -760,6 +819,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Parent != nil {
 		parentOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Parent, "parent")
 		if ok {
+			if p, ok := parentOpt.(poisonMarker); ok {
+				return p, true
+			}
 			opts = append(opts, pulumi.Parent(parentOpt.CustomResource()))
 		} else {
 			overallOk = false
@@ -771,6 +833,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
+			if p, ok := providerOpt.(poisonMarker); ok {
+				return p, true
+			}
 			provider := providerOpt.ProviderResource()
 			if provider == nil {
 				ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
@@ -786,6 +851,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		if ok {
 			var providers []pulumi.ProviderResource
 			for _, r := range dependOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
 				provider := r.ProviderResource()
 				if provider == nil {
 					ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as provider was not a provider resource '%s'", r))
@@ -919,6 +987,8 @@ func (ctx *evalContext) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, 
 	}
 
 	switch res := out.(type) {
+	case poisonMarker:
+		return res, true
 	case *lateboundCustomResourceState:
 		return res, true
 	case *lateboundProviderResourceState:
@@ -1004,6 +1074,9 @@ func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 		if !ok {
 			return nil, false
 		}
+		if p, ok := ev.(poisonMarker); ok {
+			return p, true
+		}
 		xs[i] = ev
 	}
 	return xs, true
@@ -1072,6 +1145,9 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 			p, ok := ctx.evaluatePropertyAccess(x, i.Value)
 			if !ok {
 				return nil, false
+			}
+			if p, ok := p.(poisonMarker); ok {
+				return p, true
 			}
 
 			if o, ok := p.(pulumi.Output); ok {
@@ -1630,10 +1706,16 @@ func hasOutputs(v interface{}) bool {
 // lift wraps a function s.t. the function is called inside an Apply if any of its arguments contain Outputs.
 // If none of the function's arguments contain Outputs, the function is called directly.
 func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) func(args ...interface{}) (interface{}, bool) {
+	fnOrPoison := func(args ...interface{}) (interface{}, bool) {
+		if p, ok := isPoisoned(args); ok {
+			return p, true
+		}
+		return fn(args...)
+	}
 	return func(args ...interface{}) (interface{}, bool) {
 		if hasOutputs(args) {
 			return pulumi.All(args...).ApplyT(func(resolved []interface{}) (interface{}, error) {
-				v, ok := fn(resolved...)
+				v, ok := fnOrPoison(resolved...)
 				if !ok {
 					// TODO: ensure that these appear in CLI
 					return v, fmt.Errorf("runtime error")
@@ -1641,7 +1723,7 @@ func (ctx *evalContext) lift(fn func(args ...interface{}) (interface{}, bool)) f
 				return v, nil
 			}), true
 		}
-		return fn(args...)
+		return fnOrPoison(args...)
 	}
 }
 
