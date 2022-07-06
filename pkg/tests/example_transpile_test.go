@@ -5,8 +5,10 @@ package tests
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -269,7 +271,6 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 			}
 			t.Parallel()
 			var (
-				files map[string][]byte
 				diags hcl.Diagnostics
 				err   error
 			)
@@ -281,10 +282,46 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.ReferenceLoader)
 			require.NoError(t, err, "Failed to eject program")
 
-			err = generator(writeTo, *proj, pclProgram)
+			tmpDir := t.TempDir()
+			err = generator(tmpDir, *proj, pclProgram)
 			require.NoError(t, err, "Failed to generate project")
 
+			files := map[string][]byte{}
+
+			err = filepath.WalkDir(tmpDir, func(filePath string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() {
+					return nil
+				}
+
+				bytes, err := ioutil.ReadFile(filePath)
+				if err != nil {
+					return err
+				}
+
+				segments := []string{}
+				rest := filePath[len(tmpDir):]
+				for {
+					base := filepath.Base(rest)
+					segments = append(segments, base)
+
+					if base == rest {
+						break
+					}
+					rest = filepath.Dir(rest)
+
+				}
+
+				name := path.Join(segments...)
+				files[name] = bytes
+				return nil
+			})
+			require.NoError(t, err, "Failed to walk generated files")
+
 			writeOrCompare(t, writeTo, files)
+
 			deps := pcodegen.NewStringSet()
 			for _, d := range template.Resources.Entries {
 				// This will not handle invokes correctly
