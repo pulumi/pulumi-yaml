@@ -292,7 +292,13 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 				if err != nil {
 					return err
 				}
+
 				if d.IsDir() {
+					if d.Name() == "node_modules" ||
+						d.Name() == "__pycache__" ||
+						d.Name() == "bin" {
+						return fs.SkipDir
+					}
 					return nil
 				}
 
