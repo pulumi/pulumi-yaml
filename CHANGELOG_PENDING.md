@@ -1,7 +1,7 @@
 ### Improvements
 
 - Allow lowercase `type` on config entries.
-  [#201](https://github.com/pulumi/pulumi-yaml/pull/201)
+  [#275](https://github.com/pulumi/pulumi-yaml/pull/275)
 
 - Prevent errors from cascading.
   [#258](https://github.com/pulumi/pulumi-yaml/pull/258)
