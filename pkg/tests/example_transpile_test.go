@@ -307,7 +307,7 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 					name == "package.json" ||
 					name == "yarn.lock" ||
 					name == "tsconfig.json" ||
-					name == "requirments.txt" {
+					name == "requirements.txt" {
 					return nil
 				}
 
