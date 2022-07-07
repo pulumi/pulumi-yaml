@@ -1698,3 +1698,25 @@ resources:
 			"<stdin>:5:5: Don't eat the poison",
 		})
 }
+
+func TestEmptyInterpolate(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-empty
+runtime: yaml
+variables:
+  empty: ${}
+`
+	_, diags, err := LoadYAMLBytes("<stdin>", []byte(strings.TrimSpace(text)))
+	require.NoError(t, err)
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+
+	assert.ElementsMatch(t, diagStrings,
+		[]string{
+			"<stdin>:4:10: Property access expressions cannot be empty",
+		})
+}
