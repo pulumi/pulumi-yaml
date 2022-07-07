@@ -305,7 +305,9 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 				if name := d.Name(); name == "Pulumi.yaml" ||
 					name == ".gitignore" ||
 					name == "package.json" ||
-					name == "tsconfig.json" {
+					name == "yarn.lock" ||
+					name == "tsconfig.json" ||
+					name == "requirments.txt" {
 					return nil
 				}
 
