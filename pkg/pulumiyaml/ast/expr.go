@@ -150,14 +150,20 @@ func (n *InterpolateExpr) String() string {
 // string literal.
 func InterpolateSyntax(node *syntax.StringNode) (*InterpolateExpr, syntax.Diagnostics) {
 	parts, diags := parseInterpolate(node, node.Value())
-	if len(diags) != 0 {
+	if diags.HasErrors() {
 		return nil, diags
+	}
+
+	for _, part := range parts {
+		if part.Value != nil && len(part.Value.Accessors) == 0 {
+			diags.Extend(syntax.NodeError(node, "Property access expressions cannot be empty", ""))
+		}
 	}
 
 	return &InterpolateExpr{
 		exprNode: expr(node),
 		Parts:    parts,
-	}, nil
+	}, diags
 }
 
 // Interpolate creates a new interpolated string expression by parsing the given input string.
