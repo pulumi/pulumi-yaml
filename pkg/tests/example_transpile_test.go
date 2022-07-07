@@ -294,11 +294,18 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 				}
 
 				if d.IsDir() {
-					if d.Name() == "node_modules" ||
-						d.Name() == "__pycache__" ||
-						d.Name() == "bin" {
+					if name := d.Name(); name == "node_modules" ||
+						name == "__pycache__" ||
+						name == "bin" {
 						return fs.SkipDir
 					}
+					return nil
+				}
+
+				if name := d.Name(); name == "Pulumi.yaml" ||
+					name == ".gitignore" ||
+					name == "package.json" ||
+					name == "tsconfig.json" {
 					return nil
 				}
 
@@ -343,7 +350,7 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 				return
 			}
 
-			check(t, writeTo, deps)
+			check(t, tmpDir, deps)
 		})
 	}
 }
