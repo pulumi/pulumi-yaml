@@ -309,6 +309,11 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 					return nil
 				}
 
+				// Program.cs is the driver for MyStack.cs, which is what we generate.
+				if d.Name() == "Program.cs" {
+					return nil
+				}
+
 				bytes, err := ioutil.ReadFile(filePath)
 				if err != nil {
 					return err
