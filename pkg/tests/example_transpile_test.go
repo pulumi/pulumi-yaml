@@ -302,12 +302,10 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 					return nil
 				}
 
-				if name := d.Name(); name == "Pulumi.yaml" ||
-					name == ".gitignore" ||
-					name == "package.json" ||
-					name == "yarn.lock" ||
-					name == "tsconfig.json" ||
-					name == "requirements.txt" {
+				if !(strings.HasSuffix(d.Name(), ".py") ||
+					strings.HasSuffix(d.Name(), ".cs") ||
+					strings.HasSuffix(d.Name(), ".go") ||
+					strings.HasSuffix(d.Name(), ".ts")) {
 					return nil
 				}
 
