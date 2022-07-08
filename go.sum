@@ -752,6 +752,8 @@ github.com/pulumi/pulumi/sdk/v3 v3.33.3-0.20220531233041-4bcee4bb2543 h1:4KjSHow
 github.com/pulumi/pulumi/sdk/v3 v3.33.3-0.20220531233041-4bcee4bb2543/go.mod h1:sF9VfTkwRXYNk/gCR7ICd79VDC8WcsyVq37/sb8sV5A=
 github.com/pulumi/pulumi/sdk/v3 v3.33.3-0.20220601044734-8c3b8ab96f3e h1:AQ+PuhpT3HlMuwgVI0AKlLz9E66L9PFXvskbUPlp4e0=
 github.com/pulumi/pulumi/sdk/v3 v3.33.3-0.20220601044734-8c3b8ab96f3e/go.mod h1:sF9VfTkwRXYNk/gCR7ICd79VDC8WcsyVq37/sb8sV5A=
+github.com/pulumi/pulumi/sdk/v3 v3.35.3 h1:rGW71RQelwaMqgl6WtjYgdmRgiP7qNV1iMZ+6GvG9gs=
+github.com/pulumi/pulumi/sdk/v3 v3.35.3/go.mod h1:e1xuPnh9aKzCesrFf96DEzcybLdRWRMhKeKVBmb2lm0=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rjeczalik/notify v0.9.2 h1:MiTWrPj55mNDHEiIX5YUSKefw/+lCQVoAFmD6oQm5w8=
