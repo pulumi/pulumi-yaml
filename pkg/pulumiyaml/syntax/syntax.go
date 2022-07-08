@@ -15,3 +15,11 @@ type noSyntax int
 func (noSyntax) Range() *hcl.Range {
 	return nil
 }
+
+type Trivia interface {
+	Syntax
+
+	HeadComment() string
+	LineComment() string
+	FootComment() string
+}
