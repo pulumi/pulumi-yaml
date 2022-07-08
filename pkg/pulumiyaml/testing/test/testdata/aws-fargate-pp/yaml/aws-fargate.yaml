@@ -1,4 +1,5 @@
 resources:
+  # Create a security group that permits HTTP ingress and unrestricted egress.
   webSecurityGroup:
     type: aws:ec2:SecurityGroup
     properties:
@@ -15,8 +16,10 @@ resources:
           toPort: 80
           cidrBlocks:
             - 0.0.0.0/0
+  # Create an ECS cluster to run a container-based service.
   cluster:
     type: aws:ecs:Cluster
+  # Create an IAM role that can be used by our service's task.
   taskExecRole:
     type: aws:iam:Role
     properties:
@@ -34,6 +37,7 @@ resources:
     properties:
       role: ${taskExecRole.name}
       policyArn: arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  # Create a load balancer to listen for HTTP traffic on port 80.
   webLoadBalancer:
     type: aws:elasticloadbalancingv2:LoadBalancer
     properties:
@@ -55,6 +59,7 @@ resources:
       defaultActions:
         - type: forward
           targetGroupArn: ${webTargetGroup.arn}
+  # Spin up a load balanced service running NGINX
   appTask:
     type: aws:ecs:TaskDefinition
     properties:
@@ -93,6 +98,7 @@ resources:
       dependson:
         - ${webListener}
 variables:
+  # Read the default VPC and public subnets, which we will use.
   vpc:
     Fn::Invoke:
       Function: aws:ec2:getVpc
@@ -104,4 +110,5 @@ variables:
       Arguments:
         vpcId: ${vpc.id}
 outputs:
+  # Export the resulting web address.
   url: ${webLoadBalancer.dnsName}
