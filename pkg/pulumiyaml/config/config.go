@@ -80,8 +80,9 @@ func (c Types) String() string {
 }
 
 func Parse(s string) (Type, bool) {
-	if strings.HasPrefix(s, "List<") && strings.HasSuffix(s, ">") {
-		innerString := strings.TrimSuffix(strings.TrimPrefix(s, "List<"), ">")
+	s = strings.ToLower(s)
+	if strings.HasPrefix(s, "list<") && strings.HasSuffix(s, ">") {
+		innerString := strings.TrimSuffix(strings.TrimPrefix(s, "list<"), ">")
 		inner, ok := Parse(strings.TrimSpace(innerString))
 		if !ok {
 			return nil, false
@@ -90,11 +91,11 @@ func Parse(s string) (Type, bool) {
 	}
 
 	switch s {
-	case "String":
+	case "string":
 		return String, true
-	case "Boolean":
+	case "boolean":
 		return Boolean, true
-	case "Number":
+	case "number":
 		return Number, true
 	default:
 		return nil, false
