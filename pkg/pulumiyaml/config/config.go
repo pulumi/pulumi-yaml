@@ -91,11 +91,11 @@ func Parse(s string) (Type, bool) {
 	}
 
 	switch s {
-	case "String", "string":
+	case "string":
 		return String, true
-	case "Boolean", "boolean":
+	case "boolean":
 		return Boolean, true
-	case "Number", "number":
+	case "number":
 		return Number, true
 	default:
 		return nil, false
