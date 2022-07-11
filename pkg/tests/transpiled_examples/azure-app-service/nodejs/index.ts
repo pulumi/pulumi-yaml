@@ -75,7 +75,7 @@ const app = new azure_native.web.WebApp("app", {
         appSettings: [
             {
                 name: "WEBSITE_RUN_FROM_PACKAGE",
-                value: pulumi.interpolate`https://${sa.name}.blob.core.windows.net/${container.name}/${blob.name}?${blobAccessToken}`,
+                value: pulumi.all([sa.name, container.name, blob.name, blobAccessToken]).apply(([saName, containerName, blobName, blobAccessToken]) => `https://${saName}.blob.core.windows.net/${containerName}/${blobName}?${blobAccessToken}`),
             },
             {
                 name: "APPINSIGHTS_INSTRUMENTATIONKEY",
