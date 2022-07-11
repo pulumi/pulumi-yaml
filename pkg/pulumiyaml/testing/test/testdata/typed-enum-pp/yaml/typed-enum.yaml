@@ -4,6 +4,7 @@ resources:
     properties:
       resourceGroupName: ${someString}
       accountName: ${someString}
+  # Safe enum
   faviconpng:
     type: azure-native:storage:Blob
     properties:
@@ -11,6 +12,7 @@ resources:
       accountName: ${someString}
       containerName: ${someString}
       type: Block
+  # Output umsafe enum
   _404html:
     type: azure-native:storage:Blob
     properties:
@@ -18,6 +20,7 @@ resources:
       accountName: ${someString}
       containerName: ${someString}
       type: ${staticwebsite.indexDocument}
+  # Unsafe enum
   another:
     type: azure-native:storage:Blob
     properties:

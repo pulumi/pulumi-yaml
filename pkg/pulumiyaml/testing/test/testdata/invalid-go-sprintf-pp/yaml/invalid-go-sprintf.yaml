@@ -1,4 +1,5 @@
 resources:
+  # example
   argocd_serverDeployment:
     type: kubernetes:apps/v1:Deployment
     properties:

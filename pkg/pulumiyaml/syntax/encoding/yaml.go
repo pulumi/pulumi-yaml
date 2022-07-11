@@ -171,15 +171,20 @@ func UnmarshalYAML(filename string, n *yaml.Node, tags TagDecoder) (syntax.Node,
 func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 	var yamlNode yaml.Node
 	var originalValue interface{}
-	if original, ok := n.Syntax().(YAMLSyntax); ok {
-		yamlNode.Tag = original.Tag
-		yamlNode.Value = original.Value
-		yamlNode.Style = original.Style
-		yamlNode.HeadComment = original.HeadComment
-		yamlNode.LineComment = original.LineComment
-		yamlNode.FootComment = original.FootComment
+	switch s := n.Syntax().(type) {
+	case YAMLSyntax:
+		yamlNode.Tag = s.Tag
+		yamlNode.Value = s.Value
+		yamlNode.Style = s.Style
+		yamlNode.HeadComment = s.HeadComment
+		yamlNode.LineComment = s.LineComment
+		yamlNode.FootComment = s.FootComment
 
-		originalValue = original.value
+		originalValue = s.value
+	case syntax.Trivia:
+		yamlNode.HeadComment = s.HeadComment()
+		yamlNode.LineComment = s.LineComment()
+		yamlNode.FootComment = s.FootComment()
 	}
 
 	stringNode := func(value string) {
