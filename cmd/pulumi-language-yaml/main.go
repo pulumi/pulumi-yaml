@@ -51,16 +51,9 @@ func main() {
 	var engineAddress string
 	if len(args) > 0 {
 		engineAddress = args[0]
+		var err error
+		cancelChannel, err = setupHealthChecks(engineAddress)
 
-		// If we have a host cancel our cancellation context if it fails the healthcheck
-		ctx, cancel := context.WithCancel(context.Background())
-		// map the context Done channel to the rpcutil boolean cancel channel
-		cancelChannel = make(chan bool)
-		go func() {
-			<-ctx.Done()
-			close(cancelChannel)
-		}()
-		err := rpcutil.Healthcheck(ctx, engineAddress, 5*time.Minute, cancel)
 		if err != nil {
 			cmdutil.Exit(errors.Wrapf(err, "could not start health check host RPC server"))
 		}
@@ -85,4 +78,22 @@ func main() {
 	if err := <-done; err != nil {
 		cmdutil.Exit(errors.Wrapf(err, "language host RPC stopped serving"))
 	}
+}
+
+func setupHealthChecks(engineAddress string) (chan bool, error) {
+	// If we have a host cancel our cancellation context if it fails the healthcheck
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// map the context Done channel to the rpcutil boolean cancel channel
+	cancelChannel := make(chan bool)
+	go func() {
+		<-ctx.Done()
+		close(cancelChannel)
+	}()
+	err := rpcutil.Healthcheck(ctx, engineAddress, 5*time.Minute, cancel)
+
+	if err != nil {
+		return nil, err
+	}
+	return cancelChannel, nil
 }
