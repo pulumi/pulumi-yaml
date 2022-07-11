@@ -17,8 +17,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
@@ -40,6 +42,7 @@ func main() {
 	flag.StringVar(&root, "root", "", "Root of the program execution")
 	flag.StringVar(&compiler, "compiler", "", "Compiler to use to pre-process YAML")
 	flag.Parse()
+	var cancelChannel chan bool
 	args := flag.Args()
 	logging.InitLogging(false, 0, false)
 	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
@@ -48,10 +51,16 @@ func main() {
 	var engineAddress string
 	if len(args) > 0 {
 		engineAddress = args[0]
+		var err error
+		cancelChannel, err = setupHealthChecks(engineAddress)
+
+		if err != nil {
+			cmdutil.Exit(errors.Wrapf(err, "could not start health check host RPC server"))
+		}
 	}
 
 	// Fire up a gRPC server, letting the kernel choose a free port.
-	port, done, err := rpcutil.Serve(0, nil, []func(*grpc.Server) error{
+	port, done, err := rpcutil.Serve(0, cancelChannel, []func(*grpc.Server) error{
 		func(srv *grpc.Server) error {
 			host := server.NewLanguageHost(engineAddress, tracing, compiler)
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
@@ -69,4 +78,22 @@ func main() {
 	if err := <-done; err != nil {
 		cmdutil.Exit(errors.Wrapf(err, "language host RPC stopped serving"))
 	}
+}
+
+func setupHealthChecks(engineAddress string) (chan bool, error) {
+	// If we have a host cancel our cancellation context if it fails the healthcheck
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// map the context Done channel to the rpcutil boolean cancel channel
+	cancelChannel := make(chan bool)
+	go func() {
+		<-ctx.Done()
+		close(cancelChannel)
+	}()
+	err := rpcutil.Healthcheck(ctx, engineAddress, 5*time.Minute, cancel)
+
+	if err != nil {
+		return nil, err
+	}
+	return cancelChannel, nil
 }
