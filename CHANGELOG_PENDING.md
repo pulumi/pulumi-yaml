@@ -9,6 +9,9 @@
 - Move Pulumi YAML specification to the [Pulumi
   documentation](https://www.pulumi.com/docs/reference/yaml). [#261](https://github.com/pulumi/pulumi-yaml/pull/261)
 
+- Show all error/ warning messages
+  [#279](https://github.com/pulumi/pulumi-yaml/pull/279)
+
 ### Bug Fixes
 
 - Warn when using the reserved prefix `Fn::` as a map key.
