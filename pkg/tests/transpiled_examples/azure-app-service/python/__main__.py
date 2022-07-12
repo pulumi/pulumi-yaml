@@ -17,7 +17,7 @@ container = azure_native.storage.BlobContainer("container",
     resource_group_name=appservicegroup.name,
     account_name=sa.name,
     public_access=azure_native.storage.PublicAccess.NONE)
-blob_access_token = pulumi.Output.all(sa.name, appservicegroup.name, sa.name, container.name).apply(lambda saName, appservicegroupName, saName1, containerName: azure_native.storage.list_storage_account_service_sas_output(account_name=sa_name,
+blob_access_token = pulumi.secret(pulumi.Output.all(sa.name, appservicegroup.name, sa.name, container.name).apply(lambda saName, appservicegroupName, saName1, containerName: azure_native.storage.list_storage_account_service_sas_output(account_name=sa_name,
     protocols=azure_native.storage.HttpProtocol.HTTPS,
     shared_access_start_time="2022-01-01",
     shared_access_expiry_time="2030-01-01",
@@ -28,7 +28,7 @@ blob_access_token = pulumi.Output.all(sa.name, appservicegroup.name, sa.name, co
     content_type="application/json",
     cache_control="max-age=5",
     content_disposition="inline",
-    content_encoding="deflate")).apply(lambda invoke: invoke.service_sas_token)
+    content_encoding="deflate")).apply(lambda invoke: invoke.service_sas_token))
 appserviceplan = azure_native.web.AppServicePlan("appserviceplan",
     resource_group_name=appservicegroup.name,
     kind="App",
@@ -67,7 +67,7 @@ app = azure_native.web.WebApp("app",
         app_settings=[
             azure_native.web.NameValuePairArgs(
                 name="WEBSITE_RUN_FROM_PACKAGE",
-                value=pulumi.Output.all(sa.name, container.name, blob.name).apply(lambda saName, containerName, blobName: f"https://{sa_name}.blob.core.windows.net/{container_name}/{blob_name}?{blob_access_token}"),
+                value=pulumi.Output.all(sa.name, container.name, blob.name, blob_access_token).apply(lambda saName, containerName, blobName, blob_access_token: f"https://{sa_name}.blob.core.windows.net/{container_name}/{blob_name}?{blob_access_token}"),
             ),
             azure_native.web.NameValuePairArgs(
                 name="APPINSIGHTS_INSTRUMENTATIONKEY",

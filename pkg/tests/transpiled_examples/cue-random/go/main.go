@@ -12,7 +12,7 @@ func main() {
 		randomPassword, err := random.NewRandomPassword(ctx, "randomPassword", &random.RandomPasswordArgs{
 			Length:          pulumi.Int(16),
 			Special:         pulumi.Bool(true),
-			OverrideSpecial: pulumi.String(fmt.Sprintf("%v%v%v", "_", "%", "@")),
+			OverrideSpecial: pulumi.String(fmt.Sprintf("_%v@", "%")),
 		})
 		if err != nil {
 			return err

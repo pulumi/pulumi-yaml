@@ -66,7 +66,7 @@ func newPluginLoader() schema.Loader {
 	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
 		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
 			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
-		})
+		}, deploytest.WithPath(schemaLoadPath))
 	}
 	var pluginLoaders []*deploytest.PluginLoader
 	for _, p := range defaultPlugins {

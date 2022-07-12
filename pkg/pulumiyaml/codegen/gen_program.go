@@ -16,15 +16,16 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
-
 	enc "github.com/pulumi/pulumi/sdk/v3/go/common/encoding"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
+
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	syn "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
 
 // Generate a serializable YAML template.
@@ -230,7 +231,8 @@ func (g *generator) genResource(n *pcl.Resource) {
 			value = f.Args[0]
 		}
 		v := g.expr(value)
-		properties[i] = syn.ObjectProperty(syn.String(input.Name), v)
+		properties[i] = syn.ObjectProperty(
+			syn.StringSyntax(trivia(input), input.Name), v)
 	}
 	if n.Schema == nil {
 		g.missingSchema()
@@ -247,11 +249,12 @@ func (g *generator) genResource(n *pcl.Resource) {
 	}
 	r := syn.Object(entries...)
 
-	g.resources = append(g.resources, syn.ObjectProperty(syn.String(n.LogicalName()), r))
+	g.resources = append(g.resources, syn.ObjectProperty(
+		syn.StringSyntax(trivia(n.Definition), n.LogicalName()), r))
 }
 
 func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
-	k := syn.String(n.LogicalName())
+	k := syn.StringSyntax(trivia(n.Definition), n.LogicalName())
 	v := g.expr(n.Value)
 	g.outputs = append(g.outputs, syn.ObjectProperty(k, v))
 }
@@ -628,13 +631,13 @@ func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
 		entries = append(entries, prop)
 	}
 
-	k := syn.String(n.Name())
+	k := syn.StringSyntax(trivia(n.Definition), n.Name())
 	v := syn.Object(entries...)
 	g.config = append(g.config, syn.ObjectProperty(k, v))
 }
 
 func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
-	k := syn.String(n.Name())
+	k := syn.StringSyntax(trivia(n.Definition), n.Name())
 	v := g.expr(n.Definition.Value)
 	entry := syn.ObjectProperty(k, v)
 	g.variables = append(g.variables, entry)
@@ -772,4 +775,16 @@ func collapseToken(token string) string {
 	}
 
 	return strings.Join(tokenParts, ":")
+}
+
+type HasTrivia interface {
+	GetLeadingTrivia() syntax.TriviaList
+	GetTrailingTrivia() syntax.TriviaList
+}
+
+func trivia(s HasTrivia) BlockSyntax {
+	return BlockSyntax{
+		Leading:  s.GetLeadingTrivia(),
+		Trailing: s.GetTrailingTrivia(),
+	}
 }
