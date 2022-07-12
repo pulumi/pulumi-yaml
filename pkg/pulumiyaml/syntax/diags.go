@@ -30,9 +30,6 @@ func (d Diagnostic) HCL() *hcl.Diagnostic {
 
 // Warning creates a new warning-level diagnostic from the given subject, summary, and detail.
 func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
-	if detail == "" {
-		detail = summary
-	}
 	return &Diagnostic{
 		Diagnostic: hcl.Diagnostic{
 			Severity: hcl.DiagWarning,
@@ -45,9 +42,6 @@ func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
 
 // Error creates a new error-level diagnostic from the given subject, summary, and detail.
 func Error(rng *hcl.Range, summary, detail string) *Diagnostic {
-	if detail == "" {
-		detail = summary
-	}
 	return &Diagnostic{
 		Diagnostic: hcl.Diagnostic{Severity: hcl.DiagError, Subject: rng, Summary: summary, Detail: detail},
 	}
