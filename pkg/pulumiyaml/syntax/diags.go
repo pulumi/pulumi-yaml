@@ -4,6 +4,8 @@ package syntax
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 )
@@ -82,7 +84,19 @@ func (d Diagnostics) Error() string {
 	case 1:
 		return d[0].Error()
 	default:
-		return fmt.Sprintf("%s, and %d other diagnostic(s)", d[0].Error(), len(d)-1)
+		sort.Slice(d, func(i, j int) bool {
+			return d[i].Severity < d[j].Severity
+		})
+		var sb strings.Builder
+		for _, diag := range d {
+			if diag.Severity == hcl.DiagError {
+				sb.WriteString("\n-error: ")
+			} else {
+				sb.WriteString("\n-warning: ")
+			}
+			sb.WriteString(fmt.Sprintf("%s", diag.Error()))
+		}
+		return sb.String()
 	}
 }
 
