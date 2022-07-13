@@ -97,8 +97,6 @@ resources:
   on <stdin> line 9:
    1: name: test-yaml
 
-list index 1 out-of-bounds for list of length 1
-
 `
 
 	assert.Equal(t, richError, log.errorMessages[0])
