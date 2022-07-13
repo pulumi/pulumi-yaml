@@ -402,24 +402,29 @@ type InvokeExpr struct {
 
 	Token    *StringExpr
 	CallArgs *ObjectExpr
+	CallOpts *ObjectExpr
 	Return   *StringExpr
 }
 
-func InvokeSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, token *StringExpr, callArgs *ObjectExpr, ret *StringExpr) *InvokeExpr {
+func InvokeSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, token *StringExpr, callArgs *ObjectExpr, callOpts *ObjectExpr, ret *StringExpr) *InvokeExpr {
 	return &InvokeExpr{
 		builtinNode: builtin(node, name, args),
 		Token:       token,
 		CallArgs:    callArgs,
+		CallOpts:    callOpts,
 		Return:      ret,
 	}
 }
 
-func Invoke(token string, callArgs *ObjectExpr, ret string) *InvokeExpr {
+func Invoke(token string, callArgs *ObjectExpr, callOpts *ObjectExpr, ret string) *InvokeExpr {
 	name, tok, retX := String("Fn::Invoke"), String(token), String(ret)
 
 	entries := []ObjectProperty{{Key: String("Function"), Value: tok}}
 	if callArgs != nil {
 		entries = append(entries, ObjectProperty{Key: String("Arguments"), Value: callArgs})
+	}
+	if callOpts != nil {
+		entries = append(entries, ObjectProperty{Key: String("Options"), Value: callOpts})
 	}
 	entries = append(entries, ObjectProperty{Key: String("Return"), Value: retX})
 
@@ -427,6 +432,7 @@ func Invoke(token string, callArgs *ObjectExpr, ret string) *InvokeExpr {
 		builtinNode: builtin(nil, name, Object(entries...)),
 		Token:       tok,
 		CallArgs:    callArgs,
+		CallOpts:    callOpts,
 		Return:      retX,
 	}
 }
@@ -773,7 +779,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', and 'Return'", "")}
 	}
 
-	var functionExpr, argumentsExpr, returnExpr Expr
+	var functionExpr, argumentsExpr, optionsExpr, returnExpr Expr
 	for i := 0; i < len(obj.Entries); i++ {
 		kvp := obj.Entries[i]
 		if str, ok := kvp.Key.(*StringExpr); ok {
@@ -782,6 +788,8 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 				functionExpr = kvp.Value
 			case "Arguments":
 				argumentsExpr = kvp.Value
+			case "Options":
+				optionsExpr = kvp.Value
 			case "Return":
 				returnExpr = kvp.Value
 			}
@@ -804,6 +812,11 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 		diags.Extend(ExprError(argumentsExpr, "function arguments ('Arguments') must be an object", ""))
 	}
 
+	options, ok := optionsExpr.(*ObjectExpr)
+	if !ok && optionsExpr != nil {
+		diags.Extend(ExprError(argumentsExpr, "function options ('Options') must be an object", ""))
+	}
+
 	ret, ok := returnExpr.(*StringExpr)
 	if !ok && returnExpr != nil {
 		diags.Extend(ExprError(returnExpr, "return directive must be a string literal", ""))
@@ -813,7 +826,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 		return nil, diags
 	}
 
-	return InvokeSyntax(node, name, obj, function, arguments, ret), diags
+	return InvokeSyntax(node, name, obj, function, arguments, options, ret), diags
 }
 
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
