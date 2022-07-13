@@ -776,7 +776,7 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	obj, ok := args.(*ObjectExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', and 'Return'", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', 'Options', and 'Return'", "")}
 	}
 
 	var functionExpr, argumentsExpr, optionsExpr, returnExpr Expr
