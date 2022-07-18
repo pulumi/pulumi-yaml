@@ -94,8 +94,7 @@ outputs:
   foo: ${pulumi.bar}
 `,
 			diagErrors: []string{"invalid pulumi variable.yaml:3,8-21: " +
-				"Unknown property of the `pulumi` variable: 'bar'; " +
-				"Unknown property of the `pulumi` variable: 'bar'"},
+				"Unknown property of the `pulumi` variable: 'bar'; "},
 		},
 		{
 			name: "interpolate pulumi variable",

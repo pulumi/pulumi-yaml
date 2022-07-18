@@ -4,6 +4,8 @@ package syntax
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 )
@@ -28,9 +30,6 @@ func (d Diagnostic) HCL() *hcl.Diagnostic {
 
 // Warning creates a new warning-level diagnostic from the given subject, summary, and detail.
 func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
-	if detail == "" {
-		detail = summary
-	}
 	return &Diagnostic{
 		Diagnostic: hcl.Diagnostic{
 			Severity: hcl.DiagWarning,
@@ -43,9 +42,6 @@ func Warning(rng *hcl.Range, summary, detail string) *Diagnostic {
 
 // Error creates a new error-level diagnostic from the given subject, summary, and detail.
 func Error(rng *hcl.Range, summary, detail string) *Diagnostic {
-	if detail == "" {
-		detail = summary
-	}
 	return &Diagnostic{
 		Diagnostic: hcl.Diagnostic{Severity: hcl.DiagError, Subject: rng, Summary: summary, Detail: detail},
 	}
@@ -82,7 +78,19 @@ func (d Diagnostics) Error() string {
 	case 1:
 		return d[0].Error()
 	default:
-		return fmt.Sprintf("%s, and %d other diagnostic(s)", d[0].Error(), len(d)-1)
+		sort.Slice(d, func(i, j int) bool {
+			return d[i].Severity < d[j].Severity
+		})
+		var sb strings.Builder
+		for _, diag := range d {
+			if diag.Severity == hcl.DiagError {
+				sb.WriteString("\n-error: ")
+			} else {
+				sb.WriteString("\n-warning: ")
+			}
+			sb.WriteString(fmt.Sprintf("%s", diag.Error()))
+		}
+		return sb.String()
 	}
 }
 
