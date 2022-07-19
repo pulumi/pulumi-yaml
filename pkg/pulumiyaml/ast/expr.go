@@ -778,7 +778,9 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	}
 
 	var functionExpr, argumentsExpr, returnExpr Expr
+	var diags syntax.Diagnostics
 	opts := InvokeOptionsDecl{}
+
 	for i := 0; i < len(obj.Entries); i++ {
 		kvp := obj.Entries[i]
 		if str, ok := kvp.Key.(*StringExpr); ok {
@@ -788,14 +790,15 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 			case "Arguments":
 				argumentsExpr = kvp.Value
 			case "Options":
-				parseRecord("invokeOptions", &opts, kvp.syntax.Value, true)
+				diags = parseRecord("invokeOptions", &opts, kvp.syntax.Value, true)
+				if diags.HasErrors() {
+					return nil, diags
+				}
 			case "Return":
 				returnExpr = kvp.Value
 			}
 		}
 	}
-
-	var diags syntax.Diagnostics
 
 	function, ok := functionExpr.(*StringExpr)
 	if !ok {
