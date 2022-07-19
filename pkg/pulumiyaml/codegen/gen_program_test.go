@@ -24,7 +24,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
+var defaultPlugins = []pulumiyaml.Plugin{
 	{Package: "aws", Version: "5.4.0"},
 	{Package: "azure-native", Version: "1.56.0"},
 	{Package: "azure", Version: "4.18.0"},
@@ -76,7 +76,7 @@ func newPluginLoader() schema.Loader {
 	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
 }
 
-var rootPluginLoader schema.Loader = newPluginLoader()
+var rootPluginLoader = newPluginLoader()
 
 // We stub out the real plugin hosting architecture for a fake that gives us reasonably good
 // results without the time and compute
