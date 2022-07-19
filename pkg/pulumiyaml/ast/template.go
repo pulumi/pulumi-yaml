@@ -340,6 +340,23 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 		version, pluginDownloadURL, replaceOnChanges, retainOnDelete)
 }
 
+type InvokeOptionsDecl struct {
+	declNode
+
+	Parent            Expr
+	Provider          Expr
+	Version           *StringExpr
+	PluginDownloadURL *StringExpr
+}
+
+func (d *InvokeOptionsDecl) defaultValue() interface{} {
+	return &InvokeOptionsDecl{}
+}
+
+func (d *InvokeOptionsDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
 type ResourceDecl struct {
 	declNode
 
