@@ -344,7 +344,7 @@ type InvokeOptionsDecl struct {
 	declNode
 
 	Parent            Expr
-	Provider          Expr
+	Providers         Expr
 	Version           *StringExpr
 	PluginDownloadURL *StringExpr
 }
