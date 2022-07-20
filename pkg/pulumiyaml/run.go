@@ -922,7 +922,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		props[k] = v
 	}
 
-	isRead := v.Get.Id.GetValue() != ""
+	isRead := v.Get.Id != nil
 	if isRead {
 		contract.Assertf(len(props) == 0, "Failed to check that Properties cannot be specified with Get.State")
 		p, isPoison := readIntoProperties(v.Get.State)
@@ -935,8 +935,20 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if isComponent {
 		err = ctx.ctx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
 	} else if isRead {
-		id := pulumi.ID(v.Get.Id.GetValue())
-		err = ctx.ctx.ReadResource(string(typ), k, id, untypedArgs(props), res.(pulumi.CustomResource), opts...)
+		s, ok := ctx.evaluateExpr(v.Get.Id)
+		if !ok {
+			ctx.error(v.Get.Id, "unable to evaluate get.id")
+			return nil, false
+		}
+		if p, ok := s.(poisonMarker); ok {
+			return p, true
+		}
+		id, ok := s.(string)
+		if !ok {
+			ctx.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
+			return nil, false
+		}
+		err = ctx.ctx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
 		err = ctx.ctx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 	}
