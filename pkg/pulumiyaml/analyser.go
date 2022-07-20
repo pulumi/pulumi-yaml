@@ -451,7 +451,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
-				"Get is used to decribe a resource managed outside of the pulumi stack.\n"+
+				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
 				"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
 		))
 	}

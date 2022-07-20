@@ -342,8 +342,8 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 
 type GetResourceDecl struct {
 	declNode
-
-	Id    Expr
+	// We need to call the field Id instead of ID because we want the derived user field to be id instead of iD
+	Id    Expr //nolint:revive
 	State PropertyMapDecl
 }
 
