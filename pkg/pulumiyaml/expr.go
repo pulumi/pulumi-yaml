@@ -59,8 +59,6 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		name := x.Property.RootName()
 		sx := ast.StringSyntax(syntax.StringSyntax(x.Syntax().Syntax(), name))
 		*deps = append(*deps, sx)
-	case ast.BuiltinExpr:
-		getExpressionDependencies(deps, x.Args())
 	case *ast.InvokeExpr:
 		if x.CallOpts.Parent != nil {
 			getExpressionDependencies(deps, x.CallOpts.Parent)
@@ -68,5 +66,7 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		if x.CallOpts.Providers != nil {
 			getExpressionDependencies(deps, x.CallOpts.Providers)
 		}
+	case ast.BuiltinExpr:
+		getExpressionDependencies(deps, x.Args())
 	}
 }
