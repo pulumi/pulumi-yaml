@@ -25,6 +25,9 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 	if r.Options.Providers != nil {
 		getExpressionDependencies(&deps, r.Options.Providers)
 	}
+	if r.Get.Id != nil {
+		getExpressionDependencies(&deps, r.Get.Id)
+	}
 	return deps
 }
 

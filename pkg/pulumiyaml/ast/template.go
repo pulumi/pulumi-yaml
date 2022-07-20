@@ -343,7 +343,7 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 type GetResourceDecl struct {
 	declNode
 
-	Id    *StringExpr
+	Id    Expr
 	State PropertyMapDecl
 }
 

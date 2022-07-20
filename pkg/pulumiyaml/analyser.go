@@ -447,6 +447,58 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 	tc.registerResource(k, node.Value, hint)
 
+	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
+		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+			"Resource fields properties and get are mutually exclusive",
+			"Properties is used to describe a resource managed by Pulumi.\n"+
+				"Get is used to decribe a resource managed outside of the pulumi stack.\n"+
+				"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
+		))
+	}
+
+	if existing, ok := tc.exprs[v.Get.Id]; ok && v.Get.Id != nil {
+		assertTypeAssignable(ctx, v.Get.Id.Syntax().Syntax().Range(), existing, schema.StringType)
+	}
+
+	stateProperties := map[string]*schema.Property{}
+	for _, prop := range hint.Resource.Properties {
+		stateProperties[prop.Name] = prop
+	}
+	statePropNames := []string{}
+	for _, prop := range hint.Resource.Properties {
+		statePropNames = append(statePropNames, prop.Name)
+	}
+	fmtr = yamldiags.NonExistantFieldFormatter{
+		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
+		Fields:              statePropNames,
+		MaxElements:         5,
+		FieldsAreProperties: true,
+	}
+	// TODO: factor out type checking a property list against it's schema equivalent
+	for _, kvp := range v.Get.State.Entries {
+		if typ, hasField := stateProperties[kvp.Key.Value]; !hasField {
+			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
+			subject := kvp.Key.Syntax().Syntax().Range()
+			valueRange := kvp.Value.Syntax().Syntax().Range()
+			context := hcl.RangeOver(*subject, *valueRange)
+			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
+		} else {
+			existing, ok := tc.exprs[kvp.Value]
+			rng := kvp.Key.Syntax().Syntax().Range()
+			if !ok {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: untyped input for %s.%s", k, kvp.Key.Value),
+					fmt.Sprintf("expected type %s", typ.Type)))
+			} else if typ.Type == nil {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", k, kvp.Key.Value),
+					fmt.Sprintf("got type %s", existing)))
+			} else {
+				assertTypeAssignable(ctx, rng, existing, typ.Type)
+			}
+		}
+	}
+
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
 	allOptions := make([]string, 0, len(options))
@@ -1033,15 +1085,13 @@ func (e walker) EvalResource(r *runner, node resourceNode) bool {
 		if !e.walk(ctx, v.Type) {
 			return false
 		}
-		for _, prop := range v.Properties.Entries {
-			if !e.walk(ctx, prop.Key) {
-				return false
-			}
-			if !e.walk(ctx, prop.Value) {
-				return false
-			}
+		if !e.walkPropertyMap(ctx, v.Properties) {
+			return false
 		}
 		if !e.walkResourceOptions(ctx, v.Options) {
+			return false
+		}
+		if !e.walkGetResoure(ctx, v.Get) {
 			return false
 		}
 	}
@@ -1052,6 +1102,25 @@ func (e walker) EvalResource(r *runner, node resourceNode) bool {
 		}
 	}
 	return true
+}
+
+func (e walker) walkPropertyMap(ctx *evalContext, m ast.PropertyMapDecl) bool {
+	for _, prop := range m.Entries {
+		if !e.walk(ctx, prop.Key) {
+			return false
+		}
+		if !e.walk(ctx, prop.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e walker) walkGetResoure(ctx *evalContext, get ast.GetResourceDecl) bool {
+	if !e.walk(ctx, get.Id) {
+		return false
+	}
+	return e.walkPropertyMap(ctx, get.State)
 }
 
 func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDecl) bool {
