@@ -63,7 +63,7 @@ resources:
           Arguments:
             quux: ${res-a.out}
           Options:
-            Provider: ${provider-a}
+            Providers: ${provider-a}
           Return: retval
 `
 
