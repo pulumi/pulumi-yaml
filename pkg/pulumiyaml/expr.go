@@ -61,6 +61,12 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		*deps = append(*deps, sx)
 	case ast.BuiltinExpr:
 		getExpressionDependencies(deps, x.Args())
-
+	case *ast.InvokeExpr:
+		if x.CallOpts.Parent != nil {
+			getExpressionDependencies(deps, x.CallOpts.Parent)
+		}
+		if x.CallOpts.Providers != nil {
+			getExpressionDependencies(deps, x.CallOpts.Providers)
+		}
 	}
 }
