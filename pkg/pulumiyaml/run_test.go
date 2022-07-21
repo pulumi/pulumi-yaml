@@ -1720,3 +1720,31 @@ variables:
 			"<stdin>:4:10: Property access expressions cannot be empty",
 		})
 }
+
+func TestReadResource(t *testing.T) {
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: ${id}
+      state:
+        foo: bar
+variables:
+  id: bucket-123456
+  isRight: ${bucket.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	var wasRun bool
+	diags := testInvokeDiags(t, templ, func(r *runner) {
+		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
+			wasRun = true
+			assert.Equal(t, "yes", s)
+			return s
+		})
+	})
+	assert.True(t, wasRun)
+	assert.Len(t, diags, 0)
+}

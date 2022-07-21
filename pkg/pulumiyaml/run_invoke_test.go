@@ -132,7 +132,20 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
+			if args.ReadRPC != nil {
+				switch args.TypeToken {
+				case "test:read:Resource":
+					assert.Equal(t, "bucket-123456", args.ID)
+					assert.Equal(t, `string_value:"bar"`, args.ReadRPC.Properties.Fields["foo"].String())
+					assert.Len(t, args.ReadRPC.Properties.Fields, 1)
+					return "arn:aws:s3:::" + args.ID, resource.PropertyMap{
+						"tags": resource.NewObjectProperty(resource.PropertyMap{
+							"isRight": resource.NewStringProperty("yes"),
+						}),
+					}, nil
+				}
+				return "", resource.PropertyMap{}, fmt.Errorf("Unexpected read resource type %s", args.TypeToken)
+			}
 			switch args.TypeToken {
 			case testResourceToken:
 				assert.Equal(t, testResourceToken, args.TypeToken)
