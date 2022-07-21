@@ -1722,6 +1722,7 @@ variables:
 }
 
 func TestReadResource(t *testing.T) {
+	t.Parallel()
 	text := `
 name: consumer
 runtime: yaml
