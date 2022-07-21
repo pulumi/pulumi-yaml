@@ -1379,20 +1379,20 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		}
 	}
 
-	if t.CallOpts.Providers != nil {
-		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Providers, "provider")
+	if t.CallOpts.Provider != nil {
+		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
 			}
 			provider := providerOpt.ProviderResource()
 			if provider == nil {
-				ctx.error(t.CallOpts.Providers, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
 			} else {
 				opts = append(opts, pulumi.Provider(provider))
 			}
 		} else {
-			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Providers))
+			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
 
