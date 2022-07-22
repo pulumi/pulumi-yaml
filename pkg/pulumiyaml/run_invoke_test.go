@@ -59,11 +59,11 @@ resources:
     properties:
       foo:
         Fn::Invoke:
-          Function: test:invoke:type
+          Function: test:invoke:type2
           Arguments:
             quux: ${res-a.out}
           Options:
-            Providers: ${provider-a}
+            Provider: ${provider-a}
           Return: retval
 `
 
@@ -149,6 +149,14 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 			t.Logf("Processing call %s.", args.Token)
 			switch args.Token {
 			case "test:invoke:type":
+				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
+					"quux": "tuo",
+				}), args.Args)
+				return resource.PropertyMap{
+					"retval": resource.NewStringProperty("oof"),
+				}, nil
+			case "test:invoke:type2":
+				assert.Equal(t, args.Provider, "urn:pulumi:dev::foo::pulumi:providers:test::provider-a::providerId")
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"quux": "tuo",
 				}), args.Args)
