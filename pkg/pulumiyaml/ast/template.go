@@ -357,30 +357,64 @@ func (d *InvokeOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
+type GetResourceDecl struct {
+	declNode
+	// We need to call the field Id instead of ID because we want the derived user field to be id instead of iD
+	Id    Expr //nolint:revive
+	State PropertyMapDecl
+}
+
+func (d *GetResourceDecl) defaultValue() interface{} {
+	return &GetResourceDecl{}
+}
+
+func (d *GetResourceDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
+func GetResourceSyntax(node *syntax.ObjectNode, id *StringExpr, state PropertyMapDecl) GetResourceDecl {
+	return GetResourceDecl{
+		declNode: decl(node),
+		Id:       id,
+		State:    state,
+	}
+}
+
+func GetResource(id *StringExpr, state PropertyMapDecl) GetResourceDecl {
+	return GetResourceSyntax(nil, id, state)
+}
+
 type ResourceDecl struct {
 	declNode
 
 	Type       *StringExpr
 	Properties PropertyMapDecl
 	Options    ResourceOptionsDecl
+	Get        GetResourceDecl
 }
 
 func (d *ResourceDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
+// The names of exported fields.
+func (*ResourceDecl) Fields() []string {
+	return []string{"type", "properties", "options", "get"}
+}
+
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr,
-	properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
+	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:   decl(node),
 		Type:       typ,
 		Properties: properties,
 		Options:    options,
+		Get:        get,
 	}
 }
 
-func Resource(typ *StringExpr, properties PropertyMapDecl, options ResourceOptionsDecl) *ResourceDecl {
-	return ResourceSyntax(nil, typ, properties, options)
+func Resource(typ *StringExpr, properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
+	return ResourceSyntax(nil, typ, properties, options, get)
 }
 
 type CustomTimeoutsDecl struct {
