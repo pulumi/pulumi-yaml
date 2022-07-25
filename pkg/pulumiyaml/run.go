@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	"gopkg.in/yaml.v3"
@@ -756,15 +757,22 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		overallOk = false
 	}
 
-	for _, kvp := range v.Properties.Entries {
-		vv, ok := ctx.evaluateExpr(kvp.Value)
-		if !ok {
-			overallOk = false
+	readIntoProperties := func(obj ast.PropertyMapDecl) (poisonMarker, bool) {
+		for _, kvp := range obj.Entries {
+			vv, ok := ctx.evaluateExpr(kvp.Value)
+			if !ok {
+				overallOk = false
+			}
+			if p, ok := vv.(poisonMarker); ok {
+				return p, true
+			}
+			props[kvp.Key.Value] = vv
 		}
-		if p, ok := vv.(poisonMarker); ok {
-			return p, true
-		}
-		props[kvp.Key.Value] = vv
+		return poisonMarker{}, false
+	}
+
+	if p, isPoison := readIntoProperties(v.Properties); isPoison {
+		return p, isPoison
 	}
 
 	var opts []pulumi.ResourceOption
@@ -914,9 +922,33 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		props[k] = v
 	}
 
+	isRead := v.Get.Id != nil
+	if isRead {
+		contract.Assertf(len(props) == 0, "Failed to check that Properties cannot be specified with Get.State")
+		p, isPoison := readIntoProperties(v.Get.State)
+		if isPoison {
+			return p, true
+		}
+	}
+
 	// Now register the resulting resource with the engine.
 	if isComponent {
 		err = ctx.ctx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
+	} else if isRead {
+		s, ok := ctx.evaluateExpr(v.Get.Id)
+		if !ok {
+			ctx.error(v.Get.Id, "unable to evaluate get.id")
+			return nil, false
+		}
+		if p, ok := s.(poisonMarker); ok {
+			return p, true
+		}
+		id, ok := s.(string)
+		if !ok {
+			ctx.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
+			return nil, false
+		}
+		err = ctx.ctx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
 		err = ctx.ctx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 	}

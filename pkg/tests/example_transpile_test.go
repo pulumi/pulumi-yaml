@@ -171,7 +171,7 @@ func TestGenerateExamples(t *testing.T) {
 	}
 }
 
-var defaultPlugins []pulumiyaml.Plugin = []pulumiyaml.Plugin{
+var defaultPlugins = []pulumiyaml.Plugin{
 	{Package: "aws", Version: "5.4.0"},
 	{Package: "azure-native", Version: "1.56.0"},
 	{Package: "azure", Version: "4.18.0"},

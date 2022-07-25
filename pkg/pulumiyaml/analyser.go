@@ -407,13 +407,9 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
-	properties := map[string]*schema.Property{}
-	for _, prop := range hint.Resource.InputProperties {
-		properties[prop.Name] = prop
-	}
 	var allProperties []string
-	for k := range properties {
-		allProperties = append(allProperties, k)
+	for _, prop := range hint.Resource.InputProperties {
+		allProperties = append(allProperties, prop.Name)
 	}
 	fmtr := yamldiags.NonExistantFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
@@ -422,30 +418,34 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	for _, kvp := range v.Properties.Entries {
-		if typ, hasField := properties[kvp.Key.Value]; !hasField {
-			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
-			subject := kvp.Key.Syntax().Syntax().Range()
-			valueRange := kvp.Value.Syntax().Syntax().Range()
-			context := hcl.RangeOver(*subject, *valueRange)
-			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
-		} else {
-			existing, ok := tc.exprs[kvp.Value]
-			rng := kvp.Key.Syntax().Syntax().Range()
-			if !ok {
-				ctx.addDiag(syntax.Warning(rng,
-					fmt.Sprintf("internal error: untyped input for %s.%s", k, kvp.Key.Value),
-					fmt.Sprintf("expected type %s", typ.Type)))
-			} else if typ.Type == nil {
-				ctx.addDiag(syntax.Warning(rng,
-					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", k, kvp.Key.Value),
-					fmt.Sprintf("got type %s", existing)))
-			} else {
-				assertTypeAssignable(ctx, rng, existing, typ.Type)
-			}
-		}
-	}
+	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+
 	tc.registerResource(k, node.Value, hint)
+
+	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
+		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+			"Resource fields properties and get are mutually exclusive",
+			"Properties is used to describe a resource managed by Pulumi.\n"+
+				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
+				"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
+		))
+	}
+
+	if existing, ok := tc.exprs[v.Get.Id]; ok && v.Get.Id != nil {
+		assertTypeAssignable(ctx, v.Get.Id.Syntax().Syntax().Range(), existing, schema.StringType)
+	}
+
+	statePropNames := []string{}
+	for _, prop := range hint.Resource.Properties {
+		statePropNames = append(statePropNames, prop.Name)
+	}
+	fmtr = yamldiags.NonExistantFieldFormatter{
+		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
+		Fields:              statePropNames,
+		MaxElements:         5,
+		FieldsAreProperties: true,
+	}
+	tc.typePropertyEntries(ctx, k, fmtr, v.Get.State.Entries, hint.Resource.Properties)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -455,13 +455,14 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 	if s := v.Syntax(); s != nil {
 		if o, ok := s.(*syntax.ObjectNode); ok {
-			validKeys := []string{"type", "properties", "options", "condition", "metadata"}
+			validKeys := append(v.Fields(), "condition", "metadata")
 			fmtr := yamldiags.InvalidFieldBagFormatter{
 				ParentLabel: fmt.Sprintf("Resource %s", typ.String()),
 				MaxListed:   5,
 				Bags: []yamldiags.TypeBag{
 					{Name: "properties", Properties: allProperties},
 					{Name: "options", Properties: allOptions},
+					{Name: "get", Properties: []string{"id", "state"}},
 					{Name: k, Properties: validKeys},
 				},
 				DistanceLimit: 3,
@@ -521,6 +522,36 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 
 	return true
+}
+
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
+	propMap := map[string]*schema.Property{}
+	for _, p := range props {
+		propMap[p.Name] = p
+	}
+	for _, kvp := range entries {
+		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
+			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
+			subject := kvp.Key.Syntax().Syntax().Range()
+			valueRange := kvp.Value.Syntax().Syntax().Range()
+			context := hcl.RangeOver(*subject, *valueRange)
+			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
+		} else {
+			existing, ok := tc.exprs[kvp.Value]
+			rng := kvp.Key.Syntax().Syntax().Range()
+			if !ok {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
+					fmt.Sprintf("expected type %s", typ.Type)))
+			} else if typ.Type == nil {
+				ctx.addDiag(syntax.Warning(rng,
+					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", resourceName, kvp.Key.Value),
+					fmt.Sprintf("got type %s", existing)))
+			} else {
+				assertTypeAssignable(ctx, rng, existing, typ.Type)
+			}
+		}
+	}
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
@@ -1032,15 +1063,13 @@ func (e walker) EvalResource(r *runner, node resourceNode) bool {
 		if !e.walk(ctx, v.Type) {
 			return false
 		}
-		for _, prop := range v.Properties.Entries {
-			if !e.walk(ctx, prop.Key) {
-				return false
-			}
-			if !e.walk(ctx, prop.Value) {
-				return false
-			}
+		if !e.walkPropertyMap(ctx, v.Properties) {
+			return false
 		}
 		if !e.walkResourceOptions(ctx, v.Options) {
+			return false
+		}
+		if !e.walkGetResoure(ctx, v.Get) {
 			return false
 		}
 	}
@@ -1051,6 +1080,25 @@ func (e walker) EvalResource(r *runner, node resourceNode) bool {
 		}
 	}
 	return true
+}
+
+func (e walker) walkPropertyMap(ctx *evalContext, m ast.PropertyMapDecl) bool {
+	for _, prop := range m.Entries {
+		if !e.walk(ctx, prop.Key) {
+			return false
+		}
+		if !e.walk(ctx, prop.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e walker) walkGetResoure(ctx *evalContext, get ast.GetResourceDecl) bool {
+	if !e.walk(ctx, get.Id) {
+		return false
+	}
+	return e.walkPropertyMap(ctx, get.State)
 }
 
 func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDecl) bool {
