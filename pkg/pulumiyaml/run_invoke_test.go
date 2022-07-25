@@ -41,6 +41,37 @@ resources:
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestInvokeWithOptsOutputs(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  provider-a:
+    type: pulumi:providers:test
+  res-b:
+    type: test:resource:type
+    properties:
+      foo:
+        Fn::Invoke:
+          Function: test:invoke:type2
+          Arguments:
+            quux: ${res-a.out}
+          Options:
+            Provider: ${provider-a}
+          Return: retval
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
 func TestInvokeVariable(t *testing.T) {
 	t.Parallel()
 
@@ -124,6 +155,14 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				return resource.PropertyMap{
 					"retval": resource.NewStringProperty("oof"),
 				}, nil
+			case "test:invoke:type2":
+				assert.Equal(t, args.Provider, "urn:pulumi:dev::foo::pulumi:providers:test::provider-a::providerId")
+				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
+					"quux": "tuo",
+				}), args.Args)
+				return resource.PropertyMap{
+					"retval": resource.NewStringProperty("oof"),
+				}, nil
 			case "test:invoke:empty":
 				return nil, nil
 			case "test:invoke:poison":
@@ -147,6 +186,10 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				return "", resource.PropertyMap{}, fmt.Errorf("Unexpected read resource type %s", args.TypeToken)
 			}
 			switch args.TypeToken {
+			case "pulumi:providers:test":
+				return "providerId", resource.PropertyMap{
+					"retval": resource.NewStringProperty("provider-foo"),
+				}, nil
 			case testResourceToken:
 				assert.Equal(t, testResourceToken, args.TypeToken)
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{

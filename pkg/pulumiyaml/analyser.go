@@ -587,6 +587,18 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 			}
 		}
 	}
+	if t.CallOpts.Parent != nil {
+		tc.typeExpr(ctx, t.CallOpts.Parent)
+	}
+	if t.CallOpts.Provider != nil {
+		tc.typeExpr(ctx, t.CallOpts.Provider)
+	}
+	if t.CallOpts.Version != nil {
+		tc.typeExpr(ctx, t.CallOpts.Version)
+	}
+	if t.CallOpts.PluginDownloadURL != nil {
+		tc.typeExpr(ctx, t.CallOpts.PluginDownloadURL)
+	}
 	if t.Return != nil {
 		fields := []string{}
 		var (

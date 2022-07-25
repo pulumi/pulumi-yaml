@@ -1391,6 +1391,43 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		return nil, false
 	}
 
+	var opts []pulumi.InvokeOption
+
+	if t.CallOpts.Version != nil {
+		opts = append(opts, pulumi.Version(t.CallOpts.Version.Value))
+	}
+	if t.CallOpts.PluginDownloadURL != nil {
+		opts = append(opts, pulumi.PluginDownloadURL(t.CallOpts.PluginDownloadURL.Value))
+	}
+	if t.CallOpts.Parent != nil {
+		parentOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Parent, "parent")
+		if ok {
+			if p, ok := parentOpt.(poisonMarker); ok {
+				return p, true
+			}
+			opts = append(opts, pulumi.Parent(parentOpt.CustomResource()))
+		} else {
+			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Parent field: %+v", t.CallOpts.Parent))
+		}
+	}
+
+	if t.CallOpts.Provider != nil {
+		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
+		if ok {
+			if p, ok := providerOpt.(poisonMarker); ok {
+				return p, true
+			}
+			provider := providerOpt.ProviderResource()
+			if provider == nil {
+				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+			} else {
+				opts = append(opts, pulumi.Provider(provider))
+			}
+		} else {
+			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
+		}
+	}
+
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
@@ -1399,7 +1436,7 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 			return ctx.error(t, err.Error())
 		}
 
-		if err := ctx.ctx.Invoke(string(functionName), args[0], &result); err != nil {
+		if err := ctx.ctx.Invoke(string(functionName), args[0], &result, opts...); err != nil {
 			return ctx.error(t, err.Error())
 		}
 

@@ -402,31 +402,35 @@ type InvokeExpr struct {
 
 	Token    *StringExpr
 	CallArgs *ObjectExpr
+	CallOpts InvokeOptionsDecl
 	Return   *StringExpr
 }
 
-func InvokeSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, token *StringExpr, callArgs *ObjectExpr, ret *StringExpr) *InvokeExpr {
+func InvokeSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, token *StringExpr, callArgs *ObjectExpr, callOpts InvokeOptionsDecl, ret *StringExpr) *InvokeExpr {
 	return &InvokeExpr{
 		builtinNode: builtin(node, name, args),
 		Token:       token,
 		CallArgs:    callArgs,
+		CallOpts:    callOpts,
 		Return:      ret,
 	}
 }
 
-func Invoke(token string, callArgs *ObjectExpr, ret string) *InvokeExpr {
+func Invoke(token string, callArgs *ObjectExpr, callOpts InvokeOptionsDecl, ret string) *InvokeExpr {
 	name, tok, retX := String("Fn::Invoke"), String(token), String(ret)
 
 	entries := []ObjectProperty{{Key: String("Function"), Value: tok}}
 	if callArgs != nil {
 		entries = append(entries, ObjectProperty{Key: String("Arguments"), Value: callArgs})
 	}
+
 	entries = append(entries, ObjectProperty{Key: String("Return"), Value: retX})
 
 	return &InvokeExpr{
 		builtinNode: builtin(nil, name, Object(entries...)),
 		Token:       tok,
 		CallArgs:    callArgs,
+		CallOpts:    callOpts,
 		Return:      retX,
 	}
 }
@@ -770,10 +774,13 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	obj, ok := args.(*ObjectExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', and 'Return'", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', 'Options', and 'Return'", "")}
 	}
 
 	var functionExpr, argumentsExpr, returnExpr Expr
+	var diags syntax.Diagnostics
+	opts := InvokeOptionsDecl{}
+
 	for i := 0; i < len(obj.Entries); i++ {
 		kvp := obj.Entries[i]
 		if str, ok := kvp.Key.(*StringExpr); ok {
@@ -782,13 +789,16 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 				functionExpr = kvp.Value
 			case "Arguments":
 				argumentsExpr = kvp.Value
+			case "Options":
+				diags = parseRecord("invokeOptions", &opts, kvp.syntax.Value, true)
+				if diags.HasErrors() {
+					return nil, diags
+				}
 			case "Return":
 				returnExpr = kvp.Value
 			}
 		}
 	}
-
-	var diags syntax.Diagnostics
 
 	function, ok := functionExpr.(*StringExpr)
 	if !ok {
@@ -813,7 +823,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 		return nil, diags
 	}
 
-	return InvokeSyntax(node, name, obj, function, arguments, ret), diags
+	return InvokeSyntax(node, name, obj, function, arguments, opts, ret), diags
 }
 
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

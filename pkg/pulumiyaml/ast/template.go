@@ -340,6 +340,23 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 		version, pluginDownloadURL, replaceOnChanges, retainOnDelete)
 }
 
+type InvokeOptionsDecl struct {
+	declNode
+
+	Parent            Expr
+	Provider          Expr
+	Version           *StringExpr
+	PluginDownloadURL *StringExpr
+}
+
+func (d *InvokeOptionsDecl) defaultValue() interface{} {
+	return &InvokeOptionsDecl{}
+}
+
+func (d *InvokeOptionsDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
 type GetResourceDecl struct {
 	declNode
 	// We need to call the field Id instead of ID because we want the derived user field to be id instead of iD
