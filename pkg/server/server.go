@@ -25,6 +25,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -181,4 +182,14 @@ func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Em
 func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependenciesRequest, server pulumirpc.LanguageRuntime_InstallDependenciesServer) error {
 	// No dependencies to install for YAML
 	return nil
+}
+
+// GetProgramDependencies returns the set of dependencies required by the program.
+func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *pulumirpc.GetProgramDependenciesRequest) (*pulumirpc.GetProgramDependenciesResponse, error) {
+	return &pulumirpc.GetProgramDependenciesResponse{}, nil
+}
+
+// About returns information about the runtime for this language.
+func (host *yamlLanguageHost) About(ctx context.Context, req *emptypb.Empty) (*pulumirpc.AboutResponse, error) {
+	return &pulumirpc.AboutResponse{}, nil
 }
