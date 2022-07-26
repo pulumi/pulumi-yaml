@@ -6,10 +6,11 @@ sharedKey = secret(invoke("azure-native:operationalinsights:getSharedKeys", {
 	resourceGroupName = resourceGroup.name,
 	workspaceName = workspace.name
 }).primarySharedKey)
-adminUsername = invoke("azure-native:containerregistry:listRegistryCredentials", {
+adminRegistryCreds = invoke("azure-native:containerregistry:listRegistryCredentials", {
 	resourceGroupName = resourceGroup.name,
 	registryName = registry.name
-}).username
+})
+adminUsername = adminRegistryCreds.username
 adminPasswords = secret(invoke("azure-native:containerregistry:listRegistryCredentials", {
 	resourceGroupName = resourceGroup.name,
 	registryName = registry.name
@@ -77,7 +78,7 @@ resource containerapp "azure-native:web:ContainerApp" {
 	kubeEnvironmentId = kubeEnv.id
 	configuration = {
 		ingress = {
-			external = true,
+			texternal = true,
 			targetPort = 80
 		},
 		registries = [{

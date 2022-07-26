@@ -16,9 +16,8 @@ variables:
         Return: primarySharedKey
   adminRegistryCreds:
     Fn::azure-native:containerregistry:listRegistryCredentials:
-      Arguments:
-        resourceGroupName: ${resourceGroup.name}
-        registryName: ${registry.name}
+      resourceGroupName: ${resourceGroup.name}
+      registryName: ${registry.name}
   adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
     Fn::Secret:
