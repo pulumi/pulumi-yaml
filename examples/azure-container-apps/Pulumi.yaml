@@ -14,13 +14,12 @@ variables:
           resourceGroupName: ${resourceGroup.name}
           workspaceName: ${workspace.name}
         Return: primarySharedKey
-  adminUsername:
-    Fn::Invoke:
-      Function: azure-native:containerregistry:listRegistryCredentials
+  adminRegistryCreds:
+    Fn::azure-native:containerregistry:listRegistryCredentials:
       Arguments:
         resourceGroupName: ${resourceGroup.name}
         registryName: ${registry.name}
-      Return: username
+  adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
     Fn::Secret:
       Fn::Invoke:
