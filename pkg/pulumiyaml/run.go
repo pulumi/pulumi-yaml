@@ -180,6 +180,16 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	runner := newRunner(ctx, t, loader)
 
+	/*
+
+	// if options.Provider is nil && have Default for that package
+	// construct a expr node and insert
+
+
+	*/
+
+
+
 	_, diags := TypeCheck(runner)
 	if diags.HasErrors() {
 		return diags
@@ -215,6 +225,11 @@ func (d *syncDiags) HasErrors() bool {
 	return d.diags.HasErrors()
 }
 
+type PackageInfo struct {
+	version string
+	pluginDownloadUrl string
+}
+
 type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
@@ -223,6 +238,8 @@ type runner struct {
 	variables map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
+
+	resourcePackageInfo map[lateboundResource]PackageInfo // provider: ${someProviderRes} -> packageinfo
 
 	cwd string
 
@@ -440,6 +457,9 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
+
+		resourcePackageInfo: make(map[lateboundResource]PackageInfo),
+		defaultPackages: make(map[string]lateboundResource),
 	}
 }
 
@@ -840,13 +860,15 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Protect != nil {
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
+	var provider lateboundResource
 	if v.Options.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
+
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
 			}
-			provider := providerOpt.ProviderResource()
+			provider = providerOpt.ProviderResource()
 			if provider == nil {
 				ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
 			} else {
@@ -889,6 +911,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.RetainOnDelete(b.Value))
 	}
 
+	var version string
+	var pluginDownloadUrl string
+
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
 	var state lateboundResource
@@ -899,10 +924,80 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		state = &r
 		res = &r
 		isProvider = true
+
+/*
+
+	eksCluster
+  k8sProvider depends on eksCluster
+	k8sDeployment depends on (implicitly) k8sProvider
+
+*/
+
+
+
+		// ${thisResName} -> state
+
+		/*                      k8sProvider */
+		ctx.resourcePackageInfo[state] = PackageInfo{
+			version: version,
+			pluginDownloadUrl: pluginDownloadUrl,
+		}
 	} else {
 		r := lateboundCustomResourceState{name: k}
 		state = &r
 		res = &r
+
+		/*
+
+
+pulumi_aws==4.0
+pulumi_aws==5.0
+
+resources:
+	awsProv1:
+		type: pu:providers:aws
+		defaultProvider: true
+		options:
+			version: 5.0
+
+	awsProv2
+		type: pu:providers:aws
+		defaultProvider: true
+		options:
+			version: 4.0
+
+  myBucket: # the ID property
+	  type: aws:s3:Bucket # implicitly depends on awsProv1
+		# options:
+		#   provider: ${awsProv1} # issue 293
+
+		#   version: copy our providers .options.version            # issue 122
+		#   pluginDownloadUrl: copy our providers .options.pdUrl  # issue 122
+
+		# options
+  myObj:
+	  type: aws:s3:BucketObject
+		bucket: ${myBucket}
+		options:
+		  provider: ${awsProv1} // make an RPC call to the plugin implementing ${provider} v5.0
+			version: 4.0 # error because prov2 uses 4.0  // this information would be discarded
+			pluginDownloadUrl:
+
+
+		*/
+
+
+
+		// if it is a provider then
+		if provider != nil {
+			providerInfo := ctx.resourcePackageInfo[provider]
+			if providerInfo.version != version || providerInfo.pluginDownloadUrl != pluginDownloadUrl
+
+		} else {
+			if version != "" // ... warn
+		}
+
+
 	}
 
 	if !overallOk || ctx.sdiags.HasErrors() {
