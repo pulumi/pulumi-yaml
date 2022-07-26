@@ -9,4 +9,7 @@
 - Add `Get` to resources, allowing Pulumi YAML programs to read external resources.
   [#290](https://github.com/pulumi/pulumi-yaml/pull/290)
 
+- Add sugar for `Fn::Invoke`
+  [#294](https://github.com/pulumi/pulumi-yaml/pull/294)
+
 ### Bug Fixes
