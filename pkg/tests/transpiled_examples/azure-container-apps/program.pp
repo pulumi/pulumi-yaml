@@ -78,7 +78,7 @@ resource containerapp "azure-native:web:ContainerApp" {
 	kubeEnvironmentId = kubeEnv.id
 	configuration = {
 		ingress = {
-			texternal = true,
+		texternal = true,
 			external = true,
 			targetPort = 80
 		},
