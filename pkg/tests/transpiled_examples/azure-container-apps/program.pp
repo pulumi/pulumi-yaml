@@ -79,6 +79,7 @@ resource containerapp "azure-native:web:ContainerApp" {
 	configuration = {
 		ingress = {
 			texternal = true,
+			external = true,
 			targetPort = 80
 		},
 		registries = [{
