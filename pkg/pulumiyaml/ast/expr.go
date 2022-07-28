@@ -12,7 +12,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
-const fnInvokeRegexPattern = "Fn::.+:.+(:.+)?"
+var fnInvokeRegex = regex.MustCompile("Fn::.+:.+(:.+)?")
 
 // Expr represents a Pulumi YAML expression. Expressions may be literals, interpolated strings, symbols, or builtin
 // functions.
