@@ -744,7 +744,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	default:
 		var diags syntax.Diagnostics
 		k := kvp.Key.Value()
-		// Fn::Invoke can be called as Fn::{pkg}:{Name}
+		// Fn::Invoke can be called as FN::${pkg}:${module}(:${name})?
+		// error is thrown if regex pattern cannot be parsed — handled by `regex.MustCompile(fnInvokeRegexPattern)`
 		if match, _ := regexp.MatchString(fnInvokeRegexPattern, k); match {
 			// transform the node into standard Fn::Invoke format
 			fnVal := strings.TrimPrefix(k, "Fn::")

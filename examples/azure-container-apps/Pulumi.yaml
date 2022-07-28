@@ -20,13 +20,7 @@ variables:
       registryName: ${registry.name}
   adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
-    Fn::Secret:
-      Fn::Invoke:
-        Function: azure-native:containerregistry:listRegistryCredentials
-        Arguments:
-          resourceGroupName: ${resourceGroup.name}
-          registryName: ${registry.name}
-        Return: passwords
+    Fn::Secret: ${adminRegistryCreds.password}
 resources:
   resourceGroup:
     type: azure-native:resources:ResourceGroup
