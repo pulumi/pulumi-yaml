@@ -197,7 +197,7 @@ func TestInvokeNoInputsSugar(t *testing.T) {
 	const text = `
 variables:
   config:
-    Fn::test:invoke:empty:
+    Fn::test:invoke:empty: {}
 outputs:
   v: ${config.subscriptionId}
 name: test-yaml
