@@ -747,7 +747,7 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		// Fn::Invoke can be called as Fn::{pkg}:{Name}
 		if match, _ := regexp.MatchString(fnInvokeRegexPattern, k); match {
 			// transform the node into standard Fn::Invoke format
-			fnVal := strings.Split(k, "Fn::")[1]
+			fnVal := strings.TrimPrefix(k, "Fn::")
 			if _, ok := kvp.Value.(*syntax.ObjectNode); ok {
 				kvp.Value = syntax.Object(
 					syntax.ObjectPropertyDef{
