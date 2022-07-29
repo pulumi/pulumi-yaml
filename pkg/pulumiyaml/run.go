@@ -181,21 +181,27 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	runner := newRunner(ctx, t, loader)
 
 	for _, resource := range t.Resources.Entries {
+		k := resource.Key.Value
 		v := resource.Value
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-			pkgName := strings.Split(resource.Value.Type.Value, ":")[2]
+			r := lateboundProviderResourceState{name: resource.Key.Value}
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
-				runner.defaultPackages[pkgName] = &PackageInfo{
+				runner.defaultPackageInfo[k] = &PackageInfo{
 					version:           v.Options.Version,
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
+					providerResource:  &r,
 				}
-				r := lateboundProviderResourceState{name: resource.Key.Value}
-				runner.defaultPackages[pkgName].providerResource = &r
 			} else {
-				return errors.New("cannot set defaultProvider on non-provider resource")
+				runner.otherPackageInfo[k] = &PackageInfo{
+					version:           v.Options.Version,
+					pluginDownloadUrl: v.Options.PluginDownloadURL,
+					providerResource:  &r,
+				}
 			}
+		} else if v.DefaultProvider != nil {
+			return errors.New("cannot set defaultProvider on non-provider resource")
 		}
 	}
 
@@ -249,8 +255,8 @@ type runner struct {
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
 
-	resourcePackageInfo map[string]PackageInfo  //  resource id -> packageInfo
-	defaultPackages     map[string]*PackageInfo // packageName -> package
+	defaultPackageInfo map[string]*PackageInfo // packageName -> package
+	otherPackageInfo   map[string]*PackageInfo // packageName -> package
 
 	cwd string
 
@@ -469,8 +475,8 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 
-		resourcePackageInfo: make(map[string]PackageInfo),
-		defaultPackages:     make(map[string]*PackageInfo),
+		otherPackageInfo:   make(map[string]*PackageInfo),
+		defaultPackageInfo: make(map[string]*PackageInfo),
 	}
 }
 
@@ -791,27 +797,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	}
 	pkgName := pkg.Name()
 
-	// i thought we could do this here in `registerResource()` instead of `runTemplates` because
-	// provider resources should be evaluated first, but it's causing a panic below on 914, presumably because the provider resource
-	// isn't being deterministically registered before all of its dependent resources
-
-	// // check if this is a provider resource
-	// if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-	// 	// check if it's set as a default provider
-	// 	if v.DefaultProvider != nil && v.DefaultProvider.Value {
-	// 		ctx.defaultPackages[pkgName] = &PackageInfo{
-	// 			version:           v.Options.Version,
-	// 			pluginDownloadUrl: v.Options.PluginDownloadURL,
-	// 		}
-	// 		r := lateboundProviderResourceState{name: k}
-	// 		ctx.defaultPackages[pkgName].providerResource = &r
-
-	// 	}
-	// } else if v.DefaultProvider != nil {
-	// 	// error if defaultProvider attribute is set on non-provider resource
-	// 	ctx.error(v.DefaultProvider, "cannot set defaultProvider on a non-provider resource")
-	// }
-
 	readIntoProperties := func(obj ast.PropertyMapDecl) (poisonMarker, bool) {
 		for _, kvp := range obj.Entries {
 			vv, ok := ctx.evaluateExpr(kvp.Value)
@@ -894,10 +879,8 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
 
-	// need to check this provider against any default
 	if v.Options.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
-
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
@@ -912,9 +895,9 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		} else {
 			overallOk = false
 		}
-	} else if defaultPkgInfo, ok := ctx.defaultPackages[pkgName]; ok {
+	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
+		// if no provider set, copy default provider to the resource
 		provider := defaultPkgInfo.providerResource.ProviderResource()
-		// copy default provider to the resource
 		opts = append(opts, pulumi.Provider(provider))
 	}
 	if v.Options.Providers != nil {
@@ -940,8 +923,11 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	}
 
 	if v.Options.Version != nil {
+		// if provider is set, check version against it
+		// need a way to determine if provider is a default provider or nondefault
+
 		// check against default provider version – looks like this already throws an error if versions conflict though
-		if defaultPkgInfo, ok := ctx.defaultPackages[pkgName]; ok && defaultPkgInfo.version.Value != v.Options.Version.Value {
+		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version.Value != v.Options.Version.Value {
 			ctx.error(v.Options.Version, fmt.Sprintf("version '%s' does not match default provider version", v.Options.Version.Value))
 		} else {
 			// otherwise warn against resetting the version
@@ -950,13 +936,13 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		}
 	} else {
 		// if not set, copy default version
-		if defaultPkgInfo, ok := ctx.defaultPackages[pkgName]; ok && defaultPkgInfo.version != nil {
+		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version != nil {
 			v.Options.Version = defaultPkgInfo.version
 			opts = append(opts, pulumi.Version(defaultPkgInfo.version.Value))
 		}
 	}
 	if v.Options.PluginDownloadURL != nil {
-		if defaultPkgInfo, ok := ctx.defaultPackages[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
+		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
 			ctx.error(v.Options.PluginDownloadURL, fmt.Sprintf("url '%s' does not match default provider version", v.Options.PluginDownloadURL.Value))
 		} else {
 			ctx.ctx.Log.Warn("pluginDownloadUrl should only be set on provider resource", &pulumi.LogArgs{})
@@ -964,7 +950,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 			opts = append(opts, pulumi.Version(v.Options.PluginDownloadURL.Value))
 		}
 	} else {
-		if defaultPkgInfo, ok := ctx.defaultPackages[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl != nil {
+		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl != nil {
 			opts = append(opts, pulumi.Version(defaultPkgInfo.pluginDownloadUrl.Value))
 		}
 	}
@@ -985,9 +971,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		state = &r
 		res = &r
 		isProvider = true
-		if v.DefaultProvider != nil && v.DefaultProvider.Value {
-			ctx.defaultPackages[pkgName].providerResource = state
-		}
 	} else {
 		r := lateboundCustomResourceState{name: k}
 		state = &r
