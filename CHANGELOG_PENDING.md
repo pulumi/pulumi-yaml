@@ -10,3 +10,6 @@
   [#290](https://github.com/pulumi/pulumi-yaml/pull/290)
 
 ### Bug Fixes
+
+- Allow `bool` configuration type
+  [#299](https://github.com/pulumi/pulumi-yaml/pull/299)

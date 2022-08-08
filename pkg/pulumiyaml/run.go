@@ -620,6 +620,8 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 			expectedType = ctypes.String
 		case float64, int:
 			expectedType = ctypes.Number
+		case bool:
+			expectedType = ctypes.Boolean
 		case []interface{}:
 			if len(d) == 0 && c.Type == nil {
 				return ctx.errorf(c.Default,
