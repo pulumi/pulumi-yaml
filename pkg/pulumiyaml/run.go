@@ -185,13 +185,12 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
-			r := lateboundProviderResourceState{name: resource.Key.Value}
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
 				runner.defaultPackageInfo[pkgName] = &PackageInfo{
 					version:           v.Options.Version,
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
-					providerResource:  &r,
+					providerResource:  resource.Key,
 				}
 			}
 		} else if v.DefaultProvider != nil {
@@ -237,7 +236,7 @@ func (d *syncDiags) HasErrors() bool {
 type PackageInfo struct {
 	version           *ast.StringExpr
 	pluginDownloadUrl *ast.StringExpr
-	providerResource  lateboundResource
+	providerResource  *ast.StringExpr
 }
 
 type runner struct {
@@ -886,10 +885,24 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		} else {
 			overallOk = false
 		}
-	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
+	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && !strings.HasPrefix(v.Type.Value, "pulumi:providers:") && false {
 		// if no provider set, copy default provider to the resource
-		provider := defaultPkgInfo.providerResource.ProviderResource()
-		opts = append(opts, pulumi.Provider(provider))
+		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
+		providerOpt, ok := ctx.evaluateInterpolate(expr)
+		if ok {
+			if p, ok := providerOpt.(poisonMarker); ok {
+				return p, true
+			}
+			provider := providerOpt.(lateboundResource).ProviderResource()
+
+			if provider == nil {
+				ctx.error(expr, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+			} else {
+				opts = append(opts, pulumi.Provider(provider))
+			}
+		} else {
+			overallOk = false
+		}
 	}
 	if v.Options.Providers != nil {
 		// need to check these also against the default provider for conflicts?
@@ -1479,8 +1492,21 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		}
 	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
 		// if no provider set, copy default provider to the resource
-		provider := defaultPkgInfo.providerResource.ProviderResource()
-		opts = append(opts, pulumi.Provider(provider))
+		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
+		providerOpt, ok := ctx.evaluateInterpolate(expr)
+		if ok {
+			if p, ok := providerOpt.(poisonMarker); ok {
+				return p, true
+			}
+			provider := providerOpt.(lateboundResource).ProviderResource()
+			if provider == nil {
+				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+			} else {
+				opts = append(opts, pulumi.Provider(provider))
+			}
+		} else {
+			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
+		}
 	}
 
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
