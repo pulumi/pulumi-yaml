@@ -20,7 +20,7 @@ variables:
       registryName: ${registry.name}
   adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
-    Fn::Secret: ${adminRegistryCreds.password}
+    Fn::Secret: ${adminRegistryCreds.passwords}
 resources:
   resourceGroup:
     type: azure-native:resources:ResourceGroup
@@ -70,8 +70,8 @@ resources:
       kubeEnvironmentId: ${kubeEnv}
       configuration:
         ingress:
-            external: true
-            targetPort: 80
+          external: true
+          targetPort: 80
         registries:
           - server: ${registry.loginServer}
             username: ${adminUsername}
