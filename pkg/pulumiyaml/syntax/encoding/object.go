@@ -14,17 +14,16 @@ import (
 //
 // Decoding uses the following rules:
 //
-// - Interface and pointer values decode as their element value. Nil interface and pointer values decode as
-//   *syntax.NullNode.
-// - Boolean values decode as *syntax.BooleanNode.
-// - Floating point and integer values decode as *syntax.NumberNode.
-// - String values decode as *syntax.StringNode.
-// - Arrays and slices decode as *syntax.ListNode. Nil slices are decoded as *syntax.NullNode.
-// - Maps are decoded as *syntax.ObjectNode. Map keys must be strings. Nil maps are deocded as *syntax.NullNode.
-// - Structs are decoded as *syntax.ObjectNode. Exported struct fields decode into object properties using the name of
-//   the field as the property's key. The name of the struct field can be customized using a struct tag of the form
-//   `object:"name"`. If a field's value decodes as *syntax.NullNode, that field is omitted from the result.
-//
+//   - Interface and pointer values decode as their element value. Nil interface and pointer values decode as
+//     *syntax.NullNode.
+//   - Boolean values decode as *syntax.BooleanNode.
+//   - Floating point and integer values decode as *syntax.NumberNode.
+//   - String values decode as *syntax.StringNode.
+//   - Arrays and slices decode as *syntax.ListNode. Nil slices are decoded as *syntax.NullNode.
+//   - Maps are decoded as *syntax.ObjectNode. Map keys must be strings. Nil maps are deocded as *syntax.NullNode.
+//   - Structs are decoded as *syntax.ObjectNode. Exported struct fields decode into object properties using the name of
+//     the field as the property's key. The name of the struct field can be customized using a struct tag of the form
+//     `object:"name"`. If a field's value decodes as *syntax.NullNode, that field is omitted from the result.
 func DecodeValue(v interface{}) (syntax.Node, syntax.Diagnostics) {
 	return decodeValue(reflect.ValueOf(v))
 }

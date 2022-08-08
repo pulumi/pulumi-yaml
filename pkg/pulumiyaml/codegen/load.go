@@ -208,7 +208,6 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 // - `Fn::Join` is imported as either a template expression or a call to `join`
 // - `Fn::Split` is imported as a call to `split`
 // - `Fn::StackReference` is imported as a reference to the named stack
-//
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.StringAssetExpr:

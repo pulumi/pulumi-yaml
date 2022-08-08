@@ -109,8 +109,9 @@ func makeAbs(path string) string {
 //
 // This test expects the examples folder to have the following structure
 // examples/
-//   ${test-name}/
-//     Pulumi.yaml
+//
+//	${test-name}/
+//	  Pulumi.yaml
 //
 // A folder without Pulumi.yaml will signal an error. Other files are ignored.
 //

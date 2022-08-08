@@ -421,8 +421,10 @@ func (g *generator) checkPropertyKeyIndex(n string, subject *hcl.Range) string {
 // that quotations are applied around the string.
 //
 // For example:
-//     `foo` -> `"foo"`
-//    `bar"` -> `"bar"`
+//
+//	 `foo` -> `"foo"`
+//	`bar"` -> `"bar"`
+//
 // `foo"bar` -> `"foo\"bar"`
 func asEscapedString(s string) string {
 	s = strings.TrimSuffix(s, `"`)
@@ -743,11 +745,13 @@ func (g *generator) TypeProperty(s string) syn.ObjectPropertyDef {
 
 // collapseToken converts an exact token to a token more suitable for
 // display. For example, it converts
-//   fizz:index/buzz:Buzz => fizz:Buzz
-//   fizz:mode/buzz:Buzz  => fizz:mode:Buzz
-// 	 foo:index:Bar	      => foo:Bar
-// 	 foo::Bar             => foo:Bar
-// 	 fizz:mod:buzz        => fizz:mod:buzz
+//
+//	  fizz:index/buzz:Buzz => fizz:Buzz
+//	  fizz:mode/buzz:Buzz  => fizz:mode:Buzz
+//		 foo:index:Bar	      => foo:Bar
+//		 foo::Bar             => foo:Bar
+//		 fizz:mod:buzz        => fizz:mod:buzz
+//
 // collapseToken is a partial inverse of `(pulumiyaml.resourcePackage).ResolveResource`.
 func collapseToken(token string) string {
 	tokenParts := strings.Split(token, ":")
