@@ -181,14 +181,14 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	runner := newRunner(ctx, t, loader)
 
 	for _, resource := range t.Resources.Entries {
-		k := resource.Key.Value
 		v := resource.Value
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
+			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
 			r := lateboundProviderResourceState{name: resource.Key.Value}
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
-				runner.defaultPackageInfo[k] = &PackageInfo{
+				runner.defaultPackageInfo[pkgName] = &PackageInfo{
 					version:           v.Options.Version,
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
 					providerResource:  &r,
@@ -870,7 +870,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Protect != nil {
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
-
 	if v.Options.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
@@ -917,14 +916,14 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if v.Options.Version != nil {
 		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version.Value != v.Options.Version.Value {
 			ctx.error(v.Options.Version, fmt.Sprintf("version '%s' does not match default provider version", v.Options.Version.Value))
-		} else {
+		} else if !strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 			ctx.ctx.Log.Warn("version should only be set on provider resource", &pulumi.LogArgs{})
 		}
 	}
 	if v.Options.PluginDownloadURL != nil {
 		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
 			ctx.error(v.Options.PluginDownloadURL, fmt.Sprintf("url '%s' does not match default provider version", v.Options.PluginDownloadURL.Value))
-		} else {
+		} else if !strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 			ctx.ctx.Log.Warn("pluginDownloadUrl should only be set on provider resource", &pulumi.LogArgs{})
 		}
 	}
@@ -1433,7 +1432,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
 func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
-	pkgName := strings.Split(t.Name().GetValue(), ":")[0]
+	pkgName := strings.Split(t.Token.Value, ":")[0]
 
 	args, ok := ctx.evaluateExpr(t.CallArgs)
 	if !ok {
@@ -1460,6 +1459,9 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		}
 	}
 
+	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname is %s", pkgName), &pulumi.LogArgs{})
+	// _, found := ctx.defaultPackageInfo[pkgName]
+	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname found? %v", found), &pulumi.LogArgs{})
 	if t.CallOpts.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
 		if ok {
