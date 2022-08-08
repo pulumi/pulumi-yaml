@@ -11,7 +11,7 @@ adminRegistryCreds = invoke("azure-native:containerregistry:listRegistryCredenti
 	registryName = registry.name
 })
 adminUsername = adminRegistryCreds.username
-adminPasswords = secret(adminRegistryCreds.password)
+adminPasswords = secret(adminRegistryCreds.passwords)
 
 resource resourceGroup "azure-native:resources:ResourceGroup" {
 	__logicalName = "resourceGroup"
