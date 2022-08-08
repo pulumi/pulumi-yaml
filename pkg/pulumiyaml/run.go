@@ -193,12 +193,6 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
 					providerResource:  &r,
 				}
-			} else {
-				runner.otherPackageInfo[k] = &PackageInfo{
-					version:           v.Options.Version,
-					pluginDownloadUrl: v.Options.PluginDownloadURL,
-					providerResource:  &r,
-				}
 			}
 		} else if v.DefaultProvider != nil {
 			return errors.New("cannot set defaultProvider on non-provider resource")
@@ -256,7 +250,6 @@ type runner struct {
 	stackRefs map[string]*pulumi.StackReference
 
 	defaultPackageInfo map[string]*PackageInfo // packageName -> package
-	otherPackageInfo   map[string]*PackageInfo // packageName -> package
 
 	cwd string
 
@@ -475,7 +468,6 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
 
-		otherPackageInfo:   make(map[string]*PackageInfo),
 		defaultPackageInfo: make(map[string]*PackageInfo),
 	}
 }
@@ -923,22 +915,10 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	}
 
 	if v.Options.Version != nil {
-		// if provider is set, check version against it
-		// need a way to determine if provider is a default provider or nondefault
-
-		// check against default provider version – looks like this already throws an error if versions conflict though
 		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version.Value != v.Options.Version.Value {
 			ctx.error(v.Options.Version, fmt.Sprintf("version '%s' does not match default provider version", v.Options.Version.Value))
 		} else {
-			// otherwise warn against resetting the version
 			ctx.ctx.Log.Warn("version should only be set on provider resource", &pulumi.LogArgs{})
-			opts = append(opts, pulumi.Version(v.Options.Version.Value))
-		}
-	} else {
-		// if not set, copy default version
-		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version != nil {
-			v.Options.Version = defaultPkgInfo.version
-			opts = append(opts, pulumi.Version(defaultPkgInfo.version.Value))
 		}
 	}
 	if v.Options.PluginDownloadURL != nil {
@@ -946,12 +926,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 			ctx.error(v.Options.PluginDownloadURL, fmt.Sprintf("url '%s' does not match default provider version", v.Options.PluginDownloadURL.Value))
 		} else {
 			ctx.ctx.Log.Warn("pluginDownloadUrl should only be set on provider resource", &pulumi.LogArgs{})
-			v.Options.PluginDownloadURL = defaultPkgInfo.pluginDownloadUrl
-			opts = append(opts, pulumi.Version(v.Options.PluginDownloadURL.Value))
-		}
-	} else {
-		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl != nil {
-			opts = append(opts, pulumi.Version(defaultPkgInfo.pluginDownloadUrl.Value))
 		}
 	}
 	if v.Options.ReplaceOnChanges != nil {
