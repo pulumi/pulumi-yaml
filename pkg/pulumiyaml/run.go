@@ -1433,6 +1433,8 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
 func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
+	pkgName := strings.Split(t.Name().GetValue(), ":")[0]
+
 	args, ok := ctx.evaluateExpr(t.CallArgs)
 	if !ok {
 		return nil, false
@@ -1473,6 +1475,10 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		} else {
 			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
+	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
+		// if no provider set, copy default provider to the resource
+		provider := defaultPkgInfo.providerResource.ProviderResource()
+		opts = append(opts, pulumi.Provider(provider))
 	}
 
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
