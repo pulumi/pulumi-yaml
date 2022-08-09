@@ -593,11 +593,6 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	if t.CallOpts.Provider != nil {
 		tc.typeExpr(ctx, t.CallOpts.Provider)
 	}
-	// } else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkg.Name()]; ok {
-	// 	expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-	// 	t.CallOpts.Provider = expr
-	// 	tc.typeExpr(ctx, t.CallOpts.Provider)
-	// }
 	if t.CallOpts.Version != nil {
 		tc.typeExpr(ctx, t.CallOpts.Version)
 	}

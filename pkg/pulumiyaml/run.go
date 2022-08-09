@@ -234,6 +234,33 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 			return true
 		},
 		VisitVariable: func(r *runner, node variableNode) bool {
+			v := node.Value
+			switch t := v.(type) {
+			case *ast.InvokeExpr:
+				pkgName := strings.Split(t.Token.Value, ":")[0]
+				if _, ok := defaultProviderInfoMap[pkgName]; !ok {
+					return true
+				}
+				defaultProviderInfo := defaultProviderInfoMap[pkgName]
+
+				if t.CallOpts.Version != nil &&
+					defaultProviderInfo.version.Value != t.CallOpts.Version.Value {
+					return false
+				}
+				if t.CallOpts.PluginDownloadURL != nil &&
+					defaultProviderInfo.pluginDownloadUrl.Value != t.CallOpts.PluginDownloadURL.Value {
+					return false
+				}
+
+				if t.CallOpts.Provider == nil {
+					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerResource.Value)
+					if diags.HasErrors() {
+						r.sdiags.diags = append(r.sdiags.diags, diags...)
+						return false
+					}
+					t.CallOpts.Provider = expr
+				}
+			}
 			return true
 		},
 		VisitConfig: func(r *runner, node configNode) bool {
@@ -1562,11 +1589,6 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Parent field: %+v", t.CallOpts.Parent))
 		}
 	}
-
-	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname is %s", pkgName), &pulumi.LogArgs{})
-	// dp, found := ctx.defaultPackageInfo[pkgName]
-	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname found? %v", found), &pulumi.LogArgs{})
-	// ctx.ctx.Log.Warn(fmt.Sprintf("pkg resource name %v", dp.providerResource), &pulumi.LogArgs{})
 	if t.CallOpts.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
 		if ok {
@@ -1583,25 +1605,6 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
-	// } else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
-	// 	// if no provider set, copy default provider to the resource
-	// 	expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-	// 	providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
-	// 	if ok {
-	// 		if p, ok := providerOpt.(poisonMarker); ok {
-	// 			return p, true
-	// 		}
-	// 		provider := providerOpt.ProviderResource()
-	// 		if provider == nil {
-	// 			ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
-	// 		} else {
-	// 			opts = append(opts, pulumi.Provider(provider))
-	// 		}
-	// 	} else {
-	// 		ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
-	// 	}
-	// }
-
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
