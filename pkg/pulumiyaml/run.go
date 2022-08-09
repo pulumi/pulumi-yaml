@@ -176,9 +176,8 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-// RunTemplate runs the evaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	runner := newRunner(ctx, t, loader)
+func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) error {
+	defaultProviderInfoMap := make(map[string]*PackageInfo)
 
 	for _, resource := range t.Resources.Entries {
 		v := resource.Value
@@ -187,7 +186,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
-				runner.defaultPackageInfo[pkgName] = &PackageInfo{
+				defaultProviderInfoMap[pkgName] = &PackageInfo{
 					version:           v.Options.Version,
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
 					providerResource:  resource.Key,
@@ -198,12 +197,71 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 		}
 	}
 
-	_, diags := TypeCheck(runner)
+	// Set roots
+	diags := r.Run(walker{
+		VisitResource: func(r *runner, node resourceNode) bool {
+			v := node.Value
+			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
+				return true
+			}
+			pkgName := strings.Split(v.Type.Value, ":")[0]
+
+			if _, ok := defaultProviderInfoMap[pkgName]; !ok {
+				return true
+			}
+			defaultProviderInfo := defaultProviderInfoMap[pkgName]
+
+			if v.Options.Version != nil &&
+				defaultProviderInfo.version.Value != v.Options.Version.Value {
+				return false
+			}
+			if v.Options.PluginDownloadURL != nil &&
+				defaultProviderInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
+				return false
+			}
+
+			if v.Options.Provider == nil {
+				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerResource.Value)
+				if diags.HasErrors() {
+					r.sdiags.diags = append(r.sdiags.diags, diags...)
+					return false
+				}
+				node.Value.Options.Provider = expr
+			}
+			return true
+		},
+		VisitExpr: func(ec *evalContext, e ast.Expr) bool {
+			return true
+		},
+		VisitVariable: func(r *runner, node variableNode) bool {
+			return true
+		},
+		VisitConfig: func(r *runner, node configNode) bool {
+			return true
+		},
+		VisitOutput: func(r *runner, node ast.PropertyMapEntry) bool {
+			return true
+		},
+	})
+
+	if diags.HasErrors() {
+		return diags
+	}
+	return nil
+}
+
+// RunTemplate runs the evaluator against a template using the given request/settings.
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
+	r := newRunner(ctx, t, loader)
+
+	setDefaultProviders(ctx, t, r)
+
+	_, diags := TypeCheck(r)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	diags.Extend(runner.Evaluate()...)
+	diags.Extend(r.Evaluate()...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -577,6 +635,21 @@ func (r *runner) ensureSetup() {
 	}
 }
 
+/*
+
+variables:
+  foo:
+    key1: value1
+	key2: value2
+  bar: ${foo}
+       // ^ this evaluates to the literal value of foo, which is a map
+  baz: ${foo}-some text
+
+*/
+// someYaml: ${foo.bar[0].baz}
+// someYaml: bucket-${foo.bar}-us-east
+//
+
 func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	r.ensureSetup()
 	returnDiags := func() syntax.Diagnostics {
@@ -870,6 +943,16 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
 	if v.Options.Provider != nil {
+		// switch v.Options.Provider.(type) {
+		// case *ast.SymbolExpr:
+		// 	ctx.ctx.Log.Warn("provider is a symbolexpr", &pulumi.LogArgs{})
+		// case *ast.StringExpr:
+		// 	ctx.ctx.Log.Warn("provider is a stringexpr", &pulumi.LogArgs{})
+		// case *ast.InterpolateExpr:
+		// 	ctx.ctx.Log.Warn("provider is a interpolatexpr", &pulumi.LogArgs{})
+		// case *ast.ObjectExpr:
+		// 	ctx.ctx.Log.Warn("provider is a objectexpr", &pulumi.LogArgs{})
+		// }
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
@@ -888,6 +971,14 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && !strings.HasPrefix(v.Type.Value, "pulumi:providers:") && false {
 		// if no provider set, copy default provider to the resource
 		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
+		// lateboundCustomResource
+		//   EXCEPT if topological sort has put this resource before the provider
+		// symbol := &ast.SymbolExpr{Property: &ast.PropertyAccess{
+		// 	Accessors: []ast.PropertyAccessor{
+		// 		&ast.PropertyName{Name: "resA"},
+		// 	},
+		// }}
+
 		providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
@@ -1068,7 +1159,7 @@ func asResource(value interface{}) (lateboundResource, error) {
 	case lateboundResource:
 		return d, nil
 	default:
-		return nil, fmt.Errorf("expected resource, got %v", reflect.TypeOf(value))
+		return nil, fmt.Errorf("expected resource, got %v, %v", reflect.TypeOf(value), value)
 	}
 }
 
@@ -1445,7 +1536,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
 func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
-	pkgName := strings.Split(t.Token.Value, ":")[0]
+	// pkgName := strings.Split(t.Token.Value, ":")[0]
 
 	args, ok := ctx.evaluateExpr(t.CallArgs)
 	if !ok {
@@ -1491,24 +1582,25 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		} else {
 			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
-	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
-		// if no provider set, copy default provider to the resource
-		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-		providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
-		if ok {
-			if p, ok := providerOpt.(poisonMarker); ok {
-				return p, true
-			}
-			provider := providerOpt.ProviderResource()
-			if provider == nil {
-				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
-			} else {
-				opts = append(opts, pulumi.Provider(provider))
-			}
-		} else {
-			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
-		}
 	}
+	// } else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
+	// 	// if no provider set, copy default provider to the resource
+	// 	expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
+	// 	providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
+	// 	if ok {
+	// 		if p, ok := providerOpt.(poisonMarker); ok {
+	// 			return p, true
+	// 		}
+	// 		provider := providerOpt.ProviderResource()
+	// 		if provider == nil {
+	// 			ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+	// 		} else {
+	// 			opts = append(opts, pulumi.Provider(provider))
+	// 		}
+	// 	} else {
+	// 		ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
+	// 	}
+	// }
 
 	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.

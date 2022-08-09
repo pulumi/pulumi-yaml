@@ -171,6 +171,24 @@ func Interpolate(value string) (*InterpolateExpr, syntax.Diagnostics) {
 	return InterpolateSyntax(syntax.String(value))
 }
 
+func VariableSubstitution(value string) (*SymbolExpr, syntax.Diagnostics) {
+	value = "${" + value + "}"
+	node := syntax.String(value)
+	interpolate, diags := InterpolateSyntax(node)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	if interpolate != nil && len(interpolate.Parts) == 1 && interpolate.Parts[0].Text == "" {
+		return &SymbolExpr{
+			exprNode: expr(node),
+			Property: interpolate.Parts[0].Value,
+		}, diags
+	}
+
+	return nil, syntax.Diagnostics{syntax.NodeError(node, "Must be a valid substitution, e.g.: like ${resourceName}", "")}
+}
+
 // MustInterpolate creates a new interpolated string expression and panics if parsing fails.
 func MustInterpolate(value string) *InterpolateExpr {
 	x, diags := Interpolate(value)
