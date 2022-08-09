@@ -888,12 +888,12 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && !strings.HasPrefix(v.Type.Value, "pulumi:providers:") && false {
 		// if no provider set, copy default provider to the resource
 		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-		providerOpt, ok := ctx.evaluateInterpolate(expr)
+		providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
 			}
-			provider := providerOpt.(lateboundResource).ProviderResource()
+			provider := providerOpt.ProviderResource()
 
 			if provider == nil {
 				ctx.error(expr, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
@@ -1473,8 +1473,9 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	}
 
 	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname is %s", pkgName), &pulumi.LogArgs{})
-	// _, found := ctx.defaultPackageInfo[pkgName]
+	// dp, found := ctx.defaultPackageInfo[pkgName]
 	// ctx.ctx.Log.Warn(fmt.Sprintf("pkgname found? %v", found), &pulumi.LogArgs{})
+	// ctx.ctx.Log.Warn(fmt.Sprintf("pkg resource name %v", dp.providerResource), &pulumi.LogArgs{})
 	if t.CallOpts.Provider != nil {
 		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
 		if ok {
@@ -1493,12 +1494,12 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok {
 		// if no provider set, copy default provider to the resource
 		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-		providerOpt, ok := ctx.evaluateInterpolate(expr)
+		providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
 			}
-			provider := providerOpt.(lateboundResource).ProviderResource()
+			provider := providerOpt.ProviderResource()
 			if provider == nil {
 				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
 			} else {
