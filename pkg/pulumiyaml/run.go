@@ -37,8 +37,8 @@ import (
 
 // MainTemplate is the assumed name of the JSON template file.
 // TODO: would be nice to permit multiple files, but we'd need to know which is "main", and there's
-//     no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
-//     One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
+// no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
+// One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
 const MainTemplate = "Main"
 
 // Load a template from the current working directory
@@ -1041,7 +1041,6 @@ func (ctx *evalContext) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, 
 // - []interface{}
 // - map[string]interface{}
 // - pulumi.Output, where the element type is one of the above
-//
 func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	switch x := x.(type) {
 	case *ast.NullExpr:

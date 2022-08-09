@@ -244,16 +244,16 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //
 // The syntax tree is parsed using the following rules:
 //
-// - *syntax.{Null,Boolean,Number}Node is parsed as a *{Null,Boolean,Number}Expr.
-// - *syntax.ListNode is parsed as a *ListExpr.
-// - *syntax.StringNode is parsed as an *InterpolateExpr, a *SymbolExpr, or a *StringExpr. The node's literal is first
-//   parsed as an interpolated string. If the result contains a single property access with no surrounding text, (i.e.
-//   the string is of the form "${resource.property}", it is treated as a symbol. If the result contains no property
-//   accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
-// - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
-//   that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Select",
-//   "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
-//   Otherwise, the object is parsed as a *syntax.ObjectNode.
+//   - *syntax.{Null,Boolean,Number}Node is parsed as a *{Null,Boolean,Number}Expr.
+//   - *syntax.ListNode is parsed as a *ListExpr.
+//   - *syntax.StringNode is parsed as an *InterpolateExpr, a *SymbolExpr, or a *StringExpr. The node's literal is first
+//     parsed as an interpolated string. If the result contains a single property access with no surrounding text, (i.e.
+//     the string is of the form "${resource.property}", it is treated as a symbol. If the result contains no property
+//     accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
+//   - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
+//     that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Select",
+//     "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
+//     Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *syntax.NullNode:
@@ -886,9 +886,10 @@ func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 }
 
 // We expect the following format
-// Fn::AssetArchive:
-//   path:
-//     AssetOrArchive
+//
+//	Fn::AssetArchive:
+//	  path:
+//	    AssetOrArchive
 //
 // Where `AssetOrArchive` is an object.
 func parseAssetArchive(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

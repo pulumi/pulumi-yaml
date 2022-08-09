@@ -74,14 +74,14 @@ func (p *PropertySubscript) rootName() string {
 // A property access string is essentially a Javascript property access expression in which all elements are literals.
 // Valid property accesses obey the following EBNF-ish grammar:
 //
-//   propertyName := [a-zA-Z_$] { [a-zA-Z0-9_$] }
-//   quotedPropertyName := '"' ( '\' '"' | [^"] ) { ( '\' '"' | [^"] ) } '"'
-//   arrayIndex := { [0-9] }
+//	propertyName := [a-zA-Z_$] { [a-zA-Z0-9_$] }
+//	quotedPropertyName := '"' ( '\' '"' | [^"] ) { ( '\' '"' | [^"] ) } '"'
+//	arrayIndex := { [0-9] }
 //
-//   propertyIndex := '[' ( quotedPropertyName | arrayIndex ) ']'
-//   rootProperty := ( propertyName | propertyIndex )
-//   propertyAccessor := ( ( '.' propertyName ) |  propertyIndex )
-//   path := rootProperty { propertyAccessor }
+//	propertyIndex := '[' ( quotedPropertyName | arrayIndex ) ']'
+//	rootProperty := ( propertyName | propertyIndex )
+//	propertyAccessor := ( ( '.' propertyName ) |  propertyIndex )
+//	path := rootProperty { propertyAccessor }
 //
 // Examples of valid paths:
 // - root

@@ -1,0 +1,24 @@
+resources:
+  # Create a policy with multiple Condition keys
+  policy:
+    type: aws:iam:Policy
+    properties:
+      path: /
+      description: My test policy
+      policy:
+        Fn::ToJSON:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: lambda:*
+              Resource: arn:aws:lambda:*:*:function:*
+              Condition:
+                StringEquals:
+                  aws:RequestTag/Team:
+                    - iamuser-admin
+                    - iamuser2-admin
+                ForAllValues:StringEquals:
+                  aws:TagKeys:
+                    - Team
+outputs:
+  policyName: ${policy.name}
