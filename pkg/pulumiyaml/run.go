@@ -187,7 +187,7 @@ func (r *runner) setDefaultProviders() error {
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
 				defaultProviderInfoMap[pkgName] = &providerInfo{
 					version:           v.Options.Version,
-					pluginDownloadUrl: v.Options.PluginDownloadURL,
+					pluginDownloadURL: v.Options.PluginDownloadURL,
 					providerName:      resource.Key,
 				}
 			}
@@ -202,7 +202,6 @@ func (r *runner) setDefaultProviders() error {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-				fmt.Print("in a provider, returning true\n")
 				return true
 			}
 			pkgName := strings.Split(v.Type.Value, ":")[0]
@@ -323,7 +322,7 @@ func (d *syncDiags) HasErrors() bool {
 
 type providerInfo struct {
 	version           *ast.StringExpr
-	pluginDownloadUrl *ast.StringExpr
+	pluginDownloadURL *ast.StringExpr
 	providerName      *ast.StringExpr
 }
 

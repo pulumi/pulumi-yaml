@@ -106,7 +106,6 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
-		runner.setDefaultProviders()
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil
@@ -161,7 +160,7 @@ variables:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
-		runner.setDefaultProviders()
+		assert.Equal(t, runner.setDefaultProviders(), nil)
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil

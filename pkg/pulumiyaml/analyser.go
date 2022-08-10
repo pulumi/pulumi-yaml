@@ -455,7 +455,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	}
 	if s := v.Syntax(); s != nil {
 		if o, ok := s.(*syntax.ObjectNode); ok {
-			validKeys := append(v.Fields(), "condition", "metadata", "defaultprovider")
+			validKeys := append(v.Fields(), "condition", "metadata")
 			fmtr := yamldiags.InvalidFieldBagFormatter{
 				ParentLabel: fmt.Sprintf("Resource %s", typ.String()),
 				MaxListed:   5,

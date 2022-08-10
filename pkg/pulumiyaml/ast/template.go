@@ -400,7 +400,7 @@ func (d *ResourceDecl) recordSyntax() *syntax.Node {
 
 // The names of exported fields.
 func (*ResourceDecl) Fields() []string {
-	return []string{"type", "defaultProvider", "properties", "options", "get"}
+	return []string{"type", "defaultprovider", "properties", "options", "get"}
 }
 
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, defaultProvider *BooleanExpr,
