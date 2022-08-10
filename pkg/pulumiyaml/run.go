@@ -177,7 +177,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 }
 
 func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) error {
-	defaultProviderInfoMap := make(map[string]*PackageInfo)
+	defaultProviderInfoMap := make(map[string]*providerInfo)
 
 	for _, resource := range t.Resources.Entries {
 		v := resource.Value
@@ -186,10 +186,10 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
-				defaultProviderInfoMap[pkgName] = &PackageInfo{
+				defaultProviderInfoMap[pkgName] = &providerInfo{
 					version:           v.Options.Version,
 					pluginDownloadUrl: v.Options.PluginDownloadURL,
-					providerResource:  resource.Key,
+					providerName:      resource.Key,
 				}
 			}
 		} else if v.DefaultProvider != nil {
@@ -221,7 +221,7 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 			}
 
 			if v.Options.Provider == nil {
-				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerResource.Value)
+				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 				if diags.HasErrors() {
 					r.sdiags.diags = append(r.sdiags.diags, diags...)
 					return false
@@ -253,7 +253,7 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 				}
 
 				if t.CallOpts.Provider == nil {
-					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerResource.Value)
+					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 					if diags.HasErrors() {
 						r.sdiags.diags = append(r.sdiags.diags, diags...)
 						return false
@@ -318,10 +318,10 @@ func (d *syncDiags) HasErrors() bool {
 	return d.diags.HasErrors()
 }
 
-type PackageInfo struct {
+type providerInfo struct {
 	version           *ast.StringExpr
 	pluginDownloadUrl *ast.StringExpr
-	providerResource  *ast.StringExpr
+	providerName      *ast.StringExpr
 }
 
 type runner struct {
@@ -332,8 +332,6 @@ type runner struct {
 	variables map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
-
-	defaultPackageInfo map[string]*PackageInfo // packageName -> package
 
 	cwd string
 
@@ -551,8 +549,6 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
-
-		defaultPackageInfo: make(map[string]*PackageInfo),
 	}
 }
 
@@ -661,21 +657,6 @@ func (r *runner) ensureSetup() {
 		}
 	}
 }
-
-/*
-
-variables:
-  foo:
-    key1: value1
-	key2: value2
-  bar: ${foo}
-       // ^ this evaluates to the literal value of foo, which is a map
-  baz: ${foo}-some text
-
-*/
-// someYaml: ${foo.bar[0].baz}
-// someYaml: bucket-${foo.bar}-us-east
-//
 
 func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	r.ensureSetup()
@@ -970,16 +951,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
 	if v.Options.Provider != nil {
-		// switch v.Options.Provider.(type) {
-		// case *ast.SymbolExpr:
-		// 	ctx.ctx.Log.Warn("provider is a symbolexpr", &pulumi.LogArgs{})
-		// case *ast.StringExpr:
-		// 	ctx.ctx.Log.Warn("provider is a stringexpr", &pulumi.LogArgs{})
-		// case *ast.InterpolateExpr:
-		// 	ctx.ctx.Log.Warn("provider is a interpolatexpr", &pulumi.LogArgs{})
-		// case *ast.ObjectExpr:
-		// 	ctx.ctx.Log.Warn("provider is a objectexpr", &pulumi.LogArgs{})
-		// }
 		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
@@ -995,35 +966,8 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		} else {
 			overallOk = false
 		}
-	} else if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && !strings.HasPrefix(v.Type.Value, "pulumi:providers:") && false {
-		// if no provider set, copy default provider to the resource
-		expr, _ := ast.Interpolate("${" + defaultPkgInfo.providerResource.Value + "}")
-		// lateboundCustomResource
-		//   EXCEPT if topological sort has put this resource before the provider
-		// symbol := &ast.SymbolExpr{Property: &ast.PropertyAccess{
-		// 	Accessors: []ast.PropertyAccessor{
-		// 		&ast.PropertyName{Name: "resA"},
-		// 	},
-		// }}
-
-		providerOpt, ok := ctx.evaluateResourceValuedOption(expr, "provider")
-		if ok {
-			if p, ok := providerOpt.(poisonMarker); ok {
-				return p, true
-			}
-			provider := providerOpt.ProviderResource()
-
-			if provider == nil {
-				ctx.error(expr, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
-			} else {
-				opts = append(opts, pulumi.Provider(provider))
-			}
-		} else {
-			overallOk = false
-		}
 	}
 	if v.Options.Providers != nil {
-		// need to check these also against the default provider for conflicts?
 		dependOnOpt, ok := ctx.evaluateResourceListValuedOption(v.Options.Providers, "providers")
 		if ok {
 			var providers []pulumi.ProviderResource
@@ -1045,18 +989,10 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	}
 
 	if v.Options.Version != nil {
-		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.version.Value != v.Options.Version.Value {
-			ctx.error(v.Options.Version, fmt.Sprintf("version '%s' does not match default provider version", v.Options.Version.Value))
-		} else if !strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-			ctx.ctx.Log.Warn("version should only be set on provider resource", &pulumi.LogArgs{})
-		}
+		opts = append(opts, pulumi.Version(v.Options.Version.Value))
 	}
 	if v.Options.PluginDownloadURL != nil {
-		if defaultPkgInfo, ok := ctx.defaultPackageInfo[pkgName]; ok && defaultPkgInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
-			ctx.error(v.Options.PluginDownloadURL, fmt.Sprintf("url '%s' does not match default provider version", v.Options.PluginDownloadURL.Value))
-		} else if !strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-			ctx.ctx.Log.Warn("pluginDownloadUrl should only be set on provider resource", &pulumi.LogArgs{})
-		}
+		opts = append(opts, pulumi.Version(v.Options.PluginDownloadURL.Value))
 	}
 	if v.Options.ReplaceOnChanges != nil {
 		opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
@@ -1186,7 +1122,7 @@ func asResource(value interface{}) (lateboundResource, error) {
 	case lateboundResource:
 		return d, nil
 	default:
-		return nil, fmt.Errorf("expected resource, got %v, %v", reflect.TypeOf(value), value)
+		return nil, fmt.Errorf("expected resource, got %v", reflect.TypeOf(value))
 	}
 }
 
@@ -1563,8 +1499,6 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
 func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
-	// pkgName := strings.Split(t.Token.Value, ":")[0]
-
 	args, ok := ctx.evaluateExpr(t.CallArgs)
 	if !ok {
 		return nil, false
