@@ -202,6 +202,7 @@ func (r *runner) setDefaultProviders() error {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
+				fmt.Print("in a provider, returning true\n")
 				return true
 			}
 			pkgName := strings.Split(v.Type.Value, ":")[0]
@@ -217,7 +218,6 @@ func (r *runner) setDefaultProviders() error {
 				}
 				if v.Options.PluginDownloadURL != nil {
 					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
-
 				}
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -225,10 +225,8 @@ func (r *runner) setDefaultProviders() error {
 					r.sdiags.diags = append(r.sdiags.diags, diags...)
 					return false
 				}
+
 				v.Options.Provider = expr
-				v.Options.DependsOn = &ast.ListExpr{
-					Elements: []ast.Expr{expr},
-				}
 			}
 			return true
 		},
@@ -637,29 +635,27 @@ func (r *runner) Evaluate() syntax.Diagnostics {
 }
 
 func (r *runner) ensureSetup() {
-	if r.intermediates == nil {
-		r.intermediates = []graphNode{}
-		cwd, err := os.Getwd()
-		if err != nil {
-			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-			return
-		}
-		r.variables[PulumiVarName] = map[string]interface{}{
-			"cwd":     cwd,
-			"project": r.ctx.Project(),
-			"stack":   r.ctx.Stack(),
-		}
-		r.cwd = cwd
+	r.intermediates = []graphNode{}
+	cwd, err := os.Getwd()
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return
+	}
+	r.variables[PulumiVarName] = map[string]interface{}{
+		"cwd":     cwd,
+		"project": r.ctx.Project(),
+		"stack":   r.ctx.Stack(),
+	}
+	r.cwd = cwd
 
-		// Topologically sort the intermediates based on implicit and explicit dependencies
-		intermediates, rdiags := topologicallySortedResources(r.t)
-		r.sdiags.Extend(rdiags...)
-		if rdiags.HasErrors() {
-			return
-		}
-		if intermediates != nil {
-			r.intermediates = intermediates
-		}
+	// Topologically sort the intermediates based on implicit and explicit dependencies
+	intermediates, rdiags := topologicallySortedResources(r.t)
+	r.sdiags.Extend(rdiags...)
+	if rdiags.HasErrors() {
+		return
+	}
+	if intermediates != nil {
+		r.intermediates = intermediates
 	}
 }
 
