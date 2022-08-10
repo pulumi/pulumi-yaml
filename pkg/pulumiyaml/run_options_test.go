@@ -65,6 +65,7 @@ resources:
     type: pulumi:providers:test
   provider-b:
     type: pulumi:providers:test
+    defaultProvider: true
   res-parent:
     type: test:resource:trivial
   res-dependency:
@@ -79,6 +80,8 @@ resources:
       parent: ${res-parent}
       dependsOn:
       - ${res-dependency}
+  res-b:
+    type: test:component:type2
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
@@ -100,12 +103,19 @@ resources:
 				)
 
 				return "anID", resource.PropertyMap{}, nil
+			case "test:component:type2":
+				assert.Equal(t, "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-b::providerId", args.RegisterRPC.Provider)
+				assert.Equal(t, map[string]string{
+					"test": "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-b::providerId",
+				}, args.RegisterRPC.GetProviders())
+				return "anID", resource.PropertyMap{}, nil
 			}
 			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(ctx, template, newMockPackageMap())
+		setDefaultProviders(ctx, template, runner)
 		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil

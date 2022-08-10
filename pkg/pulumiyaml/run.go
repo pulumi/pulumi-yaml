@@ -176,10 +176,9 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) error {
+func (r *runner) setDefaultProviders() error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
-
-	for _, resource := range t.Resources.Entries {
+	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -200,7 +199,7 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 	// Set roots
 	diags := r.Run(walker{
 		VisitResource: func(r *runner, node resourceNode) bool {
-			v := node.Value
+			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
@@ -214,20 +213,11 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 
 			if v.Options.Provider == nil {
 				if v.Options.Version != nil {
-					if defaultProviderInfo.version.Value != v.Options.Version.Value {
-						ctx.ctx.Log.Error("version set conflicts with default provider version", &pulumi.LogArgs{})
-						return false
-					} else {
-						ctx.ctx.Log.Warn("version should not be set on resource", &pulumi.LogArgs{})
-					}
+					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
 				}
 				if v.Options.PluginDownloadURL != nil {
-					if defaultProviderInfo.pluginDownloadUrl.Value != v.Options.PluginDownloadURL.Value {
-						ctx.ctx.Log.Error("pluginDownloadUrl set conflicts with default provider pluginDownloadUrl", &pulumi.LogArgs{})
-						return false
-					} else {
-						ctx.ctx.Log.Warn("pluginDownloadUrl should not be set on resource", &pulumi.LogArgs{})
-					}
+					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+
 				}
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -235,7 +225,10 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 					r.sdiags.diags = append(r.sdiags.diags, diags...)
 					return false
 				}
-				node.Value.Options.Provider = expr
+				v.Options.Provider = expr
+				v.Options.DependsOn = &ast.ListExpr{
+					Elements: []ast.Expr{expr},
+				}
 			}
 			return true
 		},
@@ -243,7 +236,7 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 			return true
 		},
 		VisitVariable: func(r *runner, node variableNode) bool {
-			v := node.Value
+			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 
 			switch t := v.(type) {
@@ -256,20 +249,10 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 
 				if t.CallOpts.Provider == nil {
 					if t.CallOpts.Version != nil {
-						if defaultProviderInfo.version.Value != t.CallOpts.Version.Value {
-							ctx.ctx.Log.Error("version set conflicts with default provider version", &pulumi.LogArgs{})
-							return false
-						} else {
-							ctx.ctx.Log.Warn("version should not be set on variable", &pulumi.LogArgs{})
-						}
+						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
 					}
 					if t.CallOpts.PluginDownloadURL != nil {
-						if defaultProviderInfo.pluginDownloadUrl.Value != t.CallOpts.PluginDownloadURL.Value {
-							ctx.ctx.Log.Error("pluginDownloadUrl set conflicts with default provider pluginDownloadUrl", &pulumi.LogArgs{})
-							return false
-						} else {
-							ctx.ctx.Log.Warn("pluginDownloadUrl should not be set on variable", &pulumi.LogArgs{})
-						}
+						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
 					}
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -300,7 +283,10 @@ func setDefaultProviders(ctx *pulumi.Context, t *ast.TemplateDecl, r *runner) er
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	r := newRunner(ctx, t, loader)
 
-	setDefaultProviders(ctx, t, r)
+	err := r.setDefaultProviders()
+	if err != nil {
+		return err
+	}
 
 	_, diags := TypeCheck(r)
 	if diags.HasErrors() {
