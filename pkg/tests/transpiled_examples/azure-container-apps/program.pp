@@ -6,14 +6,12 @@ sharedKey = secret(invoke("azure-native:operationalinsights:getSharedKeys", {
 	resourceGroupName = resourceGroup.name,
 	workspaceName = workspace.name
 }).primarySharedKey)
-adminUsername = invoke("azure-native:containerregistry:listRegistryCredentials", {
+adminRegistryCreds = invoke("azure-native:containerregistry:listRegistryCredentials", {
 	resourceGroupName = resourceGroup.name,
 	registryName = registry.name
-}).username
-adminPasswords = secret(invoke("azure-native:containerregistry:listRegistryCredentials", {
-	resourceGroupName = resourceGroup.name,
-	registryName = registry.name
-}).passwords)
+})
+adminUsername = adminRegistryCreds.username
+adminPasswords = secret(adminRegistryCreds.passwords)
 
 resource resourceGroup "azure-native:resources:ResourceGroup" {
 	__logicalName = "resourceGroup"
