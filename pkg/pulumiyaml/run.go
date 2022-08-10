@@ -886,7 +886,6 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		overallOk = false
 	}
-	pkgName := pkg.Name()
 
 	readIntoProperties := func(obj ast.PropertyMapDecl) (poisonMarker, bool) {
 		for _, kvp := range obj.Entries {
