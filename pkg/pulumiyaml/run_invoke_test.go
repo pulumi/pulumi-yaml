@@ -143,6 +143,72 @@ runtime: yaml
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestInvokeVariableSugar(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  foo:
+    Fn::test:invoke:type:
+      quux: tuo
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: ${foo.retval}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
+func TestInvokeOutputVariableSugar(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  foo:
+    Fn::test:invoke:type:
+      quux: ${res-a.out}
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+  res-b:
+    type: test:resource:type
+    properties:
+      foo: ${foo.retval}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
+func TestInvokeNoInputsSugar(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+variables:
+  config:
+    Fn::test:invoke:empty: {}
+outputs:
+  v: ${config.subscriptionId}
+name: test-yaml
+runtime: yaml
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {

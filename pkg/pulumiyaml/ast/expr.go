@@ -4,12 +4,15 @@ package ast
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
+
+var fnInvokeRegex = regexp.MustCompile("Fn::[^:]+:[^:]+(:[^:]+)?$")
 
 // Expr represents a Pulumi YAML expression. Expressions may be literals, interpolated strings, symbols, or builtin
 // functions.
@@ -741,7 +744,33 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	default:
 		var diags syntax.Diagnostics
 		k := kvp.Key.Value()
-		if strings.HasPrefix(k, "Fn::") {
+		// Fn::Invoke can be called as FN::${pkg}:${module}(:${name})?
+		// error is thrown if regex pattern cannot be parsed — handled by `regex.MustCompile(fnInvokeRegex)`
+		if match, _ := regexp.MatchString(fnInvokeRegex.String(), k); match {
+			// transform the node into standard Fn::Invoke format
+			fnVal := strings.TrimPrefix(k, "Fn::")
+			if _, ok := kvp.Value.(*syntax.ObjectNode); ok {
+				kvp.Value = syntax.Object(
+					syntax.ObjectPropertyDef{
+						Key:   syntax.StringSyntax(kvp.Syntax, "Arguments"),
+						Value: kvp.Value,
+					},
+					syntax.ObjectPropertyDef{
+						Key:   syntax.StringSyntax(kvp.Syntax, "Function"),
+						Value: syntax.String(fnVal),
+					},
+				)
+			} else {
+				kvp.Value = syntax.Object(
+					syntax.ObjectPropertyDef{
+						Key:   syntax.StringSyntax(kvp.Syntax, "Function"),
+						Value: syntax.String(fnVal),
+					},
+				)
+			}
+			parse = parseInvoke
+			break
+		} else if strings.HasPrefix(k, "Fn::") {
 			diags = append(diags, syntax.Warning(kvp.Key.Syntax().Range(),
 				"'Fn::' is a reserved prefix",
 				fmt.Sprintf("If you need to use the raw key '%s',"+

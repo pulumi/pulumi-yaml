@@ -12,6 +12,9 @@
 - pulumi yaml syntax errors emit one less log message
   [#300](https://github.com/pulumi/pulumi-yaml/pull/300)
 
+- Add sugar for `Fn::Invoke`
+  [#294](https://github.com/pulumi/pulumi-yaml/pull/294)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type

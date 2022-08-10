@@ -14,21 +14,13 @@ variables:
           resourceGroupName: ${resourceGroup.name}
           workspaceName: ${workspace.name}
         Return: primarySharedKey
-  adminUsername:
-    Fn::Invoke:
-      Function: azure-native:containerregistry:listRegistryCredentials
-      Arguments:
-        resourceGroupName: ${resourceGroup.name}
-        registryName: ${registry.name}
-      Return: username
+  adminRegistryCreds:
+    Fn::azure-native:containerregistry:listRegistryCredentials:
+      resourceGroupName: ${resourceGroup.name}
+      registryName: ${registry.name}
+  adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
-    Fn::Secret:
-      Fn::Invoke:
-        Function: azure-native:containerregistry:listRegistryCredentials
-        Arguments:
-          resourceGroupName: ${resourceGroup.name}
-          registryName: ${registry.name}
-        Return: passwords
+    Fn::Secret: ${adminRegistryCreds.passwords}
 resources:
   resourceGroup:
     type: azure-native:resources:ResourceGroup
@@ -78,8 +70,8 @@ resources:
       kubeEnvironmentId: ${kubeEnv}
       configuration:
         ingress:
-            external: true
-            targetPort: 80
+          external: true
+          targetPort: 80
         registries:
           - server: ${registry.loginServer}
             username: ${adminUsername}
