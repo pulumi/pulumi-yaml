@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	testInvokeFnToken  = "test:invoke:type"
+	testProvidersToken = "pulumi:providers:test"
+	providerIDAttr     = "providerId"
+)
+
 func TestInvokeOutputs(t *testing.T) {
 	t.Parallel()
 
@@ -214,7 +220,7 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 			t.Logf("Processing call %s.", args.Token)
 			switch args.Token {
-			case "test:invoke:type":
+			case testInvokeFnToken:
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
 					"quux": "tuo",
 				}), args.Args)
@@ -252,8 +258,8 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ru
 				return "", resource.PropertyMap{}, fmt.Errorf("Unexpected read resource type %s", args.TypeToken)
 			}
 			switch args.TypeToken {
-			case "pulumi:providers:test":
-				return "providerId", resource.PropertyMap{
+			case testProvidersToken:
+				return providerIDAttr, resource.PropertyMap{
 					"retval": resource.NewStringProperty("provider-foo"),
 				}, nil
 			case testResourceToken:

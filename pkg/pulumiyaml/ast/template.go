@@ -387,10 +387,11 @@ func GetResource(id *StringExpr, state PropertyMapDecl) GetResourceDecl {
 type ResourceDecl struct {
 	declNode
 
-	Type       *StringExpr
-	Properties PropertyMapDecl
-	Options    ResourceOptionsDecl
-	Get        GetResourceDecl
+	Type            *StringExpr
+	DefaultProvider *BooleanExpr
+	Properties      PropertyMapDecl
+	Options         ResourceOptionsDecl
+	Get             GetResourceDecl
 }
 
 func (d *ResourceDecl) recordSyntax() *syntax.Node {
@@ -399,22 +400,23 @@ func (d *ResourceDecl) recordSyntax() *syntax.Node {
 
 // The names of exported fields.
 func (*ResourceDecl) Fields() []string {
-	return []string{"type", "properties", "options", "get"}
+	return []string{"type", "defaultprovider", "properties", "options", "get"}
 }
 
-func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr,
+func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, defaultProvider *BooleanExpr,
 	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
 	return &ResourceDecl{
-		declNode:   decl(node),
-		Type:       typ,
-		Properties: properties,
-		Options:    options,
-		Get:        get,
+		declNode:        decl(node),
+		Type:            typ,
+		DefaultProvider: defaultProvider,
+		Properties:      properties,
+		Options:         options,
+		Get:             get,
 	}
 }
 
-func Resource(typ *StringExpr, properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
-	return ResourceSyntax(nil, typ, properties, options, get)
+func Resource(typ *StringExpr, defaultProvider *BooleanExpr, properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
+	return ResourceSyntax(nil, typ, defaultProvider, properties, options, get)
 }
 
 type CustomTimeoutsDecl struct {

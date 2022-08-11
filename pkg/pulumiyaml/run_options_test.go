@@ -115,3 +115,58 @@ resources:
 	}
 	assert.NoError(t, err)
 }
+
+func TestDefaultProvider(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  provider-a:
+    type: pulumi:providers:test
+    defaultProvider: true
+  res-a:
+    type: test:component:type
+variables:
+  var-a:
+    Fn::Invoke:
+      Function: test:invoke:type
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "pulumi:providers:test":
+				return "providerId", resource.PropertyMap{}, nil
+			case testComponentToken:
+				assert.Equal(t, "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-a::providerId", args.RegisterRPC.Provider)
+				return "anID", resource.PropertyMap{}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
+		},
+		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+			t.Logf("Processing call %s.", args.Token)
+			switch args.Token {
+			case "test:invoke:type":
+				assert.Equal(t, args.Provider, "urn:pulumi:stackDev::projectFoo::pulumi:providers:test::provider-a::providerId")
+				return resource.PropertyMap{
+					"retval": resource.NewStringProperty("oof"),
+				}, nil
+			}
+			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(ctx, template, newMockPackageMap())
+		assert.Equal(t, runner.setDefaultProviders(), nil)
+		diags := runner.Evaluate()
+		requireNoErrors(t, template, diags)
+		return nil
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	assert.NoError(t, err)
+}
