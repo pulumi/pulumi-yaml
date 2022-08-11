@@ -694,7 +694,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	if resource.Options.Version != nil {
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "version",
-			Value: &model.LiteralValueExpression{Value: cty.StringVal(resource.Options.Version.Value)},
+			Value: quotedLit(resource.Options.Version.Value),
 		})
 	}
 	if resource.Options.Provider != nil {
