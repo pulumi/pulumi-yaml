@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	idAttr = "anID"
+)
+
 type interceptingLog struct {
 	debugMessages []string
 	infoMessages  []string
@@ -60,7 +64,7 @@ resources:
 			calls = calls + 1
 			switch args.TypeToken {
 			case testResourceToken:
-				return "anID", resource.PropertyMap{
+				return idAttr, resource.PropertyMap{
 					"bar": resource.NewArrayProperty([]resource.PropertyValue{
 						resource.NewNumberProperty(42),
 					}),
