@@ -199,10 +199,10 @@ func setDefaultProviders(ctx *analyzeContext) error {
 	checkOptions := func(opts ast.ProviderOpts, providerName string) bool {
 		if opts.HasProvider() {
 			if opts.GetVersion() != nil {
-				// error msg here
+				ctx.errorf(opts.GetVersion(), "Version conflicts with the default provider version.")
 			}
 			if opts.GetPluginDownloadURL() != nil {
-
+				ctx.errorf(opts.GetPluginDownloadURL(), "PluginDownloadURL conflicts with the default provider URL.")
 			}
 
 			expr, diags := ast.VariableSubstitution(providerName)
