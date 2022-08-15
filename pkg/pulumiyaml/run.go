@@ -176,9 +176,9 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func (r *runner) setDefaultProviders() error {
+func setDefaultProviders(ctx *analyzeContext) error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
-	for _, resource := range r.t.Resources.Entries {
+	for _, resource := range ctx.t.Resources.Entries {
 		v := resource.Value
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -196,11 +196,28 @@ func (r *runner) setDefaultProviders() error {
 		}
 	}
 
+	checkOptions := func(opts ast.ProviderOpts, providerName string) bool {
+		if opts.HasProvider() {
+			if opts.GetVersion() != nil {
+				// error msg here
+			}
+			if opts.GetPluginDownloadURL() != nil {
+
+			}
+
+			expr, diags := ast.VariableSubstitution(providerName)
+			if diags.HasErrors() {
+				ctx.sdiags.diags = append(ctx.sdiags.diags, diags...)
+				return false
+			}
+			opts.SetProvider(expr)
+		}
+	}
+
 	// Set roots
-	diags := r.Run(walker{
-		VisitResource: func(r *runner, node resourceNode) bool {
-			k, v := node.Key.Value, node.Value
-			ctx := r.newContext(node)
+	walker := walker{
+		VisitResource: func(node resourceNode) bool {
+			_, v := node.Key.Value, node.Value
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
 			}
@@ -211,32 +228,10 @@ func (r *runner) setDefaultProviders() error {
 			}
 			defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
-			if v.Options.Provider == nil {
-				if v.Options.Version != nil {
-					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
-				}
-				if v.Options.PluginDownloadURL != nil {
-					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
-				}
-
-				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
-				if diags.HasErrors() {
-					r.sdiags.diags = append(r.sdiags.diags, diags...)
-					return false
-				}
-
-				v.Options.Provider = expr
-			}
-			return true
+			return checkOptions(&v.Options, defaultProviderInfo.providerName.Value)
 		},
-		VisitExpr: func(ec *evalContext, e ast.Expr) bool {
-			return true
-		},
-		VisitVariable: func(r *runner, node variableNode) bool {
-			k, v := node.Key.Value, node.Value
-			ctx := r.newContext(node)
-
-			switch t := v.(type) {
+		VisitExpr: func(e ast.Expr) bool {
+			switch t := e.(type) {
 			case *ast.InvokeExpr:
 				pkgName := strings.Split(t.Token.Value, ":")[0]
 				if _, ok := defaultProviderInfoMap[pkgName]; !ok {
@@ -244,34 +239,23 @@ func (r *runner) setDefaultProviders() error {
 				}
 				defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
-				if t.CallOpts.Provider == nil {
-					if t.CallOpts.Version != nil {
-						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
-					}
-					if t.CallOpts.PluginDownloadURL != nil {
-						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
-					}
-
-					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
-					if diags.HasErrors() {
-						r.sdiags.diags = append(r.sdiags.diags, diags...)
-						return false
-					}
-					t.CallOpts.Provider = expr
-				}
+				return checkOptions(&t.CallOpts, defaultProviderInfo.providerName.Value)
 			}
 			return true
 		},
-		VisitConfig: func(r *runner, node configNode) bool {
+		VisitVariable: func(ctx *baseCtx, node variableNode) bool {
 			return true
 		},
-		VisitOutput: func(r *runner, node ast.PropertyMapEntry) bool {
+		VisitConfig: func(ctx *baseCtx, node configNode) bool {
 			return true
 		},
-	})
+		VisitOutput: func(node ast.PropertyMapEntry) bool {
+			return true
+		},
+	}
 
-	if diags.HasErrors() {
-		return diags
+	if ctx.sdiags.HasErrors() {
+		return &ctx.sdiags
 	}
 	return nil
 }
@@ -279,8 +263,9 @@ func (r *runner) setDefaultProviders() error {
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	r := newRunner(ctx, t, loader)
+	analyzeCtx := newAnalyzeCtx(ctx, t, loader)
 
-	err := r.setDefaultProviders()
+	err := setDefaultProviders(analyzeCtx)
 	if err != nil {
 		return err
 	}
@@ -344,6 +329,74 @@ type runner struct {
 	intermediates []graphNode
 }
 
+type baseCtx interface {
+	error(ast.Expr, string) (interface{}, bool)
+	addDiag(*syntax.Diagnostic)
+	errorf(ast.Expr, string, ...interface{}) (interface{}, bool)
+
+	getPkgLoader() PackageLoader
+}
+
+type analyzeContext struct {
+	ctx       *pulumi.Context
+	t         *ast.TemplateDecl
+	pkgLoader PackageLoader
+	sdiags    syncDiags
+}
+
+func (ctx *analyzeContext) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	ctx.addDiag(diag)
+	return nil, false
+}
+
+func (ctx *analyzeContext) addDiag(diag *syntax.Diagnostic) {
+	defer func() {
+		ctx.sdiags.Extend(diag)
+	}()
+
+	var buf bytes.Buffer
+	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
+	err := w.WriteDiagnostic(diag.HCL())
+	if err != nil {
+		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+	} else {
+		s := buf.String()
+		// We strip off the appropriate HCL error message, since it will be
+		// added back on via the pulumi.Log framework.
+		switch diag.Severity {
+		case hcl.DiagWarning:
+			s = strings.TrimPrefix(s, "Warning: ")
+			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
+		default:
+			s = strings.TrimPrefix(s, "Error: ")
+			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
+		}
+	}
+	if err != nil {
+		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
+	}
+}
+
+func (ctx *analyzeContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return ctx.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (ctx *analyzeContext) getPkgLoader() PackageLoader {
+	return ctx.pkgLoader
+}
+
+func newAnalyzeCtx(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *analyzeContext {
+	return &analyzeContext{
+		ctx:       ctx,
+		t:         t,
+		pkgLoader: p,
+		sdiags:    syncDiags{},
+	}
+}
+
 type evalContext struct {
 	*runner
 
@@ -390,6 +443,10 @@ func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 
 func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
 	return ctx.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (ctx *evalContext) getPkgLoader() PackageLoader {
+	return ctx.pkgLoader
 }
 
 func (r *runner) newContext(root interface{}) *evalContext {
@@ -557,7 +614,7 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
-	EvalConfig(r *runner, node configNode) bool
+	EvalConfig(node configNode) bool
 	EvalVariable(r *runner, node variableNode) bool
 	EvalResource(r *runner, node resourceNode) bool
 	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
