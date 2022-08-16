@@ -329,79 +329,30 @@ type runner struct {
 	intermediates []graphNode
 }
 
-type baseCtx interface {
-	error(ast.Expr, string) (interface{}, bool)
-	addDiag(*syntax.Diagnostic)
-	errorf(ast.Expr, string, ...interface{}) (interface{}, bool)
+// type baseCtx interface {
+// 	error(ast.Expr, string) (interface{}, bool)
+// 	addDiag(*syntax.Diagnostic)
+// 	errorf(ast.Expr, string, ...interface{}) (interface{}, bool)
 
-	getPkgLoader() PackageLoader
-}
+// 	getPkgLoader() PackageLoader
+// }
 
-type analyzeContext struct {
+type evalContext struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
 	pkgLoader PackageLoader
-	sdiags    syncDiags
-}
+	config    map[string]interface{}
+	variables map[string]interface{}
+	resources map[string]lateboundResource
+	stackRefs map[string]*pulumi.StackReference
 
-func (ctx *analyzeContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-	diag := ast.ExprError(expr, summary, "")
-	ctx.addDiag(diag)
-	return nil, false
-}
+	cwd string
 
-func (ctx *analyzeContext) addDiag(diag *syntax.Diagnostic) {
-	defer func() {
-		ctx.sdiags.Extend(diag)
-	}()
-
-	var buf bytes.Buffer
-	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
-	err := w.WriteDiagnostic(diag.HCL())
-	if err != nil {
-		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
-	} else {
-		s := buf.String()
-		// We strip off the appropriate HCL error message, since it will be
-		// added back on via the pulumi.Log framework.
-		switch diag.Severity {
-		case hcl.DiagWarning:
-			s = strings.TrimPrefix(s, "Warning: ")
-			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
-		default:
-			s = strings.TrimPrefix(s, "Error: ")
-			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
-		}
-	}
-	if err != nil {
-		os.Stderr.Write([]byte(err.Error()))
-	} else {
-		diag.Shown = true
-	}
-}
-
-func (ctx *analyzeContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
-	return ctx.error(expr, fmt.Sprintf(format, a...))
-}
-
-func (ctx *analyzeContext) getPkgLoader() PackageLoader {
-	return ctx.pkgLoader
-}
-
-func newAnalyzeCtx(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *analyzeContext {
-	return &analyzeContext{
-		ctx:       ctx,
-		t:         t,
-		pkgLoader: p,
-		sdiags:    syncDiags{},
-	}
-}
-
-type evalContext struct {
-	*runner
-
-	root   interface{}
 	sdiags syncDiags
+
+	// Used to store sorted nodes. A non `nil` value indicates that the runner
+	// is already setup for running.
+	intermediates []graphNode
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -413,7 +364,6 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	defer func() {
 		ctx.sdiags.Extend(diag)
-		ctx.runner.sdiags.Extend(diag)
 	}()
 
 	var buf bytes.Buffer
@@ -449,15 +399,76 @@ func (ctx *evalContext) getPkgLoader() PackageLoader {
 	return ctx.pkgLoader
 }
 
-func (r *runner) newContext(root interface{}) *evalContext {
-	ctx := &evalContext{
-		runner: r,
-		root:   root,
-		sdiags: syncDiags{},
+func newContext(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *evalContext {
+	return &evalContext{
+		ctx:       ctx,
+		t:         t,
+		pkgLoader: p,
+		sdiags:    syncDiags{},
 	}
-
-	return ctx
 }
+
+// type evalContext struct {
+// 	*runner
+
+// 	root   interface{}
+// 	sdiags syncDiags
+// }
+
+// func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
+// 	diag := ast.ExprError(expr, summary, "")
+// 	ctx.addDiag(diag)
+// 	return nil, false
+// }
+
+// func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
+// 	defer func() {
+// 		ctx.sdiags.Extend(diag)
+// 		ctx.runner.sdiags.Extend(diag)
+// 	}()
+
+// 	var buf bytes.Buffer
+// 	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
+// 	err := w.WriteDiagnostic(diag.HCL())
+// 	if err != nil {
+// 		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+// 	} else {
+// 		s := buf.String()
+// 		// We strip off the appropriate HCL error message, since it will be
+// 		// added back on via the pulumi.Log framework.
+// 		switch diag.Severity {
+// 		case hcl.DiagWarning:
+// 			s = strings.TrimPrefix(s, "Warning: ")
+// 			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
+// 		default:
+// 			s = strings.TrimPrefix(s, "Error: ")
+// 			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
+// 		}
+// 	}
+// 	if err != nil {
+// 		os.Stderr.Write([]byte(err.Error()))
+// 	} else {
+// 		diag.Shown = true
+// 	}
+// }
+
+// func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+// 	return ctx.error(expr, fmt.Sprintf(format, a...))
+// }
+
+// func (ctx *evalContext) getPkgLoader() PackageLoader {
+// 	return ctx.pkgLoader
+// }
+
+// func (r *runner) newContext(root interface{}) *evalContext {
+// 	ctx := &evalContext{
+// 		runner: r,
+// 		root:   root,
+// 		sdiags: syncDiags{},
+// 	}
+
+// 	return ctx
+// }
 
 // lateboundResource is an interface shared by lateboundCustomResourceState and
 // lateboundProviderResourceState so that both normal and provider resources can be
@@ -614,149 +625,146 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
-	EvalConfig(node configNode) bool
-	EvalVariable(r *runner, node variableNode) bool
-	EvalResource(r *runner, node resourceNode) bool
-	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
+	EvalConfig(ctx *evalContext, node configNode) bool
+	EvalVariable(ctx *evalContext, node variableNode) bool
+	EvalResource(ctx *evalContext, node resourceNode) bool
+	EvalOutput(ctx *evalContext, node ast.PropertyMapEntry) bool
 }
 
 type evaluator struct{}
 
-func (evaluator) EvalConfig(r *runner, node configNode) bool {
-	ctx := r.newContext(node)
-	c, ok := ctx.registerConfig(node)
-	if !ok {
-		r.config[node.Key.Value] = poisonMarker{}
-		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
-		if err != nil {
-			return false
-		}
-	} else {
-		r.config[node.Key.Value] = c
-	}
+func (evaluator) EvalConfig(ctx *evalContext, node configNode) bool {
+	// TODO: refactor poison marker logic
+	ctx.registerConfig(node)
+	// if !ok {
+	// 	r.config[node.Key.Value] = poisonMarker{}
+	// 	msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	// } else {
+	// 	r.config[node.Key.Value] = c
+	// }
 	return true
 }
 
-func (evaluator) EvalVariable(r *runner, node variableNode) bool {
-	ctx := r.newContext(node)
-	value, ok := ctx.evaluateExpr(node.Value)
-	if !ok {
-		r.variables[node.Key.Value] = poisonMarker{}
-		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-		if err != nil {
-			return false
-		}
-	} else {
-		r.variables[node.Key.Value] = value
-	}
+func (evaluator) EvalVariable(ctx *evalContext, node variableNode) bool {
+	ctx.evaluateExpr(node.Value)
+	// if !ok {
+	// 	r.variables[node.Key.Value] = poisonMarker{}
+	// 	msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	// } else {
+	// 	r.variables[node.Key.Value] = value
+	// }
 	return true
 }
 
-func (evaluator) EvalResource(r *runner, node resourceNode) bool {
-	ctx := r.newContext(node)
-	res, ok := ctx.registerResource(node)
-	if !ok {
-		r.resources[node.Key.Value] = poisonMarker{}
-		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-		if err != nil {
-			return false
-		}
-	} else {
-		r.resources[node.Key.Value] = res
-	}
+func (evaluator) EvalResource(ctx *evalContext, node resourceNode) bool {
+	ctx.registerResource(node)
+	// if !ok {
+	// 	r.resources[node.Key.Value] = poisonMarker{}
+	// 	msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	// } else {
+	// 	r.resources[node.Key.Value] = res
+	// }
 	return true
 
 }
 
-func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	ctx := r.newContext(node)
-	out, ok := ctx.registerOutput(node)
-	if !ok {
-		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-		if err != nil {
-			return false
-		}
-	} else if _, poisoned := out.(poisonMarker); !poisoned {
-		r.ctx.Export(node.Key.Value, out)
-	}
+func (evaluator) EvalOutput(ctx *evalContext, node ast.PropertyMapEntry) bool {
+	ctx.registerOutput(node)
+	// if !ok {
+	// 	msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	// } else if _, poisoned := out.(poisonMarker); !poisoned {
+	// 	r.ctx.Export(node.Key.Value, out)
+	// }
 	return true
 }
 
-func (r *runner) Evaluate() syntax.Diagnostics {
-	return r.Run(evaluator{})
+func Evaluate(ctx *evalContext) syntax.Diagnostics {
+	return Run(ctx, evaluator{})
 }
 
-func (r *runner) ensureSetup() {
-	r.intermediates = []graphNode{}
+func ensureSetup(ctx *evalContext) {
+	ctx.intermediates = []graphNode{}
 	cwd, err := os.Getwd()
 	if err != nil {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		ctx.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
 	}
-	r.variables[PulumiVarName] = map[string]interface{}{
+	ctx.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
-		"project": r.ctx.Project(),
-		"stack":   r.ctx.Stack(),
+		"project": ctx.ctx.Project(),
+		"stack":   ctx.ctx.Stack(),
 	}
-	r.cwd = cwd
+	ctx.cwd = cwd
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t)
-	r.sdiags.Extend(rdiags...)
+	intermediates, rdiags := topologicallySortedResources(ctx.t)
+	ctx.sdiags.Extend(rdiags...)
 	if rdiags.HasErrors() {
 		return
 	}
 	if intermediates != nil {
-		r.intermediates = intermediates
+		ctx.intermediates = intermediates
 	}
 }
 
-func (r *runner) Run(e Evaluator) syntax.Diagnostics {
-	r.ensureSetup()
+func Run(ctx *evalContext, e Evaluator) syntax.Diagnostics {
+	ensureSetup(ctx)
 	returnDiags := func() syntax.Diagnostics {
-		r.sdiags.mutex.Lock()
-		defer r.sdiags.mutex.Unlock()
-		return r.sdiags.diags
+		ctx.sdiags.mutex.Lock()
+		defer ctx.sdiags.mutex.Unlock()
+		return ctx.sdiags.diags
 	}
-	if r.sdiags.HasErrors() {
+	if ctx.sdiags.HasErrors() {
 		return returnDiags()
 	}
 
-	for _, kvp := range r.intermediates {
+	for _, kvp := range ctx.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalConfig(r, kvp) {
+			if !e.EvalConfig(ctx, kvp) {
 				return returnDiags()
 			}
 		case variableNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalVariable(r, kvp) {
+			if !e.EvalVariable(ctx, kvp) {
 				return returnDiags()
 			}
 		case resourceNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalResource(r, kvp) {
+			if !e.EvalResource(ctx, kvp) {
 				return returnDiags()
 			}
 		}
 	}
 
-	for _, kvp := range r.t.Outputs.Entries {
-		if !e.EvalOutput(r, kvp) {
+	for _, kvp := range ctx.t.Outputs.Entries {
+		if !e.EvalOutput(ctx, kvp) {
 			return returnDiags()
 		}
 	}
