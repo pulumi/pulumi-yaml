@@ -218,7 +218,7 @@ func setDefaultProviders(ctx *evalContext) error {
 	// Set roots
 	walker := walker{
 		VisitResource: func(ctx *evalContext, node resourceNode) bool {
-			_, v := node.Key.Value, node.Value
+			v := node.Value
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
 			}
