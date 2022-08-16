@@ -18,6 +18,9 @@
 - Add sugar for `Fn::Invoke`
   [#294](https://github.com/pulumi/pulumi-yaml/pull/294)
 
+- CI check to ensure `pu/pkg` and `pu/sdk` versions are merged
+  [#307](https://github.com/pulumi/pulumi-yaml/pull/307)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type

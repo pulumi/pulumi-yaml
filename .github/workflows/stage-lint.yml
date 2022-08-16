@@ -23,9 +23,12 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.46.2
-      - name: Run go mod tidy
-        id: go-mod-tidy
-        run: go mod tidy
+      - run: go mod tidy
+      - name: Undo go mod tidy changes if successful
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git checkout ./go.mod && git checkout ./go.sum
+          fi
 
   check-copyright:
     runs-on: ubuntu-latest
