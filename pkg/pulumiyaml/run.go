@@ -245,9 +245,9 @@ func setDefaultProviders(ctx *evalContext) error {
 			return true
 		},
 	}
-	Run(ctx, walker)
+	diags := Run(ctx, walker)
 
-	if ctx.sdiags.HasErrors() {
+	if diags.HasErrors() {
 		return &ctx.sdiags
 	}
 	return nil
@@ -255,7 +255,7 @@ func setDefaultProviders(ctx *evalContext) error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	evalCtx := newContext(ctx, t, loader)
+	evalCtx := newEvalCtx(ctx, t, loader)
 
 	err := setDefaultProviders(evalCtx)
 	if err != nil {
@@ -365,7 +365,7 @@ func (ctx *evalContext) getPkgLoader() PackageLoader {
 	return ctx.pkgLoader
 }
 
-func newContext(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *evalContext {
+func newEvalCtx(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *evalContext {
 	return &evalContext{
 		ctx:       ctx,
 		t:         t,

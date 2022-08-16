@@ -35,7 +35,7 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags = testTemplateSyntaxDiags(t, tmpl)
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -64,7 +64,7 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags = testTemplateSyntaxDiags(t, tmpl)
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -93,7 +93,7 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags = testTemplateSyntaxDiags(t, tmpl)
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -201,7 +201,7 @@ resources:
 	}})
 	want.Equal(t, got)
 
-	diags = testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags = testTemplateSyntaxDiags(t, tmpl)
 	requireNoErrors(t, tmpl, diags)
 }
 

@@ -76,12 +76,11 @@ resources:
 
 	log := &interceptingLog{}
 
-	var hoistedRunner *runner
+	var ectx *evalContext
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		ctx.Log = log
-		r := newRunner(ctx, template, newMockPackageMap())
-		hoistedRunner = r
-		diags := r.Evaluate()
+		ectx = newEvalCtx(ctx, template, MockPackageLoader{})
+		diags := Evaluate(ectx)
 		// 1. This test demonstrates that the synchronous output of evaluate is nil
 		// as the invalid expression is inside an apply
 		assert.False(t, diags.HasErrors())
@@ -92,8 +91,8 @@ resources:
 	assert.Equal(t, "waiting for RPCs: marshaling properties: awaiting input property foo: runtime error", err.Error())
 
 	// 3. The runner on the YAML side processed the inner error:
-	assert.True(t, hoistedRunner.sdiags.HasErrors())
-	assert.Equal(t, "<stdin>:9:12: list index 1 out-of-bounds for list of length 1", diagString(hoistedRunner.sdiags.diags[0]))
+	assert.True(t, ectx.sdiags.HasErrors())
+	assert.Equal(t, "<stdin>:9:12: list index 1 out-of-bounds for list of length 1", diagString(ectx.sdiags.diags[0]))
 
 	// 4. We have rich logs sent to Pulumi:
 	richError := `list index 1 out-of-bounds for list of length 1
