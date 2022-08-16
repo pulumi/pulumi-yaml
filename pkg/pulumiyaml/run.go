@@ -370,7 +370,12 @@ func newEvalCtx(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *eval
 		ctx:       ctx,
 		t:         t,
 		pkgLoader: p,
-		sdiags:    syncDiags{},
+		config:    make(map[string]interface{}),
+		variables: make(map[string]interface{}),
+		resources: make(map[string]lateboundResource),
+		stackRefs: make(map[string]*pulumi.StackReference),
+
+		sdiags: syncDiags{},
 	}
 }
 
