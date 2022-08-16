@@ -23,6 +23,13 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.46.2
+      - name: Run go mod tidy and save output
+        run: |
+          echo "GO_MOD_TIDY_OUTPUT=$(go mod tidy)" >> $GITHUB_ENV
+      - name: Check for go mod tidy unknown revisions
+        if: contains(['unknown revision'],env.GO_MOD_TIDY_OUTPUT)
+        run: |
+          exit 1
   check-copyright:
     runs-on: ubuntu-latest
     steps:
