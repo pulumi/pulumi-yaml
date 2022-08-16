@@ -312,24 +312,6 @@ type providerInfo struct {
 	providerName      *ast.StringExpr
 }
 
-type runner struct {
-	ctx       *pulumi.Context
-	t         *ast.TemplateDecl
-	pkgLoader PackageLoader
-	config    map[string]interface{}
-	variables map[string]interface{}
-	resources map[string]lateboundResource
-	stackRefs map[string]*pulumi.StackReference
-
-	cwd string
-
-	sdiags syncDiags
-
-	// Used to store sorted nodes. A non `nil` value indicates that the runner
-	// is already setup for running.
-	intermediates []graphNode
-}
-
 type evalContext struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
@@ -539,18 +521,6 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 		return v, true
 	}
 	return poisonMarker{}, false
-}
-
-func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
-	return &runner{
-		ctx:       ctx,
-		t:         t,
-		pkgLoader: p,
-		config:    make(map[string]interface{}),
-		variables: make(map[string]interface{}),
-		resources: make(map[string]lateboundResource),
-		stackRefs: make(map[string]*pulumi.StackReference),
-	}
 }
 
 const PulumiVarName = "pulumi"
