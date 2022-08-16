@@ -176,7 +176,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func setDefaultProviders(ctx *analyzeContext) error {
+func setDefaultProviders(ctx *evalContext) error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
 	for _, resource := range ctx.t.Resources.Entries {
 		v := resource.Value
@@ -212,11 +212,12 @@ func setDefaultProviders(ctx *analyzeContext) error {
 			}
 			opts.SetProvider(expr)
 		}
+		return true
 	}
 
 	// Set roots
 	walker := walker{
-		VisitResource: func(node resourceNode) bool {
+		VisitResource: func(ctx *evalContext, node resourceNode) bool {
 			_, v := node.Key.Value, node.Value
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
@@ -230,7 +231,7 @@ func setDefaultProviders(ctx *analyzeContext) error {
 
 			return checkOptions(&v.Options, defaultProviderInfo.providerName.Value)
 		},
-		VisitExpr: func(e ast.Expr) bool {
+		VisitExpr: func(ctx *evalContext, e ast.Expr) bool {
 			switch t := e.(type) {
 			case *ast.InvokeExpr:
 				pkgName := strings.Split(t.Token.Value, ":")[0]

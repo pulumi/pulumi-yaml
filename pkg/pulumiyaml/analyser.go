@@ -379,7 +379,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 
 // Provides an appropriate diagnostic message if it is illegal to assign `from`
 // to `to`.
-func assertTypeAssignable(ctx *baseCtx, loc *hcl.Range, from, to schema.Type) {
+func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type) {
 	if to == nil {
 		return
 	}
@@ -389,20 +389,20 @@ func assertTypeAssignable(ctx *baseCtx, loc *hcl.Range, from, to schema.Type) {
 	}
 	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
-		(*ctx).addDiag(syntax.Warning(loc,
+		ctx.addDiag(syntax.Warning(loc,
 			fmt.Sprintf("internal error: %s", summary),
 			result.String(),
 		))
 		return
 	}
-	(*ctx).addDiag(syntax.Error(loc, summary, result.String()))
+	ctx.addDiag(syntax.Error(loc, summary, result.String()))
 }
 
-func (tc *typeCache) typeResource(ctx *baseCtx, node resourceNode) bool {
+func (tc *typeCache) typeResource(ctx *evalContext, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
-	pkg, typ, err := ResolveResource((*ctx).getPkgLoader(), v.Type.Value)
+	pkg, typ, err := ResolveResource(ctx.getPkgLoader(), v.Type.Value)
 	if err != nil {
-		(*ctx).error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
@@ -417,12 +417,12 @@ func (tc *typeCache) typeResource(ctx *baseCtx, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	tc.typePropertyEntries(*ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
 	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
-		(*ctx).addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
 				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
@@ -523,7 +523,7 @@ func (tc *typeCache) typeResource(ctx *baseCtx, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx baseCtx, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	propMap := map[string]*schema.Property{}
 	for _, p := range props {
 		propMap[p.Name] = p
@@ -553,10 +553,10 @@ func (tc *typeCache) typePropertyEntries(ctx baseCtx, resourceName string, fmtr 
 	}
 }
 
-func (tc *typeCache) typeInvoke(ctx *baseCtx, t *ast.InvokeExpr) bool {
-	pkg, functionName, err := ResolveFunction((*ctx).getPkgLoader(), t.Token.Value)
+func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
+	pkg, functionName, err := ResolveFunction(ctx.getPkgLoader(), t.Token.Value)
 	if err != nil {
-		_, b := (*ctx).error(t, err.Error())
+		_, b := ctx.error(t, err.Error())
 		return b
 	}
 	var existing []string
@@ -580,7 +580,7 @@ func (tc *typeCache) typeInvoke(ctx *baseCtx, t *ast.InvokeExpr) bool {
 				summary, detail := fmtr.MessageWithDetail(k, k)
 				subject := prop.Key.Syntax().Syntax().Range()
 				context := t.Syntax().Syntax().Range()
-				(*ctx).addDiag(syntax.Error(subject, summary, detail).WithContext(context))
+				ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
 			} else {
 				tc.exprs[prop.Value] = typ
 			}
@@ -621,7 +621,7 @@ func (tc *typeCache) typeInvoke(ctx *baseCtx, t *ast.InvokeExpr) bool {
 		}
 		if hint.Outputs == nil || !validReturn {
 			summary, detail := fmtr.MessageWithDetail(t.Return.Value, t.Return.Value)
-			(*ctx).addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
+			ctx.addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
 		} else {
 			tc.exprs[t] = returnType
 		}
@@ -966,8 +966,8 @@ type walker struct {
 	VisitConfig   func(ctx *evalContext, node configNode) bool
 	VisitVariable func(ctx *evalContext, node variableNode) bool
 	VisitOutput   func(node ast.PropertyMapEntry) bool
-	VisitResource func(node resourceNode) bool
-	VisitExpr     func(ast.Expr) bool
+	VisitResource func(ctx *evalContext, node resourceNode) bool
+	VisitExpr     func(*evalContext, ast.Expr) bool
 }
 
 func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
@@ -1082,7 +1082,7 @@ func (e walker) EvalResource(ctx *evalContext, node resourceNode) bool {
 	}
 	// We visit the expressions in a resource before we visit the resource itself
 	if e.VisitResource != nil {
-		if !e.VisitResource(node) {
+		if !e.VisitResource(ctx, node) {
 			return false
 		}
 	}
