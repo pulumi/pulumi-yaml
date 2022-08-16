@@ -243,16 +243,17 @@ func setDefaultProviders(ctx *analyzeContext) error {
 			}
 			return true
 		},
-		VisitVariable: func(ctx *baseCtx, node variableNode) bool {
+		VisitVariable: func(ctx *evalContext, node variableNode) bool {
 			return true
 		},
-		VisitConfig: func(ctx *baseCtx, node configNode) bool {
+		VisitConfig: func(ctx *evalContext, node configNode) bool {
 			return true
 		},
 		VisitOutput: func(node ast.PropertyMapEntry) bool {
 			return true
 		},
 	}
+	Run(ctx, walker)
 
 	if ctx.sdiags.HasErrors() {
 		return &ctx.sdiags
@@ -262,20 +263,19 @@ func setDefaultProviders(ctx *analyzeContext) error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	r := newRunner(ctx, t, loader)
-	analyzeCtx := newAnalyzeCtx(ctx, t, loader)
+	evalCtx := newContext(ctx, t, loader)
 
-	err := setDefaultProviders(analyzeCtx)
+	err := setDefaultProviders(evalCtx)
 	if err != nil {
 		return err
 	}
 
-	_, diags := TypeCheck(r)
+	_, diags := TypeCheck(evalCtx)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	diags.Extend(r.Evaluate()...)
+	diags.Extend(Evaluate(evalCtx)...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -328,14 +328,6 @@ type runner struct {
 	// is already setup for running.
 	intermediates []graphNode
 }
-
-// type baseCtx interface {
-// 	error(ast.Expr, string) (interface{}, bool)
-// 	addDiag(*syntax.Diagnostic)
-// 	errorf(ast.Expr, string, ...interface{}) (interface{}, bool)
-
-// 	getPkgLoader() PackageLoader
-// }
 
 type evalContext struct {
 	ctx       *pulumi.Context
@@ -407,68 +399,6 @@ func newContext(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *eval
 		sdiags:    syncDiags{},
 	}
 }
-
-// type evalContext struct {
-// 	*runner
-
-// 	root   interface{}
-// 	sdiags syncDiags
-// }
-
-// func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-// 	diag := ast.ExprError(expr, summary, "")
-// 	ctx.addDiag(diag)
-// 	return nil, false
-// }
-
-// func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
-// 	defer func() {
-// 		ctx.sdiags.Extend(diag)
-// 		ctx.runner.sdiags.Extend(diag)
-// 	}()
-
-// 	var buf bytes.Buffer
-// 	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
-// 	err := w.WriteDiagnostic(diag.HCL())
-// 	if err != nil {
-// 		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
-// 	} else {
-// 		s := buf.String()
-// 		// We strip off the appropriate HCL error message, since it will be
-// 		// added back on via the pulumi.Log framework.
-// 		switch diag.Severity {
-// 		case hcl.DiagWarning:
-// 			s = strings.TrimPrefix(s, "Warning: ")
-// 			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
-// 		default:
-// 			s = strings.TrimPrefix(s, "Error: ")
-// 			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
-// 		}
-// 	}
-// 	if err != nil {
-// 		os.Stderr.Write([]byte(err.Error()))
-// 	} else {
-// 		diag.Shown = true
-// 	}
-// }
-
-// func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
-// 	return ctx.error(expr, fmt.Sprintf(format, a...))
-// }
-
-// func (ctx *evalContext) getPkgLoader() PackageLoader {
-// 	return ctx.pkgLoader
-// }
-
-// func (r *runner) newContext(root interface{}) *evalContext {
-// 	ctx := &evalContext{
-// 		runner: r,
-// 		root:   root,
-// 		sdiags: syncDiags{},
-// 	}
-
-// 	return ctx
-// }
 
 // lateboundResource is an interface shared by lateboundCustomResourceState and
 // lateboundProviderResourceState so that both normal and provider resources can be
@@ -1885,7 +1815,7 @@ func (ctx *evalContext) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{
 			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 		isSubdirectory := false
-		relPath, err := filepath.Rel(ctx.runner.cwd, path)
+		relPath, err := filepath.Rel(ctx.cwd, path)
 		if err != nil {
 			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
