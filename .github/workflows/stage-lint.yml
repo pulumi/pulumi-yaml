@@ -27,7 +27,7 @@ jobs:
         run: |
           echo "GO_MOD_TIDY_OUTPUT=$(go mod tidy)" >> $GITHUB_ENV
       - name: Check for go mod tidy unknown revisions
-        if: contains(['unknown revision'],env.GO_MOD_TIDY_OUTPUT)
+        if: contains(env.GO_MOD_TIDY_OUTPUT, 'unknown revision')
         run: |
           exit 1
   check-copyright:
