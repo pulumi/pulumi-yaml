@@ -23,6 +23,10 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.46.2
+      - name: Run go mod tidy
+        id: go-mod-tidy
+        run: go mod tidy
+
   check-copyright:
     runs-on: ubuntu-latest
     steps:
