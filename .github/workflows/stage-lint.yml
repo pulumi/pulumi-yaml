@@ -23,13 +23,14 @@ jobs:
       #   uses: golangci/golangci-lint-action@v3
       #   with:
       #     version: v1.46.2
-      - name: Run go mod tidy and save output
+      - run: go mod tidy
+      # If there are any diffs from goimports or go mod tidy, fail.
+      - name: Verify no changes from goimports and go mod tidy
         run: |
-          echo "GO_MOD_TIDY_OUTPUT=$(go mod tidy)" >> $GITHUB_ENV
-      - name: Check for go mod tidy unknown revisions
-        if: contains(env.GO_MOD_TIDY_OUTPUT, 'unknown revision')
-        run: |
-          exit 1
+          if [ -n "$(git status --porcelain)" ]; then
+            git checkout ./go.mod && git checkout ./go.sum
+            exit 1
+          fi
   check-copyright:
     runs-on: ubuntu-latest
     steps:
