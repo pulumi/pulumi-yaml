@@ -531,63 +531,62 @@ type Evaluator interface {
 type evaluator struct{}
 
 func (evaluator) EvalConfig(ctx *evalContext, node configNode) bool {
-	// TODO: refactor poison marker logic
-	ctx.registerConfig(node)
-	// if !ok {
-	// 	r.config[node.Key.Value] = poisonMarker{}
-	// 	msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	// } else {
-	// 	r.config[node.Key.Value] = c
-	// }
+	c, ok := ctx.registerConfig(node)
+	if !ok {
+		ctx.config[node.Key.Value] = poisonMarker{}
+		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+		if err != nil {
+			return false
+		}
+	} else {
+		ctx.config[node.Key.Value] = c
+	}
 	return true
 }
 
 func (evaluator) EvalVariable(ctx *evalContext, node variableNode) bool {
-	ctx.evaluateExpr(node.Value)
-	// if !ok {
-	// 	r.variables[node.Key.Value] = poisonMarker{}
-	// 	msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	// } else {
-	// 	r.variables[node.Key.Value] = value
-	// }
+	value, ok := ctx.evaluateExpr(node.Value)
+	if !ok {
+		ctx.variables[node.Key.Value] = poisonMarker{}
+		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		ctx.variables[node.Key.Value] = value
+	}
 	return true
 }
 
 func (evaluator) EvalResource(ctx *evalContext, node resourceNode) bool {
-	ctx.registerResource(node)
-	// if !ok {
-	// 	r.resources[node.Key.Value] = poisonMarker{}
-	// 	msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	// } else {
-	// 	r.resources[node.Key.Value] = res
-	// }
+	res, ok := ctx.registerResource(node)
+	if !ok {
+		ctx.resources[node.Key.Value] = poisonMarker{}
+		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		ctx.resources[node.Key.Value] = res
+	}
 	return true
 
 }
 
 func (evaluator) EvalOutput(ctx *evalContext, node ast.PropertyMapEntry) bool {
-	ctx.registerOutput(node)
-	// if !ok {
-	// 	msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-	// 	err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	// } else if _, poisoned := out.(poisonMarker); !poisoned {
-	// 	r.ctx.Export(node.Key.Value, out)
-	// }
+	out, ok := ctx.registerOutput(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else if _, poisoned := out.(poisonMarker); !poisoned {
+		ctx.ctx.Export(node.Key.Value, out)
+	}
 	return true
 }
 
