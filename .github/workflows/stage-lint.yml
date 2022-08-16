@@ -25,11 +25,10 @@ jobs:
       #     version: v1.46.2
       - run: go mod tidy
       # If there are any diffs from goimports or go mod tidy, fail.
-      - name: Verify no changes from goimports and go mod tidy
+      - name: Undo go mod tidy changes if successful
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git checkout ./go.mod && git checkout ./go.sum
-            exit 1
           fi
   check-copyright:
     runs-on: ubuntu-latest
