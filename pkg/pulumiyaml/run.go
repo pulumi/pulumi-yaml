@@ -244,15 +244,6 @@ func setDefaultProviders(ctx *evalContext) error {
 			}
 			return true
 		},
-		VisitVariable: func(ctx *evalContext, node variableNode) bool {
-			return true
-		},
-		VisitConfig: func(ctx *evalContext, node configNode) bool {
-			return true
-		},
-		VisitOutput: func(node ast.PropertyMapEntry) bool {
-			return true
-		},
 	}
 	Run(ctx, walker)
 
