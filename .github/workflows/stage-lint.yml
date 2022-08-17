@@ -27,7 +27,8 @@ jobs:
       - name: Undo go mod tidy changes if successful
         run: |
           if [ -n "$(git status --porcelain)" ]; then
-            git checkout ./go.mod && git checkout ./go.sum
+            echo "::error go.mod not tidy"
+            exit 1
           fi
 
   check-copyright:
