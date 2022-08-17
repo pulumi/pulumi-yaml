@@ -24,7 +24,7 @@ jobs:
         with:
           version: v1.46.2
       - run: go mod tidy
-      - name: Undo go mod tidy changes if successful
+      - name: Fail if god mod not tidy
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             echo "::error go.mod not tidy"
