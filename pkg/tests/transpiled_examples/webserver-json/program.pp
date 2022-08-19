@@ -10,10 +10,6 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 		toPort = 80,
 		cidrBlocks = ["0.0.0.0/0"]
 	}]
-
-	options {
-		version = "4.37.1"
-	}
 }
 
 resource webServer "aws:ec2/instance:Instance" {
