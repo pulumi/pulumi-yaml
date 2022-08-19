@@ -18,9 +18,6 @@
 - Add sugar for `Fn::Invoke`
   [#294](https://github.com/pulumi/pulumi-yaml/pull/294)
 
-- Enable transformation & type checking passes in `pulumi convert` path
-  [#305](https://github.com/pulumi/pulumi-yaml/pull/305)
-
 ### Bug Fixes
 
 - Allow `bool` configuration type

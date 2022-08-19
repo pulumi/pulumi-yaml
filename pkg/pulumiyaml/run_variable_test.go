@@ -34,9 +34,10 @@ outputs:
 
 	mocks := &testMonitor{}
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-		ectx := newEvalCtx(ctx, template, MockPackageLoader{})
-		diags := Evaluate(ectx)
+		runner := newRunner(ctx, template, newMockPackageMap())
+		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
+		ectx := runner.newContext(nil)
 		cwdOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.cwd}"))
 		assert.True(t, ok)
 		assert.Equal(t, cwd, cwdOutput)
@@ -81,7 +82,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -110,7 +111,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -144,7 +145,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -185,7 +186,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -216,7 +217,7 @@ outputs:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -249,7 +250,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -275,11 +276,11 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *evalContext) {})
+	diags := testVariableDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
-func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) syntax.Diagnostics {
+func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	testInvokeCalls := 0
 
 	mocks := &testMonitor{
@@ -327,22 +328,23 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		ectx := newEvalCtx(ctx, template, MockPackageLoader{})
-		err := Evaluate(ectx)
+		runner := newRunner(ctx, template, newMockPackageMap())
+		err := runner.Evaluate()
 		if err != nil {
 			return err
 		}
 		if callback != nil {
-			callback(ectx)
+			callback(runner)
 		}
 
+		ectx := runner.newContext(nil)
 		v, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${resFinal.out}"))
 		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo", x)
 			return nil, nil
 		})
-		ectx.ctx.Export("out", out)
+		runner.ctx.Export("out", out)
 
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))

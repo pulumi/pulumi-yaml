@@ -176,9 +176,9 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func setDefaultProviders(ctx *evalContext) error {
+func (r *runner) setDefaultProviders() error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
-	for _, resource := range ctx.t.Resources.Entries {
+	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
 		// check if this is a provider resource
 		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -196,29 +196,11 @@ func setDefaultProviders(ctx *evalContext) error {
 		}
 	}
 
-	checkOptions := func(opts ast.ProviderOpts, providerName string) bool {
-		if opts.HasProvider() {
-			if opts.GetVersion() != nil {
-				ctx.errorf(opts.GetVersion(), "Version conflicts with the default provider version.")
-			}
-			if opts.GetPluginDownloadURL() != nil {
-				ctx.errorf(opts.GetPluginDownloadURL(), "PluginDownloadURL conflicts with the default provider URL.")
-			}
-
-			expr, diags := ast.VariableSubstitution(providerName)
-			if diags.HasErrors() {
-				ctx.sdiags.diags = append(ctx.sdiags.diags, diags...)
-				return false
-			}
-			opts.SetProvider(expr)
-		}
-		return true
-	}
-
 	// Set roots
-	walker := walker{
-		VisitResource: func(ctx *evalContext, node resourceNode) bool {
-			v := node.Value
+	diags := r.Run(walker{
+		VisitResource: func(r *runner, node resourceNode) bool {
+			k, v := node.Key.Value, node.Value
+			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
 			}
@@ -229,10 +211,32 @@ func setDefaultProviders(ctx *evalContext) error {
 			}
 			defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
-			return checkOptions(&v.Options, defaultProviderInfo.providerName.Value)
+			if v.Options.Provider == nil {
+				if v.Options.Version != nil {
+					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+				}
+				if v.Options.PluginDownloadURL != nil {
+					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+				}
+
+				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
+				if diags.HasErrors() {
+					r.sdiags.diags = append(r.sdiags.diags, diags...)
+					return false
+				}
+
+				v.Options.Provider = expr
+			}
+			return true
 		},
-		VisitExpr: func(ctx *evalContext, e ast.Expr) bool {
-			switch t := e.(type) {
+		VisitExpr: func(ec *evalContext, e ast.Expr) bool {
+			return true
+		},
+		VisitVariable: func(r *runner, node variableNode) bool {
+			k, v := node.Key.Value, node.Value
+			ctx := r.newContext(node)
+
+			switch t := v.(type) {
 			case *ast.InvokeExpr:
 				pkgName := strings.Split(t.Token.Value, ":")[0]
 				if _, ok := defaultProviderInfoMap[pkgName]; !ok {
@@ -240,34 +244,53 @@ func setDefaultProviders(ctx *evalContext) error {
 				}
 				defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
-				return checkOptions(&t.CallOpts, defaultProviderInfo.providerName.Value)
+				if t.CallOpts.Provider == nil {
+					if t.CallOpts.Version != nil {
+						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+					}
+					if t.CallOpts.PluginDownloadURL != nil {
+						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+					}
+
+					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
+					if diags.HasErrors() {
+						r.sdiags.diags = append(r.sdiags.diags, diags...)
+						return false
+					}
+					t.CallOpts.Provider = expr
+				}
 			}
 			return true
 		},
-	}
-	diags := Run(ctx, walker)
+		VisitConfig: func(r *runner, node configNode) bool {
+			return true
+		},
+		VisitOutput: func(r *runner, node ast.PropertyMapEntry) bool {
+			return true
+		},
+	})
 
 	if diags.HasErrors() {
-		return &ctx.sdiags
+		return diags
 	}
 	return nil
 }
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	evalCtx := newEvalCtx(ctx, t, loader)
+	r := newRunner(ctx, t, loader)
 
-	err := setDefaultProviders(evalCtx)
+	err := r.setDefaultProviders()
 	if err != nil {
 		return err
 	}
 
-	_, diags := TypeCheck(evalCtx)
+	_, diags := TypeCheck(r)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	diags.Extend(Evaluate(evalCtx)...)
+	diags.Extend(r.Evaluate()...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -303,7 +326,7 @@ type providerInfo struct {
 	providerName      *ast.StringExpr
 }
 
-type evalContext struct {
+type runner struct {
 	ctx       *pulumi.Context
 	t         *ast.TemplateDecl
 	pkgLoader PackageLoader
@@ -321,6 +344,13 @@ type evalContext struct {
 	intermediates []graphNode
 }
 
+type evalContext struct {
+	*runner
+
+	root   interface{}
+	sdiags syncDiags
+}
+
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
 	diag := ast.ExprError(expr, summary, "")
 	ctx.addDiag(diag)
@@ -330,6 +360,7 @@ func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool)
 func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 	defer func() {
 		ctx.sdiags.Extend(diag)
+		ctx.runner.sdiags.Extend(diag)
 	}()
 
 	var buf bytes.Buffer
@@ -361,22 +392,14 @@ func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (
 	return ctx.error(expr, fmt.Sprintf(format, a...))
 }
 
-func (ctx *evalContext) getPkgLoader() PackageLoader {
-	return ctx.pkgLoader
-}
-
-func newEvalCtx(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *evalContext {
-	return &evalContext{
-		ctx:       ctx,
-		t:         t,
-		pkgLoader: p,
-		config:    make(map[string]interface{}),
-		variables: make(map[string]interface{}),
-		resources: make(map[string]lateboundResource),
-		stackRefs: make(map[string]*pulumi.StackReference),
-
+func (r *runner) newContext(root interface{}) *evalContext {
+	ctx := &evalContext{
+		runner: r,
+		root:   root,
 		sdiags: syncDiags{},
 	}
+
+	return ctx
 }
 
 // lateboundResource is an interface shared by lateboundCustomResourceState and
@@ -519,148 +542,164 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
+func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
+	return &runner{
+		ctx:       ctx,
+		t:         t,
+		pkgLoader: p,
+		config:    make(map[string]interface{}),
+		variables: make(map[string]interface{}),
+		resources: make(map[string]lateboundResource),
+		stackRefs: make(map[string]*pulumi.StackReference),
+	}
+}
+
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
-	EvalConfig(ctx *evalContext, node configNode) bool
-	EvalVariable(ctx *evalContext, node variableNode) bool
-	EvalResource(ctx *evalContext, node resourceNode) bool
-	EvalOutput(ctx *evalContext, node ast.PropertyMapEntry) bool
+	EvalConfig(r *runner, node configNode) bool
+	EvalVariable(r *runner, node variableNode) bool
+	EvalResource(r *runner, node resourceNode) bool
+	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
 }
 
 type evaluator struct{}
 
-func (evaluator) EvalConfig(ctx *evalContext, node configNode) bool {
+func (evaluator) EvalConfig(r *runner, node configNode) bool {
+	ctx := r.newContext(node)
 	c, ok := ctx.registerConfig(node)
 	if !ok {
-		ctx.config[node.Key.Value] = poisonMarker{}
+		r.config[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
 			return false
 		}
 	} else {
-		ctx.config[node.Key.Value] = c
+		r.config[node.Key.Value] = c
 	}
 	return true
 }
 
-func (evaluator) EvalVariable(ctx *evalContext, node variableNode) bool {
+func (evaluator) EvalVariable(r *runner, node variableNode) bool {
+	ctx := r.newContext(node)
 	value, ok := ctx.evaluateExpr(node.Value)
 	if !ok {
-		ctx.variables[node.Key.Value] = poisonMarker{}
+		r.variables[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		ctx.variables[node.Key.Value] = value
+		r.variables[node.Key.Value] = value
 	}
 	return true
 }
 
-func (evaluator) EvalResource(ctx *evalContext, node resourceNode) bool {
+func (evaluator) EvalResource(r *runner, node resourceNode) bool {
+	ctx := r.newContext(node)
 	res, ok := ctx.registerResource(node)
 	if !ok {
-		ctx.resources[node.Key.Value] = poisonMarker{}
+		r.resources[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		ctx.resources[node.Key.Value] = res
+		r.resources[node.Key.Value] = res
 	}
 	return true
 
 }
 
-func (evaluator) EvalOutput(ctx *evalContext, node ast.PropertyMapEntry) bool {
+func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+	ctx := r.newContext(node)
 	out, ok := ctx.registerOutput(node)
 	if !ok {
 		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := ctx.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else if _, poisoned := out.(poisonMarker); !poisoned {
-		ctx.ctx.Export(node.Key.Value, out)
+		r.ctx.Export(node.Key.Value, out)
 	}
 	return true
 }
 
-func Evaluate(ctx *evalContext) syntax.Diagnostics {
-	return Run(ctx, evaluator{})
+func (r *runner) Evaluate() syntax.Diagnostics {
+	return r.Run(evaluator{})
 }
 
-func ensureSetup(ctx *evalContext) {
-	ctx.intermediates = []graphNode{}
+func (r *runner) ensureSetup() {
+	r.intermediates = []graphNode{}
 	cwd, err := os.Getwd()
 	if err != nil {
-		ctx.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
 	}
-	ctx.variables[PulumiVarName] = map[string]interface{}{
+	r.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
-		"project": ctx.ctx.Project(),
-		"stack":   ctx.ctx.Stack(),
+		"project": r.ctx.Project(),
+		"stack":   r.ctx.Stack(),
 	}
-	ctx.cwd = cwd
+	r.cwd = cwd
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(ctx.t)
-	ctx.sdiags.Extend(rdiags...)
+	intermediates, rdiags := topologicallySortedResources(r.t)
+	r.sdiags.Extend(rdiags...)
 	if rdiags.HasErrors() {
 		return
 	}
 	if intermediates != nil {
-		ctx.intermediates = intermediates
+		r.intermediates = intermediates
 	}
 }
 
-func Run(ctx *evalContext, e Evaluator) syntax.Diagnostics {
-	ensureSetup(ctx)
+func (r *runner) Run(e Evaluator) syntax.Diagnostics {
+	r.ensureSetup()
 	returnDiags := func() syntax.Diagnostics {
-		ctx.sdiags.mutex.Lock()
-		defer ctx.sdiags.mutex.Unlock()
-		return ctx.sdiags.diags
+		r.sdiags.mutex.Lock()
+		defer r.sdiags.mutex.Unlock()
+		return r.sdiags.diags
 	}
-	if ctx.sdiags.HasErrors() {
+	if r.sdiags.HasErrors() {
 		return returnDiags()
 	}
 
-	for _, kvp := range ctx.intermediates {
+	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalConfig(ctx, kvp) {
+			if !e.EvalConfig(r, kvp) {
 				return returnDiags()
 			}
 		case variableNode:
-			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalVariable(ctx, kvp) {
+			if !e.EvalVariable(r, kvp) {
 				return returnDiags()
 			}
 		case resourceNode:
-			err := ctx.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
 			if err != nil {
 				return returnDiags()
 			}
-			if !e.EvalResource(ctx, kvp) {
+			if !e.EvalResource(r, kvp) {
 				return returnDiags()
 			}
 		}
 	}
 
-	for _, kvp := range ctx.t.Outputs.Entries {
-		if !e.EvalOutput(ctx, kvp) {
+	for _, kvp := range r.t.Outputs.Entries {
+		if !e.EvalOutput(r, kvp) {
 			return returnDiags()
 		}
 	}
@@ -1781,7 +1820,7 @@ func (ctx *evalContext) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{
 			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 		isSubdirectory := false
-		relPath, err := filepath.Rel(ctx.cwd, path)
+		relPath, err := filepath.Rel(ctx.runner.cwd, path)
 		if err != nil {
 			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}

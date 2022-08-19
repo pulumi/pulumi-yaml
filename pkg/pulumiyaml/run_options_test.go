@@ -105,8 +105,8 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		evalCtx := newEvalCtx(ctx, template, MockPackageLoader{})
-		diags := Evaluate(evalCtx)
+		runner := newRunner(ctx, template, newMockPackageMap())
+		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
@@ -159,10 +159,9 @@ variables:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		evalCtx := newEvalCtx(ctx, template, MockPackageLoader{})
-		err := setDefaultProviders(evalCtx)
-		assert.NoError(t, err)
-		diags := Evaluate(evalCtx)
+		runner := newRunner(ctx, template, newMockPackageMap())
+		assert.Equal(t, runner.setDefaultProviders(), nil)
+		diags := runner.Evaluate()
 		requireNoErrors(t, template, diags)
 		return nil
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))

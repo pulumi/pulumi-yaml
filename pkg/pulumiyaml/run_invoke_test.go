@@ -43,7 +43,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -74,7 +74,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -98,7 +98,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -126,7 +126,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -145,7 +145,7 @@ runtime: yaml
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -167,7 +167,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -193,7 +193,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -211,11 +211,11 @@ runtime: yaml
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *evalContext) {})
+	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
-func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*evalContext)) syntax.Diagnostics {
+func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 			t.Logf("Processing call %s.", args.Token)
@@ -293,10 +293,13 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*ev
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		evalCtx := newEvalCtx(ctx, template, MockPackageLoader{})
-		diags := Evaluate(evalCtx)
-		if diags.HasErrors() {
-			return diags
+		runner := newRunner(ctx, template, newMockPackageMap())
+		err := runner.Evaluate()
+		if err != nil {
+			return err
+		}
+		if callback != nil {
+			callback(runner)
 		}
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))

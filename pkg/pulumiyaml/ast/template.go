@@ -275,13 +275,6 @@ func ConfigParam(typ *StringExpr, defaultValue Expr, secret *BooleanExpr) *Confi
 	return ConfigParamSyntax(nil, typ, secret, defaultValue)
 }
 
-type ProviderOpts interface {
-	SetProvider(Expr)
-	HasProvider() bool
-	GetVersion() *StringExpr
-	GetPluginDownloadURL() *StringExpr
-}
-
 type ResourceOptionsDecl struct {
 	declNode
 
@@ -308,22 +301,6 @@ func (d *ResourceOptionsDecl) defaultValue() interface{} {
 
 func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
-}
-
-func (d *ResourceOptionsDecl) SetProvider(expr Expr) {
-	d.Provider = expr
-}
-
-func (d *ResourceOptionsDecl) HasProvider() bool {
-	return d.Provider != nil
-}
-
-func (d *ResourceOptionsDecl) GetVersion() *StringExpr {
-	return d.Version
-}
-
-func (d *ResourceOptionsDecl) GetPluginDownloadURL() *StringExpr {
-	return d.PluginDownloadURL
 }
 
 func ResourceOptionsSyntax(node *syntax.ObjectNode,
@@ -378,22 +355,6 @@ func (d *InvokeOptionsDecl) defaultValue() interface{} {
 
 func (d *InvokeOptionsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
-}
-
-func (d *InvokeOptionsDecl) SetProvider(expr Expr) {
-	d.Provider = expr
-}
-
-func (d *InvokeOptionsDecl) HasProvider() bool {
-	return d.Provider != nil
-}
-
-func (d *InvokeOptionsDecl) GetVersion() *StringExpr {
-	return d.Version
-}
-
-func (d *InvokeOptionsDecl) GetPluginDownloadURL() *StringExpr {
-	return d.PluginDownloadURL
 }
 
 type GetResourceDecl struct {
