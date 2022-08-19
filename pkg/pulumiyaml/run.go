@@ -727,8 +727,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		switch d := d.(type) {
 		case string:
 			expectedType = ctypes.String
-		case float64, int:
+		case float64:
 			expectedType = ctypes.Number
+		case int:
+			expectedType = ctypes.Int
 		case bool:
 			expectedType = ctypes.Boolean
 		case []interface{}:
@@ -739,8 +741,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 			switch d[0].(type) {
 			case string:
 				expectedType = ctypes.StringList
-			case int, float64:
+			case float64:
 				expectedType = ctypes.NumberList
+			case int:
+				expectedType = ctypes.IntList
 			case bool:
 				expectedType = ctypes.BooleanList
 			}
@@ -750,8 +754,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 						"heterogeneous typed lists are not allowed: found types %T and %T", d[i-1], d[i])
 				}
 			}
-		case []int, []float64:
+		case []float64:
 			expectedType = ctypes.NumberList
+		case []int:
+			expectedType = ctypes.IntList
 		default:
 			return ctx.errorf(c.Default,
 				"unexpected configuration type '%T': valid types are %s",

@@ -6,42 +6,44 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 )
 
 type Type interface {
 	fmt.Stringer
+	Schema() schema.Type
+
+	isType()
 }
 
-type Primitive string
+type typ struct{ inner schema.Type }
+
+func (typ) isType() {}
+
+func (t typ) String() string {
+	return yamldiags.DisplayType(t.inner)
+}
+
+func (t typ) Schema() schema.Type {
+	return t.inner
+}
 
 var (
-	String      Primitive = "String"
-	StringList            = newList(String)
-	Number      Primitive = "Number"
-	NumberList            = newList(Number)
-	Boolean     Primitive = "Boolean"
-	BooleanList           = newList(Boolean)
-
-	Invalid Primitive = "Invalid"
+	String      Type = typ{schema.StringType}
+	StringList       = newList(String)
+	Number           = typ{schema.NumberType}
+	NumberList       = newList(Number)
+	Boolean          = typ{schema.BoolType}
+	BooleanList      = newList(Boolean)
+	Int              = typ{schema.IntType}
+	IntList          = newList(Int)
+	Invalid          = typ{&schema.InvalidType{}}
 )
 
-func (p Primitive) String() string {
-	return string(p)
-}
-
 type Types []Type
-
-type List struct {
-	element Type
-}
-
-func (l List) Element() Type {
-	return l.element
-}
-
-func (l List) String() string {
-	return fmt.Sprintf("List<%s>", l.element)
-}
 
 var Primitives = Types{
 	String,
@@ -58,8 +60,8 @@ var ConfigTypes = Types{
 	BooleanList,
 }
 
-func newList(c Type) List {
-	return List{element: c}
+func newList(c Type) typ {
+	return typ{&schema.ArrayType{ElementType: c.(typ).inner}}
 }
 
 func IsValidType(c Type) bool {
@@ -97,6 +99,8 @@ func Parse(s string) (Type, bool) {
 		return Boolean, true
 	case "number":
 		return Number, true
+	case "int":
+		return Int, true
 	default:
 		return nil, false
 	}

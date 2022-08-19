@@ -239,7 +239,7 @@ func TestTypePropertyAccess(t *testing.T) {
 				&ast.PropertySubscript{Index: "bar"},
 			},
 			expectedType: "Invalid",
-			errMsg: `Cannot access into start of type Union<List<string>, Map<number>, >:'start' could be a type that does not support accessing:
+			errMsg: `Cannot access into start of type Union<List<string>, Map<number>, {foo: List<any>}>:'start' could be a type that does not support accessing:
   Array<string>: cannot access a property on 'start' (type List<string>)
   Map<number>: cannot access a property on 'start' (type Map<number>)
   Cannot index via string into 'start.foo' (type List<any>)`,
