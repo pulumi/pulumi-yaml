@@ -800,7 +800,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 				" if the associated config value is secret")
 	}
 
-	var v interface{} = nil
+	var v interface{}
 	var err error
 	switch expectedType {
 	case ctypes.String:
