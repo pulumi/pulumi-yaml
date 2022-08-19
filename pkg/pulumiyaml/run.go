@@ -815,6 +815,18 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		} else {
 			v, err = config.TryFloat64(ctx.ctx, k)
 		}
+	case ctypes.Int:
+		if isSecretInConfig {
+			v, err = config.TrySecretInt(ctx.ctx, k)
+		} else {
+			v, err = config.TryInt(ctx.ctx, k)
+		}
+	case ctypes.Boolean:
+		if isSecretInConfig {
+			v, err = config.TrySecretBool(ctx.ctx, k)
+		} else {
+			v, err = config.TryInt(ctx.ctx, k)
+		}
 	case ctypes.NumberList:
 		var arr []float64
 		if isSecretInConfig {
@@ -822,6 +834,16 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		} else {
 			err = config.TryObject(ctx.ctx, k, &arr)
 			if err == nil {
+				v = arr
+			}
+		}
+	case ctypes.IntList:
+		var arr []int
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+		} else {
+			err = config.TryObject(ctx.ctx, k, &arr)
+			if err != nil {
 				v = arr
 			}
 		}
