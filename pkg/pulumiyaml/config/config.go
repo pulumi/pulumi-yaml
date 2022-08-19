@@ -33,13 +33,13 @@ func (t typ) Schema() schema.Type {
 
 var (
 	String      Type = typ{schema.StringType}
-	StringList       = newList(String)
+	StringList       = typ{&schema.ArrayType{ElementType: schema.StringType}}
 	Number           = typ{schema.NumberType}
-	NumberList       = newList(Number)
+	NumberList       = typ{&schema.ArrayType{ElementType: schema.NumberType}}
 	Boolean          = typ{schema.BoolType}
-	BooleanList      = newList(Boolean)
+	BooleanList      = typ{&schema.ArrayType{ElementType: schema.NumberType}}
 	Int              = typ{schema.IntType}
-	IntList          = newList(Int)
+	IntList          = typ{&schema.ArrayType{ElementType: schema.IntType}}
 	Invalid          = typ{&schema.InvalidType{}}
 )
 
@@ -48,6 +48,7 @@ type Types []Type
 var Primitives = Types{
 	String,
 	Number,
+	Int,
 	Boolean,
 }
 
@@ -56,12 +57,26 @@ var ConfigTypes = Types{
 	StringList,
 	Number,
 	NumberList,
+	Int,
+	IntList,
 	Boolean,
 	BooleanList,
 }
 
 func newList(c Type) typ {
-	return typ{&schema.ArrayType{ElementType: c.(typ).inner}}
+	// This is necessary to preserve switch equality
+	switch c {
+	case String:
+		return StringList
+	case Number:
+		return NumberList
+	case Int:
+		return IntList
+	case Boolean:
+		return BooleanList
+	default:
+		return typ{&schema.ArrayType{ElementType: c.(typ).inner}}
+	}
 }
 
 func IsValidType(c Type) bool {

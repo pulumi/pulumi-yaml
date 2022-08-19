@@ -800,7 +800,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 				" if the associated config value is secret")
 	}
 
-	var v interface{}
+	var v interface{} = nil
 	var err error
 	switch expectedType {
 	case ctypes.String:
@@ -852,6 +852,8 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	} else if err != nil {
 		return ctx.errorf(intm.Key, err.Error())
 	}
+
+	contract.Assertf(v != nil, "let an uninitialized var slip through")
 
 	// The value was marked secret in the configuration section, but in the
 	// config section. We need to wrap it in `pulumi.ToSecret`.
