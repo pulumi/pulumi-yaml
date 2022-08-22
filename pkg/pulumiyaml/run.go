@@ -584,7 +584,7 @@ func newEvaluator(ctx *pulumi.Context) programEvaluator {
 	}
 }
 
-func (e programEvaluator) newContext(root interface{}) programEvaluator {
+func (e programEvaluator) newProgramEvaluator(root interface{}) programEvaluator {
 	return programEvaluator{
 		evalContext: e.evalContext.newContext(root),
 		pulumiCtx:   e.pulumiCtx,
@@ -633,7 +633,7 @@ func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}
 }
 
 func (e programEvaluator) EvalConfig(r *runner, node configNode) bool {
-	ctx := e.newContext(node)
+	ctx := e.newProgramEvaluator(node)
 	c, ok := ctx.registerConfig(node)
 	if !ok {
 		e.config[node.Key.Value] = poisonMarker{}
@@ -649,7 +649,7 @@ func (e programEvaluator) EvalConfig(r *runner, node configNode) bool {
 }
 
 func (e programEvaluator) EvalVariable(r *runner, node variableNode) bool {
-	ctx := e.newContext(node)
+	ctx := e.newProgramEvaluator(node)
 	value, ok := ctx.evaluateExpr(node.Value)
 	if !ok {
 		e.variables[node.Key.Value] = poisonMarker{}
@@ -665,7 +665,7 @@ func (e programEvaluator) EvalVariable(r *runner, node variableNode) bool {
 }
 
 func (e programEvaluator) EvalResource(r *runner, node resourceNode) bool {
-	ctx := e.newContext(node)
+	ctx := e.newProgramEvaluator(node)
 	res, ok := ctx.registerResource(node)
 	if !ok {
 		e.resources[node.Key.Value] = poisonMarker{}
@@ -682,7 +682,7 @@ func (e programEvaluator) EvalResource(r *runner, node resourceNode) bool {
 }
 
 func (e programEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
-	ctx := e.newContext(node)
+	ctx := e.newProgramEvaluator(node)
 	out, ok := ctx.registerOutput(node)
 	if !ok {
 		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
@@ -839,15 +839,15 @@ func (ctx *programEvaluator) registerConfig(intm configNode) (interface{}, bool)
 		}
 	case ctypes.Int:
 		if isSecretInConfig {
-			v, err = config.TrySecretInt(ctx.ctx, k)
+			v, err = config.TrySecretInt(ctx.pulumiCtx, k)
 		} else {
-			v, err = config.TryInt(ctx.ctx, k)
+			v, err = config.TryInt(ctx.pulumiCtx, k)
 		}
 	case ctypes.Boolean:
 		if isSecretInConfig {
-			v, err = config.TrySecretBool(ctx.ctx, k)
+			v, err = config.TrySecretBool(ctx.pulumiCtx, k)
 		} else {
-			v, err = config.TryBool(ctx.ctx, k)
+			v, err = config.TryBool(ctx.pulumiCtx, k)
 		}
 	case ctypes.NumberList:
 		var arr []float64
@@ -862,9 +862,9 @@ func (ctx *programEvaluator) registerConfig(intm configNode) (interface{}, bool)
 	case ctypes.IntList:
 		var arr []int
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+			v, err = config.TrySecretObject(ctx.pulumiCtx, k, &arr)
 		} else {
-			err = config.TryObject(ctx.ctx, k, &arr)
+			err = config.TryObject(ctx.pulumiCtx, k, &arr)
 			if err != nil {
 				v = arr
 			}
