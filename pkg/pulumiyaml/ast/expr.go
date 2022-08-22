@@ -900,7 +900,7 @@ func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "The argument to Fn::Select must be a two-values list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "The argument to Fn::Split must be a two-values list", "")}
 	}
 
 	return SplitSyntax(node, name, list), nil

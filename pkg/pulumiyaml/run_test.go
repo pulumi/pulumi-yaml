@@ -448,7 +448,7 @@ configuration:
 		diagStrings = append(diagStrings, diagString(v))
 	}
 	assert.Contains(t, diagStrings,
-		"<stdin>:4:3: type mismatch: default value of type Number but type String was specified")
+		"<stdin>:4:3: type mismatch: default value of type number but type string was specified")
 	assert.Contains(t, diagStrings,
 		"<stdin>:7:3: unable to infer type: either 'default' or 'type' is required")
 	assert.Contains(t, diagStrings,
