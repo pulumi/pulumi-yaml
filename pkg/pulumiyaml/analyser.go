@@ -147,54 +147,11 @@ func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignab
 	return &c
 }
 
-func displayType(t schema.Type) string {
-	if schema.IsPrimitiveType(codegen.UnwrapType(t)) {
-		switch codegen.UnwrapType(t) {
-		case schema.ArchiveType:
-			return "archive"
-		case schema.AssetType:
-			return "asset"
-		case schema.JSONType:
-			fallthrough
-		case schema.AnyType:
-			return "any"
-		}
-
-		return codegen.UnwrapType(t).String()
-	}
-	switch t := codegen.UnwrapType(t).(type) {
-	case *schema.ObjectType:
-		if !strings.HasPrefix(t.Token, adhockObjectToken) {
-			return t.Token
-		}
-		// The token is useless to display the fields
-		props := []string{}
-		for _, prop := range t.Properties {
-			props = append(props, fmt.Sprintf("%s: %s", prop.Name, displayType(prop.Type)))
-		}
-		return fmt.Sprintf("{%s}", strings.Join(props, ", "))
-	case *schema.ArrayType:
-		return fmt.Sprintf("List<%s>", displayType(t.ElementType))
-	case *schema.MapType:
-		return fmt.Sprintf("Map<%s>", displayType(t.ElementType))
-	case *schema.UnionType:
-		inner := make([]string, len(t.ElementTypes))
-		for i, t := range t.ElementTypes {
-			inner[i] = displayType(t)
-		}
-		return fmt.Sprintf("Union<%s>", strings.Join(inner, ", "))
-	case *schema.TokenType:
-		underlying := displayType(schema.AnyType)
-		if t.UnderlyingType != nil {
-			underlying = displayType(t.UnderlyingType)
-		}
-		return fmt.Sprintf("%s<type = %s>", t.Token, underlying)
-	default:
-		return t.String()
-	}
-}
-
 const adhockObjectToken = "pulumi:adhock:" //nolint:gosec
+
+func displayType(t schema.Type) string {
+	return yamldiags.DisplayTypeWithAdhock(t, adhockObjectToken)
+}
 
 // isAssignable determines if the type `from` is assignable to the type `to`.
 // If the assignment is legal, nil is returned.
@@ -884,7 +841,7 @@ func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 	case v.Type != nil:
 		ctype, ok := ctypes.Parse(v.Type.Value)
 		if ok {
-			typ = configTypeToSchema(ctype)
+			typ = ctype.Schema()
 		}
 	}
 	typ = &schema.InputType{ElementType: typ}
@@ -893,27 +850,6 @@ func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 	}
 	tc.configuration[k] = typ
 	return true
-}
-
-func configTypeToSchema(t ctypes.Type) schema.Type {
-	// TODO: remove config/config types. Replace them with schema types.
-	switch t := t.(type) {
-	case ctypes.Primitive:
-		switch t {
-		case ctypes.String:
-			return schema.StringType
-		case ctypes.Boolean:
-			return schema.BoolType
-		case ctypes.Number:
-			return schema.NumberType
-		}
-	case ctypes.List:
-		return &schema.ArrayType{
-			ElementType: configTypeToSchema(t.Element()),
-		}
-	}
-
-	panic(fmt.Sprintf("Unexpected config type: %[1] (%[1]T)", t))
 }
 
 func (tc *typeCache) typeOutput(r *runner, node ast.PropertyMapEntry) bool {

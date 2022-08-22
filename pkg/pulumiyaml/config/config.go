@@ -5,47 +5,50 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
+
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+
+	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 )
 
 type Type interface {
 	fmt.Stringer
+	Schema() schema.Type
+
+	isType()
 }
 
-type Primitive string
+type typ struct{ inner schema.Type }
+
+func (typ) isType() {}
+
+func (t typ) String() string {
+	return yamldiags.DisplayType(t.inner)
+}
+
+func (t typ) Schema() schema.Type {
+	return t.inner
+}
 
 var (
-	String      Primitive = "String"
-	StringList            = newList(String)
-	Number      Primitive = "Number"
-	NumberList            = newList(Number)
-	Boolean     Primitive = "Boolean"
-	BooleanList           = newList(Boolean)
-
-	Invalid Primitive = "Invalid"
+	String      Type = typ{schema.StringType}
+	StringList       = typ{&schema.ArrayType{ElementType: schema.StringType}}
+	Number           = typ{schema.NumberType}
+	NumberList       = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	Boolean          = typ{schema.BoolType}
+	BooleanList      = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	Int              = typ{schema.IntType}
+	IntList          = typ{&schema.ArrayType{ElementType: schema.IntType}}
 )
 
-func (p Primitive) String() string {
-	return string(p)
-}
-
 type Types []Type
-
-type List struct {
-	element Type
-}
-
-func (l List) Element() Type {
-	return l.element
-}
-
-func (l List) String() string {
-	return fmt.Sprintf("List<%s>", l.element)
-}
 
 var Primitives = Types{
 	String,
 	Number,
+	Int,
 	Boolean,
 }
 
@@ -54,12 +57,26 @@ var ConfigTypes = Types{
 	StringList,
 	Number,
 	NumberList,
+	Int,
+	IntList,
 	Boolean,
 	BooleanList,
 }
 
-func newList(c Type) List {
-	return List{element: c}
+func newList(c Type) typ {
+	// This is necessary to preserve switch equality
+	switch c {
+	case String:
+		return StringList
+	case Number:
+		return NumberList
+	case Int:
+		return IntList
+	case Boolean:
+		return BooleanList
+	default:
+		return typ{&schema.ArrayType{ElementType: c.(typ).inner}}
+	}
 }
 
 func IsValidType(c Type) bool {
@@ -97,7 +114,104 @@ func Parse(s string) (Type, bool) {
 		return Boolean, true
 	case "number":
 		return Number, true
+	case "int":
+		return Int, true
 	default:
 		return nil, false
+	}
+}
+
+var (
+	ErrHeterogeneousList = HeterogeneousListErr{}
+	ErrEmptyList         = fmt.Errorf("empty list")
+	ErrUnexpectedType    = UnexpectedTypeErr{}
+)
+
+type HeterogeneousListErr struct {
+	T1 Type
+	T2 Type
+}
+
+func (e *HeterogeneousListErr) Error() string {
+	if e.T1 == nil || e.T2 == nil {
+		return "heterogeneous typed lists are not allowed"
+	}
+	return fmt.Sprintf("heterogeneous typed lists are not allowed: found types %s and %s",
+		e.T1, e.T2)
+}
+
+func (e *HeterogeneousListErr) Is(err error) bool {
+	_, ok := err.(*HeterogeneousListErr)
+	return ok
+}
+
+type UnexpectedTypeErr struct {
+	T interface{}
+}
+
+func (e *UnexpectedTypeErr) Error() string {
+	if e.T == nil {
+		return "unknown type"
+	}
+	return fmt.Sprintf("unexpected configuration type '%T': valid types are %s",
+		e.T, ConfigTypes,
+	)
+}
+
+func (e *UnexpectedTypeErr) Is(err error) bool {
+	_, ok := err.(*UnexpectedTypeErr)
+	return ok
+}
+
+// Type a go value into a configuration value.
+// If an error is returned, it is one of
+// - ErrHeterogeneousList
+// - ErrEmptyList
+// - ErrUnexpectedType
+func TypeValue(v interface{}) (Type, error) {
+	switch v := v.(type) {
+	case string:
+		return String, nil
+	case float64:
+		return Number, nil
+	case int:
+		return Int, nil
+	case bool:
+		return Boolean, nil
+	case []interface{}:
+		var expected Type
+		if len(v) == 0 {
+			return nil, ErrEmptyList
+		}
+		switch v[0].(type) {
+		case string:
+			expected = StringList
+		case float64:
+			expected = NumberList
+		case int:
+			expected = IntList
+		case bool:
+			expected = BooleanList
+		}
+		for i := 1; i < len(v); i++ {
+			if reflect.TypeOf(v[i-1]) != reflect.TypeOf(v[i]) {
+				t1, err := TypeValue(v[i-1])
+				if err != nil {
+					return nil, err
+				}
+				t2, err := TypeValue(v[i])
+				if err != nil {
+					return nil, err
+				}
+				return nil, &HeterogeneousListErr{t1, t2}
+			}
+		}
+		return expected, nil
+	case []float64:
+		return NumberList, nil
+	case []int:
+		return IntList, nil
+	default:
+		return nil, &UnexpectedTypeErr{v}
 	}
 }
