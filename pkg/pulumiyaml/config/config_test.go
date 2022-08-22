@@ -37,7 +37,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestTypeValue(t *testing.T) { //nolint:paralleltest
+func TestTypeValue(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		input    interface{}
@@ -54,6 +54,7 @@ func TestTypeValue(t *testing.T) { //nolint:paralleltest
 		{[]interface{}{}, nil, ErrEmptyList},
 		{[]interface{}{false, true}, BooleanList, nil},
 	}
+	//nolint:paralleltest // false positive that the "c" var isn't used, it is used via "c.input"
 	for _, c := range cases {
 		c := c
 		t.Run(fmt.Sprintf("%v", c.input), func(t *testing.T) {
