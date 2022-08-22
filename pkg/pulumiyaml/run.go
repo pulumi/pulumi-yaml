@@ -723,46 +723,12 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		if !ok {
 			return nil, false
 		}
-		defaultValue = d
-		switch d := d.(type) {
-		case string:
-			expectedType = ctypes.String
-		case float64:
-			expectedType = ctypes.Number
-		case int:
-			expectedType = ctypes.Int
-		case bool:
-			expectedType = ctypes.Boolean
-		case []interface{}:
-			if len(d) == 0 && c.Type == nil {
-				return ctx.errorf(c.Default,
-					"unable to infer type: cannot infer type of empty list, please specify type")
-			}
-			switch d[0].(type) {
-			case string:
-				expectedType = ctypes.StringList
-			case float64:
-				expectedType = ctypes.NumberList
-			case int:
-				expectedType = ctypes.IntList
-			case bool:
-				expectedType = ctypes.BooleanList
-			}
-			for i := 1; i < len(d); i++ {
-				if reflect.TypeOf(d[i-1]) != reflect.TypeOf(d[i]) {
-					return ctx.errorf(c.Default,
-						"heterogeneous typed lists are not allowed: found types %T and %T", d[i-1], d[i])
-				}
-			}
-		case []float64:
-			expectedType = ctypes.NumberList
-		case []int:
-			expectedType = ctypes.IntList
-		default:
-			return ctx.errorf(c.Default,
-				"unexpected configuration type '%T': valid types are %s",
-				d, ctypes.ConfigTypes)
+		var err error
+		expectedType, err = ctypes.TypeValue(d)
+		if err != nil {
+			return ctx.error(c.Default, err.Error())
 		}
+		defaultValue = d
 	}
 
 	if c.Type != nil {
@@ -825,7 +791,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		if isSecretInConfig {
 			v, err = config.TrySecretBool(ctx.ctx, k)
 		} else {
-			v, err = config.TryInt(ctx.ctx, k)
+			v, err = config.TryBool(ctx.ctx, k)
 		}
 	case ctypes.NumberList:
 		var arr []float64
