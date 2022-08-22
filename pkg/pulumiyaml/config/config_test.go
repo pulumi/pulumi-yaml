@@ -56,7 +56,7 @@ func TestTypeValue(t *testing.T) {
 	}
 	for _, c := range cases {
 		c := c
-		t.Run(fmt.Sprintf("%v", c.input), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v", c.input), func(t *testing.T) { //nolint:paralleltest
 			t.Parallel()
 			typ, err := TypeValue(c.input)
 			if c.error == nil {
