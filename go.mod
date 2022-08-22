@@ -12,8 +12,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.37.3-0.20220809202049-8441ea2eeefd
-	github.com/pulumi/pulumi/sdk/v3 v3.37.3-0.20220809202049-8441ea2eeefd
+	github.com/pulumi/pulumi/pkg/v3 v3.38.0
+	github.com/pulumi/pulumi/sdk/v3 v3.38.0
 	github.com/stretchr/testify v1.7.1
 	github.com/zclconf/go-cty v1.10.0
 	google.golang.org/grpc v1.47.0
@@ -148,7 +148,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	gocloud.dev v0.24.0 // indirect
 	gocloud.dev/secrets/hashivault v0.24.0 // indirect
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/mod v0.5.0 // indirect
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de // indirect
 	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a // indirect
