@@ -213,10 +213,10 @@ func (r *runner) setDefaultProviders() error {
 
 			if v.Options.Provider == nil {
 				if v.Options.Version != nil {
-					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+					ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k), ""))
 				}
 				if v.Options.PluginDownloadURL != nil {
-					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+					ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k), ""))
 				}
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -246,10 +246,10 @@ func (r *runner) setDefaultProviders() error {
 
 				if t.CallOpts.Provider == nil {
 					if t.CallOpts.Version != nil {
-						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+						ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k), ""))
 					}
 					if t.CallOpts.PluginDownloadURL != nil {
-						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+						ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k), ""))
 					}
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -278,9 +278,21 @@ func (r *runner) setDefaultProviders() error {
 
 // RunTemplate runs the evaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	r := newRunner(ctx, t, loader)
+	r := newRunner(t, loader)
 
-	err := r.setDefaultProviders()
+	cwd, err := os.Getwd()
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return err
+	}
+	r.variables[PulumiVarName] = map[string]interface{}{
+		"cwd":     cwd,
+		"project": ctx.Project(),
+		"stack":   ctx.Stack(),
+	}
+	r.cwd = cwd
+
+	err = r.setDefaultProviders()
 	if err != nil {
 		return err
 	}
@@ -290,7 +302,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 		return diags
 	}
 
-	diags.Extend(r.Evaluate()...)
+	diags.Extend(r.Evaluate(ctx)...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -350,46 +362,46 @@ type evalContext struct {
 	sdiags syncDiags
 }
 
-func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-	diag := ast.ExprError(expr, summary, "")
-	ctx.addDiag(diag)
-	return nil, false
-}
+// func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
+// 	diag := ast.ExprError(expr, summary, "")
+// 	ctx.addDiag(diag)
+// 	return nil, false
+// }
 
-func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
-	defer func() {
-		ctx.sdiags.Extend(diag)
-		ctx.runner.sdiags.Extend(diag)
-	}()
+// func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
+// 	defer func() {
+// 		ctx.sdiags.Extend(diag)
+// 		ctx.runner.sdiags.Extend(diag)
+// 	}()
 
-	var buf bytes.Buffer
-	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
-	err := w.WriteDiagnostic(diag.HCL())
-	if err != nil {
-		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
-	} else {
-		s := buf.String()
-		// We strip off the appropriate HCL error message, since it will be
-		// added back on via the pulumi.Log framework.
-		switch diag.Severity {
-		case hcl.DiagWarning:
-			s = strings.TrimPrefix(s, "Warning: ")
-			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
-		default:
-			s = strings.TrimPrefix(s, "Error: ")
-			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
-		}
-	}
-	if err != nil {
-		os.Stderr.Write([]byte(err.Error()))
-	} else {
-		diag.Shown = true
-	}
-}
+// 	var buf bytes.Buffer
+// 	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
+// 	err := w.WriteDiagnostic(diag.HCL())
+// 	if err != nil {
+// 		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+// 	} else {
+// 		s := buf.String()
+// 		// We strip off the appropriate HCL error message, since it will be
+// 		// added back on via the pulumi.Log framework.
+// 		switch diag.Severity {
+// 		case hcl.DiagWarning:
+// 			s = strings.TrimPrefix(s, "Warning: ")
+// 			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
+// 		default:
+// 			s = strings.TrimPrefix(s, "Error: ")
+// 			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
+// 		}
+// 	}
+// 	if err != nil {
+// 		os.Stderr.Write([]byte(err.Error()))
+// 	} else {
+// 		diag.Shown = true
+// 	}
+// }
 
-func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
-	return ctx.error(expr, fmt.Sprintf(format, a...))
-}
+// func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+// 	return ctx.error(expr, fmt.Sprintf(format, a...))
+// }
 
 func (r *runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
@@ -541,7 +553,7 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
-func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
+func newRunner(t *ast.TemplateDecl, p PackageLoader) *runner {
 	return &runner{
 		t:         t,
 		pkgLoader: p,
@@ -561,19 +573,66 @@ type Evaluator interface {
 	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
 }
 
-type evaluator struct {
+type programEvaluator struct {
 	*evalContext
 	pulumiCtx *pulumi.Context
 }
 
-func (e evaluator) newContext(root interface{}) evaluator {
-	return evaluator{
+func newEvaluator(ctx *pulumi.Context) programEvaluator {
+	return programEvaluator{
+		pulumiCtx: ctx,
+	}
+}
+
+func (e programEvaluator) newContext(root interface{}) programEvaluator {
+	return programEvaluator{
 		evalContext: e.evalContext.newContext(root),
 		pulumiCtx:   e.pulumiCtx,
 	}
 }
 
-func (e evaluator) EvalConfig(r *runner, node configNode) bool {
+func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	e.addDiag(diag)
+	return nil, false
+}
+
+func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
+	defer func() {
+		e.sdiags.Extend(diag)
+		e.runner.sdiags.Extend(diag)
+	}()
+
+	var buf bytes.Buffer
+	w := e.t.NewDiagnosticWriter(&buf, 0, false)
+	err := w.WriteDiagnostic(diag.HCL())
+	if err != nil {
+		err = e.pulumiCtx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+	} else {
+		s := buf.String()
+		// We strip off the appropriate HCL error message, since it will be
+		// added back on via the pulumi.Log framework.
+		switch diag.Severity {
+		case hcl.DiagWarning:
+			s = strings.TrimPrefix(s, "Warning: ")
+			err = e.pulumiCtx.Log.Warn(s, &pulumi.LogArgs{})
+		default:
+			s = strings.TrimPrefix(s, "Error: ")
+			err = e.pulumiCtx.Log.Error(s, &pulumi.LogArgs{})
+		}
+	}
+	if err != nil {
+		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
+	}
+}
+
+func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return e.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (e programEvaluator) EvalConfig(r *runner, node configNode) bool {
 	ctx := e.newContext(node)
 	c, ok := ctx.registerConfig(node)
 	if !ok {
@@ -589,7 +648,7 @@ func (e evaluator) EvalConfig(r *runner, node configNode) bool {
 	return true
 }
 
-func (e evaluator) EvalVariable(r *runner, node variableNode) bool {
+func (e programEvaluator) EvalVariable(r *runner, node variableNode) bool {
 	ctx := e.newContext(node)
 	value, ok := ctx.evaluateExpr(node.Value)
 	if !ok {
@@ -605,7 +664,7 @@ func (e evaluator) EvalVariable(r *runner, node variableNode) bool {
 	return true
 }
 
-func (e evaluator) EvalResource(r *runner, node resourceNode) bool {
+func (e programEvaluator) EvalResource(r *runner, node resourceNode) bool {
 	ctx := e.newContext(node)
 	res, ok := ctx.registerResource(node)
 	if !ok {
@@ -622,7 +681,7 @@ func (e evaluator) EvalResource(r *runner, node resourceNode) bool {
 
 }
 
-func (e evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (e programEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	ctx := e.newContext(node)
 	out, ok := ctx.registerOutput(node)
 	if !ok {
@@ -637,23 +696,12 @@ func (e evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	return true
 }
 
-func (r *runner) Evaluate() syntax.Diagnostics {
-	return r.Run(evaluator{})
+func (r *runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+	return r.Run(programEvaluator{})
 }
 
 func (r *runner) ensureSetup() {
 	r.intermediates = []graphNode{}
-	cwd, err := os.Getwd()
-	if err != nil {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return
-	}
-	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": r.ctx.Project(),
-		"stack":   r.ctx.Stack(),
-	}
-	r.cwd = cwd
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t)
@@ -680,26 +728,26 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			err := e.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
-			}
+			// err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			// if err != nil {
+			// 	return returnDiags()
+			// }
 			if !e.EvalConfig(r, kvp) {
 				return returnDiags()
 			}
 		case variableNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
-			}
+			// err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			// if err != nil {
+			// 	return returnDiags()
+			// }
 			if !e.EvalVariable(r, kvp) {
 				return returnDiags()
 			}
 		case resourceNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
-			}
+			// err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+			// if err != nil {
+			// 	return returnDiags()
+			// }
 			if !e.EvalResource(r, kvp) {
 				return returnDiags()
 			}
@@ -715,7 +763,7 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	return returnDiags()
 }
 
-func (ctx *evaluator) registerConfig(intm configNode) (interface{}, bool) {
+func (ctx *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 	k, c := intm.Key.Value, intm.Value
 
 	// If we implement global type checking, the type of configuration variables
@@ -863,7 +911,7 @@ func (ctx *evaluator) registerConfig(intm configNode) (interface{}, bool) {
 	return v, true
 }
 
-func (ctx *evaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
+func (ctx *programEvaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
@@ -1081,7 +1129,7 @@ func (ctx *evaluator) registerResource(kvp resourceNode) (lateboundResource, boo
 	return state, true
 }
 
-func (ctx *evaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
+func (ctx *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
 	value, ok := ctx.evaluateExpr(optionExpr)
 	if !ok {
 		return nil, false
@@ -1107,7 +1155,7 @@ func (ctx *evaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key 
 	return resources, true
 }
 
-func (ctx *evaluator) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, bool) {
+func (ctx *programEvaluator) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, bool) {
 	value, ok := ctx.evaluateExpr(optionExpr)
 	if !ok {
 		return nil, false
@@ -1133,7 +1181,7 @@ func asResource(value interface{}) (lateboundResource, error) {
 	}
 }
 
-func (ctx *evaluator) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, bool) {
+func (ctx *programEvaluator) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, bool) {
 	out, ok := ctx.evaluateExpr(kvp.Value)
 	if !ok {
 		return nil, false
@@ -1160,7 +1208,7 @@ func (ctx *evaluator) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, bo
 // - []interface{}
 // - map[string]interface{}
 // - pulumi.Output, where the element type is one of the above
-func (ctx *evaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	switch x := x.(type) {
 	case *ast.NullExpr:
 		return nil, true
@@ -1219,7 +1267,7 @@ func (ctx *evaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	}
 }
 
-func (ctx *evaluator) evaluateList(x *ast.ListExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	xs := make([]interface{}, len(x.Elements))
 	for i, e := range x.Elements {
 		ev, ok := ctx.evaluateExpr(e)
@@ -1234,7 +1282,7 @@ func (ctx *evaluator) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	return xs, true
 }
 
-func (ctx *evaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
 	if len(entries) == 0 {
 		return map[string]interface{}{}, true
 	}
@@ -1284,11 +1332,11 @@ func (ctx *evaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProp
 	return evalObjectF(keys...)
 }
 
-func (ctx *evaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
 	return ctx.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
 }
 
-func (ctx *evaluator) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
 	for ; len(parts) > 0; parts = parts[1:] {
 		i := parts[0]
 		b.WriteString(i.Text)
@@ -1327,7 +1375,7 @@ func unknownOutput() pulumi.Output {
 // the property access list is the head, and must be an identifier for a resource, config, or
 // variable. The tail of property accessors are either: `.foo` string literal property names or
 // `[42]` numeric literal property subscripts.
-func (ctx *evaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
+func (ctx *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.RootName()
 	var receiver interface{}
 	if res, ok := ctx.resources[resourceName]; ok {
@@ -1343,7 +1391,7 @@ func (ctx *evaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Property
 	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
 }
 
-func (ctx *evaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
+func (ctx *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
 	var evaluateAccessF func(args ...interface{}) (interface{}, bool)
 	evaluateAccessF = ctx.lift(func(args ...interface{}) (interface{}, bool) {
 		receiver := args[0]
@@ -1505,7 +1553,7 @@ func (ctx *evaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver interfa
 
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
-func (ctx *evaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
 	args, ok := ctx.evaluateExpr(t.CallArgs)
 	if !ok {
 		return nil, false
@@ -1572,7 +1620,7 @@ func (ctx *evaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, boo
 	return performInvoke(args)
 }
 
-func (ctx *evaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
 	overallOk := true
 
 	delim, ok := ctx.evaluateExpr(v.Delimiter)
@@ -1628,7 +1676,7 @@ func (ctx *evaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
 	return join(delim, items)
 }
 
-func (ctx *evaluator) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
 	delimiter, delimOk := ctx.evaluateExpr(v.Delimiter)
 	source, sourceOk := ctx.evaluateExpr(v.Source)
 	if !delimOk || !sourceOk {
@@ -1652,7 +1700,7 @@ func (ctx *evaluator) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool)
 	return split(delimiter, source)
 }
 
-func (ctx *evaluator) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, bool) {
 	value, ok := ctx.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
@@ -1669,7 +1717,7 @@ func (ctx *evaluator) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, boo
 	return toJSON(value)
 }
 
-func (ctx *evaluator) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, bool) {
 	index, ok := ctx.evaluateExpr(v.Index)
 	if !ok {
 		return nil, false
@@ -1699,7 +1747,7 @@ func (ctx *evaluator) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, boo
 	return selectFn(index, values)
 }
 
-func (ctx *evaluator) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interface{}, bool) {
 	str, ok := ctx.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
@@ -1722,7 +1770,7 @@ func (ctx *evaluator) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interfac
 	return fromBase64(str)
 }
 
-func (ctx *evaluator) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, bool) {
 	str, ok := ctx.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
@@ -1737,7 +1785,7 @@ func (ctx *evaluator) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{},
 	return toBase64(str)
 }
 
-func (ctx *evaluator) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, bool) {
 	m := map[string]interface{}{}
 	keys := make([]string, len(v.AssetOrArchives))
 	i := 0
@@ -1766,7 +1814,7 @@ func (ctx *evaluator) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (inte
 	return pulumi.NewAssetArchive(m), true
 }
 
-func (ctx *evaluator) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, bool) {
 	stackRef, ok := ctx.stackRefs[v.StackName.Value]
 	if !ok {
 		var err error
@@ -1795,7 +1843,7 @@ func (ctx *evaluator) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (
 	return stackRef.GetOutput(propertyStringOutput), true
 }
 
-func (ctx *evaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {
 	e, ok := ctx.evaluateExpr(s.Value)
 	if !ok {
 		return nil, false
@@ -1803,7 +1851,7 @@ func (ctx *evaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, boo
 	return pulumi.ToSecret(e), true
 }
 
-func (ctx *evaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
+func (ctx *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
 	e, ok := ctx.evaluateExpr(s.Path)
 	if !ok {
 		return nil, false
