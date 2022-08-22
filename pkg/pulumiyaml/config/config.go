@@ -140,6 +140,11 @@ func (e *HeterogeneousListErr) Error() string {
 		e.T1, e.T2)
 }
 
+func (e *HeterogeneousListErr) Is(err error) bool {
+	_, ok := err.(*HeterogeneousListErr)
+	return ok
+}
+
 type UnexpectedTypeErr struct {
 	T interface{}
 }
@@ -151,6 +156,11 @@ func (e *UnexpectedTypeErr) Error() string {
 	return fmt.Sprintf("unexpected configuration type '%T': valid types are %s",
 		e.T, ConfigTypes,
 	)
+}
+
+func (e *UnexpectedTypeErr) Is(err error) bool {
+	_, ok := err.(*UnexpectedTypeErr)
+	return ok
 }
 
 // Type a go value into a configuration value.
