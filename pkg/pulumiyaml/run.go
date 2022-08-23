@@ -362,11 +362,19 @@ type evalContext struct {
 	sdiags syncDiags
 }
 
-// func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-// 	diag := ast.ExprError(expr, summary, "")
-// 	ctx.addDiag(diag)
-// 	return nil, false
-// }
+func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail string) {
+	ctx.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
+}
+
+func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
+	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+}
+
+func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	ctx.sdiags.Extend(diag)
+	return nil, false
+}
 
 // func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
 // 	defer func() {

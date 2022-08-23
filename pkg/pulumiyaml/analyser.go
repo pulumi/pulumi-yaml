@@ -346,13 +346,15 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	}
 	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
-		ctx.addDiag(syntax.Warning(loc,
-			fmt.Sprintf("internal error: %s", summary),
-			result.String(),
-		))
+		ctx.addWarnDiag(loc, fmt.Sprintf("internal error: %s", summary), result.String())
+		// ctx.addDiag(syntax.Warning(loc,
+		// 	fmt.Sprintf("internal error: %s", summary),
+		// 	result.String(),
+		// ))
 		return
 	}
-	ctx.addDiag(syntax.Error(loc, summary, result.String()))
+	ctx.addErrDiag(loc, summary, result.String())
+	// ctx.addDiag(syntax.Error(loc, summary, result.String()))
 }
 
 func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
@@ -360,7 +362,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	ctx := r.newContext(node)
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
 	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
+		ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("error resolving type of resource %v: %v", k, err), ""))
+		// ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
@@ -380,12 +383,19 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	tc.registerResource(k, node.Value, hint)
 
 	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
-		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
 				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
 				"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
-		))
+		)
+
+		// ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+		// 	"Resource fields properties and get are mutually exclusive",
+		// 	"Properties is used to describe a resource managed by Pulumi.\n"+
+		// 		"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
+		// 		"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
+		// ))
 	}
 
 	if existing, ok := tc.exprs[v.Get.Id]; ok && v.Get.Id != nil {
@@ -447,7 +457,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				}
 
 				subject := prop.Key.Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail))
+				ctx.sdiags.diags.Extend(syntax.Error(subject, summary, detail))
+				// ctx.addDiag(syntax.Error(subject, summary, detail))
 			}
 		}
 	}
@@ -473,7 +484,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				}
 				summary, detail := fmtr.MessageWithDetail(key, key)
 				subject := prop.Key.Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail))
+				ctx.addErrDiag(subject, summary, detail)
 			}
 		}
 	}
@@ -490,20 +501,27 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
 			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
 			subject := kvp.Key.Syntax().Syntax().Range()
-			valueRange := kvp.Value.Syntax().Syntax().Range()
-			context := hcl.RangeOver(*subject, *valueRange)
-			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
+			// valueRange := kvp.Value.Syntax().Syntax().Range()
+			// context := hcl.RangeOver(*subject, *valueRange)
+			ctx.addErrDiag(subject, summary, detail)
+			// ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
 		} else {
 			existing, ok := tc.exprs[kvp.Value]
 			rng := kvp.Key.Syntax().Syntax().Range()
 			if !ok {
-				ctx.addDiag(syntax.Warning(rng,
+				ctx.addWarnDiag(rng,
 					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("expected type %s", typ.Type)))
+					fmt.Sprintf("expected type %s", typ.Type))
+				// ctx.addDiag(syntax.Warning(rng,
+				// 	fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
+				// 	fmt.Sprintf("expected type %s", typ.Type)))
 			} else if typ.Type == nil {
-				ctx.addDiag(syntax.Warning(rng,
+				ctx.addWarnDiag(rng,
 					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("got type %s", existing)))
+					fmt.Sprintf("got type %s", existing))
+				// ctx.addDiag(syntax.Warning(rng,
+				// 	fmt.Sprintf("internal error: unable to discover expected type for %s.%s", resourceName, kvp.Key.Value),
+				// 	fmt.Sprintf("got type %s", existing)))
 			} else {
 				assertTypeAssignable(ctx, rng, existing, typ.Type)
 			}
@@ -537,8 +555,9 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 			if typ, ok := inputs[k]; !ok {
 				summary, detail := fmtr.MessageWithDetail(k, k)
 				subject := prop.Key.Syntax().Syntax().Range()
-				context := t.Syntax().Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
+				// context := t.Syntax().Syntax().Range()
+				ctx.addWarnDiag(subject, summary, detail)
+				// ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
 			} else {
 				tc.exprs[prop.Value] = typ
 			}
@@ -579,7 +598,8 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		}
 		if hint.Outputs == nil || !validReturn {
 			summary, detail := fmtr.MessageWithDetail(t.Return.Value, t.Return.Value)
-			ctx.addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
+			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(), summary, detail)
+			// ctx.addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
 		} else {
 			tc.exprs[t] = returnType
 		}
@@ -602,8 +622,9 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	}
 	runningName := t.Property.RootName()
 	setError := func(summary, detail string) *schema.InvalidType {
-		diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
-		ctx.addDiag(diag)
+		ctx.addErrDiag(t.Syntax().Syntax().Range(), summary, detail)
+		// diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
+		// ctx.addDiag(diag)
 		typ := &schema.InvalidType{
 			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
 		}
