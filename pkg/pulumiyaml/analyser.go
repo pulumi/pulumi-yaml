@@ -622,8 +622,8 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	}
 	runningName := t.Property.RootName()
 	setError := func(summary, detail string) *schema.InvalidType {
+		diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
 		ctx.addErrDiag(t.Syntax().Syntax().Range(), summary, detail)
-		// diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
 		// ctx.addDiag(diag)
 		typ := &schema.InvalidType{
 			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
