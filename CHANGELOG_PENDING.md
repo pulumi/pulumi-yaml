@@ -28,3 +28,6 @@
 
 - Allow `bool` configuration type
   [#299](https://github.com/pulumi/pulumi-yaml/pull/299)
+
+- Fix `pulumi convert` panic on `Fn::Split`
+  [#319](https://github.com/pulumi/pulumi-yaml/pull/319)
