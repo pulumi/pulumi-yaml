@@ -22,7 +22,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.46.2
+          version: latest
       - run: go mod tidy
       - name: Fail if god mod not tidy
         run: |
