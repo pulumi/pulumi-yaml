@@ -415,7 +415,7 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 		var diags syntax.Diagnostics
 		var items []model.ObjectConsItem
 		var fieldHints map[string]schema.Type
-		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok {
+		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok && obj != nil {
 			fieldHints = map[string]schema.Type{}
 			for _, prop := range obj.Properties {
 				fieldHints[prop.Name] = prop.Type
