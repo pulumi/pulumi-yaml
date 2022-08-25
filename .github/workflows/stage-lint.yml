@@ -15,14 +15,10 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v2
-      - name: Set up Go 1.18.x
+      - name: Set up Go 1.19.x
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18.x
-      - name: Lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.46.2
+          go-version: 1.19.x
       - run: go mod tidy
       - name: Fail if god mod not tidy
         run: |
@@ -30,6 +26,10 @@ jobs:
             echo "::error go.mod not tidy"
             exit 1
           fi
+      - name: Lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.49.0
+          make lint-golang
 
   check-copyright:
     runs-on: ubuntu-latest
