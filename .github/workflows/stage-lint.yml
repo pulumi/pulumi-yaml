@@ -28,7 +28,7 @@ jobs:
           fi
       - name: Lint
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@1.46.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.49.0
           make lint-golang
 
   check-copyright:
