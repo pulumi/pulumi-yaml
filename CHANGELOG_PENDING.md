@@ -31,3 +31,6 @@
 
 - Fix `pulumi convert` panic on `Fn::Split`
   [#319](https://github.com/pulumi/pulumi-yaml/pull/319)
+
+- Fix panic on empty object node on `pulumi convert`
+  [#321](https://github.com/pulumi/pulumi-yaml/pull/321)
