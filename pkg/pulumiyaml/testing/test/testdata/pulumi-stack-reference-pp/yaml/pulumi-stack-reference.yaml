@@ -2,4 +2,4 @@ resources:
   stackRef:
     type: pulumi:pulumi:StackReference
     properties:
-      name: "foo/bar/dev"
+      name: foo/bar/dev
