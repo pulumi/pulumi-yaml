@@ -3,7 +3,8 @@
 - Show all error/ warning messages
   [#279](https://github.com/pulumi/pulumi-yaml/pull/279)
 
-- Support options on Fn::Invoke.
+- Support options on `Fn::Invoke`.
+
   [#284](https://github.com/pulumi/pulumi-yaml/pull/284)
 
 - Add `Get` to resources, allowing Pulumi YAML programs to read external resources.
@@ -23,6 +24,9 @@
 
 - Add `Int` type to the configuration section.
   [#313](https://github.com/pulumi/pulumi-yaml/pull/313)
+
+- Support `options.version` on `pulumi convert`
+  [#291](https://github.com/pulumi/pulumi-yaml/pull/291)
 
 ### Bug Fixes
 

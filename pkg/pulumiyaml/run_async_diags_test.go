@@ -89,7 +89,7 @@ resources:
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	// 2. The internal error in an apply is bubbled up by the engine via RPC:
 	assert.Error(t, err)
-	assert.Equal(t, "waiting for RPCs: marshaling properties: awaiting input property foo: runtime error", err.Error())
+	assert.Equal(t, "waiting for RPCs: marshaling properties: awaiting input property \"foo\": runtime error", err.Error())
 
 	// 3. The runner on the YAML side processed the inner error:
 	assert.True(t, hoistedRunner.sdiags.HasErrors())

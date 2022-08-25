@@ -691,6 +691,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
 		})
 	}
+	if resource.Options.Version != nil {
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "version",
+			Value: quotedLit(resource.Options.Version.Value),
+		})
+	}
 	if resource.Options.Provider != nil {
 		ref, err := imp.getResourceRefItem(resource.Options.Provider, name, "provider")
 		if err != nil {
