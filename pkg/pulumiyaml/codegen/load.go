@@ -200,6 +200,27 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 	return call, diags
 }
 
+// importSplit imports a call to Fn::Split as a call to the `split` function.
+func (imp *importer) importSplit(node *ast.SplitExpr) (model.Expression, syntax.Diagnostics) {
+	var diags syntax.Diagnostics
+
+	delim, ddiags := imp.importExpr(node.Delimiter, nil)
+	diags.Extend(ddiags...)
+
+	source, sdiags := imp.importExpr(node.Source, nil)
+	diags.Extend(sdiags...)
+
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	call := &model.FunctionCallExpression{
+		Name: "split",
+		Args: []model.Expression{delim, source},
+	}
+	return call, diags
+}
+
 // importFunctionCall imports a call to an AWS intrinsic function. The way the function is imported depends on the
 // function:
 //
@@ -296,6 +317,8 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Collection: values,
 			Key:        index,
 		}, diags
+	case *ast.SplitExpr:
+		return imp.importSplit(node)
 	case *ast.StackReferenceExpr:
 		stackName := node.StackName.Value
 		stackVar := imp.stackReferences[stackName]
@@ -392,7 +415,7 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 		var diags syntax.Diagnostics
 		var items []model.ObjectConsItem
 		var fieldHints map[string]schema.Type
-		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok {
+		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok && obj != nil {
 			fieldHints = map[string]schema.Type{}
 			for _, prop := range obj.Properties {
 				fieldHints[prop.Name] = prop.Type
@@ -666,6 +689,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
+		})
+	}
+	if resource.Options.Version != nil {
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "version",
+			Value: quotedLit(resource.Options.Version.Value),
 		})
 	}
 	if resource.Options.Provider != nil {
