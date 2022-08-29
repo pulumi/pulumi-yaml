@@ -38,3 +38,6 @@
 
 - Fix panic on empty object node on `pulumi convert`
   [#321](https://github.com/pulumi/pulumi-yaml/pull/321)
+
+- Fix type checker inaccurately allows using 'id' property of a component resource
+  [#324](https://github.com/pulumi/pulumi-yaml/pull/324)
