@@ -659,7 +659,9 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			for _, prop := range root.Resource.Properties {
 				properties[prop.Name] = prop.Type
 			}
-			properties["id"] = schema.StringType
+			if !root.Resource.IsComponent {
+				properties["id"] = schema.StringType
+			}
 			properties["urn"] = schema.StringType
 		case *schema.InvalidType:
 			return root

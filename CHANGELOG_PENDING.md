@@ -3,7 +3,8 @@
 - Show all error/ warning messages
   [#279](https://github.com/pulumi/pulumi-yaml/pull/279)
 
-- Support options on Fn::Invoke.
+- Support options on `Fn::Invoke`.
+
   [#284](https://github.com/pulumi/pulumi-yaml/pull/284)
 
 - Add `Get` to resources, allowing Pulumi YAML programs to read external resources.
@@ -24,6 +25,9 @@
 - Add `Int` type to the configuration section.
   [#313](https://github.com/pulumi/pulumi-yaml/pull/313)
 
+- Support `options.version` on `pulumi convert`
+  [#291](https://github.com/pulumi/pulumi-yaml/pull/291)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type
@@ -31,3 +35,9 @@
 
 - Fix `pulumi convert` panic on `Fn::Split`
   [#319](https://github.com/pulumi/pulumi-yaml/pull/319)
+
+- Fix panic on empty object node on `pulumi convert`
+  [#321](https://github.com/pulumi/pulumi-yaml/pull/321)
+
+- Fix type checker inaccurately allows using 'id' property of a component resource
+  [#324](https://github.com/pulumi/pulumi-yaml/pull/324)

@@ -415,7 +415,7 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 		var diags syntax.Diagnostics
 		var items []model.ObjectConsItem
 		var fieldHints map[string]schema.Type
-		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok {
+		if obj, ok := codegen.UnwrapType(hint).(*schema.ObjectType); ok && obj != nil {
 			fieldHints = map[string]schema.Type{}
 			for _, prop := range obj.Properties {
 				fieldHints[prop.Name] = prop.Type
@@ -689,6 +689,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
+		})
+	}
+	if resource.Options.Version != nil {
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "version",
+			Value: quotedLit(resource.Options.Version.Value),
 		})
 	}
 	if resource.Options.Provider != nil {
