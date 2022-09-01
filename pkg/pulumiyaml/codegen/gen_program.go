@@ -194,7 +194,7 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 			g.expr(opts.Provider)))
 	}
 	if opts.Parent != nil {
-		rOpts = append(rOpts, syn.ObjectProperty(syn.String("provider"),
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("parent"),
 			g.expr(opts.Parent)))
 	}
 	if opts.DependsOn != nil {
