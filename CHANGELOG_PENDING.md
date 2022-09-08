@@ -44,3 +44,6 @@
 
 - Fix resource option typo that make `parent` becomes `provider`
   [#326](https://github.com/pulumi/pulumi-yaml/pull/326)
+
+- Support ejecting all config types to other languages.
+  [#329](https://github.com/pulumi/pulumi-yaml/pull/329)
