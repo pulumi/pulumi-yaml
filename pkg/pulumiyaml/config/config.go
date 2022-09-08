@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
@@ -15,7 +16,10 @@ import (
 
 type Type interface {
 	fmt.Stringer
+	// Return the schema equivalent of this type
 	Schema() schema.Type
+	// Return the pcl equivalent of this type
+	Pcl() model.Type
 
 	isType()
 }
@@ -30,6 +34,27 @@ func (t typ) String() string {
 
 func (t typ) Schema() schema.Type {
 	return t.inner
+}
+
+func (t typ) Pcl() model.Type {
+	switch t.inner {
+	case schema.StringType:
+		return model.StringType
+	case schema.NumberType:
+		return model.NumberType
+	case schema.BoolType:
+		return model.BoolType
+	case schema.IntType:
+		return model.IntType
+	}
+	switch t := t.inner.(type) {
+	case *schema.ArrayType:
+		return model.NewListType(typ{t.ElementType}.Pcl())
+	}
+
+	// We should never hit this, but if we do an error should be reported instead of
+	// panicking.
+	return model.NewOpaqueType("Invalid type :" + t.String())
 }
 
 var (
