@@ -2,6 +2,10 @@ config sqlAdmin string {
 	default = "pulumi"
 }
 
+config retentionInDays int {
+	default = 30
+}
+
 sharedKey = secret(invoke("azure-native:operationalinsights:getSharedKeys", {
 	resourceGroupName = resourceGroup.name,
 	workspaceName = workspace.name
@@ -23,7 +27,7 @@ resource workspace "azure-native:operationalinsights:Workspace" {
 	sku = {
 		name = "PerGB2018"
 	}
-	retentionInDays = 30
+	retentionInDays = retentionInDays
 }
 
 resource kubeEnv "azure-native:web:KubeEnvironment" {
