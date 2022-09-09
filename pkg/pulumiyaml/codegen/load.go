@@ -726,14 +726,19 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, highestPkgInfo ma
 		})
 	}
 	if p, ok := highestPkgInfo[pkg.Name()]; ok {
-		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
-			Name:  "version",
-			Value: quotedLit(p.version),
-		})
-		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
-			Name:  "pluginDownloadURL",
-			Value: quotedLit(p.pluginDownloadURL),
-		})
+		if p.version != "" {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "version",
+				Value: quotedLit(p.version),
+			})
+		}
+		if p.pluginDownloadURL != "" {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "pluginDownloadURL",
+				Value: quotedLit(p.pluginDownloadURL),
+			})
+		}
+
 	}
 	if resource.Options.Provider != nil {
 		ref, err := imp.getResourceRefItem(resource.Options.Provider, name, "provider")
