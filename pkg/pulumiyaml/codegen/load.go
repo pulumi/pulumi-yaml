@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
@@ -602,8 +603,34 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry) (model.BodyItem, 
 	}, diags
 }
 
+// gets the highest version specified for a package
+// TODO: support invokes
+func (imp *importer) getHighestPkgVersions(kvp ast.ResourcesMapEntry, highestPkgVersion map[string]string) syntax.Diagnostics {
+	resource := kvp.Value
+
+	pkg, _, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
+	if err != nil {
+		return syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
+	}
+
+	if resource.Options.Version != nil {
+		v1, err := semver.Make(resource.Options.Version.Value)
+		if err == nil {
+			if version, ok := highestPkgVersion[pkg.Name()]; ok {
+				v2, _ := semver.Make(version)
+				if v1.Compare(v2) == 1 {
+					highestPkgVersion[pkg.Name()] = resource.Options.Version.Value
+				}
+			} else {
+				highestPkgVersion[pkg.Name()] = resource.Options.Version.Value
+			}
+		}
+	}
+	return nil
+}
+
 // importResource imports a YAML resource as a PCL resource.
-func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, syntax.Diagnostics) {
+func (imp *importer) importResource(kvp ast.ResourcesMapEntry, highestPkgVersion map[string]string) (model.BodyItem, syntax.Diagnostics) {
 	name, resource := kvp.Key.Value, kvp.Value
 
 	resourceVar, ok := imp.resources[name]
@@ -688,7 +715,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry) (model.BodyItem, 
 	if resource.Options.Version != nil {
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "version",
-			Value: quotedLit(resource.Options.Version.Value),
+			Value: quotedLit(highestPkgVersion[pkg.Name()]),
 		})
 	}
 	if resource.Options.Provider != nil {
@@ -914,8 +941,12 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	}
 
 	// Import resources.
+	highestPkgVersion := make(map[string]string)
 	for _, kvp := range file.Resources.Entries {
-		resource, rdiags := imp.importResource(kvp)
+		imp.getHighestPkgVersions(kvp, highestPkgVersion)
+	}
+	for _, kvp := range file.Resources.Entries {
+		resource, rdiags := imp.importResource(kvp, highestPkgVersion)
 		diags.Extend(rdiags...)
 
 		if resource != nil {
