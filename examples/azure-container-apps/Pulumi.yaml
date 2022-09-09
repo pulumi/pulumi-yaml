@@ -5,6 +5,9 @@ configuration:
   sqlAdmin:
     type: String
     default: pulumi
+  retentionInDays:
+    default: 30
+    type: Int
 variables:
   sharedKey:
     Fn::Secret:
@@ -30,7 +33,7 @@ resources:
       resourceGroupName: ${resourceGroup.name}
       sku:
         name: "PerGB2018"
-      retentionInDays: 30
+      retentionInDays: ${retentionInDays}
   kubeEnv:
     type: azure-native:web:KubeEnvironment
     properties:

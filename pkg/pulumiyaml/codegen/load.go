@@ -17,6 +17,7 @@ import (
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -461,18 +462,11 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 
 // importParameterType converts a YAML config variable type to its equivalent PCL type.
 func importParameterType(s string) (string, bool) {
-	switch s {
-	case "String":
-		return "string", true
-	case "Number":
-		return "number", true
-	case "List<Number>":
-		return "list(number)", true
-	case "List<String>":
-		return "list(string)", true
-	default:
+	t, ok := config.Parse(s)
+	if !ok {
 		return "", false
 	}
+	return t.Pcl().String(), true
 }
 
 // importConfig imports a template config variable. The parameter is imported as a simple config variable definition.
