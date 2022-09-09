@@ -33,6 +33,11 @@ type importer struct {
 	outputs         map[string]*model.Variable
 }
 
+type packageInfo struct {
+	version           string
+	pluginDownloadURL string
+}
+
 // null represents PCL's builtin `null` variable
 var null = &model.Variable{
 	Name:         "null",
@@ -605,7 +610,7 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry) (model.BodyItem, 
 
 // gets the highest version specified for a package
 // TODO: support invokes
-func (imp *importer) getHighestPkgVersions(kvp ast.ResourcesMapEntry, highestPkgVersion map[string]string) syntax.Diagnostics {
+func (imp *importer) getHighestPkgInfo(kvp ast.ResourcesMapEntry, pkgInfo map[string]*packageInfo) syntax.Diagnostics {
 	resource := kvp.Value
 
 	pkg, _, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
@@ -614,15 +619,23 @@ func (imp *importer) getHighestPkgVersions(kvp ast.ResourcesMapEntry, highestPkg
 	}
 
 	if resource.Options.Version != nil {
+		url := ""
+		if resource.Options.PluginDownloadURL != nil {
+			url = resource.Options.PluginDownloadURL.Value
+		}
 		v1, err := semver.Make(resource.Options.Version.Value)
 		if err == nil {
-			if version, ok := highestPkgVersion[pkg.Name()]; ok {
-				v2, _ := semver.Make(version)
+			if p, ok := pkgInfo[pkg.Name()]; ok {
+				v2, _ := semver.Make(p.version)
 				if v1.Compare(v2) == 1 {
-					highestPkgVersion[pkg.Name()] = resource.Options.Version.Value
+					p.version = resource.Options.Version.Value
+					p.pluginDownloadURL = url
 				}
 			} else {
-				highestPkgVersion[pkg.Name()] = resource.Options.Version.Value
+				pkgInfo[pkg.Name()] = &packageInfo{
+					version:           resource.Options.Version.Value,
+					pluginDownloadURL: url,
+				}
 			}
 		}
 	}
@@ -630,7 +643,7 @@ func (imp *importer) getHighestPkgVersions(kvp ast.ResourcesMapEntry, highestPkg
 }
 
 // importResource imports a YAML resource as a PCL resource.
-func (imp *importer) importResource(kvp ast.ResourcesMapEntry, highestPkgVersion map[string]string) (model.BodyItem, syntax.Diagnostics) {
+func (imp *importer) importResource(kvp ast.ResourcesMapEntry, highestPkgInfo map[string]*packageInfo) (model.BodyItem, syntax.Diagnostics) {
 	name, resource := kvp.Key.Value, kvp.Value
 
 	resourceVar, ok := imp.resources[name]
@@ -712,10 +725,14 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, highestPkgVersion
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
 		})
 	}
-	if resource.Options.Version != nil {
+	if p, ok := highestPkgInfo[pkg.Name()]; ok {
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "version",
-			Value: quotedLit(highestPkgVersion[pkg.Name()]),
+			Value: quotedLit(p.version),
+		})
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "pluginDownloadURL",
+			Value: quotedLit(p.pluginDownloadURL),
 		})
 	}
 	if resource.Options.Provider != nil {
@@ -941,13 +958,13 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	}
 
 	// Import resources.
-	highestPkgVersion := make(map[string]string)
+	highestPkgInfo := make(map[string]*packageInfo)
 	for _, kvp := range file.Resources.Entries {
-		rdiags := imp.getHighestPkgVersions(kvp, highestPkgVersion)
+		rdiags := imp.getHighestPkgInfo(kvp, highestPkgInfo)
 		diags.Extend(rdiags...)
 	}
 	for _, kvp := range file.Resources.Entries {
-		resource, rdiags := imp.importResource(kvp, highestPkgVersion)
+		resource, rdiags := imp.importResource(kvp, highestPkgInfo)
 		diags.Extend(rdiags...)
 
 		if resource != nil {
