@@ -943,7 +943,8 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	// Import resources.
 	highestPkgVersion := make(map[string]string)
 	for _, kvp := range file.Resources.Entries {
-		imp.getHighestPkgVersions(kvp, highestPkgVersion)
+		rdiags := imp.getHighestPkgVersions(kvp, highestPkgVersion)
+		diags.Extend(rdiags...)
 	}
 	for _, kvp := range file.Resources.Entries {
 		resource, rdiags := imp.importResource(kvp, highestPkgVersion)
