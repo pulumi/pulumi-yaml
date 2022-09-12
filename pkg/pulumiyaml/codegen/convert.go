@@ -49,7 +49,17 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 		loader = schema.NewPluginLoader(host)
 	}
 
-	templateBody, tdiags := ImportTemplate(template, pulumiyaml.NewPackageLoaderFromSchemaLoader(loader))
+	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
+	_, tdiags, err := pulumiyaml.PrepareTemplate(template, pkgLoader)
+	if err != nil {
+		return "", diags, err
+	}
+	diags = diags.Extend(tdiags.HCL())
+	if diags.HasErrors() {
+		return "", diags, nil
+	}
+
+	templateBody, tdiags := ImportTemplate(template, pkgLoader)
 	diags = diags.Extend(tdiags.HCL())
 	if diags.HasErrors() {
 		return "", diags, nil

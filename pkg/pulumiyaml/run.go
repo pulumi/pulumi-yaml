@@ -277,24 +277,12 @@ func (r *runner) setDefaultProviders() error {
 }
 
 // PrepareTemplate prepares a template for converting or running
-func PrepareTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) (*runner, *syntax.Diagnostics, error) {
+func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*runner, syntax.Diagnostics, error) {
 	// set up context-free runner
 	r := newRunner(t, loader)
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return nil, nil, err
-	}
-	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": ctx.Project(),
-		"stack":   ctx.Stack(),
-	}
-	r.cwd = cwd
-
 	// runner hooks up default providers
-	err = r.setDefaultProviders()
+	err := r.setDefaultProviders()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -302,19 +290,29 @@ func PrepareTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoa
 	// runner type checks nodes
 	_, diags := TypeCheck(r)
 	if diags.HasErrors() {
-		return nil, nil, diags
+		return nil, diags, nil
 	}
 
-	return r, &diags, nil
+	return r, diags, nil
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-
-	r, diags, err := PrepareTemplate(ctx, t, loader)
+	r, diags, err := PrepareTemplate(t, loader)
 	if err != nil {
 		return err
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return err
+	}
+	r.variables[PulumiVarName] = map[string]interface{}{
+		"cwd":     cwd,
+		"project": ctx.Project(),
+		"stack":   ctx.Stack(),
+	}
+	r.cwd = cwd
 
 	// runtime evaluation here
 	diags.Extend(r.Evaluate(ctx)...)
