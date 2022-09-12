@@ -31,6 +31,9 @@
 - Set highest package version on all resources
   [#331](https://github.com/pulumi/pulumi-yaml/pull/331)
 
+- Set highest package pluginDownloadURL on all resources
+  [#332](https://github.com/pulumi/pulumi-yaml/pull/332)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type
