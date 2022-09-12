@@ -33,6 +33,10 @@ resource webServer "aws:ec2/instance:Instance" {
 		"nohup python -m SimpleHTTPServer 80 &"
 	])
 	vpcSecurityGroupIds = [webSecGrp.id]
+
+	options {
+		version = "4.37.1"
+	}
 }
 
 output instanceId {
