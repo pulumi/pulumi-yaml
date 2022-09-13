@@ -634,7 +634,8 @@ func (e programEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool 
 }
 
 func (r *runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
-	return r.Run(programEvaluator{pulumiCtx: ctx})
+	eCtx := r.newContext(nil)
+	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
 func (r *runner) ensureSetup() {

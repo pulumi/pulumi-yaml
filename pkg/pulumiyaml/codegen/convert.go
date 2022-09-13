@@ -65,6 +65,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 		return "", diags, nil
 	}
 	programText := fmt.Sprintf("%v", templateBody)
+	fmt.Println(programText)
 
 	return programText, nil, nil
 }
