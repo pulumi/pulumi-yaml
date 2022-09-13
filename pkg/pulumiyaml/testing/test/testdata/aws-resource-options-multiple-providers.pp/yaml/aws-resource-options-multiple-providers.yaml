@@ -1,0 +1,29 @@
+resources:
+  provider:
+    type: pulumi:providers:aws
+    properties:
+      region: us-west-2
+  provider2:
+    type: pulumi:providers:aws
+    properties:
+      version: 5.12.0
+  bucket1:
+    type: aws:s3:Bucket
+    options:
+      provider: ${provider}
+      dependson:
+        - ${provider}
+      ignorechanges:
+        - bucket
+        - lifecycleRules[0]
+      protect: true
+  bucket2:
+    type: aws:s3:Bucket
+    options:
+      version: 5.13.0
+  bucket3:
+    type: aws:s3:Bucket
+  thirdPartyObject:
+    type: scaleway:ObjectBucket
+    options:
+      pluginDownloadURL: github://api.github.com/lbrlabs/pulumi-scaleway
