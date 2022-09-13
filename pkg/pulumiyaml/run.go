@@ -176,7 +176,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func (r *runner) setDefaultProviders() error {
+func (r *Runner) setDefaultProviders() error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
 	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
@@ -198,7 +198,7 @@ func (r *runner) setDefaultProviders() error {
 
 	// Set roots
 	diags := r.Run(walker{
-		VisitResource: func(r *runner, node resourceNode) bool {
+		VisitResource: func(r *Runner, node resourceNode) bool {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -232,7 +232,7 @@ func (r *runner) setDefaultProviders() error {
 		VisitExpr: func(ec *evalContext, e ast.Expr) bool {
 			return true
 		},
-		VisitVariable: func(r *runner, node variableNode) bool {
+		VisitVariable: func(r *Runner, node variableNode) bool {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 
@@ -262,10 +262,10 @@ func (r *runner) setDefaultProviders() error {
 			}
 			return true
 		},
-		VisitConfig: func(r *runner, node configNode) bool {
+		VisitConfig: func(r *Runner, node configNode) bool {
 			return true
 		},
-		VisitOutput: func(r *runner, node ast.PropertyMapEntry) bool {
+		VisitOutput: func(r *Runner, node ast.PropertyMapEntry) bool {
 			return true
 		},
 	})
@@ -277,7 +277,7 @@ func (r *runner) setDefaultProviders() error {
 }
 
 // PrepareTemplate prepares a template for converting or running
-func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*runner, syntax.Diagnostics, error) {
+func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
 	// set up context-free runner
 	r := newRunner(t, loader)
 
@@ -302,17 +302,6 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	if err != nil {
 		return err
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return err
-	}
-	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": ctx.Project(),
-		"stack":   ctx.Stack(),
-	}
-	r.cwd = cwd
 
 	// runtime evaluation here
 	diags.Extend(r.Evaluate(ctx)...)
@@ -351,7 +340,7 @@ type providerInfo struct {
 	providerName      *ast.StringExpr
 }
 
-type runner struct {
+type Runner struct {
 	t         *ast.TemplateDecl
 	pkgLoader PackageLoader
 	config    map[string]interface{}
@@ -369,7 +358,7 @@ type runner struct {
 }
 
 type evalContext struct {
-	*runner
+	*Runner
 
 	root   interface{}
 	sdiags syncDiags
@@ -393,7 +382,7 @@ func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (
 	return ctx.error(expr, fmt.Sprintf(format, a...))
 }
 
-func (r *runner) newContext(root interface{}) *evalContext {
+func (r *Runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
 		runner: r,
 		root:   root,
@@ -543,8 +532,8 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
-func newRunner(t *ast.TemplateDecl, p PackageLoader) *runner {
-	return &runner{
+func newRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
+	return &Runner{
 		t:         t,
 		pkgLoader: p,
 		config:    make(map[string]interface{}),
@@ -557,10 +546,10 @@ func newRunner(t *ast.TemplateDecl, p PackageLoader) *runner {
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
-	EvalConfig(r *runner, node configNode) bool
-	EvalVariable(r *runner, node variableNode) bool
-	EvalResource(r *runner, node resourceNode) bool
-	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
+	EvalConfig(r *Runner, node configNode) bool
+	EvalVariable(r *Runner, node variableNode) bool
+	EvalResource(r *Runner, node resourceNode) bool
+	EvalOutput(r *Runner, node ast.PropertyMapEntry) bool
 }
 
 type programEvaluator struct {
@@ -568,7 +557,7 @@ type programEvaluator struct {
 	pulumiCtx *pulumi.Context
 }
 
-func (e programEvaluator) EvalConfig(r *runner, node configNode) bool {
+func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
 
 	ctx := r.newContext(node)
 	c, ok := e.registerConfig(node)
@@ -585,7 +574,7 @@ func (e programEvaluator) EvalConfig(r *runner, node configNode) bool {
 	return true
 }
 
-func (e programEvaluator) EvalVariable(r *runner, node variableNode) bool {
+func (e programEvaluator) EvalVariable(r *Runner, node variableNode) bool {
 	ctx := r.newContext(node)
 	value, ok := e.evaluateExpr(node.Value)
 	if !ok {
@@ -601,7 +590,7 @@ func (e programEvaluator) EvalVariable(r *runner, node variableNode) bool {
 	return true
 }
 
-func (e programEvaluator) EvalResource(r *runner, node resourceNode) bool {
+func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 	ctx := r.newContext(node)
 	res, ok := e.registerResource(node)
 	if !ok {
@@ -618,7 +607,7 @@ func (e programEvaluator) EvalResource(r *runner, node resourceNode) bool {
 
 }
 
-func (e programEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	ctx := r.newContext(node)
 	out, ok := e.registerOutput(node)
 	if !ok {
@@ -633,12 +622,12 @@ func (e programEvaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
-func (r *runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	eCtx := r.newContext(nil)
 	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
-func (r *runner) ensureSetup() {
+func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// need to set cwd here for tests that don't call RunTemplate() and call Evaluate() directly
 	if r.cwd == "" {
 		cwd, err := os.Getwd()
@@ -647,7 +636,9 @@ func (r *runner) ensureSetup() {
 			return
 		}
 		r.variables[PulumiVarName] = map[string]interface{}{
-			"cwd": cwd,
+			"cwd":     cwd,
+			"project": ctx.Project(),
+			"stack":   ctx.Stack(),
 		}
 		r.cwd = cwd
 	}
@@ -665,14 +656,14 @@ func (r *runner) ensureSetup() {
 	}
 }
 
-func (r *runner) Run(e Evaluator) syntax.Diagnostics {
-	r.ensureSetup()
+func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 	var ctx *pulumi.Context
 
 	switch eval := e.(type) {
 	case programEvaluator:
 		ctx = eval.pulumiCtx
 	}
+	r.ensureSetup(ctx)
 
 	returnDiags := func() syntax.Diagnostics {
 		r.sdiags.mutex.Lock()

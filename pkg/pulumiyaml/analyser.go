@@ -352,7 +352,7 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	ctx.addErrDiag(loc, summary, result.String())
 }
 
-func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
+func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
@@ -821,13 +821,13 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	return true
 }
 
-func (tc *typeCache) typeVariable(r *runner, node variableNode) bool {
+func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 	k, v := node.Key.Value, node.Value
 	tc.variableNames[k] = v
 	return true
 }
 
-func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
+func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	k, v := node.Key.Value, node.Value
 	var typ schema.Type = &schema.InvalidType{}
 	var optional bool
@@ -850,7 +850,7 @@ func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 	return true
 }
 
-func (tc *typeCache) typeOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	tc.outputs[node.Key.Value] = tc.exprs[node.Value]
 	return true
 }
@@ -882,7 +882,7 @@ func newTypeCache() *typeCache {
 	}
 }
 
-func TypeCheck(r *runner) (Typing, syntax.Diagnostics) {
+func TypeCheck(r *Runner) (Typing, syntax.Diagnostics) {
 	types := newTypeCache()
 
 	// Set roots
@@ -898,10 +898,10 @@ func TypeCheck(r *runner) (Typing, syntax.Diagnostics) {
 }
 
 type walker struct {
-	VisitConfig   func(r *runner, node configNode) bool
-	VisitVariable func(r *runner, node variableNode) bool
-	VisitOutput   func(r *runner, node ast.PropertyMapEntry) bool
-	VisitResource func(r *runner, node resourceNode) bool
+	VisitConfig   func(r *Runner, node configNode) bool
+	VisitVariable func(r *Runner, node variableNode) bool
+	VisitOutput   func(r *Runner, node ast.PropertyMapEntry) bool
+	VisitResource func(r *Runner, node resourceNode) bool
 	VisitExpr     func(*evalContext, ast.Expr) bool
 }
 
@@ -944,7 +944,7 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	return true
 }
 
-func (e walker) EvalConfig(r *runner, node configNode) bool {
+func (e walker) EvalConfig(r *Runner, node configNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -964,7 +964,7 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 	}
 	return true
 }
-func (e walker) EvalVariable(r *runner, node variableNode) bool {
+func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -981,7 +981,7 @@ func (e walker) EvalVariable(r *runner, node variableNode) bool {
 	}
 	return true
 }
-func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -999,7 +999,7 @@ func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	}
 	return true
 }
-func (e walker) EvalResource(r *runner, node resourceNode) bool {
+func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {

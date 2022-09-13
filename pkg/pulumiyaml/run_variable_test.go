@@ -86,7 +86,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -115,7 +115,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -149,7 +149,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -190,7 +190,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -221,7 +221,7 @@ outputs:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -254,7 +254,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -280,11 +280,11 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
-func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
+func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
 	testInvokeCalls := 0
 
 	mocks := &testMonitor{

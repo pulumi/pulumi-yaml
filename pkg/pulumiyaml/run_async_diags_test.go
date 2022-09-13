@@ -76,7 +76,7 @@ resources:
 
 	log := &interceptingLog{}
 
-	var hoistedRunner *runner
+	var hoistedRunner *Runner
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		ctx.Log = log
 		r := newRunner(template, newMockPackageMap())

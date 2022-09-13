@@ -287,7 +287,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	return nil
 }
 
-func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
+func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
 	// Same mocks as in testTemplateDiags but without assertions, just pure syntax checking.
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
@@ -395,7 +395,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, text)
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 	require.Len(t, diags, 0)
 	// Consider warning on this?
 	// require.True(t, diags.HasErrors())
@@ -1561,7 +1561,7 @@ outputs:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 
 	var diagStrings []string
 	for _, v := range diags {
@@ -1623,7 +1623,7 @@ variables:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *runner) {})
+	diags := testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 
 	var diagStrings []string
 	for _, v := range diags {
@@ -1658,7 +1658,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	diags := testInvokeDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -1687,7 +1687,7 @@ resources:
     properties:
       foo: ${poisoned}`
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testInvokeDiags(t, tmpl, func(r *runner) {})
+	diags := testInvokeDiags(t, tmpl, func(r *Runner) {})
 	var diagStrings []string
 	for _, v := range diags {
 		diagStrings = append(diagStrings, diagString(v))
@@ -1739,7 +1739,7 @@ variables:
 `
 	templ := yamlTemplate(t, text)
 	var wasRun bool
-	diags := testInvokeDiags(t, templ, func(r *runner) {
+	diags := testInvokeDiags(t, templ, func(r *Runner) {
 		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
 			wasRun = true
 			assert.Equal(t, "yes", s)
