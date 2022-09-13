@@ -212,10 +212,10 @@ func (r *runner) setDefaultProviders() error {
 			defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
 			if v.Options.Provider == nil {
-				if v.Options.Version != nil {
+				if v.Options.Version != nil && v.Options.Version.Value != defaultProviderInfo.version.Value {
 					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
 				}
-				if v.Options.PluginDownloadURL != nil {
+				if v.Options.PluginDownloadURL != nil && v.Options.PluginDownloadURL.Value != defaultProviderInfo.pluginDownloadURL.Value {
 					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
 				}
 
