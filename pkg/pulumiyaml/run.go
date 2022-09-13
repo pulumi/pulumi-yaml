@@ -639,6 +639,19 @@ func (r *runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 }
 
 func (r *runner) ensureSetup() {
+	// need to set cwd here for tests that don't call RunTemplate() and call Evaluate() directly
+	if r.cwd == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+			return
+		}
+		r.variables[PulumiVarName] = map[string]interface{}{
+			"cwd": cwd,
+		}
+		r.cwd = cwd
+	}
+
 	r.intermediates = []graphNode{}
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
