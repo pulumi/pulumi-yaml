@@ -635,10 +635,16 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 			return
 		}
+
+		var project, stack string
+		if ctx != nil {
+			project = ctx.Project()
+			stack = ctx.Stack()
+		}
 		r.variables[PulumiVarName] = map[string]interface{}{
 			"cwd":     cwd,
-			"project": ctx.Project(),
-			"stack":   ctx.Stack(),
+			"project": project,
+			"stack":   stack,
 		}
 		r.cwd = cwd
 	}
