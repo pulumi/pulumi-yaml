@@ -384,7 +384,7 @@ func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (
 
 func (r *Runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
-		runner: r,
+		Runner: r,
 		root:   root,
 		sdiags: syncDiags{},
 	}
@@ -1828,7 +1828,7 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 		isSubdirectory := false
-		relPath, err := filepath.Rel(e.runner.cwd, path)
+		relPath, err := filepath.Rel(e.Runner.cwd, path)
 		if err != nil {
 			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
