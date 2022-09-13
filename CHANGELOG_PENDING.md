@@ -37,6 +37,9 @@
 - Set highest package version and pluginDownloadURL on all invokes
   [#334](https://github.com/pulumi/pulumi-yaml/pull/334)
 
+- Enable transformation & type checking passes on `pulumi convert` 
+  [#320](https://github.com/pulumi/pulumi-yaml/pull/320)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type
