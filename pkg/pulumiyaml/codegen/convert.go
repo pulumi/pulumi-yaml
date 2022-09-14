@@ -50,6 +50,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 	}
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
+	// don't need the runner here since template is not executed and we can use pkgLoader
 	_, tdiags, err := pulumiyaml.PrepareTemplate(template, pkgLoader)
 	if err != nil {
 		return "", diags, err
