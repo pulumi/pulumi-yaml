@@ -680,26 +680,23 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 }
 
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
-	// need to set cwd here for tests that don't call RunTemplate() and call Evaluate() directly
-	if r.cwd == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-			return
-		}
-
-		var project, stack string
-		if ctx != nil {
-			project = ctx.Project()
-			stack = ctx.Stack()
-		}
-		r.variables[PulumiVarName] = map[string]interface{}{
-			"cwd":     cwd,
-			"project": project,
-			"stack":   stack,
-		}
-		r.cwd = cwd
+	cwd, err := os.Getwd()
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return
 	}
+
+	var project, stack string
+	if ctx != nil {
+		project = ctx.Project()
+		stack = ctx.Stack()
+	}
+	r.variables[PulumiVarName] = map[string]interface{}{
+		"cwd":     cwd,
+		"project": project,
+		"stack":   stack,
+	}
+	r.cwd = cwd
 
 	r.intermediates = []graphNode{}
 
