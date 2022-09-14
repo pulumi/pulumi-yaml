@@ -358,7 +358,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
 	if err != nil {
 		ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("error resolving type of resource %v: %v", k, err), ""))
-		// ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
+		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
@@ -445,8 +445,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 				}
 
 				subject := prop.Key.Syntax().Range()
-				ctx.sdiags.diags.Extend(syntax.Error(subject, summary, detail))
-				// ctx.addDiag(syntax.Error(subject, summary, detail))
+				ctx.addErrDiag(subject, summary, detail)
 			}
 		}
 	}

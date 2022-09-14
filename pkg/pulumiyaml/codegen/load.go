@@ -771,7 +771,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
 		})
 	}
-	// latest package settings takes precedence over a set provider
+	// latest package settings takes precedence over a set provider/ version/ url
 	if p, ok := latestPkgInfo[pkg.Name()]; ok {
 		if p.version != "" {
 			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
@@ -785,14 +785,28 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 				Value: quotedLit(p.pluginDownloadURL),
 			})
 		}
-	} else if resource.Options.Provider != nil {
-		ref, err := imp.getResourceRefItem(resource.Options.Provider, name, "provider")
-		if err != nil {
-			diags.Extend(err)
-		} else {
+	} else {
+		if resource.Options.Provider != nil {
+			ref, err := imp.getResourceRefItem(resource.Options.Provider, name, "provider")
+			if err != nil {
+				diags.Extend(err)
+			} else {
+				resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+					Name:  "provider",
+					Value: ref,
+				})
+			}
+		}
+		if resource.Options.Version != nil {
 			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
-				Name:  "provider",
-				Value: ref,
+				Name:  "version",
+				Value: quotedLit(resource.Options.Version.Value),
+			})
+		}
+		if resource.Options.PluginDownloadURL != nil {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "pluginDownloadURL",
+				Value: quotedLit(resource.Options.PluginDownloadURL.Value),
 			})
 		}
 	}

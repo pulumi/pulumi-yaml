@@ -213,10 +213,14 @@ func (r *Runner) setDefaultProviders() error {
 
 			if v.Options.Provider == nil {
 				if v.Options.Version != nil && v.Options.Version.Value != defaultProviderInfo.version.Value {
-					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+						"Version conflicts with the default provider version",
+						fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 				}
 				if v.Options.PluginDownloadURL != nil && v.Options.PluginDownloadURL.Value != defaultProviderInfo.pluginDownloadURL.Value {
-					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+						"PluginDownloadURL conflicts with the default provider URL",
+						fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 				}
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -246,10 +250,14 @@ func (r *Runner) setDefaultProviders() error {
 
 				if t.CallOpts.Provider == nil {
 					if t.CallOpts.Version != nil {
-						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+						ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+							"Version conflicts with the default provider version",
+							fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 					}
 					if t.CallOpts.PluginDownloadURL != nil {
-						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+						ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+							"PluginDownloadURL conflicts with the default provider URL",
+							fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 					}
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -366,15 +374,18 @@ type evalContext struct {
 
 func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail string) {
 	ctx.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.Runner.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
 }
 
 func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
 	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+	ctx.Runner.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
 	diag := ast.ExprError(expr, summary, "")
 	ctx.sdiags.Extend(diag)
+	ctx.Runner.sdiags.Extend(diag)
 	return nil, false
 }
 
@@ -557,19 +568,60 @@ type programEvaluator struct {
 	pulumiCtx *pulumi.Context
 }
 
+func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	e.addDiag(diag)
+	return nil, false
+}
+
+func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
+	defer func() {
+		e.sdiags.Extend(diag)
+		e.evalContext.Runner.sdiags.Extend(diag)
+	}()
+
+	var buf bytes.Buffer
+	w := e.t.NewDiagnosticWriter(&buf, 0, false)
+	err := w.WriteDiagnostic(diag.HCL())
+	if err != nil {
+		err = e.pulumiCtx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+	} else {
+		s := buf.String()
+		// We strip off the appropriate HCL error message, since it will be
+		// added back on via the pulumi.Log framework.
+		switch diag.Severity {
+		case hcl.DiagWarning:
+			s = strings.TrimPrefix(s, "Warning: ")
+			err = e.pulumiCtx.Log.Warn(s, &pulumi.LogArgs{})
+		default:
+			s = strings.TrimPrefix(s, "Error: ")
+			err = e.pulumiCtx.Log.Error(s, &pulumi.LogArgs{})
+		}
+	}
+	if err != nil {
+		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
+	}
+}
+
+func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return e.error(expr, fmt.Sprintf(format, a...))
+}
+
 func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
 
 	ctx := r.newContext(node)
 	c, ok := e.registerConfig(node)
 	if !ok {
-		r.config[node.Key.Value] = poisonMarker{}
+		e.config[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
 			return false
 		}
 	} else {
-		r.config[node.Key.Value] = c
+		e.config[node.Key.Value] = c
 	}
 	return true
 }
@@ -578,14 +630,14 @@ func (e programEvaluator) EvalVariable(r *Runner, node variableNode) bool {
 	ctx := r.newContext(node)
 	value, ok := e.evaluateExpr(node.Value)
 	if !ok {
-		r.variables[node.Key.Value] = poisonMarker{}
+		e.variables[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		r.variables[node.Key.Value] = value
+		e.variables[node.Key.Value] = value
 	}
 	return true
 }
@@ -594,14 +646,14 @@ func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 	ctx := r.newContext(node)
 	res, ok := e.registerResource(node)
 	if !ok {
-		r.resources[node.Key.Value] = poisonMarker{}
+		e.resources[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		r.resources[node.Key.Value] = res
+		e.resources[node.Key.Value] = res
 	}
 	return true
 
