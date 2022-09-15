@@ -518,6 +518,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		}
 
 	case *model.FunctionCallExpression:
+		fmt.Println("functionCallExpression")
 		return g.function(e)
 	case *model.RelativeTraversalExpression:
 		// Direct use of a function
@@ -646,6 +647,7 @@ func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
 }
 
 func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
+	fmt.Println(f.Name)
 	getRange := func() hcl.Range {
 		if s := f.Syntax; s != nil {
 			return s.Range()
@@ -669,6 +671,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
+	case "fromBase64":
+		return wrapFn("FromBase64", g.expr(f.Args[0]))
 	case "toJSON":
 		return wrapFn("ToJSON", g.expr(f.Args[0]))
 	case "element":
