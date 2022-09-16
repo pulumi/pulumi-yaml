@@ -59,3 +59,6 @@
 
 - Support ejecting all config types to other languages.
   [#329](https://github.com/pulumi/pulumi-yaml/pull/329)
+
+- Allow `fromBase64` support on convert
+  [#336](https://github.com/pulumi/pulumi-yaml/pull/336)
