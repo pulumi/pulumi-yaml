@@ -17,6 +17,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
+var ProjectKeysToOmit = []string{"configuration", "resources", "outputs"}
+
 // Eject on a YAML program directory returns a Pulumi Project and a YAML program which has been
 // parsed and converted to the intermediate PCL language
 //
@@ -29,6 +31,12 @@ func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.
 	}
 	if template == nil && diags.HasErrors() {
 		return nil, nil, fmt.Errorf("failed to load the template: %s", diags.Error())
+	}
+	// remove extraneous keys from Pulumi.yaml project file
+	if proj.AdditionalKeys != nil {
+		for _, k := range ProjectKeysToOmit {
+			delete(proj.AdditionalKeys, k)
+		}
 	}
 	diagWriter := template.NewDiagnosticWriter(os.Stderr, 0, true)
 	if len(diags) != 0 {
