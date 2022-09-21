@@ -17,7 +17,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
-var ProjectKeysToOmit = []string{"configuration", "resources", "outputs"}
+var ProjectKeysToOmit = []string{"configuration", "resources", "outputs", "variables"}
 
 // Eject on a YAML program directory returns a Pulumi Project and a YAML program which has been
 // parsed and converted to the intermediate PCL language
