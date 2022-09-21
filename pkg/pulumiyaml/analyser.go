@@ -358,7 +358,9 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
 	if err != nil {
 		ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("error resolving type of resource %v: %v", k, err), ""))
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
+		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+			fmt.Sprintf("Error resolving type of resource %v: %v", k, err),
+			"")
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
@@ -373,7 +375,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, k, fmtr, pkg, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -400,7 +402,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		MaxElements:         5,
 		FieldsAreProperties: true,
 	}
-	tc.typePropertyEntries(ctx, k, fmtr, v.Get.State.Entries, hint.Resource.Properties)
+	tc.typePropertyEntries(ctx, k, fmtr, pkg, v.Get.State.Entries, hint.Resource.Properties)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -479,20 +481,45 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, pkg Package, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	propMap := map[string]*schema.Property{}
 	for _, p := range props {
 		propMap[p.Name] = p
 	}
+
 	for _, kvp := range entries {
 		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
 			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
 			subject := kvp.Key.Syntax().Syntax().Range()
 			ctx.addErrDiag(subject, summary, detail)
 		} else {
+			if obj, ok := kvp.Value.(*ast.ObjectExpr); ok {
+				entryProp := propMap[kvp.Key.Value]
+
+				switch root := codegen.UnwrapType(entryProp.Type).(type) {
+				case *schema.ObjectType:
+					var propProperties []string
+					for _, p := range root.Properties {
+						propProperties = append(propProperties, p.Name)
+					}
+					propMapList := make([]ast.PropertyMapEntry, len(obj.Entries))
+					for i, e := range obj.Entries {
+						propMapList[i] = ast.ObjectPropToPropMapEntry(e)
+					}
+					subFmtr := yamldiags.NonExistantFieldFormatter{
+						ParentLabel:         root.Token,
+						Fields:              propProperties,
+						MaxElements:         5,
+						FieldsAreProperties: true,
+					}
+					tc.typePropertyEntries(ctx, fmt.Sprintf("%s.%s", resourceName, kvp.Key.Value), subFmtr, pkg, propMapList, root.Properties)
+				}
+			}
+
 			existing, ok := tc.exprs[kvp.Value]
 			rng := kvp.Key.Syntax().Syntax().Range()
 			if !ok {
+				rng := kvp.Key.Syntax().Syntax().Range()
 				ctx.addWarnDiag(rng,
 					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
 					fmt.Sprintf("expected type %s", typ.Type))
@@ -503,6 +530,7 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 			} else {
 				assertTypeAssignable(ctx, rng, existing, typ.Type)
 			}
+
 		}
 	}
 }
@@ -510,8 +538,10 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
 	if err != nil {
-		_, b := ctx.error(t, err.Error())
-		return b
+		ctx.addErrDiag(t.Syntax().Syntax().Range(),
+			fmt.Sprintf("Error resolving type of function %v: %v", t.Name(), err),
+			"")
+		return false
 	}
 	var existing []string
 	hint := pkg.FunctionTypeHint(functionName)

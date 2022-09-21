@@ -307,6 +307,9 @@ func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	r, diags, err := PrepareTemplate(t, loader)
+	if diags.HasErrors() {
+		return diags
+	}
 	if err != nil {
 		return err
 	}
@@ -380,17 +383,6 @@ func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail strin
 func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
 	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
 	ctx.Runner.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
-}
-
-func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-	diag := ast.ExprError(expr, summary, "")
-	ctx.sdiags.Extend(diag)
-	ctx.Runner.sdiags.Extend(diag)
-	return nil, false
-}
-
-func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
-	return ctx.error(expr, fmt.Sprintf(format, a...))
 }
 
 func (r *Runner) newContext(root interface{}) *evalContext {
