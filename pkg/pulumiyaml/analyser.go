@@ -375,7 +375,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	tc.typePropertyEntries(ctx, k, fmtr, pkg, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -402,7 +402,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		MaxElements:         5,
 		FieldsAreProperties: true,
 	}
-	tc.typePropertyEntries(ctx, k, fmtr, pkg, v.Get.State.Entries, hint.Resource.Properties)
+	tc.typePropertyEntries(ctx, k, fmtr, v.Get.State.Entries, hint.Resource.Properties)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -481,12 +481,11 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, pkg Package, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	propMap := map[string]*schema.Property{}
 	for _, p := range props {
 		propMap[p.Name] = p
 	}
-
 	for _, kvp := range entries {
 		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
 			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
@@ -494,13 +493,13 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 			ctx.addErrDiag(subject, summary, detail)
 		} else {
 			if obj, ok := kvp.Value.(*ast.ObjectExpr); ok {
-				entryProp := propMap[kvp.Key.Value]
+				prop := propMap[kvp.Key.Value]
 
-				switch root := codegen.UnwrapType(entryProp.Type).(type) {
+				switch root := codegen.UnwrapType(prop.Type).(type) {
 				case *schema.ObjectType:
-					var propProperties []string
+					var subProps []string
 					for _, p := range root.Properties {
-						propProperties = append(propProperties, p.Name)
+						subProps = append(subProps, p.Name)
 					}
 					propMapList := make([]ast.PropertyMapEntry, len(obj.Entries))
 					for i, e := range obj.Entries {
@@ -508,18 +507,17 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 					}
 					subFmtr := yamldiags.NonExistantFieldFormatter{
 						ParentLabel:         root.Token,
-						Fields:              propProperties,
+						Fields:              subProps,
 						MaxElements:         5,
 						FieldsAreProperties: true,
 					}
-					tc.typePropertyEntries(ctx, fmt.Sprintf("%s.%s", resourceName, kvp.Key.Value), subFmtr, pkg, propMapList, root.Properties)
+					tc.typePropertyEntries(ctx, fmt.Sprintf("%s.%s", resourceName, kvp.Key.Value), subFmtr, propMapList, root.Properties)
 				}
 			}
 
 			existing, ok := tc.exprs[kvp.Value]
 			rng := kvp.Key.Syntax().Syntax().Range()
 			if !ok {
-				rng := kvp.Key.Syntax().Syntax().Range()
 				ctx.addWarnDiag(rng,
 					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
 					fmt.Sprintf("expected type %s", typ.Type))

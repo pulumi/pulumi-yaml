@@ -40,6 +40,9 @@
 - Enable transformation & type checking passes on `pulumi convert` 
   [#320](https://github.com/pulumi/pulumi-yaml/pull/320)
 
+- Typecheck nested properties
+  [#330](https://github.com/pulumi/pulumi-yaml/pull/330)
+
 ### Bug Fixes
 
 - Allow `bool` configuration type
