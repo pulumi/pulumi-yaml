@@ -357,14 +357,18 @@ func TestAssetOrArchive(t *testing.T) {
 
 	const text = `name: test-yaml
 variables:
+  foo: bar
+  foo2: ./README.md
   dir:
     Fn::AssetArchive:
       str:
         Fn::StringAsset: this is home
+      strIter:
+        Fn::StringAsset: start ${foo} end
       away:
         Fn::RemoteAsset: example.org/asset
       local:
-        Fn::FileAsset: ./asset
+        Fn::FileAsset: ${foo2}
       folder:
         Fn::AssetArchive:
           docs:
@@ -379,8 +383,11 @@ variables:
 
 		assets := assetArchive.Assets()
 		assert.Equal(t, assets["str"].(pulumi.Asset).Text(), "this is home")
+		assert.Equal(t, assets["strIter"].(pulumi.Asset).Text(), "start bar end")
 		assert.Equal(t, assets["away"].(pulumi.Asset).URI(), "example.org/asset")
-		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), "./asset")
+		filePath, err := filepath.Abs("./README.md")
+		assert.NoError(t, err)
+		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), filePath)
 		assert.Equal(t, assets["folder"].(pulumi.Archive).Assets()["docs"].(pulumi.Archive).URI(), "example.org/docs")
 	})
 }
