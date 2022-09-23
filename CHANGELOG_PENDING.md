@@ -65,3 +65,6 @@
 
 - Allow `fromBase64` support on convert
   [#336](https://github.com/pulumi/pulumi-yaml/pull/336)
+
+- Fix generated `Pulumi.yaml` on convert
+  [#339](https://github.com/pulumi/pulumi-yaml/pull/339)
