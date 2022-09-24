@@ -152,7 +152,7 @@ func newMockPackageMap() PackageLoader {
 						return function(typeName,
 							[]schema.Property{
 								{Name: "yesArg", Type: schema.StringType},
-								{Name: "someSuchArg", Type: schema.StringType},
+								{Name: "someSuchArg", Type: &schema.OptionalType{ElementType: schema.StringType}},
 							},
 							[]schema.Property{
 								{Name: "outString", Type: schema.StringType},

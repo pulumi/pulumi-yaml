@@ -522,7 +522,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	for _, prop := range hint.Resource.InputProperties {
 		allProperties = append(allProperties, prop.Name)
 	}
-	tc.typePropertyEntries(ctx, typ.String(), v.Properties.Entries, hint.Resource.InputProperties)
+	label := fmt.Sprintf("Resource %s", typ.String())
+	tc.typePropertyEntries(ctx, typ.String(), label, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -544,7 +545,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		for _, prop := range hint.Resource.Properties {
 			statePropNames = append(statePropNames, prop.Name)
 		}
-		tc.typePropertyEntries(ctx, typ.String(), v.Get.State.Entries, hint.Resource.Properties)
+		tc.typePropertyEntries(ctx, typ.String(), label, v.Get.State.Entries, hint.Resource.Properties)
 	}
 
 	// Check for extra fields that didn't make it into the resource or resource options object
@@ -660,7 +661,7 @@ func getNameFromObject(obj *schema.ObjectType) string {
 	return v.(string)
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, token string, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label string, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	to := &schema.ObjectType{
 		Token:      token,
 		Properties: props,
@@ -683,7 +684,7 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, token string, entries
 		}
 	}
 	from := &schema.ObjectType{Properties: entryProps}
-	storeNameInObject(to, fmt.Sprintf("Resource %s", token))
+	storeNameInObject(to, label)
 	assertTypeAssignable(ctx, nil, from, to)
 }
 
@@ -693,33 +694,23 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		_, b := ctx.error(t, err.Error())
 		return b
 	}
-	var existing []string
 	hint := pkg.FunctionTypeHint(functionName)
-	inputs := map[string]schema.Type{}
-	if hint.Inputs != nil {
-		for _, input := range hint.Inputs.Properties {
-			existing = append(existing, input.Name)
-			inputs[input.Name] = input.Type
-		}
-	}
-	fmtr := yamldiags.NonExistantFieldFormatter{
-		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
-		Fields:      existing,
-		MaxElements: 5,
-	}
+	entries := []ast.PropertyMapEntry{}
 	if t.CallArgs != nil {
-		for _, prop := range t.CallArgs.Entries {
-			k := prop.Key.(*ast.StringExpr).Value
-			if typ, ok := inputs[k]; !ok {
-				summary, detail := fmtr.MessageWithDetail(k, k)
-				subject := prop.Key.Syntax().Syntax().Range()
-				context := t.Syntax().Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(context))
-			} else {
-				tc.exprs[prop.Value] = typ
-			}
+		for _, entry := range t.CallArgs.Entries {
+			entries = append(entries, ast.PropertyMapEntry{
+				Key:   entry.Key.(*ast.StringExpr),
+				Value: entry.Value,
+			})
 		}
 	}
+	inputs := []*schema.Property{}
+	if hint.Inputs != nil {
+		inputs = hint.Inputs.Properties
+	}
+
+	tc.typePropertyEntries(ctx, functionName.String(), fmt.Sprintf("Function %s", functionName.String()), entries, inputs)
+
 	if t.CallOpts.Parent != nil {
 		tc.typeExpr(ctx, t.CallOpts.Parent)
 	}
