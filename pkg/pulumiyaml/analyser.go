@@ -453,7 +453,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 					MaxElements:         5,
 					FieldsAreProperties: true,
 				}
-				summary, detail := fmtr.MessageWithDetail(prop.Name, fmt.Sprintf("Property "+prop.Name))
+				summary, detail := fmtr.MessageWithDetail(prop.Name, getNameFromProperty(prop))
 				failures = append(failures, &notAssignable{
 					summary:  summary,
 					property: prop.Name,
@@ -523,7 +523,8 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		allProperties = append(allProperties, prop.Name)
 	}
 	label := fmt.Sprintf("Resource %s", typ.String())
-	tc.typePropertyEntries(ctx, typ.String(), label, v.Properties.Entries, hint.Resource.InputProperties)
+	prefix := "Property"
+	tc.typePropertyEntries(ctx, typ.String(), label, prefix, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -545,7 +546,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		for _, prop := range hint.Resource.Properties {
 			statePropNames = append(statePropNames, prop.Name)
 		}
-		tc.typePropertyEntries(ctx, typ.String(), label, v.Get.State.Entries, hint.Resource.Properties)
+		tc.typePropertyEntries(ctx, typ.String(), label, prefix, v.Get.State.Entries, hint.Resource.Properties)
 	}
 
 	// Check for extra fields that didn't make it into the resource or resource options object
@@ -643,6 +644,24 @@ func getRangeFromProperty(prop *schema.Property) *hcl.Range {
 	return v.(*hcl.Range)
 }
 
+func storeNameInProperty(prop *schema.Property, name string) {
+	if prop.Language == nil {
+		prop.Language = map[string]interface{}{}
+	}
+	prop.Language["pulumi yaml prop name"] = name
+}
+
+func getNameFromProperty(prop *schema.Property) string {
+	if prop.Language == nil {
+		return prop.Name
+	}
+	v, ok := prop.Language["pulumi yaml prop name"]
+	if !ok {
+		return prop.Name
+	}
+	return v.(string)
+}
+
 func storeNameInObject(obj *schema.ObjectType, name string) {
 	if obj.Language == nil {
 		obj.Language = map[string]interface{}{}
@@ -661,7 +680,7 @@ func getNameFromObject(obj *schema.ObjectType) string {
 	return v.(string)
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label string, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label, propPrefix string, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	to := &schema.ObjectType{
 		Token:      token,
 		Properties: props,
@@ -680,6 +699,7 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label string, 
 				Type: existing,
 			}
 			storeRangeInProperty(p, rng)
+			storeNameInProperty(p, propPrefix+" "+p.Name)
 			entryProps = append(entryProps, p)
 		}
 	}
@@ -709,7 +729,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		inputs = hint.Inputs.Properties
 	}
 
-	tc.typePropertyEntries(ctx, functionName.String(), fmt.Sprintf("Function %s", functionName.String()), entries, inputs)
+	tc.typePropertyEntries(ctx, functionName.String(), fmt.Sprintf("Invoke %s", functionName.String()), "Argument", entries, inputs)
 
 	if t.CallOpts.Parent != nil {
 		tc.typeExpr(ctx, t.CallOpts.Parent)

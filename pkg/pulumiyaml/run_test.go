@@ -726,7 +726,7 @@ resources:
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
 	require.Len(t, diags, 2)
-	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
+	assert.Equal(t, "<stdin>:10:9: Argument noArg does not exist on Invoke test:fn",
 		diagString(diags[0]))
 	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on Resource test:resource:type",
 		diagString(diags[1]))
