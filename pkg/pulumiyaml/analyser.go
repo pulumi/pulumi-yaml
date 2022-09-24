@@ -192,7 +192,12 @@ func (n *notAssignable) Property(propName string) *notAssignable {
 }
 
 func (n *notAssignable) WithRange(rng *hcl.Range) *notAssignable {
-	return n.setField(func() { n.location = rng })
+	return n.setField(func() {
+		if rng == nil {
+			return
+		}
+		n.location = rng
+	})
 }
 
 func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignable {
@@ -257,8 +262,16 @@ func displayType(t schema.Type) string {
 
 // isAssignable determines if the type `from` is assignable to the type `to`.
 // If the assignment is legal, nil is returned.
-func isAssignable(from, to schema.Type) *notAssignable {
+func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssignable {
 	to = codegen.UnwrapType(to)
+	from := tc.exprs[fromExpr]
+	if from == nil {
+		return &notAssignable{
+			summary:  "Could not find type",
+			location: fromExpr.Syntax().Syntax().Range(),
+			internal: true,
+		}
+	}
 	from = codegen.UnwrapType(from)
 
 	// If either type is invalid, we return. An error message should have
@@ -287,7 +300,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 	fail := &notAssignable{
 		reason: fmt.Sprintf("Cannot assign %s to %s",
 			dispType(from), dispType(to)),
-		internal: false,
+		location: fromExpr.Syntax().Syntax().Range(),
 	}
 	okIf := func(cond bool) *notAssignable {
 		if !cond {
@@ -300,6 +313,13 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			return nil
 		}
 		return fail.Because(s)
+	}
+
+	isAssignable := func(from, to schema.Type) *notAssignable {
+		v := tc.exprs[fromExpr]
+		defer func() { tc.exprs[fromExpr] = v }()
+		tc.exprs[fromExpr] = from
+		return tc.isAssignable(fromExpr, to)
 	}
 
 	// If from is a union type, then it can only assign if every element it contains can
@@ -366,6 +386,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		if !ok {
 			return fail
 		}
+		fail = fail.markTransitory()
 		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
 	case *schema.MapType:
 		switch from := from.(type) {
@@ -409,13 +430,32 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		}
 		fail = fail.markTransitory()
 		failures := []*notAssignable{}
+
+		var propExpr map[string]ast.Expr
+		getPropExpr := func(name string) ast.Expr {
+			if obj, ok := fromExpr.(*ast.ObjectExpr); ok {
+				if propExpr == nil {
+					propExpr = make(map[string]ast.Expr)
+					for _, prop := range obj.Entries {
+						propExpr[prop.Key.(*ast.StringExpr).GetValue()] = prop.Value
+					}
+				}
+				if v, ok := propExpr[name]; ok {
+					return v
+				}
+			}
+			return fromExpr
+		}
+
 		// We check that types line up
 		for _, prop := range to.Properties {
 			fromProp, ok := from.Property(prop.Name)
 			if prop.IsRequired() && !ok {
-				failures = append(failures, (&notAssignable{
-					reason: fmt.Sprintf("Missing required property"),
-				}).Property(prop.Name))
+				failures = append(failures, &notAssignable{
+					summary:  fmt.Sprintf("%s is not assignable from %s", dispType(to), dispType(from)),
+					reason:   fmt.Sprintf("Missing required property '%s'", prop.Name),
+					location: getPropExpr(prop.Name).Syntax().Syntax().Range(),
+				})
 				continue
 			}
 			if !ok {
@@ -423,10 +463,17 @@ func isAssignable(from, to schema.Type) *notAssignable {
 				continue
 			}
 			// We have a matching property, so the type must agree
-			notAssignable := isAssignable(fromProp.Type, prop.Type)
+			expr := getPropExpr(prop.Name)
+			var notAssignable *notAssignable
+			if expr == fromExpr {
+				notAssignable = isAssignable(fromProp.Type, prop.Type)
+			} else {
+				notAssignable = tc.isAssignable(expr, prop.Type)
+			}
 			if notAssignable != nil {
 				failures = append(failures,
-					notAssignable.Property(prop.Name).WithRange(getRangeFromProperty(fromProp)))
+					notAssignable.Property(prop.Name).
+						WithRange(expr.Syntax().Syntax().Range()))
 				continue
 			}
 		}
@@ -449,7 +496,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 					summary:  summary,
 					property: prop.Name,
 					reason:   detail,
-					location: getRangeFromProperty(prop),
+					location: getPropExpr(prop.Name).Syntax().Syntax().Range(),
 				})
 			}
 		}
@@ -457,9 +504,9 @@ func isAssignable(from, to schema.Type) *notAssignable {
 
 	case *schema.TokenType:
 		if to.UnderlyingType != nil {
-			return okIfAssignable(isAssignable(from, to.UnderlyingType))
+			return okIfAssignable(isAssignable(to.UnderlyingType, to.UnderlyingType))
 		}
-		return okIfAssignable(isAssignable(from, schema.AnyType))
+		return okIfAssignable(tc.isAssignable(fromExpr, schema.AnyType))
 
 	default:
 		// We mark this an internal error since we don't recognize the type.
@@ -471,29 +518,25 @@ func isAssignable(from, to schema.Type) *notAssignable {
 
 // Provides an appropriate diagnostic message if it is illegal to assign `from`
 // to `to`.
-func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type) {
+func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to schema.Type) {
 	if to == nil {
 		return
 	}
-	result := isAssignable(from, to)
+	result := tc.isAssignable(from, to)
 	if result == nil {
 		return
 	}
-	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
+	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(tc.exprs[from]))
 	if result.IsInternal() {
-		ctx.addWarnDiag(loc, fmt.Sprintf("internal error: %s", summary), result.String())
+		ctx.addWarnDiag(result.Range(), fmt.Sprintf("internal error: %s", summary), result.String())
 		return
 	}
 	for _, v := range result.IndependentErrors() {
-		r := loc
-		if loc := v.Range(); loc != nil {
-			r = loc
-		}
 		s := summary
 		if summary := v.Summary(); summary != "" {
 			s = summary
 		}
-		ctx.addErrDiag(r, s, v.String())
+		ctx.addErrDiag(v.Range(), s, v.String())
 	}
 }
 
@@ -526,8 +569,8 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		)
 	}
 
-	if existing, ok := tc.exprs[v.Get.Id]; ok && v.Get.Id != nil {
-		assertTypeAssignable(ctx, v.Get.Id.Syntax().Syntax().Range(), existing, schema.StringType)
+	if v.Get.Id != nil {
+		tc.assertTypeAssignable(ctx, v.Get.Id, schema.StringType)
 	}
 
 	if len(v.Get.State.Entries) != 0 {
@@ -681,7 +724,9 @@ func (tc *typeCache) typePropertyEntries(
 		Properties: props,
 	}
 	entryProps := []*schema.Property{}
+	objEntries := make([]ast.ObjectProperty, 0, len(entries))
 	for _, kvp := range entries {
+		objEntries = append(objEntries, kvp.ObjectProperty())
 		existing, ok := tc.exprs[kvp.Value]
 		rng := kvp.Key.Syntax().Syntax().Range()
 		if !ok {
@@ -698,9 +743,11 @@ func (tc *typeCache) typePropertyEntries(
 			entryProps = append(entryProps, p)
 		}
 	}
-	from := &schema.ObjectType{Properties: entryProps}
+	fromType := &schema.ObjectType{Properties: entryProps}
+	var from ast.Expr = ast.Object(objEntries...)
+	tc.exprs[from] = fromType
 	storeNameInObject(to, label)
-	assertTypeAssignable(ctx, nil, from, to)
+	tc.assertTypeAssignable(ctx, from, to)
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
@@ -930,7 +977,7 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	case *ast.ToJSONExpr:
 		tc.exprs[t] = schema.StringType
 	case *ast.JoinExpr:
-		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
+		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
 		tc.exprs[t] = schema.StringType
 	case *ast.ListExpr:
 		var types OrderedTypeSet
@@ -975,12 +1022,12 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		// The type of a secret is the type of its argument
 		tc.exprs[t] = tc.exprs[t.Value]
 	case *ast.SplitExpr:
-		assertTypeAssignable(ctx, t.Delimiter.Syntax().Syntax().Range(), tc.exprs[t.Delimiter], schema.StringType)
-		assertTypeAssignable(ctx, t.Source.Syntax().Syntax().Range(), tc.exprs[t.Source], schema.StringType)
+		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
+		tc.assertTypeAssignable(ctx, t.Source, schema.StringType)
 		tc.exprs[t] = &schema.ArrayType{ElementType: schema.StringType}
 	case *ast.SelectExpr:
-		assertTypeAssignable(ctx, t.Index.Syntax().Syntax().Range(), tc.exprs[t.Index], schema.IntType)
-		assertTypeAssignable(ctx, t.Values.Syntax().Syntax().Range(), tc.exprs[t.Values],
+		tc.assertTypeAssignable(ctx, t.Index, schema.IntType)
+		tc.assertTypeAssignable(ctx, t.Values,
 			&schema.ArrayType{ElementType: schema.AnyType}) // We accept an array of any type
 		if valuesType, ok := tc.exprs[t.Values]; ok {
 			arr, ok := codegen.UnwrapType(valuesType).(*schema.ArrayType)

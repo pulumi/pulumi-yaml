@@ -15,6 +15,9 @@ func DisplayType(t schema.Type) string {
 }
 
 func DisplayTypeWithAdhock(t schema.Type, adhockObjectToken string) string {
+	if t == nil {
+		return "<nil>"
+	}
 	if schema.IsPrimitiveType(codegen.UnwrapType(t)) {
 		switch codegen.UnwrapType(t) {
 		case schema.ArchiveType:

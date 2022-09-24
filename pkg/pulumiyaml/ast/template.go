@@ -210,6 +210,14 @@ type PropertyMapEntry struct {
 	Value  Expr
 }
 
+func (m *PropertyMapEntry) ObjectProperty() ObjectProperty {
+	return ObjectProperty{
+		syntax: m.syntax,
+		Key:    m.Key,
+		Value:  m.Value,
+	}
+}
+
 type PropertyMapDecl struct {
 	declNode
 

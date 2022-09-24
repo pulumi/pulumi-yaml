@@ -161,7 +161,12 @@ func TestTypeError(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			result := isAssignable(c.from, c.to)
+			tc := typeCache{
+				exprs: map[ast.Expr]schema.Type{
+					nil: c.from,
+				},
+			}
+			result := tc.isAssignable(nil, c.to)
 			if c.message == "" {
 				assert.Nil(t, result)
 				if t.Failed() {
