@@ -310,6 +310,9 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	if err != nil {
 		return err
 	}
+	if diags.HasErrors() {
+		return diags
+	}
 
 	// runtime evaluation here
 	diags.Extend(r.Evaluate(ctx)...)
