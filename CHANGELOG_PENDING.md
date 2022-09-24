@@ -37,8 +37,11 @@
 - Set highest package version and pluginDownloadURL on all invokes
   [#334](https://github.com/pulumi/pulumi-yaml/pull/334)
 
-- Enable transformation & type checking passes on `pulumi convert` 
+- Enable transformation & type checking passes on `pulumi convert`
   [#320](https://github.com/pulumi/pulumi-yaml/pull/320)
+
+- Type check invokes and nested objects
+  [#344](https://github.com/pulumi/pulumi-yaml/pull/344)
 
 ### Bug Fixes
 
