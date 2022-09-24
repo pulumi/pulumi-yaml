@@ -272,7 +272,8 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			underlying = from.UnderlyingType
 		}
 		check := isAssignable(underlying, to)
-		return okIfAssignable(check).WithReason(". '%s' is a Token Type. Token types act like their underlying type", displayType(from))
+		return okIfAssignable(check).
+			WithReason(". %s is a Token Type. Token types act like their underlying type", dispType(from))
 	}
 
 	if schema.IsPrimitiveType(to) {
@@ -387,7 +388,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 					fields = append(fields, p.Name)
 				}
 				fmtr := yamldiags.NonExistantFieldFormatter{
-					ParentLabel:         displayType(to),
+					ParentLabel:         dispType(to),
 					Fields:              fields,
 					MaxElements:         5,
 					FieldsAreProperties: true,
