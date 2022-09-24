@@ -78,11 +78,64 @@ func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, t
 
 // notAssignable represents the logic chain for why an assignment is not possible.
 type notAssignable struct {
-	reason   string
-	because  []*notAssignable
+	// A display ready summary of the error
+	summary string
+	// The message to display for the error
+	reason string
+	// Subsidiary contributing errors
+	because []*notAssignable
+	// If the error was caused by a bug in Pulumi YAML and not the user
 	internal bool
+	// The name of the property the error is on
 	property string
+	// The location where the error occurred.
 	location *hcl.Range
+	// If the error doesn't need to lead its own chain
+	transitory bool
+}
+
+// Get the list of leading errors to display.
+//
+// An error is considered leading unless it is
+// 1. marked as transitory *and*
+// 2. It has children which are not transitory
+func (n *notAssignable) IndependentErrors() []*notAssignable {
+	if n == nil {
+		return nil
+	}
+	result := n.independentErrors()
+	if len(result) == 0 {
+		return []*notAssignable{n}
+	}
+	return result
+}
+
+func (n *notAssignable) independentErrors() []*notAssignable {
+	if !n.transitory {
+		return []*notAssignable{n}
+	}
+	errList := []*notAssignable{}
+	for _, e := range n.because {
+		errList = append(errList, e.independentErrors()...)
+	}
+	return errList
+}
+
+// Mark an error as a uninportant part of a chain.
+func (n *notAssignable) markTransitory() *notAssignable {
+	if n == nil {
+		return nil
+	}
+	c := *n
+	c.transitory = true
+	return &c
+}
+
+func (n *notAssignable) Summary() string {
+	if n == nil {
+		return ""
+	}
+	return n.summary
 }
 
 func (n notAssignable) String() string {
@@ -227,6 +280,12 @@ func isAssignable(from, to schema.Type) *notAssignable {
 	}
 
 	dispType := func(t schema.Type) string {
+		if obj, ok := t.(*schema.ObjectType); ok {
+			name := getNameFromObject(obj)
+			if name != "" {
+				return name
+			}
+		}
 		var maybeType string
 		if schema.IsPrimitiveType(from) {
 			maybeType = "type "
@@ -357,6 +416,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		if !ok {
 			return fail
 		}
+		fail = fail.markTransitory()
 		failures := []*notAssignable{}
 		// We check that types line up
 		for _, prop := range to.Properties {
@@ -375,7 +435,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			notAssignable := isAssignable(fromProp.Type, prop.Type)
 			if notAssignable != nil {
 				failures = append(failures,
-					notAssignable.Property(prop.Name).WithRange(getRngFromProperty(fromProp)))
+					notAssignable.Property(prop.Name).WithRange(getRangeFromProperty(fromProp)))
 				continue
 			}
 		}
@@ -384,7 +444,7 @@ func isAssignable(from, to schema.Type) *notAssignable {
 		for _, prop := range from.Properties {
 			if _, ok := to.Property(prop.Name); !ok {
 				fields := []string{}
-				for _, p := range from.Properties {
+				for _, p := range to.Properties {
 					fields = append(fields, p.Name)
 				}
 				fmtr := yamldiags.NonExistantFieldFormatter{
@@ -393,10 +453,12 @@ func isAssignable(from, to schema.Type) *notAssignable {
 					MaxElements:         5,
 					FieldsAreProperties: true,
 				}
+				summary, detail := fmtr.MessageWithDetail(prop.Name, fmt.Sprintf("Property "+prop.Name))
 				failures = append(failures, &notAssignable{
+					summary:  summary,
 					property: prop.Name,
-					reason:   fmtr.Message(prop.Name, prop.Name),
-					location: getRngFromProperty(prop),
+					reason:   detail,
+					location: getRangeFromProperty(prop),
 				})
 			}
 		}
@@ -426,9 +488,6 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	if result == nil {
 		return
 	}
-	if loc == nil {
-		loc = result.Range()
-	}
 	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
 		ctx.addDiag(syntax.Warning(loc,
@@ -437,7 +496,17 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 		))
 		return
 	}
-	ctx.addDiag(syntax.Error(loc, summary, result.String()))
+	for _, v := range result.IndependentErrors() {
+		r := loc
+		if loc := v.Range(); loc != nil {
+			r = loc
+		}
+		s := summary
+		if summary := v.Summary(); summary != "" {
+			s = summary
+		}
+		ctx.addDiag(syntax.Error(r, s, v.String()))
+	}
 }
 
 func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
@@ -559,23 +628,41 @@ func storeRangeInProperty(prop *schema.Property, rng *hcl.Range) {
 	if prop.Language == nil {
 		prop.Language = map[string]interface{}{}
 	}
-	prop.Language["pulumi_yaml_range"] = rng
+	prop.Language["pulumi yaml range"] = rng
 }
 
-func getRngFromProperty(prop *schema.Property) *hcl.Range {
+func getRangeFromProperty(prop *schema.Property) *hcl.Range {
 	if prop.Language == nil {
 		return nil
 	}
-	v, ok := prop.Language["pulumi_yaml_range"]
+	v, ok := prop.Language["pulumi yaml range"]
 	if !ok {
 		return nil
 	}
 	return v.(*hcl.Range)
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func storeNameInObject(obj *schema.ObjectType, name string) {
+	if obj.Language == nil {
+		obj.Language = map[string]interface{}{}
+	}
+	obj.Language["pulumi yaml name"] = name
+}
+
+func getNameFromObject(obj *schema.ObjectType) string {
+	if obj.Language == nil {
+		return ""
+	}
+	v, ok := obj.Language["pulumi yaml name"]
+	if !ok {
+		return ""
+	}
+	return v.(string)
+}
+
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, token string, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	to := &schema.ObjectType{
-		Token:      resourceName,
+		Token:      token,
 		Properties: props,
 	}
 	entryProps := []*schema.Property{}
@@ -584,7 +671,7 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 		rng := kvp.Key.Syntax().Syntax().Range()
 		if !ok {
 			ctx.addDiag(syntax.Warning(rng,
-				fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
+				fmt.Sprintf("internal error: untyped input for %s.%s", token, kvp.Key.Value),
 				""))
 		} else {
 			p := &schema.Property{
@@ -596,6 +683,7 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, 
 		}
 	}
 	from := &schema.ObjectType{Properties: entryProps}
+	storeNameInObject(to, fmt.Sprintf("Resource %s", token))
 	assertTypeAssignable(ctx, nil, from, to)
 }
 
