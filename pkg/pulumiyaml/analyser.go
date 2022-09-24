@@ -431,17 +431,17 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		fail = fail.markTransitory()
 		failures := []*notAssignable{}
 
-		var propExpr map[string]ast.Expr
+		var propExpr map[string]ast.ObjectProperty
 		getPropExpr := func(name string) ast.Expr {
 			if obj, ok := fromExpr.(*ast.ObjectExpr); ok {
 				if propExpr == nil {
-					propExpr = make(map[string]ast.Expr)
+					propExpr = make(map[string]ast.ObjectProperty)
 					for _, prop := range obj.Entries {
-						propExpr[prop.Key.(*ast.StringExpr).GetValue()] = prop.Value
+						propExpr[prop.Key.(*ast.StringExpr).GetValue()] = prop
 					}
 				}
 				if v, ok := propExpr[name]; ok {
-					return v
+					return v.Value
 				}
 			}
 			return fromExpr
@@ -454,7 +454,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 				failures = append(failures, &notAssignable{
 					summary:  fmt.Sprintf("%s is not assignable from %s", dispType(to), dispType(from)),
 					reason:   fmt.Sprintf("Missing required property '%s'", prop.Name),
-					location: getPropExpr(prop.Name).Syntax().Syntax().Range(),
+					location: fromExpr.Syntax().Syntax().Range(),
 				})
 				continue
 			}
@@ -492,11 +492,21 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 					FieldsAreProperties: true,
 				}
 				summary, detail := fmtr.MessageWithDetail(prop.Name, getNameFromProperty(prop))
+				// The error is at the key, so it would be better to highlight the key then the value
+				location := getPropExpr(prop.Name).Syntax().Syntax().Range()
+				// Calling `getPropExpr` gets a backup, as well as priming `propExpr`
+				if propExpr != nil {
+					if kv, ok := propExpr[prop.Name]; ok {
+						if keyLoc := kv.Key.Syntax().Syntax().Range(); keyLoc != nil {
+							location = keyLoc
+						}
+					}
+				}
 				failures = append(failures, &notAssignable{
 					summary:  summary,
 					property: prop.Name,
 					reason:   detail,
-					location: getPropExpr(prop.Name).Syntax().Syntax().Range(),
+					location: location,
 				})
 			}
 		}

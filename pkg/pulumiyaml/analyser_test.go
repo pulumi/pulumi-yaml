@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -107,7 +108,7 @@ func TestTypeError(t *testing.T) {
 			},
 			message: `Cannot assign '{prop1: asset, prop3: any}' to '{prop1: archive, prop2: boolean, prop3: string}':
   prop1: Cannot assign type 'asset' to type 'archive'
-  prop2: Missing required property
+  Missing required property 'prop2'
   prop3: Cannot assign type 'any' to type 'string'`,
 		},
 
@@ -161,12 +162,13 @@ func TestTypeError(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			dummyExpr := ast.StringSyntax(syntax.StringSyntax(syntax.NoSyntax, "arbitrary"))
 			tc := typeCache{
 				exprs: map[ast.Expr]schema.Type{
-					nil: c.from,
+					dummyExpr: c.from,
 				},
 			}
-			result := tc.isAssignable(nil, c.to)
+			result := tc.isAssignable(dummyExpr, c.to)
 			if c.message == "" {
 				assert.Nil(t, result)
 				if t.Failed() {
