@@ -29,6 +29,8 @@ func DisplayTypeWithAdhock(t schema.Type, adhockObjectToken string) string {
 
 		return codegen.UnwrapType(t).String()
 	}
+	_, optional := t.(*schema.OptionalType)
+	var typ string
 	switch t := codegen.UnwrapType(t).(type) {
 	case *schema.ObjectType:
 		if (adhockObjectToken != "" && strings.HasPrefix(t.Token, adhockObjectToken)) || t.Token == "" {
@@ -38,29 +40,33 @@ func DisplayTypeWithAdhock(t schema.Type, adhockObjectToken string) string {
 				props = append(props, fmt.Sprintf("%s: %s", prop.Name,
 					DisplayTypeWithAdhock(prop.Type, adhockObjectToken)))
 			}
-			return fmt.Sprintf("{%s}", strings.Join(props, ", "))
+			typ = fmt.Sprintf("{%s}", strings.Join(props, ", "))
+		} else {
+			typ = t.Token
 		}
-		return t.Token
-
 	case *schema.ArrayType:
-		return fmt.Sprintf("List<%s>",
+		typ = fmt.Sprintf("List<%s>",
 			DisplayTypeWithAdhock(t.ElementType, adhockObjectToken))
 	case *schema.MapType:
-		return fmt.Sprintf("Map<%s>",
+		typ = fmt.Sprintf("Map<%s>",
 			DisplayTypeWithAdhock(t.ElementType, adhockObjectToken))
 	case *schema.UnionType:
 		inner := make([]string, len(t.ElementTypes))
 		for i, t := range t.ElementTypes {
 			inner[i] = DisplayTypeWithAdhock(t, adhockObjectToken)
 		}
-		return fmt.Sprintf("Union<%s>", strings.Join(inner, ", "))
+		typ = fmt.Sprintf("Union<%s>", strings.Join(inner, ", "))
 	case *schema.TokenType:
 		underlying := DisplayTypeWithAdhock(schema.AnyType, adhockObjectToken)
 		if t.UnderlyingType != nil {
 			underlying = DisplayTypeWithAdhock(t.UnderlyingType, adhockObjectToken)
 		}
-		return fmt.Sprintf("%s<type = %s>", t.Token, underlying)
+		typ = fmt.Sprintf("%s<type = %s>", t.Token, underlying)
 	default:
-		return t.String()
+		typ = t.String()
 	}
+	if optional {
+		typ += "?"
+	}
+	return typ
 }

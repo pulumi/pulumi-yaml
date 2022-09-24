@@ -82,6 +82,7 @@ type notAssignable struct {
 	because  []*notAssignable
 	internal bool
 	property string
+	location *hcl.Range
 }
 
 func (n notAssignable) String() string {
@@ -137,6 +138,15 @@ func (n *notAssignable) Property(propName string) *notAssignable {
 	return &c
 }
 
+func (n *notAssignable) WithRange(rng *hcl.Range) *notAssignable {
+	if n == nil {
+		return nil
+	}
+	c := *n
+	c.location = rng
+	return &c
+}
+
 func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignable {
 	if n == nil {
 		return nil
@@ -145,6 +155,54 @@ func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignab
 	c := *n
 	c.reason += fmt.Sprintf(reason, a...)
 	return &c
+}
+
+func (n *notAssignable) Range() *hcl.Range {
+	if n == nil {
+		return nil
+	}
+	if n.location != nil {
+		return n.location
+	}
+	var rng *hcl.Range
+	for _, v := range n.because {
+		if r := v.Range(); r != nil {
+			if rng == nil {
+				rng = r
+				continue
+			}
+			rng = RangeOver(r, rng)
+		}
+	}
+	return rng
+}
+
+// Applies the hcl.RangeOver function, accounting for the fact that we don't hydrate the
+// Bytes field in Pos.
+func RangeOver(r1, r2 *hcl.Range) *hcl.Range {
+	if r1 == nil {
+		return r2
+	}
+	if r2 == nil {
+		return r1
+	}
+
+	// This ensures that the Pos.Bytes field is directionally correct:
+	// 	forall (p1, p2 : hcl.Pos),
+	// 	 p1.Bytes < p2.Bytes iff p1 appears before p2 in the document.
+	//
+	// This is valid iff no line is greater then 100,000 characters long.
+	fixBytes := func(r hcl.Range) hcl.Range {
+		r.Start.Byte = 100_100*r.Start.Line + r.Start.Column
+		r.End.Byte = 100_100*r.End.Line + r.End.Column
+		return r
+	}
+	v := hcl.RangeOver(fixBytes(*r1), fixBytes(*r2))
+
+	// Zero inaccurate bytes
+	v.Start.Byte = 0
+	v.End.Byte = 0
+	return &v
 }
 
 const adhockObjectToken = "pulumi:adhock:" //nolint:gosec
@@ -299,11 +357,12 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			return fail
 		}
 		failures := []*notAssignable{}
+		// We check that types line up
 		for _, prop := range to.Properties {
 			fromProp, ok := from.Property(prop.Name)
 			if prop.IsRequired() && !ok {
 				failures = append(failures, (&notAssignable{
-					reason: fmt.Sprintf("Missing required property '%s'", prop.Name),
+					reason: fmt.Sprintf("Missing required property"),
 				}).Property(prop.Name))
 				continue
 			}
@@ -314,8 +373,30 @@ func isAssignable(from, to schema.Type) *notAssignable {
 			// We have a matching property, so the type must agree
 			notAssignable := isAssignable(fromProp.Type, prop.Type)
 			if notAssignable != nil {
-				failures = append(failures, notAssignable.Property(prop.Name))
+				failures = append(failures,
+					notAssignable.Property(prop.Name).WithRange(getRngFromProperty(fromProp)))
 				continue
+			}
+		}
+
+		// We check that there are no extra props
+		for _, prop := range from.Properties {
+			if _, ok := to.Property(prop.Name); !ok {
+				fields := []string{}
+				for _, p := range from.Properties {
+					fields = append(fields, p.Name)
+				}
+				fmtr := yamldiags.NonExistantFieldFormatter{
+					ParentLabel:         displayType(to),
+					Fields:              fields,
+					MaxElements:         5,
+					FieldsAreProperties: true,
+				}
+				failures = append(failures, &notAssignable{
+					property: prop.Name,
+					reason:   fmtr.Message(prop.Name, prop.Name),
+					location: getRngFromProperty(prop),
+				})
 			}
 		}
 		return okIf(len(failures) == 0).Because(failures...)
@@ -344,6 +425,9 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	if result == nil {
 		return
 	}
+	if loc == nil {
+		loc = result.Range()
+	}
 	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
 		ctx.addDiag(syntax.Warning(loc,
@@ -368,14 +452,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	for _, prop := range hint.Resource.InputProperties {
 		allProperties = append(allProperties, prop.Name)
 	}
-	fmtr := yamldiags.NonExistantFieldFormatter{
-		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
-		Fields:              allProperties,
-		MaxElements:         5,
-		FieldsAreProperties: true,
-	}
-
-	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, hint.Token, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -392,17 +469,13 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		assertTypeAssignable(ctx, v.Get.Id.Syntax().Syntax().Range(), existing, schema.StringType)
 	}
 
-	statePropNames := []string{}
-	for _, prop := range hint.Resource.Properties {
-		statePropNames = append(statePropNames, prop.Name)
+	if len(v.Get.State.Entries) != 0 {
+		statePropNames := []string{}
+		for _, prop := range hint.Resource.Properties {
+			statePropNames = append(statePropNames, prop.Name)
+		}
+		tc.typePropertyEntries(ctx, hint.Token, v.Get.State.Entries, hint.Resource.Properties)
 	}
-	fmtr = yamldiags.NonExistantFieldFormatter{
-		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
-		Fields:              statePropNames,
-		MaxElements:         5,
-		FieldsAreProperties: true,
-	}
-	tc.typePropertyEntries(ctx, k, fmtr, v.Get.State.Entries, hint.Resource.Properties)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -481,34 +554,48 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
-	propMap := map[string]*schema.Property{}
-	for _, p := range props {
-		propMap[p.Name] = p
+func storeRangeInProperty(prop *schema.Property, rng *hcl.Range) {
+	if prop.Language == nil {
+		prop.Language = map[string]interface{}{}
 	}
+	prop.Language["pulumi_yaml_range"] = rng
+}
+
+func getRngFromProperty(prop *schema.Property) *hcl.Range {
+	if prop.Language == nil {
+		return nil
+	}
+	v, ok := prop.Language["pulumi_yaml_range"]
+	if !ok {
+		return nil
+	}
+	return v.(*hcl.Range)
+}
+
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, entries []ast.PropertyMapEntry, props []*schema.Property) {
+	to := &schema.ObjectType{
+		Token:      resourceName,
+		Properties: props,
+	}
+	entryProps := []*schema.Property{}
 	for _, kvp := range entries {
-		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
-			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
-			subject := kvp.Key.Syntax().Syntax().Range()
-			valueRange := kvp.Value.Syntax().Syntax().Range()
-			context := hcl.RangeOver(*subject, *valueRange)
-			ctx.addDiag(syntax.Error(subject, summary, detail).WithContext(&context))
+		existing, ok := tc.exprs[kvp.Value]
+		rng := kvp.Key.Syntax().Syntax().Range()
+		if !ok {
+			ctx.addDiag(syntax.Warning(rng,
+				fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
+				""))
 		} else {
-			existing, ok := tc.exprs[kvp.Value]
-			rng := kvp.Key.Syntax().Syntax().Range()
-			if !ok {
-				ctx.addDiag(syntax.Warning(rng,
-					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("expected type %s", typ.Type)))
-			} else if typ.Type == nil {
-				ctx.addDiag(syntax.Warning(rng,
-					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("got type %s", existing)))
-			} else {
-				assertTypeAssignable(ctx, rng, existing, typ.Type)
+			p := &schema.Property{
+				Name: kvp.Key.Value,
+				Type: existing,
 			}
+			storeRangeInProperty(p, rng)
+			entryProps = append(entryProps, p)
 		}
 	}
+	from := &schema.ObjectType{Properties: entryProps}
+	assertTypeAssignable(ctx, nil, from, to)
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {

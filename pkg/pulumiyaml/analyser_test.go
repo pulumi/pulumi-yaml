@@ -107,7 +107,7 @@ func TestTypeError(t *testing.T) {
 			},
 			message: `Cannot assign '{prop1: asset, prop3: any}' to '{prop1: archive, prop2: boolean, prop3: string}':
   prop1: Cannot assign type 'asset' to type 'archive'
-  prop2: Missing required property 'prop2'
+  prop2: Missing required property
   prop3: Cannot assign type 'any' to type 'string'`,
 		},
 

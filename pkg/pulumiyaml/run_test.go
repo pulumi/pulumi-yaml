@@ -92,6 +92,7 @@ func inputProperties(token string, props ...schema.Property) *schema.ResourceTyp
 	}
 	return &schema.ResourceType{
 		Resource: &schema.Resource{
+			Token:           token,
 			InputProperties: p,
 			Properties:      p,
 		},
@@ -129,7 +130,7 @@ func newMockPackageMap() PackageLoader {
 							Type: schema.StringType,
 						}, schema.Property{
 							Name: "bar",
-							Type: schema.StringType,
+							Type: &schema.OptionalType{ElementType: schema.StringType},
 						})
 					case testComponentToken:
 						return inputProperties(typeName, schema.Property{
@@ -724,12 +725,11 @@ resources:
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
 	require.True(t, diags.HasErrors())
-	assert.Len(t, diags, 2)
+	require.Len(t, diags, 2)
 	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
 		diagString(diags[0]))
 	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on Resource test:resource:type",
 		diagString(diags[1]))
-
 }
 
 func TestPropertyAccess(t *testing.T) {
