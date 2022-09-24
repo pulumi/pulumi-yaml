@@ -453,7 +453,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	for _, prop := range hint.Resource.InputProperties {
 		allProperties = append(allProperties, prop.Name)
 	}
-	tc.typePropertyEntries(ctx, hint.Token, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, typ.String(), v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -475,7 +475,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 		for _, prop := range hint.Resource.Properties {
 			statePropNames = append(statePropNames, prop.Name)
 		}
-		tc.typePropertyEntries(ctx, hint.Token, v.Get.State.Entries, hint.Resource.Properties)
+		tc.typePropertyEntries(ctx, typ.String(), v.Get.State.Entries, hint.Resource.Properties)
 	}
 
 	// Check for extra fields that didn't make it into the resource or resource options object
