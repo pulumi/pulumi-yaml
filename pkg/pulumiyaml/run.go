@@ -176,7 +176,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func (r *runner) setDefaultProviders() error {
+func (r *Runner) setDefaultProviders() error {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
 	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
@@ -198,7 +198,7 @@ func (r *runner) setDefaultProviders() error {
 
 	// Set roots
 	diags := r.Run(walker{
-		VisitResource: func(r *runner, node resourceNode) bool {
+		VisitResource: func(r *Runner, node resourceNode) bool {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -212,11 +212,15 @@ func (r *runner) setDefaultProviders() error {
 			defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
 			if v.Options.Provider == nil {
-				if v.Options.Version != nil {
-					ctx.errorf(v.Options.Version, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+				if v.Options.Version != nil && v.Options.Version.Value != defaultProviderInfo.version.Value {
+					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+						"Version conflicts with the default provider version",
+						fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 				}
-				if v.Options.PluginDownloadURL != nil {
-					ctx.errorf(v.Options.PluginDownloadURL, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+				if v.Options.PluginDownloadURL != nil && v.Options.PluginDownloadURL.Value != defaultProviderInfo.pluginDownloadURL.Value {
+					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+						"PluginDownloadURL conflicts with the default provider URL",
+						fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 				}
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -232,7 +236,7 @@ func (r *runner) setDefaultProviders() error {
 		VisitExpr: func(ec *evalContext, e ast.Expr) bool {
 			return true
 		},
-		VisitVariable: func(r *runner, node variableNode) bool {
+		VisitVariable: func(r *Runner, node variableNode) bool {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
 
@@ -246,10 +250,14 @@ func (r *runner) setDefaultProviders() error {
 
 				if t.CallOpts.Provider == nil {
 					if t.CallOpts.Version != nil {
-						ctx.errorf(t.CallOpts.Provider, "Version conflicts with the default provider version. Try removing this option on resource \"%s\".", k)
+						ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+							"Version conflicts with the default provider version",
+							fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 					}
 					if t.CallOpts.PluginDownloadURL != nil {
-						ctx.errorf(t.CallOpts.Provider, "PluginDownloadURL conflicts with the default provider URL. Try removing this option on resource \"%s\".", k)
+						ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+							"PluginDownloadURL conflicts with the default provider URL",
+							fmt.Sprintf("Try removing this option on resource \"%s\"", k))
 					}
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
@@ -262,10 +270,10 @@ func (r *runner) setDefaultProviders() error {
 			}
 			return true
 		},
-		VisitConfig: func(r *runner, node configNode) bool {
+		VisitConfig: func(r *Runner, node configNode) bool {
 			return true
 		},
-		VisitOutput: func(r *runner, node ast.PropertyMapEntry) bool {
+		VisitOutput: func(r *Runner, node ast.PropertyMapEntry) bool {
 			return true
 		},
 	})
@@ -276,21 +284,35 @@ func (r *runner) setDefaultProviders() error {
 	return nil
 }
 
-// RunTemplate runs the evaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	r := newRunner(ctx, t, loader)
+// PrepareTemplate prepares a template for converting or running
+func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
+	// set up context-free runner
+	r := newRunner(t, loader)
 
+	// runner hooks up default providers
 	err := r.setDefaultProviders()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// runner type checks nodes
+	_, diags := TypeCheck(r)
+	if diags.HasErrors() {
+		return nil, diags, nil
+	}
+
+	return r, diags, nil
+}
+
+// RunTemplate runs the programEvaluator against a template using the given request/settings.
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
+	r, diags, err := PrepareTemplate(t, loader)
 	if err != nil {
 		return err
 	}
 
-	_, diags := TypeCheck(r)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	diags.Extend(r.Evaluate()...)
+	// runtime evaluation here
+	diags.Extend(r.Evaluate(ctx)...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -326,8 +348,7 @@ type providerInfo struct {
 	providerName      *ast.StringExpr
 }
 
-type runner struct {
-	ctx       *pulumi.Context
+type Runner struct {
 	t         *ast.TemplateDecl
 	pkgLoader PackageLoader
 	config    map[string]interface{}
@@ -345,56 +366,36 @@ type runner struct {
 }
 
 type evalContext struct {
-	*runner
+	*Runner
 
 	root   interface{}
 	sdiags syncDiags
 }
 
-func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
-	diag := ast.ExprError(expr, summary, "")
-	ctx.addDiag(diag)
-	return nil, false
+func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail string) {
+	ctx.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.Runner.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
 }
 
-func (ctx *evalContext) addDiag(diag *syntax.Diagnostic) {
-	defer func() {
-		ctx.sdiags.Extend(diag)
-		ctx.runner.sdiags.Extend(diag)
-	}()
+func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
+	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+	ctx.Runner.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+}
 
-	var buf bytes.Buffer
-	w := ctx.t.NewDiagnosticWriter(&buf, 0, false)
-	err := w.WriteDiagnostic(diag.HCL())
-	if err != nil {
-		err = ctx.ctx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
-	} else {
-		s := buf.String()
-		// We strip off the appropriate HCL error message, since it will be
-		// added back on via the pulumi.Log framework.
-		switch diag.Severity {
-		case hcl.DiagWarning:
-			s = strings.TrimPrefix(s, "Warning: ")
-			err = ctx.ctx.Log.Warn(s, &pulumi.LogArgs{})
-		default:
-			s = strings.TrimPrefix(s, "Error: ")
-			err = ctx.ctx.Log.Error(s, &pulumi.LogArgs{})
-		}
-	}
-	if err != nil {
-		os.Stderr.Write([]byte(err.Error()))
-	} else {
-		diag.Shown = true
-	}
+func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	ctx.sdiags.Extend(diag)
+	ctx.Runner.sdiags.Extend(diag)
+	return nil, false
 }
 
 func (ctx *evalContext) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
 	return ctx.error(expr, fmt.Sprintf(format, a...))
 }
 
-func (r *runner) newContext(root interface{}) *evalContext {
+func (r *Runner) newContext(root interface{}) *evalContext {
 	ctx := &evalContext{
-		runner: r,
+		Runner: r,
 		root:   root,
 		sdiags: syncDiags{},
 	}
@@ -542,9 +543,8 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
-func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runner {
-	return &runner{
-		ctx:       ctx,
+func newRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
+	return &Runner{
 		t:         t,
 		pkgLoader: p,
 		config:    make(map[string]interface{}),
@@ -557,95 +557,148 @@ func newRunner(ctx *pulumi.Context, t *ast.TemplateDecl, p PackageLoader) *runne
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
-	EvalConfig(r *runner, node configNode) bool
-	EvalVariable(r *runner, node variableNode) bool
-	EvalResource(r *runner, node resourceNode) bool
-	EvalOutput(r *runner, node ast.PropertyMapEntry) bool
+	EvalConfig(r *Runner, node configNode) bool
+	EvalVariable(r *Runner, node variableNode) bool
+	EvalResource(r *Runner, node resourceNode) bool
+	EvalOutput(r *Runner, node ast.PropertyMapEntry) bool
 }
 
-type evaluator struct{}
+type programEvaluator struct {
+	*evalContext
+	pulumiCtx *pulumi.Context
+}
 
-func (evaluator) EvalConfig(r *runner, node configNode) bool {
+func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
+	diag := ast.ExprError(expr, summary, "")
+	e.addDiag(diag)
+	return nil, false
+}
+
+func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
+	defer func() {
+		e.sdiags.Extend(diag)
+		e.evalContext.Runner.sdiags.Extend(diag)
+	}()
+
+	var buf bytes.Buffer
+	w := e.t.NewDiagnosticWriter(&buf, 0, false)
+	err := w.WriteDiagnostic(diag.HCL())
+	if err != nil {
+		err = e.pulumiCtx.Log.Error(fmt.Sprintf("internal error: %v", err), &pulumi.LogArgs{})
+	} else {
+		s := buf.String()
+		// We strip off the appropriate HCL error message, since it will be
+		// added back on via the pulumi.Log framework.
+		switch diag.Severity {
+		case hcl.DiagWarning:
+			s = strings.TrimPrefix(s, "Warning: ")
+			err = e.pulumiCtx.Log.Warn(s, &pulumi.LogArgs{})
+		default:
+			s = strings.TrimPrefix(s, "Error: ")
+			err = e.pulumiCtx.Log.Error(s, &pulumi.LogArgs{})
+		}
+	}
+	if err != nil {
+		os.Stderr.Write([]byte(err.Error()))
+	} else {
+		diag.Shown = true
+	}
+}
+
+func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
+	return e.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
+
 	ctx := r.newContext(node)
-	c, ok := ctx.registerConfig(node)
+	c, ok := e.registerConfig(node)
 	if !ok {
-		r.config[node.Key.Value] = poisonMarker{}
+		e.config[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
+		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
 			return false
 		}
 	} else {
-		r.config[node.Key.Value] = c
+		e.config[node.Key.Value] = c
 	}
 	return true
 }
 
-func (evaluator) EvalVariable(r *runner, node variableNode) bool {
+func (e programEvaluator) EvalVariable(r *Runner, node variableNode) bool {
 	ctx := r.newContext(node)
-	value, ok := ctx.evaluateExpr(node.Value)
+	value, ok := e.evaluateExpr(node.Value)
 	if !ok {
-		r.variables[node.Key.Value] = poisonMarker{}
+		e.variables[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering variable [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		r.variables[node.Key.Value] = value
+		e.variables[node.Key.Value] = value
 	}
 	return true
 }
 
-func (evaluator) EvalResource(r *runner, node resourceNode) bool {
+func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 	ctx := r.newContext(node)
-	res, ok := ctx.registerResource(node)
+	res, ok := e.registerResource(node)
 	if !ok {
-		r.resources[node.Key.Value] = poisonMarker{}
+		e.resources[node.Key.Value] = poisonMarker{}
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else {
-		r.resources[node.Key.Value] = res
+		e.resources[node.Key.Value] = res
 	}
 	return true
 
 }
 
-func (evaluator) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	ctx := r.newContext(node)
-	out, ok := ctx.registerOutput(node)
+	out, ok := e.registerOutput(node)
 	if !ok {
 		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
-		err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
 		if err != nil {
 			return false
 		}
 	} else if _, poisoned := out.(poisonMarker); !poisoned {
-		r.ctx.Export(node.Key.Value, out)
+		e.pulumiCtx.Export(node.Key.Value, out)
 	}
 	return true
 }
 
-func (r *runner) Evaluate() syntax.Diagnostics {
-	return r.Run(evaluator{})
+func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+	eCtx := r.newContext(nil)
+	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
-func (r *runner) ensureSetup() {
-	r.intermediates = []graphNode{}
+func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
 	}
+
+	var project, stack string
+	if ctx != nil {
+		project = ctx.Project()
+		stack = ctx.Stack()
+	}
 	r.variables[PulumiVarName] = map[string]interface{}{
 		"cwd":     cwd,
-		"project": r.ctx.Project(),
-		"stack":   r.ctx.Stack(),
+		"project": project,
+		"stack":   stack,
 	}
 	r.cwd = cwd
+
+	r.intermediates = []graphNode{}
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t)
@@ -658,8 +711,15 @@ func (r *runner) ensureSetup() {
 	}
 }
 
-func (r *runner) Run(e Evaluator) syntax.Diagnostics {
-	r.ensureSetup()
+func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
+	var ctx *pulumi.Context
+
+	switch eval := e.(type) {
+	case programEvaluator:
+		ctx = eval.pulumiCtx
+	}
+	r.ensureSetup(ctx)
+
 	returnDiags := func() syntax.Diagnostics {
 		r.sdiags.mutex.Lock()
 		defer r.sdiags.mutex.Unlock()
@@ -672,25 +732,32 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
+			if ctx != nil {
+				err := ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+				if err != nil {
+					return returnDiags()
+				}
 			}
+
 			if !e.EvalConfig(r, kvp) {
 				return returnDiags()
 			}
 		case variableNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
+			if ctx != nil {
+				err := ctx.Log.Debug(fmt.Sprintf("Registering variable [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+				if err != nil {
+					return returnDiags()
+				}
 			}
 			if !e.EvalVariable(r, kvp) {
 				return returnDiags()
 			}
 		case resourceNode:
-			err := r.ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
-			if err != nil {
-				return returnDiags()
+			if ctx != nil {
+				err := ctx.Log.Debug(fmt.Sprintf("Registering resource [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+				if err != nil {
+					return returnDiags()
+				}
 			}
 			if !e.EvalResource(r, kvp) {
 				return returnDiags()
@@ -707,26 +774,26 @@ func (r *runner) Run(e Evaluator) syntax.Diagnostics {
 	return returnDiags()
 }
 
-func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
+func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 	k, c := intm.Key.Value, intm.Value
 
 	// If we implement global type checking, the type of configuration variables
 	// can be inferred and this requirement relaxed.
 	if c.Type == nil && c.Default == nil {
-		return ctx.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
+		return e.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
 	}
 
 	var defaultValue interface{}
 	var expectedType ctypes.Type
 	if c.Default != nil {
-		d, ok := ctx.evaluateExpr(c.Default)
+		d, ok := e.evaluateExpr(c.Default)
 		if !ok {
 			return nil, false
 		}
 		var err error
 		expectedType, err = ctypes.TypeValue(d)
 		if err != nil {
-			return ctx.error(c.Default, err.Error())
+			return e.error(c.Default, err.Error())
 		}
 		defaultValue = d
 	}
@@ -734,7 +801,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	if c.Type != nil {
 		t, ok := ctypes.Parse(c.Type.Value)
 		if !ok {
-			return ctx.errorf(c.Type,
+			return e.errorf(c.Type,
 				"unexpected configuration type '%s': valid types are %s",
 				c.Type.Value, ctypes.ConfigTypes)
 		}
@@ -742,7 +809,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 		// We have both a default value and a explicit type. Make sure they
 		// agree.
 		if ctypes.IsValidType(expectedType) && t != expectedType {
-			return ctx.errorf(intm.Key,
+			return e.errorf(intm.Key,
 				"type mismatch: default value of type %s but type %s was specified",
 				expectedType, t)
 		}
@@ -758,10 +825,10 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	// section. It the value is specified as secret only in the configuration
 	// section, we call Try* normally, and later wrap the value with
 	// `pulumi.ToSecret`.
-	isSecretInConfig := ctx.ctx.IsConfigSecret(ctx.ctx.Project() + ":" + k)
+	isSecretInConfig := e.pulumiCtx.IsConfigSecret(e.pulumiCtx.Project() + ":" + k)
 
 	if isSecretInConfig && c.Secret != nil && !c.Secret.Value {
-		return ctx.error(c.Secret,
+		return e.error(c.Secret,
 			"Cannot mark a configuration value as not secret"+
 				" if the associated config value is secret")
 	}
@@ -771,34 +838,34 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	switch expectedType {
 	case ctypes.String:
 		if isSecretInConfig {
-			v, err = config.TrySecret(ctx.ctx, k)
+			v, err = config.TrySecret(e.pulumiCtx, k)
 		} else {
-			v, err = config.Try(ctx.ctx, k)
+			v, err = config.Try(e.pulumiCtx, k)
 		}
 	case ctypes.Number:
 		if isSecretInConfig {
-			v, err = config.TrySecretFloat64(ctx.ctx, k)
+			v, err = config.TrySecretFloat64(e.pulumiCtx, k)
 		} else {
-			v, err = config.TryFloat64(ctx.ctx, k)
+			v, err = config.TryFloat64(e.pulumiCtx, k)
 		}
 	case ctypes.Int:
 		if isSecretInConfig {
-			v, err = config.TrySecretInt(ctx.ctx, k)
+			v, err = config.TrySecretInt(e.pulumiCtx, k)
 		} else {
-			v, err = config.TryInt(ctx.ctx, k)
+			v, err = config.TryInt(e.pulumiCtx, k)
 		}
 	case ctypes.Boolean:
 		if isSecretInConfig {
-			v, err = config.TrySecretBool(ctx.ctx, k)
+			v, err = config.TrySecretBool(e.pulumiCtx, k)
 		} else {
-			v, err = config.TryBool(ctx.ctx, k)
+			v, err = config.TryBool(e.pulumiCtx, k)
 		}
 	case ctypes.NumberList:
 		var arr []float64
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
 		} else {
-			err = config.TryObject(ctx.ctx, k, &arr)
+			err = config.TryObject(e.pulumiCtx, k, &arr)
 			if err == nil {
 				v = arr
 			}
@@ -806,9 +873,9 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	case ctypes.IntList:
 		var arr []int
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
 		} else {
-			err = config.TryObject(ctx.ctx, k, &arr)
+			err = config.TryObject(e.pulumiCtx, k, &arr)
 			if err != nil {
 				v = arr
 			}
@@ -816,9 +883,9 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	case ctypes.StringList:
 		var arr []string
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
 		} else {
-			err = config.TryObject(ctx.ctx, k, &arr)
+			err = config.TryObject(e.pulumiCtx, k, &arr)
 			if err == nil {
 				v = arr
 			}
@@ -826,9 +893,9 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	case ctypes.BooleanList:
 		var arr []bool
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(ctx.ctx, k, &arr)
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
 		} else {
-			err = config.TryObject(ctx.ctx, k, &arr)
+			err = config.TryObject(e.pulumiCtx, k, &arr)
 			if err == nil {
 				v = arr
 			}
@@ -838,7 +905,7 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
 		v = defaultValue
 	} else if err != nil {
-		return ctx.errorf(intm.Key, err.Error())
+		return e.errorf(intm.Key, err.Error())
 	}
 
 	contract.Assertf(v != nil, "let an uninitialized var slip through")
@@ -851,22 +918,22 @@ func (ctx *evalContext) registerConfig(intm configNode) (interface{}, bool) {
 	return v, true
 }
 
-func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, bool) {
+func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
 	props := make(map[string]interface{})
 	overallOk := true
 
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
+	pkg, typ, err := ResolveResource(e.pkgLoader, v.Type.Value)
 	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
+		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		overallOk = false
 	}
 
 	readIntoProperties := func(obj ast.PropertyMapDecl) (poisonMarker, bool) {
 		for _, kvp := range obj.Entries {
-			vv, ok := ctx.evaluateExpr(kvp.Value)
+			vv, ok := e.evaluateExpr(kvp.Value)
 			if !ok {
 				overallOk = false
 			}
@@ -914,7 +981,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.DeleteBeforeReplace(v.Options.DeleteBeforeReplace.Value))
 	}
 	if v.Options.DependsOn != nil {
-		dependOnOpt, ok := ctx.evaluateResourceListValuedOption(v.Options.DependsOn, "dependsOn")
+		dependOnOpt, ok := e.evaluateResourceListValuedOption(v.Options.DependsOn, "dependsOn")
 		if ok {
 			var dependsOn []pulumi.Resource
 			for _, r := range dependOnOpt {
@@ -932,7 +999,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
 	if v.Options.Parent != nil {
-		parentOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Parent, "parent")
+		parentOpt, ok := e.evaluateResourceValuedOption(v.Options.Parent, "parent")
 		if ok {
 			if p, ok := parentOpt.(poisonMarker); ok {
 				return p, true
@@ -946,7 +1013,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
 	}
 	if v.Options.Provider != nil {
-		providerOpt, ok := ctx.evaluateResourceValuedOption(v.Options.Provider, "provider")
+		providerOpt, ok := e.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
@@ -954,7 +1021,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 			provider := providerOpt.ProviderResource()
 
 			if provider == nil {
-				ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+				e.error(v.Options.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
 			} else {
 				opts = append(opts, pulumi.Provider(provider))
 			}
@@ -963,7 +1030,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		}
 	}
 	if v.Options.Providers != nil {
-		dependOnOpt, ok := ctx.evaluateResourceListValuedOption(v.Options.Providers, "providers")
+		dependOnOpt, ok := e.evaluateResourceListValuedOption(v.Options.Providers, "providers")
 		if ok {
 			var providers []pulumi.ProviderResource
 			for _, r := range dependOnOpt {
@@ -972,7 +1039,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 				}
 				provider := r.ProviderResource()
 				if provider == nil {
-					ctx.error(v.Options.Provider, fmt.Sprintf("resource passed as provider was not a provider resource '%s'", r))
+					e.error(v.Options.Provider, fmt.Sprintf("resource passed as provider was not a provider resource '%s'", r))
 				} else {
 					providers = append(providers, provider)
 				}
@@ -1012,7 +1079,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		res = &r
 	}
 
-	if !overallOk || ctx.sdiags.HasErrors() {
+	if !overallOk || e.sdiags.HasErrors() {
 		return nil, false
 	}
 
@@ -1020,7 +1087,7 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 	if !isProvider {
 		result, err := pkg.IsComponent(typ)
 		if err != nil {
-			ctx.error(v.Type, "unable to resolve type")
+			e.error(v.Type, "unable to resolve type")
 			return nil, false
 		}
 		isComponent = result
@@ -1042,11 +1109,11 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 
 	// Now register the resulting resource with the engine.
 	if isComponent {
-		err = ctx.ctx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
+		err = e.pulumiCtx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
 	} else if isRead {
-		s, ok := ctx.evaluateExpr(v.Get.Id)
+		s, ok := e.evaluateExpr(v.Get.Id)
 		if !ok {
-			ctx.error(v.Get.Id, "unable to evaluate get.id")
+			e.error(v.Get.Id, "unable to evaluate get.id")
 			return nil, false
 		}
 		if p, ok := s.(poisonMarker); ok {
@@ -1054,40 +1121,40 @@ func (ctx *evalContext) registerResource(kvp resourceNode) (lateboundResource, b
 		}
 		id, ok := s.(string)
 		if !ok {
-			ctx.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
+			e.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
 			return nil, false
 		}
-		err = ctx.ctx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
+		err = e.pulumiCtx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
 	} else {
-		err = ctx.ctx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
+		err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
 	}
 	if err != nil {
-		ctx.error(kvp.Key, err.Error())
+		e.error(kvp.Key, err.Error())
 		return nil, false
 	}
 
 	return state, true
 }
 
-func (ctx *evalContext) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
-	value, ok := ctx.evaluateExpr(optionExpr)
+func (e *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr, key string) ([]lateboundResource, bool) {
+	value, ok := e.evaluateExpr(optionExpr)
 	if !ok {
 		return nil, false
 	}
 	if hasOutputs(value) {
-		ctx.error(optionExpr, fmt.Sprintf("resource option %v value must be a list of resource, not an output", key))
+		e.error(optionExpr, fmt.Sprintf("resource option %v value must be a list of resource, not an output", key))
 		return nil, false
 	}
 	dependencies, ok := value.([]interface{})
 	if !ok {
-		ctx.error(optionExpr, fmt.Sprintf("resource option %v value must be a list of resources", key))
+		e.error(optionExpr, fmt.Sprintf("resource option %v value must be a list of resources", key))
 		return nil, false
 	}
 	var resources []lateboundResource
 	for _, dep := range dependencies {
 		res, err := asResource(dep)
 		if err != nil {
-			ctx.error(optionExpr, err.Error())
+			e.error(optionExpr, err.Error())
 			continue
 		}
 		resources = append(resources, res)
@@ -1095,18 +1162,18 @@ func (ctx *evalContext) evaluateResourceListValuedOption(optionExpr ast.Expr, ke
 	return resources, true
 }
 
-func (ctx *evalContext) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, bool) {
-	value, ok := ctx.evaluateExpr(optionExpr)
+func (e *programEvaluator) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, bool) {
+	value, ok := e.evaluateExpr(optionExpr)
 	if !ok {
 		return nil, false
 	}
 	if hasOutputs(value) {
-		ctx.error(optionExpr, "resource cannot be an output")
+		e.error(optionExpr, "resource cannot be an output")
 		return nil, false
 	}
 	res, err := asResource(value)
 	if err != nil {
-		ctx.error(optionExpr, err.Error())
+		e.error(optionExpr, err.Error())
 		return nil, false
 	}
 	return res, true
@@ -1121,8 +1188,8 @@ func asResource(value interface{}) (lateboundResource, error) {
 	}
 }
 
-func (ctx *evalContext) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, bool) {
-	out, ok := ctx.evaluateExpr(kvp.Value)
+func (e *programEvaluator) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, bool) {
+	out, ok := e.evaluateExpr(kvp.Value)
 	if !ok {
 		return nil, false
 	}
@@ -1148,7 +1215,7 @@ func (ctx *evalContext) registerOutput(kvp ast.PropertyMapEntry) (pulumi.Input, 
 // - []interface{}
 // - map[string]interface{}
 // - pulumi.Output, where the element type is one of the above
-func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
+func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	switch x := x.(type) {
 	case *ast.NullExpr:
 		return nil, true
@@ -1159,31 +1226,31 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.StringExpr:
 		return x.Value, true
 	case *ast.ListExpr:
-		return ctx.evaluateList(x)
+		return e.evaluateList(x)
 	case *ast.ObjectExpr:
 		var entries []ast.ObjectProperty
 		if x != nil {
 			entries = x.Entries
 		}
-		return ctx.evaluateObject(x, entries)
+		return e.evaluateObject(x, entries)
 	case *ast.InterpolateExpr:
-		return ctx.evaluateInterpolate(x)
+		return e.evaluateInterpolate(x)
 	case *ast.SymbolExpr:
-		return ctx.evaluatePropertyAccess(x, x.Property)
+		return e.evaluatePropertyAccess(x, x.Property)
 	case *ast.InvokeExpr:
-		return ctx.evaluateBuiltinInvoke(x)
+		return e.evaluateBuiltinInvoke(x)
 	case *ast.JoinExpr:
-		return ctx.evaluateBuiltinJoin(x)
+		return e.evaluateBuiltinJoin(x)
 	case *ast.SplitExpr:
-		return ctx.evaluateBuiltinSplit(x)
+		return e.evaluateBuiltinSplit(x)
 	case *ast.ToJSONExpr:
-		return ctx.evaluateBuiltinToJSON(x)
+		return e.evaluateBuiltinToJSON(x)
 	case *ast.SelectExpr:
-		return ctx.evaluateBuiltinSelect(x)
+		return e.evaluateBuiltinSelect(x)
 	case *ast.ToBase64Expr:
-		return ctx.evaluateBuiltinToBase64(x)
+		return e.evaluateBuiltinToBase64(x)
 	case *ast.FromBase64Expr:
-		return ctx.evaluateBuiltinFromBase64(x)
+		return e.evaluateBuiltinFromBase64(x)
 	case *ast.FileAssetExpr:
 		return pulumi.NewFileAsset(x.Source.Value), true
 	case *ast.StringAssetExpr:
@@ -1195,22 +1262,22 @@ func (ctx *evalContext) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.RemoteArchiveExpr:
 		return pulumi.NewRemoteArchive(x.Source.Value), true
 	case *ast.AssetArchiveExpr:
-		return ctx.evaluateBuiltinAssetArchive(x)
+		return e.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
-		return ctx.evaluateBuiltinStackReference(x)
+		return e.evaluateBuiltinStackReference(x)
 	case *ast.SecretExpr:
-		return ctx.evaluateBuiltinSecret(x)
+		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
-		return ctx.evaluateBuiltinReadFile(x)
+		return e.evaluateBuiltinReadFile(x)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
 }
 
-func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
+func (e *programEvaluator) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	xs := make([]interface{}, len(x.Elements))
-	for i, e := range x.Elements {
-		ev, ok := ctx.evaluateExpr(e)
+	for i, elem := range x.Elements {
+		ev, ok := e.evaluateExpr(elem)
 		if !ok {
 			return nil, false
 		}
@@ -1222,7 +1289,7 @@ func (ctx *evalContext) evaluateList(x *ast.ListExpr) (interface{}, bool) {
 	return xs, true
 }
 
-func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
+func (e *programEvaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectProperty) (interface{}, bool) {
 	if len(entries) == 0 {
 		return map[string]interface{}{}, true
 	}
@@ -1232,14 +1299,14 @@ func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectPr
 	var keyExprs []ast.Expr
 	var values []interface{}
 	for _, op := range entries {
-		k, ok := ctx.evaluateExpr(op.Key)
+		k, ok := e.evaluateExpr(op.Key)
 		if !ok {
 			allOk = false
 		}
 		keys = append(keys, k)
 		keyExprs = append(keyExprs, op.Key)
 
-		v, ok := ctx.evaluateExpr(op.Value)
+		v, ok := e.evaluateExpr(op.Value)
 		if !ok {
 			allOk = false
 		}
@@ -1250,14 +1317,14 @@ func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectPr
 		return nil, false
 	}
 
-	evalObjectF := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	evalObjectF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		returnMap := map[string]interface{}{}
 		allOk := true
 		for i, arg := range args {
 			if k, ok := arg.(string); ok {
 				returnMap[k] = values[i]
 			} else {
-				ctx.error(keyExprs[i], fmt.Sprintf("object key must evaluate to a string, not %v", typeString(k)))
+				e.error(keyExprs[i], fmt.Sprintf("object key must evaluate to a string, not %v", typeString(k)))
 				allOk = false
 			}
 		}
@@ -1272,17 +1339,17 @@ func (ctx *evalContext) evaluateObject(x *ast.ObjectExpr, entries []ast.ObjectPr
 	return evalObjectF(keys...)
 }
 
-func (ctx *evalContext) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
-	return ctx.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
+func (e *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
+	return e.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
 }
 
-func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
+func (e *programEvaluator) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
 	for ; len(parts) > 0; parts = parts[1:] {
 		i := parts[0]
 		b.WriteString(i.Text)
 
 		if i.Value != nil {
-			p, ok := ctx.evaluatePropertyAccess(x, i.Value)
+			p, ok := e.evaluatePropertyAccess(x, i.Value)
 			if !ok {
 				return nil, false
 			}
@@ -1293,7 +1360,7 @@ func (ctx *evalContext) evaluateInterpolations(x *ast.InterpolateExpr, b *string
 			if o, ok := p.(pulumi.Output); ok {
 				return o.ApplyT(func(v interface{}) (interface{}, error) {
 					fmt.Fprintf(b, "%v", v)
-					v, ok := ctx.evaluateInterpolations(x, b, parts[1:])
+					v, ok := e.evaluateInterpolations(x, b, parts[1:])
 					if !ok {
 						return nil, fmt.Errorf("runtime error")
 					}
@@ -1315,25 +1382,25 @@ func unknownOutput() pulumi.Output {
 // the property access list is the head, and must be an identifier for a resource, config, or
 // variable. The tail of property accessors are either: `.foo` string literal property names or
 // `[42]` numeric literal property subscripts.
-func (ctx *evalContext) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
+func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.PropertyAccess) (interface{}, bool) {
 	resourceName := access.RootName()
 	var receiver interface{}
-	if res, ok := ctx.resources[resourceName]; ok {
+	if res, ok := e.resources[resourceName]; ok {
 		receiver = res
-	} else if p, ok := ctx.config[resourceName]; ok {
+	} else if p, ok := e.config[resourceName]; ok {
 		receiver = p
-	} else if v, ok := ctx.variables[resourceName]; ok {
+	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v
 	} else {
-		return ctx.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))
+		return e.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))
 	}
 
-	return ctx.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
+	return e.evaluatePropertyAccessTail(expr, receiver, access.Accessors[1:])
 }
 
-func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
+func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver interface{}, accessors []ast.PropertyAccessor) (interface{}, bool) {
 	var evaluateAccessF func(args ...interface{}) (interface{}, bool)
-	evaluateAccessF = ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	evaluateAccessF = e.lift(func(args ...interface{}) (interface{}, bool) {
 		receiver := args[0]
 		accessors := args[1].([]ast.PropertyAccessor)
 	Loop:
@@ -1366,7 +1433,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				case *ast.PropertySubscript:
 					s, ok := a.Index.(string)
 					if !ok {
-						return ctx.error(expr, "cannot access an object property using an integer index")
+						return e.error(expr, "cannot access an object property using an integer index")
 					}
 					k = s
 				}
@@ -1412,9 +1479,9 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 						res = &r
 					}
 					// Use the `getResource` invoke to get and deserialize the resource from state:
-					err := ctx.ctx.RegisterResource("_", "_", nil, res, pulumi.URN_(string(ref.URN)))
+					err := e.pulumiCtx.RegisterResource("_", "_", nil, res, pulumi.URN_(string(ref.URN)))
 					if err != nil {
-						ctx.error(expr, fmt.Sprintf("Failed to get resource %q: %v", ref.URN, err))
+						e.error(expr, fmt.Sprintf("Failed to get resource %q: %v", ref.URN, err))
 						return nil, false
 					}
 					return evaluateAccessF(state, accessors)
@@ -1431,14 +1498,14 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				}
 				sub, ok := accessors[0].(*ast.PropertySubscript)
 				if !ok {
-					return ctx.error(expr, "cannot access a list element using a property name")
+					return e.error(expr, "cannot access a list element using a property name")
 				}
 				index, ok := sub.Index.(int)
 				if !ok {
-					return ctx.error(expr, "cannot access a list element using a property name")
+					return e.error(expr, "cannot access a list element using a property name")
 				}
 				if index < 0 || index >= len(x) {
-					return ctx.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, len(x)))
+					return e.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, len(x)))
 				}
 				receiver = x[index]
 				accessors = accessors[1:]
@@ -1448,16 +1515,16 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				}
 				sub, ok := accessors[0].(*ast.PropertySubscript)
 				if !ok {
-					return ctx.error(expr, "cannot access a list element using a property name")
+					return e.error(expr, "cannot access a list element using a property name")
 				}
 				index, ok := sub.Index.(int)
 				if !ok {
-					return ctx.error(expr, "cannot access a list element using a property name")
+					return e.error(expr, "cannot access a list element using a property name")
 				}
 				reflx := reflect.ValueOf(x)
 				length := reflx.Len()
 				if index < 0 || index >= length {
-					return ctx.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, length))
+					return e.error(expr, fmt.Sprintf("list index %v out-of-bounds for list of length %v", index, length))
 				}
 				receiver = reflect.Indirect(reflx).Index(index).Interface()
 				accessors = accessors[1:]
@@ -1472,7 +1539,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				case *ast.PropertySubscript:
 					s, ok := a.Index.(string)
 					if !ok {
-						return ctx.error(expr, "cannot access an object property using an integer index")
+						return e.error(expr, "cannot access an object property using an integer index")
 					}
 					k = s
 				}
@@ -1482,7 +1549,7 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 				if len(accessors) == 0 {
 					break Loop
 				}
-				return ctx.error(expr, fmt.Sprintf("receiver must be a list or object, not %v", typeString(receiver)))
+				return e.error(expr, fmt.Sprintf("receiver must be a list or object, not %v", typeString(receiver)))
 			}
 		}
 		return receiver, true
@@ -1493,8 +1560,8 @@ func (ctx *evalContext) evaluatePropertyAccessTail(expr ast.Expr, receiver inter
 
 // evaluateBuiltinInvoke evaluates the "Invoke" builtin, which enables templates to invoke arbitrary
 // data source functions, to fetch information like the current availability zone, lookup AMIs, etc.
-func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
-	args, ok := ctx.evaluateExpr(t.CallArgs)
+func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, bool) {
+	args, ok := e.evaluateExpr(t.CallArgs)
 	if !ok {
 		return nil, false
 	}
@@ -1508,42 +1575,42 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 		opts = append(opts, pulumi.PluginDownloadURL(t.CallOpts.PluginDownloadURL.Value))
 	}
 	if t.CallOpts.Parent != nil {
-		parentOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Parent, "parent")
+		parentOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Parent, "parent")
 		if ok {
 			if p, ok := parentOpt.(poisonMarker); ok {
 				return p, true
 			}
 			opts = append(opts, pulumi.Parent(parentOpt.CustomResource()))
 		} else {
-			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Parent field: %+v", t.CallOpts.Parent))
+			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Parent field: %+v", t.CallOpts.Parent))
 		}
 	}
 	if t.CallOpts.Provider != nil {
-		providerOpt, ok := ctx.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
+		providerOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
 			}
 			provider := providerOpt.ProviderResource()
 			if provider == nil {
-				ctx.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
+				e.error(t.CallOpts.Provider, fmt.Sprintf("resource passed as Provider was not a provider resource '%s'", providerOpt))
 			} else {
 				opts = append(opts, pulumi.Provider(provider))
 			}
 		} else {
-			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
+			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
-	performInvoke := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		_, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
+		_, functionName, err := ResolveFunction(e.pkgLoader, t.Token.Value)
 		if err != nil {
-			return ctx.error(t, err.Error())
+			return e.error(t, err.Error())
 		}
 
-		if err := ctx.ctx.Invoke(string(functionName), args[0], &result, opts...); err != nil {
-			return ctx.error(t, err.Error())
+		if err := e.pulumiCtx.Invoke(string(functionName), args[0], &result, opts...); err != nil {
+			return e.error(t, err.Error())
 		}
 
 		if t.Return.GetValue() == "" {
@@ -1552,28 +1619,28 @@ func (ctx *evalContext) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}, b
 
 		retv, ok := result[t.Return.Value]
 		if !ok {
-			ctx.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-			return ctx.error(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
+			return e.error(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
 		}
 		return retv, true
 	})
 	return performInvoke(args)
 }
 
-func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
+func (e *programEvaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {
 	overallOk := true
 
-	delim, ok := ctx.evaluateExpr(v.Delimiter)
+	delim, ok := e.evaluateExpr(v.Delimiter)
 	overallOk = overallOk && ok
 
-	items, ok := ctx.evaluateExpr(v.Values)
+	items, ok := e.evaluateExpr(v.Values)
 	overallOk = overallOk && ok
 
 	if !overallOk {
 		return nil, false
 	}
 
-	join := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	join := e.lift(func(args ...interface{}) (interface{}, bool) {
 		overallOk := true
 
 		delim := args[0]
@@ -1583,13 +1650,13 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 		delimStr, ok := delim.(string)
 		overallOk = overallOk && ok
 		if !ok {
-			ctx.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(args[0])))
+			e.error(v.Delimiter, fmt.Sprintf("delimiter must be a string, not %v", typeString(args[0])))
 		}
 
 		parts, ok := args[1].([]interface{})
 		overallOk = overallOk && ok
 		if !ok {
-			ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list, found %v", typeString(args[1])))
+			e.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list, found %v", typeString(args[1])))
 		}
 
 		if !overallOk {
@@ -1600,7 +1667,7 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 		for i, p := range parts {
 			str, ok := p.(string)
 			if !ok {
-				ctx.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list of strings, found %v at index %v", typeString(p), i))
+				e.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list of strings, found %v at index %v", typeString(p), i))
 				overallOk = false
 			} else {
 				strs[i] = str
@@ -1616,21 +1683,21 @@ func (ctx *evalContext) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool)
 	return join(delim, items)
 }
 
-func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
-	delimiter, delimOk := ctx.evaluateExpr(v.Delimiter)
-	source, sourceOk := ctx.evaluateExpr(v.Source)
+func (e *programEvaluator) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, bool) {
+	delimiter, delimOk := e.evaluateExpr(v.Delimiter)
+	source, sourceOk := e.evaluateExpr(v.Source)
 	if !delimOk || !sourceOk {
 		return nil, false
 	}
 
-	split := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	split := e.lift(func(args ...interface{}) (interface{}, bool) {
 		d, delimOk := args[0].(string)
 		if !delimOk {
-			ctx.error(v.Delimiter, fmt.Sprintf("Must be a string, not %v", typeString(d)))
+			e.error(v.Delimiter, fmt.Sprintf("Must be a string, not %v", typeString(d)))
 		}
 		s, sourceOk := args[1].(string)
 		if !sourceOk {
-			ctx.error(v.Source, fmt.Sprintf("Must be a string, not %v", typeString(s)))
+			e.error(v.Source, fmt.Sprintf("Must be a string, not %v", typeString(s)))
 		}
 		if !delimOk || !sourceOk {
 			return nil, false
@@ -1640,16 +1707,16 @@ func (ctx *evalContext) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, boo
 	return split(delimiter, source)
 }
 
-func (ctx *evalContext) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, bool) {
-	value, ok := ctx.evaluateExpr(v.Value)
+func (e *programEvaluator) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, bool) {
+	value, ok := e.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
 	}
 
-	toJSON := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	toJSON := e.lift(func(args ...interface{}) (interface{}, bool) {
 		b, err := json.Marshal(args[0])
 		if err != nil {
-			ctx.error(v, fmt.Sprintf("failed to encode JSON: %v", err))
+			e.error(v, fmt.Sprintf("failed to encode JSON: %v", err))
 			return "", false
 		}
 		return string(b), true
@@ -1657,75 +1724,75 @@ func (ctx *evalContext) evaluateBuiltinToJSON(v *ast.ToJSONExpr) (interface{}, b
 	return toJSON(value)
 }
 
-func (ctx *evalContext) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, bool) {
-	index, ok := ctx.evaluateExpr(v.Index)
+func (e *programEvaluator) evaluateBuiltinSelect(v *ast.SelectExpr) (interface{}, bool) {
+	index, ok := e.evaluateExpr(v.Index)
 	if !ok {
 		return nil, false
 	}
-	values, ok := ctx.evaluateExpr(v.Values)
+	values, ok := e.evaluateExpr(v.Values)
 	if !ok {
 		return nil, false
 	}
 
-	selectFn := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	selectFn := e.lift(func(args ...interface{}) (interface{}, bool) {
 		indexArg := args[0]
 		elemsArg := args[1]
 
 		index, ok := indexArg.(float64)
 		if !ok {
-			return ctx.error(v.Index, fmt.Sprintf("index must be a number, not %v", typeString(indexArg)))
+			return e.error(v.Index, fmt.Sprintf("index must be a number, not %v", typeString(indexArg)))
 		}
 		if float64(int(index)) != index || int(index) < 0 {
 			// Cannot be a valid index, so we error
 			f := strconv.FormatFloat(index, 'f', -1, 64) // Manual formatting is so -3 does not get formatted as -3.0
-			return ctx.error(v.Index, fmt.Sprintf("index must be a positive integral, not %s", f))
+			return e.error(v.Index, fmt.Sprintf("index must be a positive integral, not %s", f))
 		}
 		intIndex := int(index)
 
-		return ctx.evaluatePropertyAccessTail(v.Values, elemsArg, []ast.PropertyAccessor{&ast.PropertySubscript{Index: intIndex}})
+		return e.evaluatePropertyAccessTail(v.Values, elemsArg, []ast.PropertyAccessor{&ast.PropertySubscript{Index: intIndex}})
 	})
 	return selectFn(index, values)
 }
 
-func (ctx *evalContext) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interface{}, bool) {
-	str, ok := ctx.evaluateExpr(v.Value)
+func (e *programEvaluator) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (interface{}, bool) {
+	str, ok := e.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
 	}
-	fromBase64 := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	fromBase64 := e.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::FromBase64 to be a string, got %v", typeString(args[0])))
+			return e.error(v.Value, fmt.Sprintf("expected argument to Fn::FromBase64 to be a string, got %v", typeString(args[0])))
 		}
 		b, err := b64.StdEncoding.DecodeString(s)
 		if err != nil {
-			return ctx.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
+			return e.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
 		}
 		decoded := string(b)
 		if !utf8.ValidString(decoded) {
-			return ctx.error(v.Value, "Fn::FromBase64 output is not a valid UTF-8 string")
+			return e.error(v.Value, "Fn::FromBase64 output is not a valid UTF-8 string")
 		}
 		return decoded, true
 	})
 	return fromBase64(str)
 }
 
-func (ctx *evalContext) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, bool) {
-	str, ok := ctx.evaluateExpr(v.Value)
+func (e *programEvaluator) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interface{}, bool) {
+	str, ok := e.evaluateExpr(v.Value)
 	if !ok {
 		return nil, false
 	}
-	toBase64 := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	toBase64 := e.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return ctx.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
+			return e.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
 		}
 		return b64.StdEncoding.EncodeToString([]byte(s)), true
 	})
 	return toBase64(str)
 }
 
-func (ctx *evalContext) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, bool) {
+func (e *programEvaluator) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (interface{}, bool) {
 	m := map[string]interface{}{}
 	keys := make([]string, len(v.AssetOrArchives))
 	i := 0
@@ -1739,7 +1806,7 @@ func (ctx *evalContext) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (in
 
 	for _, k := range keys {
 		v := v.AssetOrArchives[k]
-		assetOrArchive, ok := ctx.evaluateExpr(v)
+		assetOrArchive, ok := e.evaluateExpr(v)
 		if !ok {
 			overallOk = false
 		} else {
@@ -1754,18 +1821,18 @@ func (ctx *evalContext) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) (in
 	return pulumi.NewAssetArchive(m), true
 }
 
-func (ctx *evalContext) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, bool) {
-	stackRef, ok := ctx.stackRefs[v.StackName.Value]
+func (e *programEvaluator) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, bool) {
+	stackRef, ok := e.stackRefs[v.StackName.Value]
 	if !ok {
 		var err error
-		stackRef, err = pulumi.NewStackReference(ctx.ctx, v.StackName.Value, &pulumi.StackReferenceArgs{})
+		stackRef, err = pulumi.NewStackReference(e.pulumiCtx, v.StackName.Value, &pulumi.StackReferenceArgs{})
 		if err != nil {
-			return ctx.error(v.StackName, err.Error())
+			return e.error(v.StackName, err.Error())
 		}
-		ctx.stackRefs[v.StackName.Value] = stackRef
+		e.stackRefs[v.StackName.Value] = stackRef
 	}
 
-	property, ok := ctx.evaluateExpr(v.PropertyName)
+	property, ok := e.evaluateExpr(v.PropertyName)
 	if !ok {
 		return nil, false
 	}
@@ -1773,7 +1840,7 @@ func (ctx *evalContext) evaluateBuiltinStackReference(v *ast.StackReferenceExpr)
 	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(n interface{}) (string, error) {
 		s, ok := n.(string)
 		if !ok {
-			ctx.error(v.PropertyName,
+			e.error(v.PropertyName,
 				fmt.Sprintf("expected property name argument to Fn::StackReference to be a string, got %v", typeString(n)),
 			)
 		}
@@ -1783,42 +1850,42 @@ func (ctx *evalContext) evaluateBuiltinStackReference(v *ast.StackReferenceExpr)
 	return stackRef.GetOutput(propertyStringOutput), true
 }
 
-func (ctx *evalContext) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {
-	e, ok := ctx.evaluateExpr(s.Value)
+func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Value)
 	if !ok {
 		return nil, false
 	}
-	return pulumi.ToSecret(e), true
+	return pulumi.ToSecret(expr), true
 }
 
-func (ctx *evalContext) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
-	e, ok := ctx.evaluateExpr(s.Path)
+func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Path)
 	if !ok {
 		return nil, false
 	}
 
 	_, isConstant := s.Path.(*ast.StringExpr)
 
-	readFileF := ctx.lift(func(args ...interface{}) (interface{}, bool) {
+	readFileF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		path, ok := args[0].(string)
 		if !ok {
-			return ctx.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
+			return e.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
 		}
 
 		path = filepath.Clean(path)
 		isAbsolute := filepath.IsAbs(path)
 		path, err := filepath.EvalSymlinks(path) // Evaluate symlinks to ensure we don't escape the current project dir
 		if err != nil {
-			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 		path, err = filepath.Abs(path) // Compute the absolute path to use a prefix to check if we're relative
 		if err != nil {
-			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 		isSubdirectory := false
-		relPath, err := filepath.Rel(ctx.runner.cwd, path)
+		relPath, err := filepath.Rel(e.Runner.cwd, path)
 		if err != nil {
-			ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
 
 		if !strings.HasPrefix(relPath, "../") {
@@ -1847,15 +1914,15 @@ func (ctx *evalContext) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{
 		if isSubdirectory || (isConstant && isAbsolute) {
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
-				ctx.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
+				e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 			}
 			return string(data), true
 		}
 
-		return ctx.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a constant or contained in the project dir"))
+		return e.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a constant or contained in the project dir"))
 	})
 
-	return readFileF(e)
+	return readFileF(expr)
 }
 
 func hasOutputs(v interface{}) bool {

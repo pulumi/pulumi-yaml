@@ -490,10 +490,7 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 	}
 	summary := fmt.Sprintf("%s is not assignable from %s", displayType(to), displayType(from))
 	if result.IsInternal() {
-		ctx.addDiag(syntax.Warning(loc,
-			fmt.Sprintf("internal error: %s", summary),
-			result.String(),
-		))
+		ctx.addWarnDiag(loc, fmt.Sprintf("internal error: %s", summary), result.String())
 		return
 	}
 	for _, v := range result.IndependentErrors() {
@@ -505,15 +502,16 @@ func assertTypeAssignable(ctx *evalContext, loc *hcl.Range, from, to schema.Type
 		if summary := v.Summary(); summary != "" {
 			s = summary
 		}
-		ctx.addDiag(syntax.Error(r, s, v.String()))
+		ctx.addErrDiag(r, s, v.String())
 	}
 }
 
-func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
+func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
 	if err != nil {
+		ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("error resolving type of resource %v: %v", k, err), ""))
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
@@ -529,12 +527,12 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 	tc.registerResource(k, node.Value, hint)
 
 	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
-		ctx.addDiag(syntax.Error(node.Key.Syntax().Syntax().Range(),
+		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
 				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
 				"See https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
-		))
+		)
 	}
 
 	if existing, ok := tc.exprs[v.Get.Id]; ok && v.Get.Id != nil {
@@ -592,7 +590,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				}
 
 				subject := prop.Key.Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail))
+				ctx.addErrDiag(subject, summary, detail)
 			}
 		}
 	}
@@ -618,7 +616,7 @@ func (tc *typeCache) typeResource(r *runner, node resourceNode) bool {
 				}
 				summary, detail := fmtr.MessageWithDetail(key, key)
 				subject := prop.Key.Syntax().Range()
-				ctx.addDiag(syntax.Error(subject, summary, detail))
+				ctx.addErrDiag(subject, summary, detail)
 			}
 		}
 	}
@@ -690,9 +688,9 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label, propPre
 		existing, ok := tc.exprs[kvp.Value]
 		rng := kvp.Key.Syntax().Syntax().Range()
 		if !ok {
-			ctx.addDiag(syntax.Warning(rng,
+			ctx.addWarnDiag(rng,
 				fmt.Sprintf("internal error: untyped input for %s.%s", token, kvp.Key.Value),
-				""))
+				"")
 		} else {
 			p := &schema.Property{
 				Name: kvp.Key.Value,
@@ -766,7 +764,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		}
 		if hint.Outputs == nil || !validReturn {
 			summary, detail := fmtr.MessageWithDetail(t.Return.Value, t.Return.Value)
-			ctx.addDiag(syntax.Error(t.Return.Syntax().Syntax().Range(), summary, detail))
+			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(), summary, detail)
 		} else {
 			tc.exprs[t] = returnType
 		}
@@ -790,7 +788,7 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 	runningName := t.Property.RootName()
 	setError := func(summary, detail string) *schema.InvalidType {
 		diag := syntax.Error(t.Syntax().Syntax().Range(), summary, detail)
-		ctx.addDiag(diag)
+		ctx.addErrDiag(t.Syntax().Syntax().Range(), summary, detail)
 		typ := &schema.InvalidType{
 			Diagnostics: []*hcl.Diagnostic{diag.HCL()},
 		}
@@ -1012,13 +1010,13 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	return true
 }
 
-func (tc *typeCache) typeVariable(r *runner, node variableNode) bool {
+func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 	k, v := node.Key.Value, node.Value
 	tc.variableNames[k] = v
 	return true
 }
 
-func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
+func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	k, v := node.Key.Value, node.Value
 	var typ schema.Type = &schema.InvalidType{}
 	var optional bool
@@ -1041,7 +1039,7 @@ func (tc *typeCache) typeConfig(r *runner, node configNode) bool {
 	return true
 }
 
-func (tc *typeCache) typeOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	tc.outputs[node.Key.Value] = tc.exprs[node.Value]
 	return true
 }
@@ -1073,7 +1071,7 @@ func newTypeCache() *typeCache {
 	}
 }
 
-func TypeCheck(r *runner) (Typing, syntax.Diagnostics) {
+func TypeCheck(r *Runner) (Typing, syntax.Diagnostics) {
 	types := newTypeCache()
 
 	// Set roots
@@ -1089,10 +1087,10 @@ func TypeCheck(r *runner) (Typing, syntax.Diagnostics) {
 }
 
 type walker struct {
-	VisitConfig   func(r *runner, node configNode) bool
-	VisitVariable func(r *runner, node variableNode) bool
-	VisitOutput   func(r *runner, node ast.PropertyMapEntry) bool
-	VisitResource func(r *runner, node resourceNode) bool
+	VisitConfig   func(r *Runner, node configNode) bool
+	VisitVariable func(r *Runner, node variableNode) bool
+	VisitOutput   func(r *Runner, node ast.PropertyMapEntry) bool
+	VisitResource func(r *Runner, node resourceNode) bool
 	VisitExpr     func(*evalContext, ast.Expr) bool
 }
 
@@ -1135,7 +1133,7 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	return true
 }
 
-func (e walker) EvalConfig(r *runner, node configNode) bool {
+func (e walker) EvalConfig(r *Runner, node configNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -1155,7 +1153,7 @@ func (e walker) EvalConfig(r *runner, node configNode) bool {
 	}
 	return true
 }
-func (e walker) EvalVariable(r *runner, node variableNode) bool {
+func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -1172,7 +1170,7 @@ func (e walker) EvalVariable(r *runner, node variableNode) bool {
 	}
 	return true
 }
-func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
+func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {
@@ -1190,7 +1188,7 @@ func (e walker) EvalOutput(r *runner, node ast.PropertyMapEntry) bool {
 	}
 	return true
 }
-func (e walker) EvalResource(r *runner, node resourceNode) bool {
+func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
 		if !e.walk(ctx, node.Key) {

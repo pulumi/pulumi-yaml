@@ -282,6 +282,11 @@ func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) Con
 			require.False(t, diags.HasErrors(), diags.Error())
 			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.ReferenceLoader)
 			require.NoError(t, err, "Failed to eject program")
+			for k1 := range proj.AdditionalKeys {
+				for k2 := range codegen.ProjectKeysToOmit {
+					require.NotEqual(t, k1, k2)
+				}
+			}
 
 			tmpDir := t.TempDir()
 			err = generator(tmpDir, *proj, pclProgram)

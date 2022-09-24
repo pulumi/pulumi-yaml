@@ -35,7 +35,7 @@ resources:
     type: kubernetes:helm.sh/v3:Chart
 `
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testTemplateDiags(t, tmpl, func(r *evalContext) {})
+	diags := testTemplateDiags(t, tmpl, func(e *programEvaluator) {})
 	assert.True(t, diags.HasErrors())
 	var diagStrings []string
 	for _, v := range diags {

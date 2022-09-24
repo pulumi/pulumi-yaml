@@ -34,19 +34,23 @@ outputs:
 
 	mocks := &testMonitor{}
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, newMockPackageMap())
-		diags := runner.Evaluate()
+		runner := newRunner(template, newMockPackageMap())
+		diags := runner.Evaluate(ctx)
 		requireNoErrors(t, template, diags)
 		ectx := runner.newContext(nil)
-		cwdOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.cwd}"))
+		programEvaluator := programEvaluator{
+			evalContext: ectx,
+			pulumiCtx:   ctx,
+		}
+		cwdOutput, ok := programEvaluator.evaluateInterpolate(ast.MustInterpolate("${pulumi.cwd}"))
 		assert.True(t, ok)
 		assert.Equal(t, cwd, cwdOutput)
 
-		projectOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.project}"))
+		projectOutput, ok := programEvaluator.evaluateInterpolate(ast.MustInterpolate("${pulumi.project}"))
 		assert.True(t, ok)
 		assert.Equal(t, "projectFoo", projectOutput)
 
-		stackOutput, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${pulumi.stack}"))
+		stackOutput, ok := programEvaluator.evaluateInterpolate(ast.MustInterpolate("${pulumi.stack}"))
 		assert.True(t, ok)
 		assert.Equal(t, "stackDev", stackOutput)
 
@@ -82,7 +86,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -111,7 +115,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -145,7 +149,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -186,7 +190,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -217,7 +221,7 @@ outputs:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -250,7 +254,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
@@ -276,11 +280,11 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testVariableDiags(t, tmpl, func(r *runner) {})
+	diags := testVariableDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
 }
 
-func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*runner)) syntax.Diagnostics {
+func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
 	testInvokeCalls := 0
 
 	mocks := &testMonitor{
@@ -328,8 +332,8 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(ctx, template, newMockPackageMap())
-		err := runner.Evaluate()
+		runner := newRunner(template, newMockPackageMap())
+		err := runner.Evaluate(ctx)
 		if err != nil {
 			return err
 		}
@@ -338,13 +342,17 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		}
 
 		ectx := runner.newContext(nil)
-		v, ok := ectx.evaluateInterpolate(ast.MustInterpolate("${resFinal.out}"))
+		programEvaluator := programEvaluator{
+			evalContext: ectx,
+			pulumiCtx:   ctx,
+		}
+		v, ok := programEvaluator.evaluateInterpolate(ast.MustInterpolate("${resFinal.out}"))
 		assert.True(t, ok)
 		out := v.(pulumi.AnyOutput).ApplyT(func(x interface{}) (interface{}, error) {
 			assert.Equal(t, "tuo", x)
 			return nil, nil
 		})
-		runner.ctx.Export("out", out)
+		programEvaluator.pulumiCtx.Export("out", out)
 
 		return nil
 	}, pulumi.WithMocks("foo", "dev", mocks))

@@ -669,6 +669,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":
 		return wrapFn("ToBase64", g.expr(f.Args[0]))
+	case "fromBase64":
+		return wrapFn("FromBase64", g.expr(f.Args[0]))
 	case "toJSON":
 		return wrapFn("ToJSON", g.expr(f.Args[0]))
 	case "element":
