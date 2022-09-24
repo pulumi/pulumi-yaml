@@ -123,12 +123,7 @@ func (n *notAssignable) independentErrors() []*notAssignable {
 
 // Mark an error as a uninportant part of a chain.
 func (n *notAssignable) markTransitory() *notAssignable {
-	if n == nil {
-		return nil
-	}
-	c := *n
-	c.transitory = true
-	return &c
+	return n.setField(func() { n.transitory = true })
 }
 
 func (n *notAssignable) Summary() string {
@@ -173,43 +168,39 @@ func (n notAssignable) IsInternal() bool {
 	return false
 }
 
-func (n *notAssignable) Because(b ...*notAssignable) *notAssignable {
+func (n *notAssignable) setField(f func()) *notAssignable {
 	if n == nil {
 		return nil
 	}
-	c := *n
-	c.because = b
-	return &c
+	// We grab a copy of the old value `*n`. We want this to be unchanged at the end of
+	// the function.
+	old := *n
+	// `f` mutates `n`.
+	f()
+	// We grab the new value, reassign `n` to `old`, and return the `new`.
+	new := *n
+	*n = old
+	return &new
+}
+
+func (n *notAssignable) Because(b ...*notAssignable) *notAssignable {
+	return n.setField(func() { n.because = b })
 }
 
 func (n *notAssignable) Property(propName string) *notAssignable {
-	if n == nil {
-		return nil
-	}
-	c := *n
-	c.property = propName
-	return &c
+	return n.setField(func() { n.property = propName })
 }
 
 func (n *notAssignable) WithRange(rng *hcl.Range) *notAssignable {
-	if n == nil {
-		return nil
-	}
-	c := *n
-	c.location = rng
-	return &c
+	return n.setField(func() { n.location = rng })
 }
 
 func (n *notAssignable) WithReason(reason string, a ...interface{}) *notAssignable {
-	if n == nil {
-		return nil
-	}
-
-	c := *n
-	c.reason += fmt.Sprintf(reason, a...)
-	return &c
+	return n.setField(func() { n.reason += fmt.Sprintf(reason, a...) })
 }
 
+// The range that the error operates over. If `*notAssignable` does not have a range, it
+// returns the union of the range of its children.
 func (n *notAssignable) Range() *hcl.Range {
 	if n == nil {
 		return nil
@@ -678,7 +669,13 @@ func getNameFromObject(obj *schema.ObjectType) string {
 	return v.(string)
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, token, label, propPrefix string, entries []ast.PropertyMapEntry, props []*schema.Property) {
+// typePropertyEntries applies diagnostics to `ctx` if the it is not valid to assign `entries` to `props`.
+// `token` should be the type token of the resource/function/object that defined `props`.
+// `label` is the display name of the resource/function/object that defined `props`.
+// `propString` is the name of the type or property. It is pre-appended to property names during display.
+func (tc *typeCache) typePropertyEntries(
+	ctx *evalContext, token, label, propPrefix string, entries []ast.PropertyMapEntry, props []*schema.Property,
+) {
 	to := &schema.ObjectType{
 		Token:      token,
 		Properties: props,
