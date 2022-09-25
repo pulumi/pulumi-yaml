@@ -373,7 +373,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	tc.typePropertyEntries(ctx, k, fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.Entries, hint.Resource.InputProperties)
 
 	tc.registerResource(k, node.Value, hint)
 
@@ -390,9 +390,15 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		assertTypeAssignable(ctx, v.Get.Id.Syntax().Syntax().Range(), existing, schema.StringType)
 	}
 
-	statePropNames := []string{}
-	for _, prop := range hint.Resource.Properties {
-		statePropNames = append(statePropNames, prop.Name)
+	stateProps := make([]*schema.Property, len(hint.Resource.Properties))
+	statePropNames := make([]string, len(hint.Resource.Properties))
+	for i, v := range hint.Resource.Properties {
+		statePropNames[i] = v.Name
+		p := *v
+		if p.IsRequired() {
+			p.Type = &schema.OptionalType{ElementType: p.Type}
+		}
+		stateProps[i] = &p
 	}
 	fmtr = yamldiags.NonExistantFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
@@ -400,7 +406,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		MaxElements:         5,
 		FieldsAreProperties: true,
 	}
-	tc.typePropertyEntries(ctx, k, fmtr, v.Get.State.Entries, hint.Resource.Properties)
+	tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Get.State.Entries, stateProps)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -479,32 +485,33 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
-	propMap := map[string]*schema.Property{}
-	for _, p := range props {
-		propMap[p.Name] = p
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourceType string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
+	to := &schema.ObjectType{
+		Token:      resourceType,
+		Properties: props,
 	}
-	for _, kvp := range entries {
-		if typ, hasField := propMap[kvp.Key.Value]; !hasField {
-			summary, detail := fmtr.MessageWithDetail(kvp.Key.Value, fmt.Sprintf("Property %s", kvp.Key.Value))
-			subject := kvp.Key.Syntax().Syntax().Range()
-			ctx.addErrDiag(subject, summary, detail)
-		} else {
-			existing, ok := tc.exprs[kvp.Value]
-			rng := kvp.Key.Syntax().Syntax().Range()
-			if !ok {
-				ctx.addWarnDiag(rng,
-					fmt.Sprintf("internal error: untyped input for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("expected type %s", typ.Type))
-			} else if typ.Type == nil {
-				ctx.addWarnDiag(rng,
-					fmt.Sprintf("internal error: unable to discover expected type for %s.%s", resourceName, kvp.Key.Value),
-					fmt.Sprintf("got type %s", existing))
-			} else {
-				assertTypeAssignable(ctx, rng, existing, typ.Type)
+	fromProps := make([]*schema.Property, 0, len(entries))
+	for _, entry := range entries {
+		typ, ok := tc.exprs[entry.Value]
+		if !ok {
+			var expectedType string
+			if p, ok := to.Property(entry.Key.GetValue()); ok && p.Type != nil {
+				expectedType = fmt.Sprintf("expected type %s", displayType(p.Type))
 			}
+			ctx.addWarnDiag(entry.Key.Syntax().Syntax().Range(),
+				fmt.Sprintf("internal error: unable to discover type of %s.%s", resourceName, entry.Key.Value),
+				expectedType)
+			continue
 		}
+		fromProps = append(fromProps, &schema.Property{
+			Name: entry.Key.GetValue(),
+			Type: typ,
+		})
 	}
+	from := &schema.ObjectType{
+		Properties: fromProps,
+	}
+	assertTypeAssignable(ctx, nil, from, to)
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
