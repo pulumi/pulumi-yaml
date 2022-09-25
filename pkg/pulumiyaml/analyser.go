@@ -318,6 +318,13 @@ func isAssignable(from, to schema.Type) *notAssignable {
 				continue
 			}
 		}
+		for _, prop := range from.Properties {
+			if _, ok := to.Property(prop.Name); !ok {
+				failures = append(failures, &notAssignable{
+					reason: fmt.Sprintf("Property '%s' does not exist on '%s'", prop.Name, dispType(to)),
+				})
+			}
+		}
 		return okIf(len(failures) == 0).Because(failures...)
 
 	case *schema.TokenType:
