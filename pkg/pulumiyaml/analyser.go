@@ -83,6 +83,22 @@ type notAssignable struct {
 	internal bool
 	property string
 	errRange *hcl.Range
+	summary  string
+}
+
+func (n *notAssignable) Summary() string {
+	if n == nil {
+		return ""
+	}
+	if n.summary != "" {
+		return n.summary
+	}
+	if len(n.because) == 1 {
+		// We don't have a way to display multiple summaries, so hoist the value iff there
+		// is only one reason.
+		return n.because[0].Summary()
+	}
+	return ""
 }
 
 func (n notAssignable) String() string {
@@ -127,12 +143,10 @@ func (n *notAssignable) Range() *hcl.Range {
 	if n.errRange != nil {
 		return n.errRange
 	}
-	for _, sub := range n.because {
-		if r := sub.Range(); r != nil {
-			// We don't have a mechanism to report multiple ranges yet, so we just report
-			// the first one we encounter.
-			return r
-		}
+	if len(n.because) == 1 {
+		// We don't have a mechanism to report multiple ranges yet, so we just report
+		// the first one we encounter.
+		return n.because[0].Range()
 	}
 	return nil
 }
@@ -346,7 +360,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 			return fail
 		}
 		var objMap map[string]ast.ObjectProperty
-		propAssignable := func(prop string, from, to schema.Type) *notAssignable {
+		primeMap := func() {
 			if obj, ok := fromExpr.(*ast.ObjectExpr); ok {
 				if objMap == nil {
 					objMap = make(map[string]ast.ObjectProperty)
@@ -356,6 +370,11 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 						}
 					}
 				}
+			}
+		}
+		propAssignable := func(prop string, from, to schema.Type) *notAssignable {
+			primeMap()
+			if objMap != nil {
 				if kv, ok := objMap[prop]; ok {
 					return tc.isAssignable(kv.Value, to).WithRange(kv.Value.Syntax().Syntax().Range())
 				}
@@ -381,6 +400,36 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 			if notAssignable != nil {
 				failures = append(failures, notAssignable)
 				continue
+			}
+		}
+		for _, prop := range from.Properties {
+			if _, ok := to.Property(prop.Name); !ok {
+				fields := []string{}
+				for _, p := range to.Properties {
+					fields = append(fields, p.Name)
+				}
+				fmtr := yamldiags.NonExistantFieldFormatter{
+					ParentLabel:         dispType(to),
+					MaxElements:         5,
+					Fields:              fields,
+					FieldsAreProperties: true,
+				}
+				primeMap()
+				loc := fromExpr.Syntax().Syntax().Range()
+				if objMap != nil {
+					if v, ok := objMap[prop.Name]; ok {
+						r := v.Key.Syntax().Syntax().Range()
+						if r != nil {
+							loc = r
+						}
+					}
+				}
+				summary, detail := fmtr.MessageWithDetail(prop.Name, fmt.Sprintf("Property %s", prop.Name))
+				f := (&notAssignable{
+					reason:  detail,
+					summary: summary,
+				}).WithRange(loc)
+				failures = append(failures, f)
 			}
 		}
 		return okIf(len(failures) == 0).Because(failures...)
@@ -425,6 +474,9 @@ func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to sc
 	if result.IsInternal() {
 		ctx.addWarnDiag(rng, fmt.Sprintf("internal error: %s", summary), result.String())
 		return
+	}
+	if s := result.Summary(); s != "" {
+		summary = s
 	}
 	ctx.addErrDiag(rng, summary, result.String())
 }
