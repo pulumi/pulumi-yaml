@@ -1,6 +1,8 @@
 resources:
   iamForLambda:
     type: aws:iam:Role
+    properties:
+      assumeRolePolicy: canBeAString
   testLambda:
     type: aws:lambda:Function
     properties:

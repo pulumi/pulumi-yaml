@@ -2,6 +2,7 @@ resources:
   frontDoor:
     type: azure-native:network:FrontDoor
     properties:
+      resourceGroupName: someGroupName
       routingRules:
         - routeConfiguration:
             odataType: '#Microsoft.Azure.FrontDoor.Models.FrontdoorForwardingConfiguration'
@@ -10,6 +11,7 @@ resources:
   endpoint:
     type: azure-native:cdn:Endpoint
     properties:
+      origins: []
       deliveryPolicy:
         rules:
           - actions:
