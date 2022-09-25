@@ -65,3 +65,6 @@
 
 - Fix generated `Pulumi.yaml` on convert
   [#339](https://github.com/pulumi/pulumi-yaml/pull/339)
+
+- Enforce top level required properties
+  [#350](https://github.com/pulumi/pulumi-yaml/pull/350)
