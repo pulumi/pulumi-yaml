@@ -193,7 +193,7 @@ func (n *notAssignable) Property(propName string) *notAssignable {
 
 func (n *notAssignable) WithRange(rng *hcl.Range) *notAssignable {
 	return n.setField(func() {
-		if rng == nil {
+		if rng == nil || n.location != nil {
 			return
 		}
 		n.location = rng
@@ -387,6 +387,21 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 			return fail
 		}
 		fail = fail.markTransitory()
+		// We have an expr of type List<T>. This could be an interpolation, or it could be
+		// an list literal. If it is a list literal, we should point to the specific
+		// problematic elements. Otherwise we will point to the whole array expression.
+		if list, ok := fromExpr.(*ast.ListExpr); ok {
+			failures := []*notAssignable{}
+			for i, l := range list.Elements {
+				notAssignable := tc.isAssignable(l, to.ElementType)
+				if notAssignable != nil {
+					failures = append(failures,
+						notAssignable.Property(fmt.Sprintf("%d", i)).
+							WithRange(l.Syntax().Syntax().Range()))
+				}
+			}
+			return okIf(len(failures) == 0).Because(failures...)
+		}
 		return okIfAssignable(isAssignable(from.ElementType, to.ElementType))
 	case *schema.MapType:
 		switch from := from.(type) {
