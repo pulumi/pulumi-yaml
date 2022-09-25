@@ -683,24 +683,6 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	return true
 }
 
-func storeRangeInProperty(prop *schema.Property, rng *hcl.Range) {
-	if prop.Language == nil {
-		prop.Language = map[string]interface{}{}
-	}
-	prop.Language["pulumi yaml range"] = rng
-}
-
-func getRangeFromProperty(prop *schema.Property) *hcl.Range {
-	if prop.Language == nil {
-		return nil
-	}
-	v, ok := prop.Language["pulumi yaml range"]
-	if !ok {
-		return nil
-	}
-	return v.(*hcl.Range)
-}
-
 func storeNameInProperty(prop *schema.Property, name string) {
 	if prop.Language == nil {
 		prop.Language = map[string]interface{}{}
@@ -763,7 +745,6 @@ func (tc *typeCache) typePropertyEntries(
 				Name: kvp.Key.Value,
 				Type: existing,
 			}
-			storeRangeInProperty(p, rng)
 			storeNameInProperty(p, propPrefix+" "+p.Name)
 			entryProps = append(entryProps, p)
 		}
