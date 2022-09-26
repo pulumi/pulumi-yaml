@@ -37,7 +37,7 @@
 - Set highest package version and pluginDownloadURL on all invokes
   [#334](https://github.com/pulumi/pulumi-yaml/pull/334)
 
-- Enable transformation & type checking passes on `pulumi convert` 
+- Enable transformation & type checking passes on `pulumi convert`
   [#320](https://github.com/pulumi/pulumi-yaml/pull/320)
 
 ### Bug Fixes
@@ -68,3 +68,6 @@
 
 - Enforce top level required properties
   [#350](https://github.com/pulumi/pulumi-yaml/pull/350)
+
+- Don't panic when the typechecker rejects
+  [#346](https://github.com/pulumi/pulumi-yaml/pull/346)
