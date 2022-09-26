@@ -73,6 +73,7 @@ func TestExampleStackreference(t *testing.T) {
 	testWrapper(t, exampleDir("stackreference-consumer"),
 		NoParallel,
 		RequireLiveRun,
+		RequireService,
 		PrepareProject{func(stackName string, project *engine.Projinfo) error {
 			dir, _, err := project.GetPwdMain()
 			if err != nil {
@@ -133,6 +134,7 @@ func stackReferenceSourceProject(t *testing.T) string {
 		PrepareProject:   prepareYamlProject,
 		Quick:            true,
 		DestroyOnCleanup: true,
+		RequireService:   true,
 	})
 
 	return stackName
