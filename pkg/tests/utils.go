@@ -50,6 +50,14 @@ func (o requireLiveRun) apply(options *testOptions) {
 	options.programTestOptions.ExpectRefreshChanges = !dryrun
 }
 
+type requireService struct{}
+
+var RequireService = requireService{}
+
+func (o requireService) apply(options *testOptions) {
+	options.programTestOptions.RequireService = true
+}
+
 type noParallel struct{}
 
 var NoParallel = noParallel{}
