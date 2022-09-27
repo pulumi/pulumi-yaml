@@ -1,6 +1,4 @@
-resource iamForLambda "aws:iam:Role" {
-    assumeRolePolicy = "canBeAString"
-}
+resource iamForLambda "aws:iam:Role" {}
 
 resource testLambda "aws:lambda:Function" {
     code = fileArchive("lambda_function_payload.zip")

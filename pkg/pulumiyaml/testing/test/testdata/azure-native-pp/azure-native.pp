@@ -1,5 +1,4 @@
 resource frontDoor "azure-native:network:FrontDoor" {
-    resourceGroupName = "someGroupName"
     routingRules = [{
         routeConfiguration = {
             odataType = "#Microsoft.Azure.FrontDoor.Models.FrontdoorForwardingConfiguration"
@@ -11,7 +10,6 @@ resource frontDoor "azure-native:network:FrontDoor" {
 }
 
 resource endpoint "azure-native:cdn:Endpoint" {
-    origins = [ ]
     deliveryPolicy = {
         rules = [{
             actions = [
