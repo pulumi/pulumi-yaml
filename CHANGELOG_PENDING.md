@@ -10,3 +10,6 @@
 
 - Don't panic when the typechecker rejects
   [#346](https://github.com/pulumi/pulumi-yaml/pull/346)
+
+- Allow interpolations for `AssetOrArchive` function values
+  [#341](https://github.com/pulumi/pulumi-yaml/pull/341)

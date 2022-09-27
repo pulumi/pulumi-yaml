@@ -307,6 +307,9 @@ func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	r, diags, err := PrepareTemplate(t, loader)
+	if diags.HasErrors() {
+		return diags
+	}
 	if err != nil {
 		return err
 	}
@@ -1255,15 +1258,15 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.FromBase64Expr:
 		return e.evaluateBuiltinFromBase64(x)
 	case *ast.FileAssetExpr:
-		return pulumi.NewFileAsset(x.Source.Value), true
+		return e.evaluateInterpolatedBuiltinAssetArchive(x, x.Source)
 	case *ast.StringAssetExpr:
-		return pulumi.NewStringAsset(x.Source.Value), true
+		return e.evaluateInterpolatedBuiltinAssetArchive(x, x.Source)
 	case *ast.RemoteAssetExpr:
-		return pulumi.NewRemoteAsset(x.Source.Value), true
+		return e.evaluateInterpolatedBuiltinAssetArchive(x, x.Source)
 	case *ast.FileArchiveExpr:
-		return pulumi.NewFileArchive(x.Source.Value), true
+		return e.evaluateInterpolatedBuiltinAssetArchive(x, x.Source)
 	case *ast.RemoteArchiveExpr:
-		return pulumi.NewRemoteArchive(x.Source.Value), true
+		return e.evaluateInterpolatedBuiltinAssetArchive(x, x.Source)
 	case *ast.AssetArchiveExpr:
 		return e.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
@@ -1861,6 +1864,105 @@ func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}
 	return pulumi.ToSecret(expr), true
 }
 
+func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr) (interface{}, bool) {
+	_, isConstant := s.(*ast.StringExpr)
+	v, b := e.evaluateExpr(s)
+	if !b {
+		return nil, false
+	}
+
+	createAssetArchiveF := e.lift(func(args ...interface{}) (interface{}, bool) {
+		value, ok := args[0].(string)
+		if !ok {
+			return e.error(s, fmt.Sprintf("Argument to Fn::* must be a string, got %v", reflect.TypeOf(args[0])))
+		}
+
+		switch x.(type) {
+		case *ast.StringAssetExpr:
+			return pulumi.NewStringAsset(value), true
+		case *ast.FileArchiveExpr:
+			path, err := e.sanitizePath(value, isConstant)
+			if err != nil {
+				return e.error(s, err.Error())
+			}
+			return pulumi.NewFileArchive(path), true
+		case *ast.FileAssetExpr:
+			path, err := e.sanitizePath(value, isConstant)
+			if err != nil {
+				return e.error(s, err.Error())
+			}
+			return pulumi.NewFileAsset(path), true
+		case *ast.RemoteArchiveExpr:
+			if !isConstant {
+				return e.error(s, "Argument to Fn::RemoteArchiveExpr must be a constantr")
+			}
+			return pulumi.NewRemoteArchive(value), true
+		case *ast.RemoteAssetExpr:
+			if !isConstant {
+				return e.error(s, "Argument to Fn::RemoteAssetExpr must be a constant")
+			}
+			return pulumi.NewRemoteAsset(value), true
+
+		}
+		return e.error(s, "unhandled expression")
+	})
+
+	return createAssetArchiveF(v)
+}
+
+func (e *programEvaluator) sanitizePath(path string, isConstant bool) (string, error) {
+	path = filepath.Clean(path)
+	isAbsolute := filepath.IsAbs(path)
+	var err error
+	if !e.pulumiCtx.DryRun() {
+		path, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
+		}
+	}
+
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
+	}
+	isSubdirectory := false
+	relPath, err := filepath.Rel(e.Runner.cwd, path)
+	if err != nil {
+		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
+	}
+
+	if !strings.HasPrefix(relPath, "../") {
+		isSubdirectory = true
+	}
+
+	isSafe := isSubdirectory || (isConstant && isAbsolute)
+	if !isSafe {
+		return "", fmt.Errorf("Argument must be a constant or contained in the project dir")
+	}
+	// Evaluate symlinks to ensure we don't escape the current project dir
+	// Compute the absolute path to use a prefix to check if we're relative
+	// Security, defense in depth: prevent path traversal exploits from leaking any information
+	// (secrets, tokens, ...) from outside the project directory.
+	//
+	// Allow subdirectory paths, these are valid constructions of the form:
+	//
+	//  * "./README.md"
+	//  * "${pulumi.cwd}/README.md"
+	//  * ... etc
+	//
+	// Allow constant paths that are absolute, therefore reviewable:
+	//
+	//  * /etc/lsb-release
+	//  * /usr/share/nginx/html
+	//  * /var/run/secrets/kubernetes.io/serviceaccount/token
+	//
+	// Forbidding parent directory path traversals (Path Traversal vulnerability):
+	//
+	//  * ../../etc/shadow
+	//  * ../../.ssh/id_rsa.pub
+	return path, nil
+}
+
 func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
 	expr, ok := e.evaluateExpr(s.Path)
 	if !ok {
@@ -1874,55 +1976,15 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 		if !ok {
 			return e.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
 		}
-
-		path = filepath.Clean(path)
-		isAbsolute := filepath.IsAbs(path)
-		path, err := filepath.EvalSymlinks(path) // Evaluate symlinks to ensure we don't escape the current project dir
+		path, err := e.sanitizePath(path, isConstant)
+		if err != nil {
+			return e.error(s, err.Error())
+		}
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
 		}
-		path, err = filepath.Abs(path) // Compute the absolute path to use a prefix to check if we're relative
-		if err != nil {
-			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
-		}
-		isSubdirectory := false
-		relPath, err := filepath.Rel(e.Runner.cwd, path)
-		if err != nil {
-			e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
-		}
-
-		if !strings.HasPrefix(relPath, "../") {
-			isSubdirectory = true
-		}
-
-		// Security, defense in depth: prevent path traversal exploits from leaking any information
-		// (secrets, tokens, ...) from outside the project directory.
-		//
-		// Allow subdirectory paths, these are valid constructions of the form:
-		//
-		//  * "./README.md"
-		//  * "${pulumi.cwd}/README.md"
-		//  * ... etc
-		//
-		// Allow constant paths that are absolute, therefore reviewable:
-		//
-		//  * /etc/lsb-release
-		//  * /usr/share/nginx/html
-		//  * /var/run/secrets/kubernetes.io/serviceaccount/token
-		//
-		// Forbidding parent directory path traversals (Path Traversal vulnerability):
-		//
-		//  * ../../etc/shadow
-		//  * ../../.ssh/id_rsa.pub
-		if isSubdirectory || (isConstant && isAbsolute) {
-			data, err := ioutil.ReadFile(path)
-			if err != nil {
-				e.error(s.Path, fmt.Sprintf("Error reading file at path %v: %v", path, err))
-			}
-			return string(data), true
-		}
-
-		return e.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a constant or contained in the project dir"))
+		return string(data), true
 	})
 
 	return readFileF(expr)

@@ -352,12 +352,12 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	}
 }
 
-var assetOrArchiveFunctions = map[string]func(node syntax.Node, k, v *StringExpr) Expr{
-	"Fn::StringAsset":   func(node syntax.Node, k, v *StringExpr) Expr { return StringAssetSyntax(node, k, v) },
-	"Fn::FileAsset":     func(node syntax.Node, k, v *StringExpr) Expr { return FileAssetSyntax(node, k, v) },
-	"Fn::RemoteAsset":   func(node syntax.Node, k, v *StringExpr) Expr { return RemoteAssetSyntax(node, k, v) },
-	"Fn::FileArchive":   func(node syntax.Node, k, v *StringExpr) Expr { return FileArchiveSyntax(node, k, v) },
-	"Fn::RemoteArchive": func(node syntax.Node, k, v *StringExpr) Expr { return RemoteArchiveSyntax(node, k, v) },
+var assetOrArchiveFunctions = map[string]func(node syntax.Node, k *StringExpr, v Expr) Expr{
+	"Fn::StringAsset":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return StringAssetSyntax(node, k, v) },
+	"Fn::FileAsset":     func(node syntax.Node, k *StringExpr, v Expr) Expr { return FileAssetSyntax(node, k, v) },
+	"Fn::RemoteAsset":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return RemoteAssetSyntax(node, k, v) },
+	"Fn::FileArchive":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return FileArchiveSyntax(node, k, v) },
+	"Fn::RemoteArchive": func(node syntax.Node, k *StringExpr, v Expr) Expr { return RemoteArchiveSyntax(node, k, v) },
 }
 
 // Attempts to parse an asset or archive. These are not normal `Fn::*` objects
@@ -373,13 +373,7 @@ func tryParseAssetOrArchive(k, v Expr) (Expr, syntax.Diagnostics, bool) {
 	}
 
 	if fn, ok := assetOrArchiveFunctions[fnName.Value]; ok {
-		s, ok := v.(*StringExpr)
-		if !ok {
-			diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("The argument to %s must be a string literal", fnName.Value), ""))
-			return nil, diags, true
-		}
-		return fn(k.Syntax(), fnName, s), diags, true
-
+		return fn(k.Syntax(), fnName, v), diags, true
 	}
 
 	// Not a asset or archive
@@ -586,12 +580,12 @@ type AssetOrArchiveExpr interface {
 
 type StringAssetExpr struct {
 	builtinNode
-	Source *StringExpr
+	Source Expr
 }
 
 func (*StringAssetExpr) isAssetOrArchive() {}
 
-func StringAssetSyntax(node syntax.Node, name, source *StringExpr) *StringAssetExpr {
+func StringAssetSyntax(node syntax.Node, name *StringExpr, source Expr) *StringAssetExpr {
 	return &StringAssetExpr{
 		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
 		Source:      source,
@@ -600,12 +594,12 @@ func StringAssetSyntax(node syntax.Node, name, source *StringExpr) *StringAssetE
 
 type FileAssetExpr struct {
 	builtinNode
-	Source *StringExpr
+	Source Expr
 }
 
 func (*FileAssetExpr) isAssetOrArchive() {}
 
-func FileAssetSyntax(node syntax.Node, name, source *StringExpr) *FileAssetExpr {
+func FileAssetSyntax(node syntax.Node, name *StringExpr, source Expr) *FileAssetExpr {
 	return &FileAssetExpr{
 		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
 		Source:      source,
@@ -614,12 +608,12 @@ func FileAssetSyntax(node syntax.Node, name, source *StringExpr) *FileAssetExpr 
 
 type RemoteAssetExpr struct {
 	builtinNode
-	Source *StringExpr
+	Source Expr
 }
 
 func (*RemoteAssetExpr) isAssetOrArchive() {}
 
-func RemoteAssetSyntax(node syntax.Node, name, source *StringExpr) *RemoteAssetExpr {
+func RemoteAssetSyntax(node syntax.Node, name *StringExpr, source Expr) *RemoteAssetExpr {
 	return &RemoteAssetExpr{
 		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
 		Source:      source,
@@ -628,12 +622,12 @@ func RemoteAssetSyntax(node syntax.Node, name, source *StringExpr) *RemoteAssetE
 
 type FileArchiveExpr struct {
 	builtinNode
-	Source *StringExpr
+	Source Expr
 }
 
 func (*FileArchiveExpr) isAssetOrArchive() {}
 
-func FileArchiveSyntax(node syntax.Node, name, source *StringExpr) *FileArchiveExpr {
+func FileArchiveSyntax(node syntax.Node, name *StringExpr, source Expr) *FileArchiveExpr {
 	return &FileArchiveExpr{
 		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
 		Source:      source,
@@ -642,12 +636,12 @@ func FileArchiveSyntax(node syntax.Node, name, source *StringExpr) *FileArchiveE
 
 type RemoteArchiveExpr struct {
 	builtinNode
-	Source *StringExpr
+	Source Expr
 }
 
 func (*RemoteArchiveExpr) isAssetOrArchive() {}
 
-func RemoteArchiveSyntax(node syntax.Node, name, source *StringExpr) *RemoteArchiveExpr {
+func RemoteArchiveSyntax(node syntax.Node, name *StringExpr, source Expr) *RemoteArchiveExpr {
 	return &RemoteArchiveExpr{
 		builtinNode: builtinNode{exprNode: expr(node), name: name, args: source},
 		Source:      source,
