@@ -1865,11 +1865,11 @@ func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}
 }
 
 func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr) (interface{}, bool) {
+	_, isConstant := s.(*ast.StringExpr)
 	v, b := e.evaluateExpr(s)
 	if !b {
 		return nil, false
 	}
-	_, isConstant := v.(*ast.StringExpr)
 
 	createAssetArchiveF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		value, ok := args[0].(string)
