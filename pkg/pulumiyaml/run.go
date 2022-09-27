@@ -1909,19 +1909,11 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 
 	return createAssetArchiveF(v)
 }
-<<<<<<< Updated upstream
-// sanitizePath checks that `path` exists and points to either a file within `./` or is constant and absolute. This provides security when running Pulumi YAML programs.
-func (e *programEvaluator) sanitizePath(value string, isConstant bool) (string, error) {
-	value = filepath.Clean(value)
-	isAbsolute := filepath.IsAbs(value)
-	value, err := filepath.EvalSymlinks(value)
-=======
 
 func (e *programEvaluator) sanitizePath(path string, isConstant bool) (string, error) {
 	path = filepath.Clean(path)
 	isAbsolute := filepath.IsAbs(path)
 	path, err := filepath.EvalSymlinks(path)
->>>>>>> Stashed changes
 	if err != nil {
 		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
 	}
