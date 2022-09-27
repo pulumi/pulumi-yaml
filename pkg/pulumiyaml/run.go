@@ -1913,10 +1913,14 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 func (e *programEvaluator) sanitizePath(path string, isConstant bool) (string, error) {
 	path = filepath.Clean(path)
 	isAbsolute := filepath.IsAbs(path)
-	path, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
+	var err error
+	if !e.pulumiCtx.DryRun() {
+		path, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
+		}
 	}
+
 	path, err = filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
