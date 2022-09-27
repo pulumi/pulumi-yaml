@@ -1874,7 +1874,7 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 	createAssetArchiveF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		value, ok := args[0].(string)
 		if !ok {
-			return e.error(s, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
+			return e.error(s, fmt.Sprintf("Argument to Fn::* must be a string, got %v", reflect.TypeOf(args[0])))
 		}
 
 		switch x.(type) {
@@ -1909,22 +1909,30 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 
 	return createAssetArchiveF(v)
 }
+<<<<<<< Updated upstream
 // sanitizePath checks that `path` exists and points to either a file within `./` or is constant and absolute. This provides security when running Pulumi YAML programs.
 func (e *programEvaluator) sanitizePath(value string, isConstant bool) (string, error) {
 	value = filepath.Clean(value)
 	isAbsolute := filepath.IsAbs(value)
 	value, err := filepath.EvalSymlinks(value)
+=======
+
+func (e *programEvaluator) sanitizePath(path string, isConstant bool) (string, error) {
+	path = filepath.Clean(path)
+	isAbsolute := filepath.IsAbs(path)
+	path, err := filepath.EvalSymlinks(path)
+>>>>>>> Stashed changes
 	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", value, err)
+		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
 	}
-	value, err = filepath.Abs(value)
+	path, err = filepath.Abs(path)
 	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", value, err)
+		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
 	}
 	isSubdirectory := false
-	relPath, err := filepath.Rel(e.Runner.cwd, value)
+	relPath, err := filepath.Rel(e.Runner.cwd, path)
 	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", value, err)
+		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
 	}
 
 	if !strings.HasPrefix(relPath, "../") {
@@ -1956,7 +1964,7 @@ func (e *programEvaluator) sanitizePath(value string, isConstant bool) (string, 
 	//
 	//  * ../../etc/shadow
 	//  * ../../.ssh/id_rsa.pub
-	return value, nil
+	return path, nil
 }
 
 func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {

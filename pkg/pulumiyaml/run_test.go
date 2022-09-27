@@ -1577,7 +1577,7 @@ outputs:
 	}
 	assert.ElementsMatch(t, diagStrings,
 		[]string{
-			"<stdin>:5:19: Argument to Fn::ReadFile must be a constant or contained in the project dir",
+			"<stdin>:5:5: Argument must be a constant or contained in the project dir",
 		},
 	)
 }
