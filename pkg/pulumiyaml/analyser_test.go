@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -161,7 +162,13 @@ func TestTypeError(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			result := isAssignable(c.from, c.to)
+			standin := ast.StringSyntax(syntax.String("standin"))
+			tc := typeCache{
+				exprs: map[ast.Expr]schema.Type{
+					standin: c.from,
+				},
+			}
+			result := tc.isAssignable(standin, c.to)
 			if c.message == "" {
 				assert.Nil(t, result)
 				if t.Failed() {
