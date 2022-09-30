@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -456,11 +457,17 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 // If a type cast fails, it means that the schema is invalid. In that case an internal
 // error is returned.
 func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
+	var errRange *hcl.Range
+	if node := from.Syntax(); node != nil {
+		if syntax := node.Syntax(); syntax != nil {
+			errRange = syntax.Range()
+		}
+	}
 	convertError := func(expectedType string) *notAssignable {
 		return &notAssignable{
 			internal: true,
 			reason:   fmt.Sprintf("schema enum value was type %T but a %s was expected", to, expectedType),
-			errRange: from.Syntax().Syntax().Range(),
+			errRange: errRange,
 		}
 	}
 	for _, to := range to {
@@ -489,20 +496,34 @@ func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
 	var valueList []string
 	for _, value := range to {
 
+		// We want to display just the value in 2 conditions:
+		// 1. We have a string based enum, and the name matches the value.
+		// 2. When the name is empty.
+
 		// This cast is safe because we performed the same cast in the above for loop. If
 		// the cast failed then we would have already returned with a
 		// `convertError(string)`.
-		if _, ok := from.(*ast.StringExpr); ok && value.Name == value.Value.(string) {
-			valueList = append(valueList, fmt.Sprintf("%q", value.Value))
-			continue
+		var s string
+		switch v := value.Value.(type) {
+		case string:
+			s = `"` + v + `"`
+		case float64:
+			s = strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			panic("If we have a non-conformant value we should have panicked in the first for loop.")
 		}
-		valueList = append(valueList, fmt.Sprintf("%s (%q)", value.Name, value.Value))
+		// Add the the value to the list of possible values
+		if value.Name == "" || value.Name == s {
+			valueList = append(valueList, s)
+		} else {
+			valueList = append(valueList, fmt.Sprintf("%s (%s)", value.Name, s))
+		}
 	}
 	allowed := fmt.Sprintf("Allowed values are %s", strings.Join(valueList, ", "))
 
 	return &notAssignable{
 		reason:   allowed,
-		errRange: from.Syntax().Syntax().Range(),
+		errRange: errRange,
 	}
 }
 
