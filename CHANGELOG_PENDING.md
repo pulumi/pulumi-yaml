@@ -13,3 +13,7 @@
 
 - Allow interpolations for `AssetOrArchive` function values
   [#341](https://github.com/pulumi/pulumi-yaml/pull/341)
+
+- Clarify the lifetimes when calling `codegen.Eject`. This is a breaking change to the
+  `codegen.Eject` API.
+  [#358](https://github.com/pulumi/pulumi-yaml/pull/358)
