@@ -21,10 +21,19 @@ var ProjectKeysToOmit = []string{"configuration", "resources", "outputs", "varia
 
 // Eject on a YAML program directory returns a Pulumi Project and a YAML program which has been
 // parsed and converted to the intermediate PCL language
-//
-// If no loader is provided (nil argument), a new plugin host will be spawned to obtain resource
-// provider schemas.
 func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.Program, error) {
+
+	// `*pcl.Program`'s maintains an internal reference to the loader that was used during
+	// its creation. This means the lifetime of the returned program is tied to the
+	// lifetime of the loader passed to EjectProgram and ultimately to the host that
+	// created that loader.
+	//
+	// To avoid panics (see https://github.com/pulumi/pulumi/issues/10875), we make it the
+	// caller's responsibility to cleanup the loader used. This prevents us from providing
+	// a default loader, since there would be no way to clean it up correctly.
+	if loader == nil {
+		panic("must provide a non-nil loader")
+	}
 	proj, template, diags, err := LoadTemplate(dir)
 	if err != nil {
 		return nil, nil, err
@@ -44,15 +53,6 @@ func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.
 		if err != nil {
 			return nil, nil, err
 		}
-	}
-
-	if loader == nil {
-		host, err := newPluginHost()
-		if err != nil {
-			return nil, nil, err
-		}
-		loader = schema.NewPluginLoader(host)
-		defer host.Close()
 	}
 
 	program, pdiags, err := EjectProgram(template, loader)
