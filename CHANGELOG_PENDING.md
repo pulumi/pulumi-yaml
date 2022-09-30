@@ -1,5 +1,8 @@
 ### Improvements
 
+- Ensure that constant values passed to enums are valid.
+  [#357](https://github.com/pulumi/pulumi-yaml/pull/357)
+
 ### Bug Fixes
 
 - Fix generated `Pulumi.yaml` on convert
