@@ -349,10 +349,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		if notAssignable != nil {
 			return fail
 		}
-		// TODO: check that known enum values are type checked against valid
-		// values e.g. string "Foo" should not be assignable to
-		// type Enum { Type: string, Elements: ["fizz", "buzz"] }
-		return okIf(true)
+		return okIfAssignable(hasValidEnumValue(fromExpr, to.Elements))
 	case *schema.ObjectType:
 		// We implement structural typing for objects.
 		from, ok := from.(*schema.ObjectType)
@@ -445,6 +442,67 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		// This means we are missing a type, not that the user has an invalid
 		// program.
 		return &notAssignable{reason: fmt.Sprintf("Unknown type: %[1]s (%[1]T)", to), internal: true}
+	}
+}
+
+// hasValidEnumValue checks that `from` is a member of `to.map(.Value)`. This check only
+// applies to constant types. All other types are let through error free. It is intended
+// that check takes place after a traditional type check on the underlying enum type.
+//
+// Currently, the only ast.Expr types that support enum member checks are
+// - ast.StringExpr
+// - ast.NumberExpr
+//
+// If a type cast fails, it means that the schema is invalid. In that case an internal
+// error is returned.
+func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
+	convertError := func(expectedType string) *notAssignable {
+		return &notAssignable{
+			internal: true,
+			reason:   fmt.Sprintf("schema enum value was type %T but a %s was expected", to, expectedType),
+			errRange: from.Syntax().Syntax().Range(),
+		}
+	}
+	for _, to := range to {
+		switch from := from.(type) {
+		case *ast.StringExpr:
+			if value, ok := to.Value.(string); ok {
+				if from.GetValue() == value {
+					return nil
+				}
+			} else {
+				return convertError("string")
+			}
+		case *ast.NumberExpr:
+			if to, ok := to.Value.(float64); ok {
+				if from.Value == to {
+					return nil
+				}
+			} else {
+				return convertError("float64")
+			}
+		default:
+			return nil
+		}
+	}
+	// We didn't find the value we expected. We should return an error.
+	var valueList []string
+	for _, value := range to {
+
+		// This cast is safe because we performed the same cast in the above for loop. If
+		// the cast failed then we would have already returned with a
+		// `convertError(string)`.
+		if _, ok := from.(*ast.StringExpr); ok && value.Name == value.Value.(string) {
+			valueList = append(valueList, fmt.Sprintf("%q", value.Value))
+			continue
+		}
+		valueList = append(valueList, fmt.Sprintf("%s (%q)", value.Name, value.Value))
+	}
+	allowed := fmt.Sprintf("Allowed values are %s", strings.Join(valueList, ", "))
+
+	return &notAssignable{
+		reason:   allowed,
+		errRange: from.Syntax().Syntax().Range(),
 	}
 }
 
