@@ -18,6 +18,7 @@ func TestTypeError(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		from, to schema.Type
+		fromExpr ast.Expr
 		message  string
 	}{
 		{
@@ -150,6 +151,40 @@ func TestTypeError(t *testing.T) {
 			from: schema.BoolType,
 			to:   &schema.TokenType{Token: "tk:index:Tk", UnderlyingType: schema.BoolType},
 		},
+		{
+			from:     schema.StringType,
+			fromExpr: ast.String("notValid"),
+			to: &schema.EnumType{
+				Token: "tk:index:Enum",
+				Elements: []*schema.Enum{{
+					Name:  "fizz",
+					Value: "foo",
+				}, {
+					Value: "bar",
+				}},
+				ElementType: schema.StringType,
+			},
+			message: `Cannot assign type 'string' to type 'tk:index:Enum':
+  Allowed values are fizz ("foo"), "bar"`,
+		},
+		{
+			from:     schema.NumberType,
+			fromExpr: ast.Number(0.55),
+			to: &schema.EnumType{
+				Token: "tk:index:Enum",
+				Elements: []*schema.Enum{{
+					Name:  "fizz",
+					Value: 0.0,
+				}, {
+					Value: 0.5,
+				}, {
+					Value: 1.0,
+				}},
+				ElementType: schema.StringType,
+			},
+			message: `Cannot assign type 'number' to type 'tk:index:Enum':
+  Allowed values are fizz (0), 0.5, 1`,
+		},
 	}
 
 	for i, c := range cases { //nolint:paralleltest
@@ -162,13 +197,16 @@ func TestTypeError(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			standin := ast.StringSyntax(syntax.String("standin"))
+			expr := c.fromExpr
+			if expr == nil {
+				expr = ast.StringSyntax(syntax.String("standin"))
+			}
 			tc := typeCache{
 				exprs: map[ast.Expr]schema.Type{
-					standin: c.from,
+					expr: c.from,
 				},
 			}
-			result := tc.isAssignable(standin, c.to)
+			result := tc.isAssignable(expr, c.to)
 			if c.message == "" {
 				assert.Nil(t, result)
 				if t.Failed() {
