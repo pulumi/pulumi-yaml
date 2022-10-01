@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
@@ -349,10 +350,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		if notAssignable != nil {
 			return fail
 		}
-		// TODO: check that known enum values are type checked against valid
-		// values e.g. string "Foo" should not be assignable to
-		// type Enum { Type: string, Elements: ["fizz", "buzz"] }
-		return okIf(true)
+		return okIfAssignable(hasValidEnumValue(fromExpr, to.Elements))
 	case *schema.ObjectType:
 		// We implement structural typing for objects.
 		from, ok := from.(*schema.ObjectType)
@@ -445,6 +443,87 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		// This means we are missing a type, not that the user has an invalid
 		// program.
 		return &notAssignable{reason: fmt.Sprintf("Unknown type: %[1]s (%[1]T)", to), internal: true}
+	}
+}
+
+// hasValidEnumValue checks that `from` is a member of `to.map(.Value)`. This check only
+// applies to constant types. All other types are let through error free. It is intended
+// that check takes place after a traditional type check on the underlying enum type.
+//
+// Currently, the only ast.Expr types that support enum member checks are
+// - ast.StringExpr
+// - ast.NumberExpr
+//
+// If a type cast fails, it means that the schema is invalid. In that case an internal
+// error is returned.
+func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
+	var errRange *hcl.Range
+	if node := from.Syntax(); node != nil {
+		if syntax := node.Syntax(); syntax != nil {
+			errRange = syntax.Range()
+		}
+	}
+	convertError := func(expectedType string) *notAssignable {
+		return &notAssignable{
+			internal: true,
+			reason:   fmt.Sprintf("schema enum value was type %T but a %s was expected", to, expectedType),
+			errRange: errRange,
+		}
+	}
+	for _, to := range to {
+		switch from := from.(type) {
+		case *ast.StringExpr:
+			if value, ok := to.Value.(string); ok {
+				if from.GetValue() == value {
+					return nil
+				}
+			} else {
+				return convertError("string")
+			}
+		case *ast.NumberExpr:
+			if to, ok := to.Value.(float64); ok {
+				if from.Value == to {
+					return nil
+				}
+			} else {
+				return convertError("float64")
+			}
+		default:
+			return nil
+		}
+	}
+	// We didn't find the value we expected. We should return an error.
+	var valueList []string
+	for _, value := range to {
+
+		// We want to display just the value in 2 conditions:
+		// 1. We have a string based enum, and the name matches the value.
+		// 2. When the name is empty.
+
+		// This cast is safe because we performed the same cast in the above for loop. If
+		// the cast failed then we would have already returned with a
+		// `convertError(string)`.
+		var s string
+		switch v := value.Value.(type) {
+		case string:
+			s = `"` + v + `"`
+		case float64:
+			s = strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			panic("If we have a non-conformant value we should have panicked in the first for loop.")
+		}
+		// Add the the value to the list of possible values
+		if value.Name == "" || value.Name == s {
+			valueList = append(valueList, s)
+		} else {
+			valueList = append(valueList, fmt.Sprintf("%s (%s)", value.Name, s))
+		}
+	}
+	allowed := fmt.Sprintf("Allowed values are %s", strings.Join(valueList, ", "))
+
+	return &notAssignable{
+		reason:   allowed,
+		errRange: errRange,
 	}
 }
 
