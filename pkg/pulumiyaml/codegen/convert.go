@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -47,6 +48,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 			return "", diags, err
 		}
 		loader = schema.NewPluginLoader(host)
+		defer contract.IgnoreClose(host)
 	}
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
