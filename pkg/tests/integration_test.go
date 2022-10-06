@@ -24,7 +24,7 @@ func extractStackName(stderr string) string {
 }
 
 //nolint:paralleltest // uses parallel programtest
-func TestTypecheckFail(t *testing.T) {
+func TestTypeCheckError(t *testing.T) {
 	testWrapper(t, integrationDir("type-fail"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
 			// Since the stack name changes each test, we dynamically extract it for
