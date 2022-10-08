@@ -360,19 +360,19 @@ variables:
   foo: bar
   foo2: ./README.md
   dir:
-    Fn::AssetArchive:
+    fn::assetArchive:
       str:
-        Fn::StringAsset: this is home
+        fn::stringAsset: this is home
       strIter:
-        Fn::StringAsset: start ${foo} end
+        fn::stringAsset: start ${foo} end
       away:
-        Fn::RemoteAsset: example.org/asset
+        fn::remoteAsset: example.org/asset
       local:
-        Fn::FileAsset: ${foo2}
+        fn::fileAsset: ${foo2}
       folder:
-        Fn::AssetArchive:
+        fn::assetArchive:
           docs:
-            Fn::RemoteArchive: example.org/docs
+            fn::remoteArchive: example.org/docs
 `
 	tmpl := yamlTemplate(t, text)
 	testTemplate(t, tmpl, func(e *programEvaluator) {
@@ -717,9 +717,9 @@ runtime: yaml
 description: An EKS cluster
 variables:
   vpcId:
-    Fn::Invoke:
-      Function: test:fn
-      Arguments:
+    fn::invoke:
+      function: test:fn
+      arguments:
         noArg: false
         yesArg: true
 resources:
@@ -1492,7 +1492,7 @@ name: test-secret
 runtime: yaml
 variables:
   mySecret:
-    Fn::Secret: my-special-secret
+    fn::secret: my-special-secret
 `
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var hasRun = false
@@ -1524,11 +1524,11 @@ name: test-readfile
 runtime: yaml
 variables:
   textData:
-    Fn::ReadFile: ./README.md
+    fn::readFile: ./README.md
   absInDirData:
-    Fn::ReadFile: ${pulumi.cwd}/README.md
+    fn::readFile: ${pulumi.cwd}/README.md
   absOutOfDirData:
-    Fn::ReadFile: %v
+    fn::readFile: %v
 `, repoReadmePath)
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -1565,7 +1565,7 @@ name: test-readfile
 runtime: yaml
 outputs:
   readme:
-    Fn::ReadFile: ${pulumi.cwd}/../../go.mod # imagine this is /etc/shadow, /var/run/secrets/tokens, etc.
+    fn::readFile: ${pulumi.cwd}/../../go.mod # imagine this is /etc/shadow, /var/run/secrets/tokens, etc.
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -1593,7 +1593,7 @@ variables:
     - "foo"
     - "bar"
   foo-bar:
-    Fn::Join:
+    fn::join:
       - "-"
       - ${inputs}
 `
@@ -1621,11 +1621,11 @@ variables:
     - [1, 2, 3]
     - true
   foo-bar:
-    Fn::Join:
+    fn::join:
       - "-"
       - ${inputs}
   foo-err:
-    Fn::Join:
+    fn::join:
       - "-"
       - ${inputs[1]}
 `
@@ -1639,12 +1639,11 @@ variables:
 	}
 	assert.ElementsMatch(t, diagStrings,
 		[]string{
-			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a number at index 0",
-			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found an object at index 1",
-			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a list at index 2",
-			"<stdin>:12:9: the second argument to Fn::Join must be a list of strings, found a boolean at index 3",
-
-			"<stdin>:16:9: the second argument to Fn::Join must be a list, found an object",
+			"<stdin>:12:9: the second argument to fn::join must be a list of strings, found a number at index 0",
+			"<stdin>:12:9: the second argument to fn::join must be a list of strings, found an object at index 1",
+			"<stdin>:12:9: the second argument to fn::join must be a list of strings, found a list at index 2",
+			"<stdin>:12:9: the second argument to fn::join must be a list of strings, found a boolean at index 3",
+			"<stdin>:16:9: the second argument to fn::join must be a list, found an object",
 		},
 	)
 }
@@ -1678,15 +1677,15 @@ name: test-poison
 runtime: yaml
 variables:
   poisoned:
-    Fn::Invoke:
-      Function: test:invoke:poison
-      Arguments:
+    fn::invoke:
+      function: test:invoke:poison
+      arguments:
         foo: three
       return: value
   never-run:
-    Fn::Invoke:
-      Function: test:invoke:poison
-      Arguments:
+    fn::invoke:
+      function: test:invoke:poison
+      arguments:
         foo: ${poisoned}
       return: value
 resources:

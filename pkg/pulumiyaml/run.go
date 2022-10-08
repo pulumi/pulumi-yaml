@@ -1626,7 +1626,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		retv, ok := result[t.Return.Value]
 		if !ok {
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-			return e.error(t.Return, fmt.Sprintf("Fn::Invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
 		}
 		return retv, true
 	})
@@ -1662,7 +1662,7 @@ func (e *programEvaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bo
 		parts, ok := args[1].([]interface{})
 		overallOk = overallOk && ok
 		if !ok {
-			e.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list, found %v", typeString(args[1])))
+			e.error(v.Values, fmt.Sprintf("the second argument to fn::join must be a list, found %v", typeString(args[1])))
 		}
 
 		if !overallOk {
@@ -1673,7 +1673,7 @@ func (e *programEvaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bo
 		for i, p := range parts {
 			str, ok := p.(string)
 			if !ok {
-				e.error(v.Values, fmt.Sprintf("the second argument to Fn::Join must be a list of strings, found %v at index %v", typeString(p), i))
+				e.error(v.Values, fmt.Sprintf("the second argument to fn::join must be a list of strings, found %v at index %v", typeString(p), i))
 				overallOk = false
 			} else {
 				strs[i] = str
@@ -1768,15 +1768,15 @@ func (e *programEvaluator) evaluateBuiltinFromBase64(v *ast.FromBase64Expr) (int
 	fromBase64 := e.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return e.error(v.Value, fmt.Sprintf("expected argument to Fn::FromBase64 to be a string, got %v", typeString(args[0])))
+			return e.error(v.Value, fmt.Sprintf("expected argument to fn::fromBase64 to be a string, got %v", typeString(args[0])))
 		}
 		b, err := b64.StdEncoding.DecodeString(s)
 		if err != nil {
-			return e.error(v.Value, fmt.Sprintf("Fn::FromBase64 unable to decode %v, error: %v", args[0], err))
+			return e.error(v.Value, fmt.Sprintf("fn::fromBase64 unable to decode %v, error: %v", args[0], err))
 		}
 		decoded := string(b)
 		if !utf8.ValidString(decoded) {
-			return e.error(v.Value, "Fn::FromBase64 output is not a valid UTF-8 string")
+			return e.error(v.Value, "fn::fromBase64 output is not a valid UTF-8 string")
 		}
 		return decoded, true
 	})
@@ -1791,7 +1791,7 @@ func (e *programEvaluator) evaluateBuiltinToBase64(v *ast.ToBase64Expr) (interfa
 	toBase64 := e.lift(func(args ...interface{}) (interface{}, bool) {
 		s, ok := args[0].(string)
 		if !ok {
-			return e.error(v.Value, fmt.Sprintf("expected argument to Fn::ToBase64 to be a string, got %v", typeString(args[0])))
+			return e.error(v.Value, fmt.Sprintf("expected argument to fn::toBase64 to be a string, got %v", typeString(args[0])))
 		}
 		return b64.StdEncoding.EncodeToString([]byte(s)), true
 	})
@@ -1847,7 +1847,7 @@ func (e *programEvaluator) evaluateBuiltinStackReference(v *ast.StackReferenceEx
 		s, ok := n.(string)
 		if !ok {
 			e.error(v.PropertyName,
-				fmt.Sprintf("expected property name argument to Fn::StackReference to be a string, got %v", typeString(n)),
+				fmt.Sprintf("expected property name argument to fn::stackReference to be a string, got %v", typeString(n)),
 			)
 		}
 		return s, nil
@@ -1874,7 +1874,7 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 	createAssetArchiveF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		value, ok := args[0].(string)
 		if !ok {
-			return e.error(s, fmt.Sprintf("Argument to Fn::* must be a string, got %v", reflect.TypeOf(args[0])))
+			return e.error(s, fmt.Sprintf("Argument to fn::* must be a string, got %v", reflect.TypeOf(args[0])))
 		}
 
 		switch x.(type) {
@@ -1894,12 +1894,12 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 			return pulumi.NewFileAsset(path), true
 		case *ast.RemoteArchiveExpr:
 			if !isConstant {
-				return e.error(s, "Argument to Fn::RemoteArchiveExpr must be a constantr")
+				return e.error(s, "Argument to fn::remoteArchiveExpr must be a constantr")
 			}
 			return pulumi.NewRemoteArchive(value), true
 		case *ast.RemoteAssetExpr:
 			if !isConstant {
-				return e.error(s, "Argument to Fn::RemoteAssetExpr must be a constant")
+				return e.error(s, "Argument to fn::remoteAssetExpr must be a constant")
 			}
 			return pulumi.NewRemoteAsset(value), true
 
@@ -1974,7 +1974,7 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	readFileF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		path, ok := args[0].(string)
 		if !ok {
-			return e.error(s.Path, fmt.Sprintf("Argument to Fn::ReadFile must be a string, got %v", reflect.TypeOf(args[0])))
+			return e.error(s.Path, fmt.Sprintf("Argument to fn::readFile must be a string, got %v", reflect.TypeOf(args[0])))
 		}
 		path, err := e.sanitizePath(path, isConstant)
 		if err != nil {

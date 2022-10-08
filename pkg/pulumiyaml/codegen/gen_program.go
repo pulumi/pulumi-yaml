@@ -530,7 +530,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			if len(e.Traversal) > 0 {
 				YAMLError{
 					kind:   "Traversal not allowed on function result",
-					detail: "Cannot traverse the return value of Fn::" + f.Name,
+					detail: "Cannot traverse the return value of fn::" + f.Name,
 					rng:    f.Syntax.Range(),
 				}.AppendTo(g)
 			}
@@ -567,10 +567,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			}
 		}
 
-		// useJoin implies we need to use "Fn::Join" to construct the desired
+		// useJoin implies we need to use "fn::join" to construct the desired
 		// string.
 		if useJoin {
-			return wrapFn("Join", syn.List(syn.String(""), syn.List(nodes...)))
+			return wrapFn("join", syn.List(syn.String(""), syn.List(nodes...)))
 		}
 
 		s := ""
@@ -664,21 +664,21 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		for i, arg := range f.Args {
 			args[i] = g.expr(arg)
 		}
-		return wrapFn("Join", syn.List(args...))
+		return wrapFn("join", syn.List(args...))
 	case "split":
-		return wrapFn("Split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
+		return wrapFn("split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
 	case "toBase64":
-		return wrapFn("ToBase64", g.expr(f.Args[0]))
+		return wrapFn("toBase64", g.expr(f.Args[0]))
 	case "fromBase64":
-		return wrapFn("FromBase64", g.expr(f.Args[0]))
+		return wrapFn("fromBase64", g.expr(f.Args[0]))
 	case "toJSON":
-		return wrapFn("ToJSON", g.expr(f.Args[0]))
+		return wrapFn("toJSON", g.expr(f.Args[0]))
 	case "element":
 		args := make([]syn.Node, len(f.Args))
 		for i, arg := range f.Args {
 			args[i] = g.expr(arg)
 		}
-		return wrapFn("Select", syn.List(args[1], args[0]))
+		return wrapFn("select", syn.List(args[1], args[0]))
 	case pcl.IntrinsicConvert:
 		// We can't perform the convert, but it might happen automatically.
 		// This works for enums, as well as number -> strings.
@@ -694,7 +694,7 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 	default:
 		YAMLError{
 			kind:   "Unknown Function",
-			detail: fmt.Sprintf("YAML does not support Fn::%s.", f.Name),
+			detail: fmt.Sprintf("YAML does not support fn::%s.", f.Name),
 			rng:    getRange(),
 		}.AppendTo(g)
 		return wrapFn(f.Name, syn.Null())
@@ -702,14 +702,14 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 }
 
 func wrapFn(name string, body syn.Node) *syn.ObjectNode {
-	entry := syn.ObjectProperty(syn.String("Fn::"+name), body)
+	entry := syn.ObjectProperty(syn.String("fn::"+name), body)
 	return syn.Object(entry)
 }
 
 type Invoke struct {
-	Function  string      `yaml:"Function" json:"Function"`
-	Arguments interface{} `yaml:"Arguments,omitempty" json:"Arguments,omitempty"`
-	Return    string      `yaml:"Return" json:"Return"`
+	Function  string      `yaml:"function" json:"function"`
+	Arguments interface{} `yaml:"arguments,omitempty" json:"arguments,omitempty"`
+	Return    string      `yaml:"return,omitempty" json:"return,omitempty"`
 }
 
 func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn.ObjectNode {
@@ -738,7 +738,7 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn
 			))
 	}
 
-	return wrapFn("Invoke", syn.Object(properties...))
+	return wrapFn("invoke", syn.Object(properties...))
 }
 
 func (g *generator) TypeProperty(s string) syn.ObjectPropertyDef {

@@ -60,7 +60,7 @@ resources: {
 				contentType:       "text/html"
 				type:              "Block"
 				source: {
-					"Fn::FileAsset": "./\(_documents.root)/\(_documents.index)"
+					"fn::fileAsset": "./\(_documents.root)/\(_documents.index)"
 				}
 			}
 		}

@@ -10,20 +10,20 @@ configuration:
     type: Int
 variables:
   sharedKey:
-    Fn::Secret:
-      Fn::Invoke:
-        Function: azure-native:operationalinsights:getSharedKeys
-        Arguments:
+    fn::secret:
+      fn::invoke:
+        function: azure-native:operationalinsights:getSharedKeys
+        arguments:
           resourceGroupName: ${resourceGroup.name}
           workspaceName: ${workspace.name}
-        Return: primarySharedKey
+        return: primarySharedKey
   adminRegistryCreds:
-    Fn::azure-native:containerregistry:listRegistryCredentials:
+    fn::azure-native:containerregistry:listRegistryCredentials:
       resourceGroupName: ${resourceGroup.name}
       registryName: ${registry.name}
   adminUsername: ${adminRegistryCreds.username}
   adminPasswords:
-    Fn::Secret: ${adminRegistryCreds.passwords}
+    fn::secret: ${adminRegistryCreds.passwords}
 resources:
   resourceGroup:
     type: azure-native:resources:ResourceGroup

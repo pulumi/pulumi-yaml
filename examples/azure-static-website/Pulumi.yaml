@@ -26,7 +26,7 @@ resources:
       contentType: text/html
       type: 'Block'
       source:
-          Fn::FileAsset: ./www/index.html
+          fn::fileAsset: ./www/index.html
   favicon.png:
     type: azure-native:storage:Blob
     properties:
@@ -36,7 +36,7 @@ resources:
       contentType: image/png
       type: 'Block'
       source:
-          Fn::FileAsset: ./www/favicon.png
+          fn::fileAsset: ./www/favicon.png
   404.html:
     type: azure-native:storage:Blob
     properties:
@@ -46,6 +46,6 @@ resources:
       contentType: text/html
       type: 'Block'
       source:
-          Fn::FileAsset: ./www/404.html
+          fn::fileAsset: ./www/404.html
 outputs:
   endpoint: ${storageaccount.primaryEndpoints.web}

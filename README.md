@@ -39,7 +39,7 @@ resources:
     properties:
       bucket: ${my-bucket}
       source:
-        Fn::StringAsset: <h1>Hello, world!</h1>
+        fn::stringAsset: <h1>Hello, world!</h1>
       acl: public-read
       contentType: text/html
 outputs:
@@ -57,15 +57,15 @@ configuration:
     default: t3.micro
 variables:
   AmazonLinuxAmi:
-    Fn::Invoke:
-      Function: aws:getAmi
-      Arguments:
+    fn::invoke:
+      function: aws:getAmi
+      arguments:
         filters:
           - name: name
             values: ["amzn-ami-hvm-*-x86_64-ebs"]
         owners: ["137112412989"]
         mostRecent: true
-      Return: id
+      return: id
 resources:
   WebSecGrp:
     type: aws:ec2:SecurityGroup
