@@ -135,6 +135,6 @@ func UnexpectedCasing(rng *hcl.Range, expected, found string) *Diagnostic {
 		return nil
 	}
 	summary := fmt.Sprintf("'%s' looks like a miscapitalization of '%s'", found, expected)
-	detail := "Pulumi YAML will enforce camelCase capitalization by GA. See https://github.com/pulumi/pulumi-yaml/issues/355 for details."
+	detail := "A future version of Pulumi YAML will enforce camelCase fields. See https://github.com/pulumi/pulumi-yaml/issues/355 for details."
 	return Warning(rng, summary, detail)
 }
