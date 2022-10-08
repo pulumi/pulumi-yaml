@@ -97,7 +97,11 @@ func (d Diagnostics) Error() string {
 // Extend appends the given list of diagnostics to the list.
 func (d *Diagnostics) Extend(diags ...*Diagnostic) {
 	if len(diags) != 0 {
-		*d = append(*d, diags...)
+		for _, diag := range diags {
+			if diag != nil {
+				*d = append(*d, diag)
+			}
+		}
 	}
 }
 
@@ -120,4 +124,17 @@ func (d Diagnostics) Unshown() *Diagnostics {
 		}
 	}
 	return &diags
+}
+
+// Inform the user that they did not conform with the expected capitalization style. If
+// `expected` matches `found`, then `nil` is returned. This allows
+// `Diagnostics.Extend(UnexpectedCasing(location, expected, found))` without checking if
+// expected equals found.
+func UnexpectedCasing(rng *hcl.Range, expected, found string) *Diagnostic {
+	if expected == found {
+		return nil
+	}
+	summary := fmt.Sprintf("'%s' looks like a miscapitalization of '%s'", found, expected)
+	detail := "Pulumi YAML will enforce camelCase capitalization by GA. See https://github.com/pulumi/pulumi-yaml/issues/355 for details."
+	return Warning(rng, summary, detail)
 }

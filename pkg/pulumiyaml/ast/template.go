@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"unicode"
 
 	"github.com/hashicorp/hcl/v2"
@@ -597,22 +598,21 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 
 		key := kvp.Key.Value()
 		var hasMatch bool
-		for _, name := range []string{key, title(key)} {
-			if f, ok := t.FieldByName(name); ok && f.IsExported() {
-				fdiags := parseField(key, v.FieldByIndex(f.Index), kvp.Value)
-				diags.Extend(fdiags...)
+		for _, f := range reflect.VisibleFields(t) {
+			if f.IsExported() && strings.ToLower(f.Name) == strings.ToLower(key) {
+				diags.Extend(syntax.UnexpectedCasing(kvp.Key.Syntax().Range(), camel(f.Name), key))
+				diags.Extend(parseField(camel(f.Name), v.FieldByIndex(f.Index), kvp.Value)...)
 				hasMatch = true
 				break
 			}
 		}
+
 		if !hasMatch && noMatchWarning {
 			var fieldNames []string
 			for i := 0; i < t.NumField(); i++ {
 				f := t.Field(i)
 				if f.IsExported() {
-					name := []rune(f.Name)
-					name[0] = unicode.ToLower(name[0])
-					fieldNames = append(fieldNames, fmt.Sprintf("'%s'", string(name)))
+					fieldNames = append(fieldNames, fmt.Sprintf("'%s'", camel(f.Name)))
 				}
 			}
 			formatter := yamldiags.NonExistantFieldFormatter{
@@ -657,10 +657,11 @@ func exprFieldTypeMismatchError(name string, expected interface{}, actual Expr) 
 	return ExprError(actual, fmt.Sprintf("%v must be %v", name, typeName), "")
 }
 
-func title(s string) string {
+func camel(s string) string {
 	if s == "" {
 		return ""
 	}
-	runes := []rune(s)
-	return string(append([]rune{unicode.ToUpper(runes[0])}, runes[1:]...))
+	name := []rune(s)
+	name[0] = unicode.ToLower(name[0])
+	return string(name)
 }
