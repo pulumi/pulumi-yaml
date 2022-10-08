@@ -26,7 +26,7 @@ resources:
 variables:
   # Get the ID for the latest Amazon Linux AMI.
   ami:
-    Fn::Invoke:
+    fn::invoke:
       Function: aws:getAmi
       Arguments:
         filters:

@@ -130,8 +130,8 @@ resources:
     type: test:component:type
 variables:
   var-a:
-    Fn::Invoke:
-      Function: test:invoke:type
+    fn::Invoke:
+      function: test:invoke:type
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 

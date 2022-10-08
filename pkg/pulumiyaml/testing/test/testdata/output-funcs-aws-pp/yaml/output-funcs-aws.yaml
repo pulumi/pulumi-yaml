@@ -26,7 +26,7 @@ resources:
       toPort: 443
 variables:
   privateS3PrefixList:
-    Fn::Invoke:
+    fn::invoke:
       Function: aws:ec2:getPrefixList
       Arguments:
         prefixListId: ${privateS3VpcEndpoint.prefixListId}
@@ -34,7 +34,7 @@ variables:
   # below) generate correctly when using output-versioned function
   # invoke forms.
   amis:
-    Fn::Invoke:
+    fn::invoke:
       Function: aws:ec2:getAmiIds
       Arguments:
         owners:

@@ -5,7 +5,7 @@ resources:
       name: example_policy
       path: /
       policy:
-        Fn::Invoke:
+        fn::invoke:
           Function: aws:iam:getPolicyDocument
           Arguments:
             statements:

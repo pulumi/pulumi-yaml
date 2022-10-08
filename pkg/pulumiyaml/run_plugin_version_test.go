@@ -122,9 +122,9 @@ resources:
     properties:
       instanceType: ${InstanceType}
       ami:
-        Fn::Invoke:
-          Function: aws:getAmi
-          Arguments:
+        fn::invoke:
+          function: aws:getAmi
+          arguments:
             filters:
               - name: name
                 values: ["amzn-ami-hvm-*-x86_64-ebs"]

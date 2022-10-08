@@ -12,7 +12,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
-var fnInvokeRegex = regexp.MustCompile("Fn::[^:]+:[^:]+(:[^:]+)?$")
+var fnInvokeRegex = regexp.MustCompile("fn::[^:]+:[^:]+(:[^:]+)?$")
 
 // Expr represents a Pulumi YAML expression. Expressions may be literals, interpolated strings, symbols, or builtin
 // functions.
@@ -272,8 +272,8 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //     the string is of the form "${resource.property}", it is treated as a symbol. If the result contains no property
 //     accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 //   - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
-//     that key names a builtin function ("Fn::Invoke", "Fn::Join", "Fn::Select",
-//     "Fn::*Asset", "Fn::*Archive", or "Fn::StackReference"), then the object is parsed as the corresponding BuiltinExpr.
+//     that key names a builtin function ("fn::invoke", "fn::join", "fn::select",
+//     "fn::*Asset", "fn::*Archive", or "fn::stackReference"), then the object is parsed as the corresponding BuiltinExpr.
 //     Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	switch node := node.(type) {
@@ -376,10 +376,10 @@ func getAssetOrArchive(name *StringExpr) (func(node syntax.Node, v Expr) Expr, s
 	}
 }
 
-// Attempts to parse an asset or archive. These are not normal `Fn::*` objects
+// Attempts to parse an asset or archive. These are not normal `fn::*` objects
 // because they are parsed as part of an `ObjectProperty` instead of an object.
 // Note: because of the difference in parsing, this function does not identify
-// AssetArchive.
+// assetArchive.
 func tryParseAssetOrArchive(k, v Expr) (Expr, syntax.Diagnostics, bool) {
 	fnName, ok := k.(*StringExpr)
 	if !ok {
@@ -446,14 +446,14 @@ func InvokeSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, t
 }
 
 func Invoke(token string, callArgs *ObjectExpr, callOpts InvokeOptionsDecl, ret string) *InvokeExpr {
-	name, tok, retX := String("Fn::Invoke"), String(token), String(ret)
+	name, tok, retX := String("fn::invoke"), String(token), String(ret)
 
-	entries := []ObjectProperty{{Key: String("Function"), Value: tok}}
+	entries := []ObjectProperty{{Key: String("function"), Value: tok}}
 	if callArgs != nil {
-		entries = append(entries, ObjectProperty{Key: String("Arguments"), Value: callArgs})
+		entries = append(entries, ObjectProperty{Key: String("arguments"), Value: callArgs})
 	}
 
-	entries = append(entries, ObjectProperty{Key: String("Return"), Value: retX})
+	entries = append(entries, ObjectProperty{Key: String("return"), Value: retX})
 
 	return &InvokeExpr{
 		builtinNode: builtin(nil, name, Object(entries...)),
@@ -479,7 +479,7 @@ func ToJSONSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *ToJSONE
 }
 
 func ToJSON(value Expr) *ToJSONExpr {
-	name := String("Fn::ToJSON")
+	name := String("fn::toJSON")
 	return ToJSONSyntax(nil, name, value)
 }
 
@@ -501,7 +501,7 @@ func JoinSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, delim
 }
 
 func Join(delimiter Expr, values *ListExpr) *JoinExpr {
-	name := String("Fn::Join")
+	name := String("fn::join")
 	return &JoinExpr{
 		builtinNode: builtin(nil, name, List(delimiter, values)),
 		Delimiter:   delimiter,
@@ -528,7 +528,7 @@ func SplitSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr) *Spl
 }
 
 func Split(delimiter, source Expr) *SplitExpr {
-	name := String("Fn::Split")
+	name := String("fn::split")
 	return &SplitExpr{
 		builtinNode: builtin(nil, name, List(delimiter, source)),
 		Delimiter:   delimiter,
@@ -553,7 +553,7 @@ func SelectSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListExpr, ind
 }
 
 func Select(index Expr, values Expr) *SelectExpr {
-	name := String("Fn::Select")
+	name := String("fn::select")
 	return &SelectExpr{
 		builtinNode: builtin(nil, name, List(index, values)),
 		Index:       index,
@@ -693,7 +693,7 @@ func StackReferenceSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListE
 }
 
 func StackReference(stackName string, propertyName Expr) *StackReferenceExpr {
-	name, stackNameX := String("Fn::StackReference"), String(stackName)
+	name, stackNameX := String("fn::stackReference"), String(stackName)
 
 	return &StackReferenceExpr{
 		builtinNode:  builtin(nil, name, List(stackNameX, propertyName)),
@@ -758,7 +758,7 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::toJSON", parseToJSON)
 	case "fn::tobase64":
 		set("fn::toBase64", parseToBase64)
-	case "Fn::FromBase64":
+	case "fn::frombase64":
 		set("fn::fromBase64", parseFromBase64)
 	case "fn::select":
 		set("fn::select", parseSelect)
@@ -774,11 +774,11 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::readFile", parseReadFile)
 	default:
 		k := kvp.Key.Value()
-		// Fn::Invoke can be called as FN::${pkg}:${module}(:${name})?
+		// fn::invoke can be called as fn::${pkg}:${module}(:${name})?
 		// error is thrown if regex pattern cannot be parsed — handled by `regex.MustCompile(fnInvokeRegex)`
-		if match, _ := regexp.MatchString(fnInvokeRegex.String(), k); match {
-			// transform the node into standard Fn::Invoke format
-			fnVal := strings.TrimPrefix(strings.ToLower(k), "fn::")
+		if fnInvokeRegex.MatchString(strings.ToLower(k)) {
+			// transform the node into standard fn::invoke format
+			fnVal := k[4:]
 			if _, ok := kvp.Value.(*syntax.ObjectNode); ok {
 				kvp.Value = syntax.Object(
 					syntax.ObjectPropertyDef{
@@ -948,7 +948,7 @@ func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 
 // We expect the following format
 //
-//	Fn::AssetArchive:
+//	fn::assetArchive:
 //	  path:
 //	    AssetOrArchive
 //

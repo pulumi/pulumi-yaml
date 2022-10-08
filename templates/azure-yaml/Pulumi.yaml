@@ -23,9 +23,9 @@ resources:
       kind: StorageV2
 variables:
   storageAccountKeys:
-    Fn::Invoke:
-      Function: azure-native:storage:listStorageAccountKeys
-      Arguments:
+    fn::Invoke:
+      function: azure-native:storage:listStorageAccountKeys
+      arguments:
         resourceGroupName: ${resourceGroup.name}
         accountName: ${storageAccount.name}
 outputs:

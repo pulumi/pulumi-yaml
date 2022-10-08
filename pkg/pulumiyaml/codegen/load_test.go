@@ -131,12 +131,12 @@ resources:
 			input: `
 variables:
   ret:
-    Fn::Invoke:
-      Function: test:mod:fn
-      Return: foo
+    fn::invoke:
+      function: test:mod:fn
+      return: foo
   noRet:
-    Fn::Invoke:
-      Function: test:mod:fn`,
+    fn::invoke:
+      function: test:mod:fn`,
 			expected: `ret = invoke("test:mod:fn", {}).foo
 noRet = invoke("test:mod:fn", {})
 `,

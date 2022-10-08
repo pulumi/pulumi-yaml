@@ -1,14 +1,14 @@
 {
-  "Configuration": {
+  "configuration": {
     "InstanceType": {
       "type": "String",
       "default": "t3.micro"
     }
   },
-  "Resources": {
+  "resources": {
     "WebSecGrp": {
-      "Type": "aws:ec2:SecurityGroup",
-      "Properties": {
+      "type": "aws:ec2:SecurityGroup",
+      "properties": {
         "ingress": [
           {
             "protocol": "tcp",
@@ -18,29 +18,29 @@
           }
         ]
       },
-      "Options": {
-        "Version": "4.37.1"
+      "options": {
+        "version": "4.37.1"
       }
     },
     "WebServer": {
-      "Type": "aws:ec2:Instance",
-      "Properties": {
+      "type": "aws:ec2:Instance",
+      "properties": {
         "instanceType": "${InstanceType}",
         "ami": {
-          "Fn::Invoke": {
-            "Function": "aws:getAmi",
-            "Arguments": {
+          "fn::invoke": {
+            "function": "aws:getAmi",
+            "arguments": {
               "filters": [
                 { "name": "name", "values": ["amzn-ami-hvm-*-x86_64-ebs"] }
               ],
               "owners": ["137112412989"],
               "mostRecent": true
             },
-            "Return": "id"
+            "return": "id"
           }
         },
         "userData": {
-          "Fn::Join": [
+          "fn::join": [
             "\n",
             [
               "#!/bin/bash",
@@ -53,7 +53,7 @@
       }
     }
   },
-  "Outputs": {
+  "outputs": {
     "InstanceId": "${WebServer.id}",
     "PublicIp": "${WebServer.publicIp}",
     "PublicHostName": "${WebServer.publicDns}"

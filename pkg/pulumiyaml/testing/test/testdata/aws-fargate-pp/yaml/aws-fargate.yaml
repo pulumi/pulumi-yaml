@@ -24,7 +24,7 @@ resources:
     type: aws:iam:Role
     properties:
       assumeRolePolicy:
-        Fn::ToJSON:
+        fn::toJSON:
           Version: 2008-10-17
           Statement:
             - Sid:
@@ -71,7 +71,7 @@ resources:
         - FARGATE
       executionRoleArn: ${taskExecRole.arn}
       containerDefinitions:
-        Fn::ToJSON:
+        fn::toJSON:
           - name: my-app
             image: nginx
             portMappings:
@@ -100,12 +100,12 @@ resources:
 variables:
   # Read the default VPC and public subnets, which we will use.
   vpc:
-    Fn::Invoke:
+    fn::invoke:
       Function: aws:ec2:getVpc
       Arguments:
         default: true
   subnets:
-    Fn::Invoke:
+    fn::invoke:
       Function: aws:ec2:getSubnetIds
       Arguments:
         vpcId: ${vpc.id}

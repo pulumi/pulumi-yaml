@@ -6,7 +6,7 @@ resources:
       path: /
       description: My test policy
       policy:
-        Fn::ToJSON:
+        fn::toJSON:
           Version: 2012-10-17
           Statement:
             - Effect: Allow

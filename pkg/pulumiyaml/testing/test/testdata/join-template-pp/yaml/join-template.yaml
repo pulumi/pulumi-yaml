@@ -3,17 +3,17 @@ resources:
     type: aws:iam:Policy
     properties:
       name:
-        Fn::Join:
+        fn::join:
           -
-          - - Fn::Select:
+          - - fn::select:
                 - 0
                 - - foo
                   - bar
             - -policy
       path: /
       policy:
-        Fn::Select:
+        fn::select:
           - 0
-          - Fn::Split:
+          - fn::split:
               - '-'
               - '{}-foo'
