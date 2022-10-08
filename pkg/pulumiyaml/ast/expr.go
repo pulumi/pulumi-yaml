@@ -352,12 +352,28 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	}
 }
 
-var assetOrArchiveFunctions = map[string]func(node syntax.Node, k *StringExpr, v Expr) Expr{
-	"Fn::StringAsset":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return StringAssetSyntax(node, k, v) },
-	"Fn::FileAsset":     func(node syntax.Node, k *StringExpr, v Expr) Expr { return FileAssetSyntax(node, k, v) },
-	"Fn::RemoteAsset":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return RemoteAssetSyntax(node, k, v) },
-	"Fn::FileArchive":   func(node syntax.Node, k *StringExpr, v Expr) Expr { return FileArchiveSyntax(node, k, v) },
-	"Fn::RemoteArchive": func(node syntax.Node, k *StringExpr, v Expr) Expr { return RemoteArchiveSyntax(node, k, v) },
+func getAssetOrArchive(name *StringExpr) (func(node syntax.Node, v Expr) Expr, syntax.Diagnostics, bool) {
+	diag := func(expected string) syntax.Diagnostics {
+		err := syntax.UnexpectedCasing(name.Syntax().Syntax().Range(), expected, name.GetValue())
+		if err != nil {
+			return syntax.Diagnostics{err}
+		}
+		return nil
+	}
+	switch strings.ToLower(name.GetValue()) {
+	case "fn::stringasset":
+		return func(node syntax.Node, v Expr) Expr { return StringAssetSyntax(node, name, v) }, diag("fn::stringAsset"), true
+	case "fn::fileasset":
+		return func(node syntax.Node, v Expr) Expr { return FileAssetSyntax(node, name, v) }, diag("fn::fileAsset"), true
+	case "fn::remoteasset":
+		return func(node syntax.Node, v Expr) Expr { return RemoteAssetSyntax(node, name, v) }, diag("fn::remoteAsset"), true
+	case "fn::filearchive":
+		return func(node syntax.Node, v Expr) Expr { return FileArchiveSyntax(node, name, v) }, diag("fn::fileArchive"), true
+	case "fn::remotearchive":
+		return func(node syntax.Node, v Expr) Expr { return RemoteArchiveSyntax(node, name, v) }, diag("fn::remoteArchive"), true
+	default:
+		return nil, nil, false
+	}
 }
 
 // Attempts to parse an asset or archive. These are not normal `Fn::*` objects
@@ -365,15 +381,13 @@ var assetOrArchiveFunctions = map[string]func(node syntax.Node, k *StringExpr, v
 // Note: because of the difference in parsing, this function does not identify
 // AssetArchive.
 func tryParseAssetOrArchive(k, v Expr) (Expr, syntax.Diagnostics, bool) {
-	diags := syntax.Diagnostics{}
-
 	fnName, ok := k.(*StringExpr)
 	if !ok {
 		return nil, nil, false
 	}
 
-	if fn, ok := assetOrArchiveFunctions[fnName.Value]; ok {
-		return fn(k.Syntax(), fnName, v), diags, true
+	if fn, diags, ok := getAssetOrArchive(fnName); ok {
+		return fn(k.Syntax(), v), diags, true
 	}
 
 	// Not a asset or archive
@@ -724,74 +738,76 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 
 	kvp := node.Index(0)
 
-	if _, ok := assetOrArchiveFunctions[kvp.Key.Value()]; ok {
+	if _, _, ok := getAssetOrArchive(StringSyntax(kvp.Key)); ok {
 		// We will parse this node as an asset or archive later, so we don't need to do it now
 		return nil, nil, false
 	}
 
 	var parse func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)
-	switch kvp.Key.Value() {
-	case "Fn::Invoke":
-		parse = parseInvoke
-	case "Fn::Join":
-		parse = parseJoin
-	case "Fn::ToJSON":
-		parse = parseToJSON
-	case "Fn::ToBase64":
-		parse = parseToBase64
+	var diags syntax.Diagnostics
+	set := func(expected string, parseFn func(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics)) {
+		diags.Extend(syntax.UnexpectedCasing(kvp.Key.Syntax().Range(), expected, kvp.Key.Value()))
+		parse = parseFn
+	}
+	switch strings.ToLower(kvp.Key.Value()) {
+	case "fn::invoke":
+		set("fn::invoke", parseInvoke)
+	case "fn::join":
+		set("fn::join", parseJoin)
+	case "fn::tojson":
+		set("fn::toJSON", parseToJSON)
+	case "fn::tobase64":
+		set("fn::toBase64", parseToBase64)
 	case "Fn::FromBase64":
-		parse = parseFromBase64
-	case "Fn::Select":
-		parse = parseSelect
-	case "Fn::Split":
-		parse = parseSplit
-	case "Fn::StackReference":
-		parse = parseStackReference
-	case "Fn::AssetArchive":
-		parse = parseAssetArchive
-	case "Fn::Secret":
-		parse = parseSecret
-	case "Fn::ReadFile":
-		parse = parseReadFile
+		set("fn::fromBase64", parseFromBase64)
+	case "fn::select":
+		set("fn::select", parseSelect)
+	case "fn::split":
+		set("fn::split", parseSplit)
+	case "fn::stackreference":
+		set("fn::stackReference", parseStackReference)
+	case "fn::assetarchive":
+		set("fn::assetArchive", parseAssetArchive)
+	case "fn::secret":
+		set("fn::secret", parseSecret)
+	case "fn::readfile":
+		set("fn::readFile", parseReadFile)
 	default:
-		var diags syntax.Diagnostics
 		k := kvp.Key.Value()
 		// Fn::Invoke can be called as FN::${pkg}:${module}(:${name})?
 		// error is thrown if regex pattern cannot be parsed — handled by `regex.MustCompile(fnInvokeRegex)`
 		if match, _ := regexp.MatchString(fnInvokeRegex.String(), k); match {
 			// transform the node into standard Fn::Invoke format
-			fnVal := strings.TrimPrefix(k, "Fn::")
+			fnVal := strings.TrimPrefix(strings.ToLower(k), "fn::")
 			if _, ok := kvp.Value.(*syntax.ObjectNode); ok {
 				kvp.Value = syntax.Object(
 					syntax.ObjectPropertyDef{
-						Key:   syntax.StringSyntax(kvp.Syntax, "Arguments"),
+						Key:   syntax.StringSyntax(kvp.Syntax, "arguments"),
 						Value: kvp.Value,
 					},
 					syntax.ObjectPropertyDef{
-						Key:   syntax.StringSyntax(kvp.Syntax, "Function"),
+						Key:   syntax.StringSyntax(kvp.Syntax, "function"),
 						Value: syntax.String(fnVal),
 					},
 				)
 			} else {
 				kvp.Value = syntax.Object(
 					syntax.ObjectPropertyDef{
-						Key:   syntax.StringSyntax(kvp.Syntax, "Function"),
+						Key:   syntax.StringSyntax(kvp.Syntax, "function"),
 						Value: syntax.String(fnVal),
 					},
 				)
 			}
 			parse = parseInvoke
 			break
-		} else if strings.HasPrefix(k, "Fn::") {
+		} else if strings.HasPrefix(strings.ToLower(k), "fn::") {
 			diags = append(diags, syntax.Warning(kvp.Key.Syntax().Range(),
-				"'Fn::' is a reserved prefix",
+				"'fn::' is a reserved prefix",
 				fmt.Sprintf("If you need to use the raw key '%s',"+
 					" please open an issue at https://github.com/pulumi/pulumi-yaml/issues", k)))
 		}
 		return nil, diags, false
 	}
-
-	var diags syntax.Diagnostics
 
 	name := StringSyntax(kvp.Key)
 
@@ -815,7 +831,7 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	obj, ok := args.(*ObjectExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Invoke must be an object containing 'Function', 'Arguments', 'Options', and 'Return'", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::invoke must be an object containing 'function', 'arguments', 'options', and 'return'", "")}
 	}
 
 	var functionExpr, argumentsExpr, returnExpr Expr
@@ -825,17 +841,21 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	for i := 0; i < len(obj.Entries); i++ {
 		kvp := obj.Entries[i]
 		if str, ok := kvp.Key.(*StringExpr); ok {
-			switch str.Value {
-			case "Function":
+			switch strings.ToLower(str.Value) {
+			case "function":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "function", str.GetValue()))
 				functionExpr = kvp.Value
-			case "Arguments":
+			case "arguments":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "arguments", str.GetValue()))
 				argumentsExpr = kvp.Value
-			case "Options":
-				diags = parseRecord("invokeOptions", &opts, kvp.syntax.Value, true)
+			case "options":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "options", str.GetValue()))
+				diags.Extend(parseRecord("invokeOptions", &opts, kvp.syntax.Value, true)...)
 				if diags.HasErrors() {
 					return nil, diags
 				}
-			case "Return":
+			case "return":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "return", str.GetValue()))
 				returnExpr = kvp.Value
 			}
 		}
@@ -844,7 +864,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	function, ok := functionExpr.(*StringExpr)
 	if !ok {
 		if functionExpr == nil {
-			diags.Extend(ExprError(obj, "missing function name ('Function')", ""))
+			diags.Extend(ExprError(obj, "missing function name ('function')", ""))
 		} else {
 			diags.Extend(ExprError(functionExpr, "function name must be a string literal", ""))
 		}
@@ -852,7 +872,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 
 	arguments, ok := argumentsExpr.(*ObjectExpr)
 	if !ok && argumentsExpr != nil {
-		diags.Extend(ExprError(argumentsExpr, "function arguments ('Arguments') must be an object", ""))
+		diags.Extend(ExprError(argumentsExpr, "function arguments ('arguments') must be an object", ""))
 	}
 
 	ret, ok := returnExpr.(*StringExpr)
@@ -870,7 +890,7 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Join must be a two-valued list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::join must be a two-valued list", "")}
 	}
 
 	return JoinSyntax(node, name, list, list.Elements[0], list.Elements[1]), nil
@@ -883,7 +903,7 @@ func parseToJSON(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::Select must be a two-valued list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::select must be a two-valued list", "")}
 	}
 
 	index := list.Elements[0]
@@ -894,7 +914,7 @@ func parseSelect(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 func parseSplit(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "The argument to Fn::Split must be a two-values list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "The argument to fn::split must be a two-values list", "")}
 	}
 
 	return SplitSyntax(node, name, list), nil
@@ -911,12 +931,12 @@ func parseFromBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr
 func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	list, ok := args.(*ListExpr)
 	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to Fn::StackReference must be a two-valued list", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::stackReference must be a two-valued list", "")}
 	}
 
 	stackName, ok := list.Elements[0].(*StringExpr)
 	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the first argument to Fn::StackReference must be a string literal", "")}
+		return nil, syntax.Diagnostics{ExprError(args, "the first argument to fn::stackReference must be a string literal", "")}
 	}
 
 	return StackReferenceSyntax(node, name, list, stackName, list.Elements[1]), nil
@@ -934,8 +954,8 @@ func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 //
 // Where `AssetOrArchive` is an object.
 func parseAssetArchive(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	const mustObjectMsg string = "the argument to Fn::AssetArchive must be an object"
-	const mustStringMsg string = "keys in Fn::AssetArchive arguments must be string literals"
+	const mustObjectMsg string = "the argument to fn::assetArchive must be an object"
+	const mustStringMsg string = "keys in fn::assetArchive arguments must be string literals"
 	obj, ok := args.(*ObjectExpr)
 	if !ok {
 		return nil, syntax.Diagnostics{ExprError(args, mustObjectMsg, "")}
