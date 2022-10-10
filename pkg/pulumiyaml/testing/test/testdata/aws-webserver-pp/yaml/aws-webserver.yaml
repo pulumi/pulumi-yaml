@@ -34,7 +34,7 @@ variables:
             values:
               - amzn-ami-hvm-*-x86_64-ebs
         owners:
-          - 137112412989
+          - '137112412989'
         mostRecent: true
 outputs:
   # Export the resulting server's IP address and DNS name.
