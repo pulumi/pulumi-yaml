@@ -11,7 +11,7 @@ variables:
       - '-'
       - - ${encoded}
         - ${decoded}
-        - "2"
+        - '2'
   encoded2:
     fn::toBase64: ${bucket.id}
   decoded2:

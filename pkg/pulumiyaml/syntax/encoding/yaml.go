@@ -227,7 +227,7 @@ func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 			yamlNode.Tag = "!!str"
 		}
 		if _, err := strconv.ParseFloat(value, 32); err == nil || value == "true" || value == "false" {
-			yamlNode.Style = yaml.DoubleQuotedStyle
+			yamlNode.Style = yaml.SingleQuotedStyle
 		}
 		if originalValue != value {
 			yamlNode.Value = value
