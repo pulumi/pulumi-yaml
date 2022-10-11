@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +30,8 @@ func prepareYamlProject(*engine.Projinfo) error {
 type testOptions struct {
 	requireLiveRun     *bool
 	programTestOptions integration.ProgramTestOptions
+	// Must be called *after* the test has been run
+	validateStderr func(t *testing.T)
 }
 
 type TestOption interface {
@@ -109,6 +112,26 @@ func (o EditDir) apply(options *testOptions) {
 	options.programTestOptions.EditDirs = append(options.programTestOptions.EditDirs, o.editDir)
 }
 
+type expectFailure struct{}
+
+var ExpectFailure = expectFailure{}
+
+func (expectFailure) apply(options *testOptions) {
+	options.programTestOptions.ExpectFailure = true
+}
+
+type StderrValidator struct {
+	f func(t *testing.T, stderr string)
+}
+
+func (o StderrValidator) apply(options *testOptions) {
+	stderr := &bytes.Buffer{}
+	options.programTestOptions.Stderr = stderr
+	options.validateStderr = func(t *testing.T) {
+		o.f(t, stderr.String())
+	}
+}
+
 type Validator struct {
 	f func(t *testing.T, stack integration.RuntimeValidationStackInfo)
 }
@@ -135,8 +158,7 @@ func testWrapper(t *testing.T, dir string, opts ...TestOption) {
 	var testOptions testOptions
 
 	testOptions.programTestOptions = integration.ProgramTestOptions{
-		Dir: filepath.Join(getCwd(t), dir),
-
+		Dir:            filepath.Join(getCwd(t), dir),
 		PrepareProject: prepareYamlProject,
 	}
 
@@ -162,6 +184,10 @@ func testWrapper(t *testing.T, dir string, opts ...TestOption) {
 	}
 
 	integration.ProgramTest(t, &testOptions.programTestOptions)
+
+	if testOptions.validateStderr != nil {
+		testOptions.validateStderr(t)
+	}
 }
 
 func getCwd(t *testing.T) string {
