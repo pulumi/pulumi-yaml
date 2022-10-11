@@ -1,0 +1,7 @@
+resources:
+  bucket:
+    type: aws:s3:Bucket
+    properties:
+      website:
+        indexDocument: index-${range.value}.html
+    options: {}
