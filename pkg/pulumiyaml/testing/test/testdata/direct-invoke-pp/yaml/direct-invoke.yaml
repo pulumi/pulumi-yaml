@@ -9,7 +9,7 @@ resources:
           Function: aws:iam:getPolicyDocument
           Arguments:
             statements:
-              - sid: 1
+              - sid: '1'
                 actions:
                   - s3:ListAllMyBuckets
                   - s3:GetBucketLocation

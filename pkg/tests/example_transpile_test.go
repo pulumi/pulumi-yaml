@@ -187,6 +187,7 @@ var defaultPlugins = []pulumiyaml.Plugin{
 	// While the schemas are not the correct version, we rely on not
 	// depending on the difference between them.
 	{Package: "kubernetes", Version: "3.0.0"},
+	{Package: "aws", Version: "4.37.1"},
 }
 
 func newPluginLoader() schema.ReferenceLoader {

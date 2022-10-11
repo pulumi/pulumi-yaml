@@ -5,7 +5,7 @@ resources:
     properties:
       vpcId: ${vpc.id}
       egress:
-        - protocol: -1
+        - protocol: '-1'
           fromPort: 0
           toPort: 0
           cidrBlocks:
@@ -64,8 +64,8 @@ resources:
     type: aws:ecs:TaskDefinition
     properties:
       family: fargate-task-definition
-      cpu: 256
-      memory: 512
+      cpu: '256'
+      memory: '512'
       networkMode: awsvpc
       requiresCompatibilities:
         - FARGATE

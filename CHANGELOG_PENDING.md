@@ -14,3 +14,6 @@
 - Clarify the lifetimes when calling `codegen.Eject`. This is a breaking change to the
   `codegen.Eject` API.
   [#358](https://github.com/pulumi/pulumi-yaml/pull/358)
+
+- Quote generated strings that could be numbers.
+  [#363](https://github.com/pulumi/pulumi-yaml/issues/363)

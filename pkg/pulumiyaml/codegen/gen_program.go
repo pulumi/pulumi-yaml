@@ -679,6 +679,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 			args[i] = g.expr(arg)
 		}
 		return wrapFn("select", syn.List(args[1], args[0]))
+	case "readFile":
+		return wrapFn("readFile", g.expr(f.Args[0]))
 	case pcl.IntrinsicConvert:
 		// We can't perform the convert, but it might happen automatically.
 		// This works for enums, as well as number -> strings.

@@ -7,3 +7,14 @@ resources:
     type: other:module:Object
     properties:
       answer: 42
+  Question2:
+    type: other:module/sub:Object
+    properties:
+      answer: 24
+  Provider:
+    type: pulumi:providers:other
+    properties:
+      objectProp:
+        prop1: foo
+        prop2: bar
+        prop3: fizz

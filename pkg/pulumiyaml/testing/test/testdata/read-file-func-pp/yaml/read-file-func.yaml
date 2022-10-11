@@ -1,0 +1,5 @@
+variables:
+  key:
+    fn::readFile: key.pub
+outputs:
+  result: ${key}

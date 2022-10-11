@@ -187,16 +187,6 @@ func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 		yamlNode.FootComment = s.FootComment()
 	}
 
-	stringNode := func(value string) {
-		yamlNode.Kind = yaml.ScalarNode
-		if yamlNode.Tag != "" && yamlNode.Tag != "!!str" {
-			yamlNode.Tag = "!!str"
-		}
-		if originalValue != value {
-			yamlNode.Value = value
-		}
-	}
-
 	var diags syntax.Diagnostics
 	switch n := n.(type) {
 	case *syntax.NullNode:
@@ -231,7 +221,17 @@ func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 			}
 		}
 	case *syntax.StringNode:
-		stringNode(n.Value())
+		value := n.Value()
+		yamlNode.Kind = yaml.ScalarNode
+		if yamlNode.Tag != "" && yamlNode.Tag != "!!str" {
+			yamlNode.Tag = "!!str"
+		}
+		if _, err := strconv.ParseFloat(value, 32); err == nil || value == "true" || value == "false" {
+			yamlNode.Style = yaml.SingleQuotedStyle
+		}
+		if originalValue != value {
+			yamlNode.Value = value
+		}
 	case *syntax.ListNode:
 		if yamlNode.Kind != yaml.SequenceNode && yamlNode.Kind != yaml.DocumentNode {
 			yamlNode.Kind = yaml.SequenceNode

@@ -202,6 +202,11 @@ func TestGenerateProgram(t *testing.T) {
 				// But the actual error is that it is using a Splat operator.
 			case "python-resource-names":
 				// Reason: A python only test.
+			case "simple-range":
+				// Pulumi YAML does not support ranges
+			case "read-file-func":
+				tt.SkipCompile = codegen.NewStringSet("yaml")
+				l = append(l, tt)
 			default:
 				l = append(l, tt)
 			}

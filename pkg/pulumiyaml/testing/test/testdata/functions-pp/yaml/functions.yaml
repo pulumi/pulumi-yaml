@@ -1,8 +1,18 @@
+resources:
+  bucket:
+    type: aws:s3:Bucket
 variables:
   encoded:
     fn::toBase64: haha business
+  decoded:
+    fn::fromBase64: ${encoded}
   joined:
     fn::join:
       - '-'
-      - - haha
-        - business
+      - - ${encoded}
+        - ${decoded}
+        - '2'
+  encoded2:
+    fn::toBase64: ${bucket.id}
+  decoded2:
+    fn::fromBase64: ${bucket.id}
