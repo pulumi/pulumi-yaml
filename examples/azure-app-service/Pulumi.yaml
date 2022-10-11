@@ -7,10 +7,10 @@ configuration:
     default: pulumi
 variables:
   blobAccessToken:
-    Fn::Secret:
-      Fn::Invoke:
-        Function: azure-native:storage:listStorageAccountServiceSAS
-        Arguments:
+    fn::secret:
+      fn::invoke:
+        function: azure-native:storage:listStorageAccountServiceSAS
+        arguments:
           accountName: ${sa.name}
           protocols: https
           sharedAccessStartTime: '2022-01-01'
@@ -23,7 +23,7 @@ variables:
           cacheControl: max-age=5
           contentDisposition: inline
           contentEncoding: deflate
-        Return: serviceSasToken
+        return: serviceSasToken
 resources:
   appservicegroup:
     type: azure-native:resources:ResourceGroup
@@ -55,7 +55,7 @@ resources:
       containerName: ${container.name}
       type: 'Block'
       source:
-        Fn::FileArchive: ./www
+        fn::fileArchive: ./www
   appInsights:
     type: azure-native:insights:Component
     properties:

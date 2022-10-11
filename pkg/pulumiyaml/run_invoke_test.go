@@ -35,11 +35,11 @@ resources:
     type: test:resource:type
     properties:
       foo:
-        Fn::Invoke:
-          Function: test:invoke:type
-          Arguments:
+        fn::invoke:
+          function: test:invoke:type
+          arguments:
             quux: ${res-a.out}
-          Return: retval
+          return: retval
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -64,13 +64,13 @@ resources:
     type: test:resource:type
     properties:
       foo:
-        Fn::Invoke:
-          Function: test:invoke:type2
-          Arguments:
+        fn::invoke:
+          function: test:invoke:type2
+          arguments:
             quux: ${res-a.out}
-          Options:
+          options:
             Provider: ${provider-a}
-          Return: retval
+          return: retval
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
@@ -86,9 +86,9 @@ name: test-yaml
 runtime: yaml
 variables:
   foo:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: tuo
 resources:
   res-a:
@@ -110,9 +110,9 @@ name: test-yaml
 runtime: yaml
 variables:
   foo:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: ${res-a.out}
 resources:
   res-a:
@@ -136,8 +136,8 @@ func TestInvokeNoInputs(t *testing.T) {
 	const text = `
 variables:
   config:
-    Fn::Invoke:
-      Function: test:invoke:empty
+    fn::invoke:
+      function: test:invoke:empty
 outputs:
   v: ${config.subscriptionId}
 name: test-yaml
@@ -157,7 +157,7 @@ name: test-yaml
 runtime: yaml
 variables:
   foo:
-    Fn::test:invoke:type:
+    fn::test:invoke:type:
       quux: tuo
 resources:
   res-a:
@@ -179,7 +179,7 @@ name: test-yaml
 runtime: yaml
 variables:
   foo:
-    Fn::test:invoke:type:
+    fn::test:invoke:type:
       quux: ${res-a.out}
 resources:
   res-a:
@@ -203,7 +203,7 @@ func TestInvokeNoInputsSugar(t *testing.T) {
 	const text = `
 variables:
   config:
-    Fn::test:invoke:empty: {}
+    fn::test:invoke:empty: {}
 outputs:
   v: ${config.subscriptionId}
 name: test-yaml

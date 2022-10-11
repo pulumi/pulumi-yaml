@@ -72,9 +72,9 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: tuo
       Return: retval
 resources:
@@ -102,9 +102,9 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::Invoke:
+      function: test:invoke:type
+      arguments:
         quux: tuo
       Return: retval
 resources:
@@ -132,11 +132,11 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: ${res-a.out}
-      Return: retval
+      return: retval
 resources:
   res-a:
     type: test:resource:type
@@ -167,17 +167,17 @@ name: test-yaml
 runtime: yaml
 variables:
   passthrough:
-    Fn::Invoke:
-      Function: test:invoke-passthrough:type
-      Arguments:
+    fn::Invoke:
+      function: test:invoke-passthrough:type
+      arguments:
         returnValue: ${res-a.out}
-      Return: returnValue
+      return: returnValue
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: ${passthrough}
-      Return: retval
+      return: retval
 resources:
   res-a:
     type: test:resource:type
@@ -206,11 +206,11 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: ${resFinal.out}
-      Return: retval
+      return: retval
 resources:
   resFinal:
     type: test:resource:type
@@ -233,11 +233,11 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: ${res-a.out}
-      Return: retval
+      return: retval
 resources:
   res-a:
     type: test:resource:type
@@ -267,11 +267,11 @@ name: test-yaml
 runtime: yaml
 variables:
   someVar:
-    Fn::Invoke:
-      Function: test:invoke:type
-      Arguments:
+    fn::invoke:
+      function: test:invoke:type
+      arguments:
         quux: tuo
-      Return: retval
+      return: retval
 resources:
   resFinal:
     type: test:resource:type

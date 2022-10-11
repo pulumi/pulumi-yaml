@@ -27,7 +27,7 @@ resources:
     properties:
       bucket: ${my-bucket}
       source:
-        Fn::StringAsset: <h1>Hello, world!</h1>
+        fn::stringAsset: <h1>Hello, world!</h1>
       acl: public-read
       contentType: text/html
 outputs:

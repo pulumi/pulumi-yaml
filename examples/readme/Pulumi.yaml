@@ -6,4 +6,4 @@ outputs:
   - fizz
   - buzz
   readme:
-    Fn::ReadFile: ./Pulumi.README.md
+    fn::readFile: ./Pulumi.README.md

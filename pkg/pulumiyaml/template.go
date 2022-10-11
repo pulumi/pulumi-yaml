@@ -18,7 +18,7 @@ type Template struct {
 	// TODO: Mappings and Conditions
 
 	// Mappings provides the ability to have a static set of maps for programs that need to
-	// perform lookups using Fn::FindInMap. For instance, we can map from region name to AMI IDs:
+	// perform lookups using fn::FindInMap. For instance, we can map from region name to AMI IDs:
 	//      "Mappings": {
 	//          "RegionMap": {
 	//              "us-east-1"     : { "HVM64": "ami-0ff8a91507f77f867" },

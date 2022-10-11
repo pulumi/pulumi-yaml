@@ -2,7 +2,7 @@ name: stackreference-consumer
 runtime: yaml
 outputs:
   referencedImageName:
-    Fn::StackReference:
+    fn::stackReference:
       # These are placeholders that our test environment replaces.
       #
       # If you're using this sample:

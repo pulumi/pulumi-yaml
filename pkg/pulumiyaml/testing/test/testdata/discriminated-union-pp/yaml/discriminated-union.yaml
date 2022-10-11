@@ -15,4 +15,4 @@ resources:
         name: B_Gen5_2
         tier: Basic
       tags:
-        ElasticServer: 1
+        ElasticServer: '1'

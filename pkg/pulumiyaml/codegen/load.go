@@ -187,7 +187,7 @@ func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions 
 	return &model.TemplateExpression{Parts: parts}, diags
 }
 
-// importJoin imports a call to Fn::Join as a call to the `join` function.
+// importJoin imports a call to fn::join as a call to the `join` function.
 func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
@@ -208,7 +208,7 @@ func (imp *importer) importJoin(node *ast.JoinExpr) (model.Expression, syntax.Di
 	return call, diags
 }
 
-// importSplit imports a call to Fn::Split as a call to the `split` function.
+// importSplit imports a call to fn::split as a call to the `split` function.
 func (imp *importer) importSplit(node *ast.SplitExpr) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
@@ -232,11 +232,11 @@ func (imp *importer) importSplit(node *ast.SplitExpr) (model.Expression, syntax.
 // importFunctionCall imports a call to an AWS intrinsic function. The way the function is imported depends on the
 // function:
 //
-// - `Fn::Asset` is imported as a call to the `fileAsset` function
-// - `Fn::Invoke` is imported as a call to `invoke`
-// - `Fn::Join` is imported as either a template expression or a call to `join`
-// - `Fn::Split` is imported as a call to `split`
-// - `Fn::StackReference` is imported as a reference to the named stack
+// - `fn::asset` is imported as a call to the `fileAsset` function
+// - `fn::invoke` is imported as a call to `invoke`
+// - `fn::join` is imported as either a template expression or a call to `join`
+// - `fn::split` is imported as a call to `split`
+// - `fn::stackReference` is imported as a reference to the named stack
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.StringAssetExpr:
