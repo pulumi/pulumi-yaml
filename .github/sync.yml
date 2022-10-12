@@ -1,0 +1,3 @@
+pulumi/pulumi:
+  - source: ../pkg/pulumiyaml/testing/test/testdata/
+    dest: pkg/codegen/testing/test/testdata

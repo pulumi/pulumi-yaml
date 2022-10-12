@@ -1,0 +1,20 @@
+name: Sync Files
+
+# on:
+#   release:
+#     types: [published]
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  convert-test-sync:
+    name: Sync PCL test files
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Run GitHub File Sync
+        uses: BetaHuhn/repo-file-sync-action@v1
+        with:
+          GH_PAT: ${{ secrets.PULUMI_ACCESS_TOKEN }}
