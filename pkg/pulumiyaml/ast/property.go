@@ -17,6 +17,7 @@ type PropertyAccess struct {
 
 func (p *PropertyAccess) String() string {
 	var str strings.Builder
+
 	for _, accessor := range p.Accessors {
 		switch accessor := accessor.(type) {
 		case *PropertyName:
