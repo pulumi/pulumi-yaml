@@ -17,3 +17,6 @@
 
 - Quote generated strings that could be numbers.
   [#363](https://github.com/pulumi/pulumi-yaml/issues/363)
+
+- Respect import option on resource.
+  [#367](https://github.com/pulumi/pulumi-yaml/issues/367)
