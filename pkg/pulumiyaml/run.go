@@ -1001,6 +1001,9 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			overallOk = false
 		}
 	}
+	if v.Options.Import != nil {
+		opts = append(opts, pulumi.Import(pulumi.ID(v.Options.Import.Value)))
+	}
 	if v.Options.IgnoreChanges != nil {
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
