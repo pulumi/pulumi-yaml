@@ -1,0 +1,18 @@
+name: Sync Files
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  convert-test-sync:
+    name: Sync PCL test files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Run GitHub File Sync
+        uses: BetaHuhn/repo-file-sync-action@40da4d517e0a744fce9e8aed03e63d6c8bafbdc0 # v1.17.21
+        with:
+          GH_PAT: ${{ secrets.PULUMI_BOT_TOKEN }}
+          TEAM_REVIEWERS: pulumi/platform
