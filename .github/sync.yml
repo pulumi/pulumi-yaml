@@ -1,3 +1,10 @@
 pulumi/pulumi:
-  - source: ../pkg/tests/transpiled_examples
+  - source: pkg/tests/transpiled_examples
     dest: pkg/codegen/testing/test/testdata/transpiled_examples
+    exclude: |
+      .gitignore
+pulumi/pulumi-java:
+  - source: pkg/tests/transpiled_examples
+    dest: pkg/codegen/testing/test/testdata/transpiled_examples
+    exclude: |
+      .gitignore
