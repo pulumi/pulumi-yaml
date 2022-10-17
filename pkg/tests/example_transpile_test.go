@@ -264,7 +264,7 @@ type projectGeneratorFunc func(directory string, project workspace.Project, p *p
 
 func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) ConvertFunc {
 	return func(t *testing.T, projectDir string) {
-		name := filepath.Base(projectDir)
+		name := filepath.Base(projectDir) + "-pp"
 		writeTo := filepath.Join(outDir, name, lang)
 		t.Run(lang, func(t *testing.T) {
 			if failingCompile[name].Has(lang) {
