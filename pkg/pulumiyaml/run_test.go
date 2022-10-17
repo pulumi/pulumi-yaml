@@ -1762,7 +1762,34 @@ variables:
 	assert.Len(t, diags, 0)
 }
 
-func TestReadResourceTyping(t *testing.T) {
+func TestReadResourceNoState(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: no-state
+variables:
+  id: bucket-123456
+  isRight: ${bucket.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	var wasRun bool
+	diags := testInvokeDiags(t, templ, func(r *Runner) {
+		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
+			wasRun = true
+			assert.Equal(t, "yes", s)
+			return s
+		})
+	})
+	assert.True(t, wasRun)
+	assert.Len(t, diags, 0)
+}
+
+func TestReadResourceErrorTyping(t *testing.T) {
 	t.Parallel()
 	text := `
 name: consumer
