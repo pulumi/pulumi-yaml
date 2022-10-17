@@ -3,6 +3,7 @@ name: Sync Files
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   convert-test-sync:
@@ -16,3 +17,5 @@ jobs:
         with:
           GH_PAT: ${{ secrets.PULUMI_BOT_TOKEN }}
           TEAM_REVIEWERS: pulumi/platform
+          PR_BODY: "This PR syncs changes to the codegen'd PCL files from the latest `pulumi/yaml` release"
+          COMMIT_PREFIX: "(pulumi-bot)"
