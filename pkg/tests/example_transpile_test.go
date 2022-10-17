@@ -130,7 +130,7 @@ func TestGenerateExamples(t *testing.T) {
 			pcl, tdiags, err := getValidPCLFile(t, template)
 			if pcl != nil {
 				// If there wasn't an error, we write out the program file, even if it is invalid PCL.
-				writeOrCompare(t, filepath.Join(outDir, dir.Name()), map[string][]byte{"program.pp": pcl})
+				writeOrCompare(t, filepath.Join(outDir, dir.Name()+"-pp"), map[string][]byte{"program.pp": pcl})
 			}
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
