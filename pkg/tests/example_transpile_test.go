@@ -5,13 +5,10 @@ package tests
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/blang/semver"
@@ -27,10 +24,6 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	pcodegen "github.com/pulumi/pulumi/pkg/v3/codegen"
-	"github.com/pulumi/pulumi/pkg/v3/codegen/dotnet"
-	gogen "github.com/pulumi/pulumi/pkg/v3/codegen/go"
-	"github.com/pulumi/pulumi/pkg/v3/codegen/nodejs"
-	"github.com/pulumi/pulumi/pkg/v3/codegen/python"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
@@ -69,30 +62,6 @@ var (
 		"kubernetes":              Golang, // returning string instead of *string in ApplyT
 		"readme": (Dotnet.And( // https://github.com/pulumi/pulumi/issues/9642
 			Golang)), // https://github.com/pulumi/pulumi/issues/9692
-	}
-
-	failingTypecheck = map[string]LanguageList{
-		"awsx-fargate": (Nodejs.And( // https://github.com/pulumi/pulumi-awsx/issues/853
-			Golang)), // https://github.com/pulumi/pulumi/issues/9664
-	}
-
-	yarnLock  sync.Mutex
-	langTests = []ConvertFunc{
-		convertTo("nodejs", nodejs.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			// concurrent yarn install commands can fail
-			yarnLock.Lock()
-			defer yarnLock.Unlock()
-			nodejs.TypeCheck(t, filepath.Join(dir, "index.ts"), deps, false)
-		}),
-		convertTo("python", python.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			python.Check(t, filepath.Join(dir, "__main__.py"), deps)
-		}),
-		convertTo("go", gogen.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			gogen.TypeCheck(t, filepath.Join(dir, "main.go"), deps, "")
-		}),
-		convertTo("dotnet", dotnet.GenerateProject, func(t *testing.T, dir string, deps pcodegen.StringSet) {
-			dotnet.TypeCheck(t, filepath.Join(dir, "Program.cs"), deps, "")
-		}),
 	}
 )
 
@@ -165,9 +134,6 @@ func TestGenerateExamples(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
-			for _, testLang := range langTests {
-				testLang(t, exampleProjectDir)
-			}
 		})
 	}
 }
@@ -261,111 +227,6 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 }
 
 type projectGeneratorFunc func(directory string, project workspace.Project, p *pcl.Program) error
-
-func convertTo(lang string, generator projectGeneratorFunc, check CheckFunc) ConvertFunc {
-	return func(t *testing.T, projectDir string) {
-		name := filepath.Base(projectDir) + "-pp"
-		writeTo := filepath.Join(outDir, name, lang)
-		t.Run(lang, func(t *testing.T) {
-			if failingCompile[name].Has(lang) {
-				t.Skipf("%s/%s is known to not produce valid code", name, lang)
-				return
-			}
-			t.Parallel()
-			var (
-				diags hcl.Diagnostics
-				err   error
-			)
-			err = os.MkdirAll(writeTo, 0700)
-			require.NoError(t, err, "Failed to create target dir")
-			_, template, diags, err := codegen.LoadTemplate(projectDir)
-			require.NoError(t, err, "Failed to convert")
-			require.False(t, diags.HasErrors(), diags.Error())
-			proj, pclProgram, err := codegen.Eject(projectDir, rootPluginLoader.ReferenceLoader)
-			require.NoError(t, err, "Failed to eject program")
-			for k1 := range proj.AdditionalKeys {
-				for k2 := range codegen.ProjectKeysToOmit {
-					require.NotEqual(t, k1, k2)
-				}
-			}
-
-			tmpDir := t.TempDir()
-			err = generator(tmpDir, *proj, pclProgram)
-			require.NoError(t, err, "Failed to generate project")
-
-			files := map[string][]byte{}
-
-			err = filepath.WalkDir(tmpDir, func(filePath string, d fs.DirEntry, err error) error {
-				if err != nil {
-					return err
-				}
-
-				if d.IsDir() {
-					if name := d.Name(); name == "node_modules" ||
-						name == "__pycache__" ||
-						name == "bin" {
-						return fs.SkipDir
-					}
-					return nil
-				}
-
-				if !(strings.HasSuffix(d.Name(), ".py") ||
-					strings.HasSuffix(d.Name(), ".cs") ||
-					strings.HasSuffix(d.Name(), ".go") ||
-					strings.HasSuffix(d.Name(), ".ts")) {
-					return nil
-				}
-
-				// Program.cs is the driver for MyStack.cs, which is what we generate.
-				if d.Name() == "Program.cs" {
-					return nil
-				}
-
-				bytes, err := ioutil.ReadFile(filePath)
-				if err != nil {
-					return err
-				}
-
-				segments := []string{}
-				rest := filePath[len(tmpDir):]
-				for {
-					base := filepath.Base(rest)
-					segments = append(segments, base)
-
-					if base == rest {
-						break
-					}
-					rest = filepath.Dir(rest)
-
-				}
-
-				name := path.Join(segments...)
-				files[name] = bytes
-				return nil
-			})
-			require.NoError(t, err, "Failed to walk generated files")
-
-			writeOrCompare(t, writeTo, files)
-
-			deps := pcodegen.NewStringSet()
-			for _, d := range template.Resources.Entries {
-				// This will not handle invokes correctly
-				urn := strings.Split(d.Value.Type.Value, ":")
-				if urn[0] == "pulumi" && urn[1] == "providers" {
-					deps.Add(urn[2])
-				} else {
-					deps.Add(urn[0])
-				}
-			}
-
-			if failingTypecheck[name].Has(lang) {
-				return
-			}
-
-			check(t, tmpDir, deps)
-		})
-	}
-}
 
 type LanguageList struct {
 	list []string
