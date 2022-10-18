@@ -8,3 +8,4 @@ pulumi/pulumi-java:
     dest: pkg/codegen/testing/test/testdata/transpiled_examples
     exclude: |
       .gitignore
+      go.mod
