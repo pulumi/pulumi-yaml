@@ -127,10 +127,12 @@ func TestGenerateExamples(t *testing.T) {
 				return
 			}
 
-			pcl, tdiags, err := getValidPCLFile(t, template)
+			dirName := dir.Name()
+			pclFileName := dirName + ".pp"
+			pcl, tdiags, err := getValidPCLFile(t, template, pclFileName)
 			if pcl != nil {
 				// If there wasn't an error, we write out the program file, even if it is invalid PCL.
-				writeOrCompare(t, filepath.Join(outDir, dir.Name()+"-pp"), map[string][]byte{"program.pp": pcl})
+				writeOrCompare(t, filepath.Join(outDir, dirName+"-pp"), map[string][]byte{pclFileName: pcl})
 			}
 			require.NoError(t, err)
 			require.False(t, tdiags.HasErrors(), tdiags.Error())
@@ -182,7 +184,7 @@ func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) 
 
 func (l mockPackageLoader) Close() {}
 
-func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnostics, error) {
+func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]byte, hcl.Diagnostics, error) {
 	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
 	diags := tdiags.HCL()
 	if tdiags.HasErrors() {
@@ -190,7 +192,7 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl) ([]byte, hcl.Diagnost
 	}
 	program := fmt.Sprintf("%v", templateBody)
 	parser := hclsyntax.NewParser()
-	if err := parser.ParseFile(strings.NewReader(program), "program.pp"); err != nil {
+	if err := parser.ParseFile(strings.NewReader(program), fileName); err != nil {
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
