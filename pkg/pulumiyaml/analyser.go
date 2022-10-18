@@ -581,11 +581,10 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		FieldsAreProperties: true,
 	}
 
-	tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	resourceIsGet := v.Get.Id != nil || len(v.Get.State.Entries) > 0
+	resourceHasProperties := len(v.Properties.Entries) > 0
 
-	tc.registerResource(k, node.Value, hint)
-
-	if len(v.Properties.Entries) > 0 && (v.Get.Id != nil || len(v.Get.State.Entries) > 0) {
+	if resourceIsGet && resourceHasProperties {
 		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
@@ -594,10 +593,20 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		)
 	}
 
+	// We type check properties if
+	// 1. They exist, or
+	// 2. The resource doesn't have a `Get` field (catching missing properties)
+	if resourceHasProperties || !resourceIsGet {
+		tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+	}
+
+	tc.registerResource(k, node.Value, hint)
+
 	if v.Get.Id != nil {
 		tc.assertTypeAssignable(ctx, v.Get.Id, schema.StringType)
 	}
 
+	// State properties are the same as normal properties, but they are all optional.
 	stateProps := make([]*schema.Property, len(hint.Resource.Properties))
 	statePropNames := make([]string, len(hint.Resource.Properties))
 	for i, v := range hint.Resource.Properties {
