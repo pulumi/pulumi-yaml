@@ -73,7 +73,9 @@ func TestSortOrdered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	confNodes, err := getPulumiConfNodes()
+	assert.Nil(t, err)
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -100,7 +102,9 @@ func TestSortUnordered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	confNodes, err := getPulumiConfNodes()
+	assert.Nil(t, err)
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -129,7 +133,9 @@ func TestSortErrorCycle(t *testing.T) {
 			},
 		},
 	})
-	_, err := topologicallySortedResources(tmpl)
+	confNodes, err := getPulumiConfNodes()
+	assert.Nil(t, err)
+	_, err = topologicallySortedResources(tmpl, confNodes)
 	assert.Error(t, err)
 }
 

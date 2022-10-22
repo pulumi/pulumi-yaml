@@ -1055,20 +1055,30 @@ func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 }
 
 func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
-	k, v := node.Key.Value, node.Value
+	k := node.key().Value
 	var typ schema.Type = &schema.InvalidType{}
 	var optional bool
-	switch {
-	case v.Default != nil:
-		// We have a default, so the type is optional
-		typ = tc.exprs[v.Default]
-		optional = true
-	case v.Type != nil:
-		ctype, ok := ctypes.Parse(v.Type.Value)
-		if ok {
-			typ = ctype.Schema()
+
+	switch n := node.(type) {
+	case configNodeYaml:
+		v := n.Value
+		switch {
+		case v.Default != nil:
+			// We have a default, so the type is optional
+			typ = tc.exprs[v.Default]
+			optional = true
+		case v.Type != nil:
+			ctype, ok := ctypes.Parse(v.Type.Value)
+			if ok {
+				typ = ctype.Schema()
+			}
+		}
+	case configNodeEnv:
+		if n.Type != nil {
+			typ = n.Type.Schema()
 		}
 	}
+
 	typ = &schema.InputType{ElementType: typ}
 	if optional {
 		typ = &schema.OptionalType{ElementType: typ}
@@ -1174,14 +1184,16 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 func (e walker) EvalConfig(r *Runner, node configNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
-		if !e.walk(ctx, node.Key) {
+		if !e.walk(ctx, node.key()) {
 			return false
 		}
-		if !e.walk(ctx, node.Value.Default) {
-			return false
-		}
-		if !e.walk(ctx, node.Value.Secret) {
-			return false
+		if nodeYaml, ok := node.(configNodeYaml); ok {
+			if !e.walk(ctx, nodeYaml.Value.Default) {
+				return false
+			}
+			if !e.walk(ctx, nodeYaml.Value.Secret) {
+				return false
+			}
 		}
 	}
 	if e.VisitConfig != nil {

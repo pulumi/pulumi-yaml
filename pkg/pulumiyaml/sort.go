@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -37,17 +38,45 @@ func (e variableNode) key() *ast.StringExpr {
 	return e.Key
 }
 
-type configNode ast.ConfigMapEntry
+type configNode interface {
+	graphNode
+	value() interface{}
+}
 
-func (e configNode) valueKind() string {
+type configNodeYaml ast.ConfigMapEntry
+
+func (e configNodeYaml) valueKind() string {
 	return "config"
 }
 
-func (e configNode) key() *ast.StringExpr {
+func (e configNodeYaml) key() *ast.StringExpr {
 	return e.Key
 }
 
-func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diagnostics) {
+func (e configNodeYaml) value() interface{} {
+	return e.Value
+}
+
+type configNodeEnv struct {
+	Key    string
+	Value  interface{}
+	Type   config.Type
+	Secret bool
+}
+
+func (e configNodeEnv) valueKind() string {
+	return "config"
+}
+
+func (e configNodeEnv) key() *ast.StringExpr {
+	return ast.String(e.Key)
+}
+
+func (e configNodeEnv) value() interface{} {
+	return e.Value
+}
+
+func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -79,10 +108,13 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	}
 
 	dependencies := map[string][]*ast.StringExpr{}
-	for _, kvp := range t.Configuration.Entries {
-		cname := kvp.Key.Value
-		node := configNode(kvp)
 
+	templateConfig := make([]configNode, len(t.Configuration.Entries))
+	for i, kvp := range t.Configuration.Entries {
+		templateConfig[i] = configNode(configNodeYaml(kvp))
+	}
+	for _, node := range append(templateConfig, externalConfig...) {
+		cname := node.key().Value
 		cdiags := checkUniqueNode(intermediates, node)
 		diags = append(diags, cdiags...)
 

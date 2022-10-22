@@ -145,7 +145,6 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
 	defer pctx.Close()
-
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
 		loader, err := pulumiyaml.NewPackageLoader()

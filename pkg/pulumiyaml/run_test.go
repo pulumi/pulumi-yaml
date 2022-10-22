@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -1840,4 +1841,47 @@ resources:
 		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
 		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
 	})
+}
+
+func TestGetPulumiConfNodes(t *testing.T) {
+	validJSON := `{
+    "confStr" : "foo",
+    "confNum" : 2,
+	"confBool": true
+}`
+	t.Setenv(pulumi.EnvConfig, validJSON)
+	confNodes, err := getPulumiConfNodes()
+	assert.Nil(t, err)
+	assert.Len(t, confNodes, 3)
+	for _, n := range confNodes {
+		envN, ok := n.(configNodeEnv)
+		assert.True(t, ok)
+		switch envN.Key {
+		case "confStr":
+			assert.IsType(t, ctypes.String, envN.Type)
+		case "confNum":
+			assert.IsType(t, ctypes.Number, envN.Type)
+		case "confBool":
+			assert.IsType(t, ctypes.Boolean, envN.Type)
+		}
+	}
+
+	invalidJSON := `{
+    "conf1" : "foo,
+    "conf2" : "bar"
+}`
+	t.Setenv(pulumi.EnvConfig, invalidJSON)
+	_, err = getPulumiConfNodes()
+	assert.Error(t, err)
+
+	emptyStr := ""
+	t.Setenv(pulumi.EnvConfig, emptyStr)
+	confNodes, err = getPulumiConfNodes()
+	assert.Nil(t, err)
+	assert.Nil(t, confNodes)
+
+	// os.Unset(envVar)
+	// confNodes, err = getPulumiConfNodes()
+	// assert.Nil(t, err)
+	// assert.Nil(t, confNodes)
 }
