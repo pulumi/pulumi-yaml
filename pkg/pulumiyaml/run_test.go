@@ -142,6 +142,11 @@ func newMockPackageMap() PackageLoader {
 							Name: "foo",
 							Type: schema.StringType,
 						})
+					case "test:read:Resource":
+						return inputProperties(typeName, schema.Property{
+							Name: "foo",
+							Type: schema.StringType,
+						})
 					default:
 						return inputProperties(typeName)
 					}
@@ -1755,4 +1760,58 @@ variables:
 	})
 	assert.True(t, wasRun)
 	assert.Len(t, diags, 0)
+}
+
+func TestReadResourceNoState(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: no-state
+variables:
+  id: bucket-123456
+  isRight: ${bucket.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	var wasRun bool
+	diags := testInvokeDiags(t, templ, func(r *Runner) {
+		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
+			wasRun = true
+			assert.Equal(t, "yes", s)
+			return s
+		})
+	})
+	assert.True(t, wasRun)
+	assert.Len(t, diags, 0)
+}
+
+func TestReadResourceErrorTyping(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    properties:
+      foo: bar
+    get:
+      state:
+        fizz: buzz
+`
+	templ := yamlTemplate(t, text)
+	diags := testTemplateDiags(t, templ, nil)
+	assert.Len(t, diags, 2)
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+	assert.ElementsMatch(t, diagStrings, []string{
+		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
+		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
+	})
 }

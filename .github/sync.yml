@@ -1,10 +1,11 @@
-pulumi/pulumi:
-  - source: pkg/tests/transpiled_examples
-    dest: pkg/codegen/testing/test/testdata/transpiled_examples
-    exclude: |
-      .gitignore
-pulumi/pulumi-java:
-  - source: pkg/tests/transpiled_examples
-    dest: pkg/codegen/testing/test/testdata/transpiled_examples
-    exclude: |
-      .gitignore
+group:
+  repos: |
+    pulumi/pulumi
+    pulumi/pulumi-java
+  files:
+    - source: pkg/tests/transpiled_examples
+      dest: pkg/codegen/testing/test/testdata/transpiled_examples
+      exclude: |
+        .gitignore
+        go.mod
+      deleteOrphaned: true
