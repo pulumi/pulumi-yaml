@@ -113,40 +113,54 @@ type pluginEntry struct {
 func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics) {
 	pluginMap := map[string]*pluginEntry{}
 
-	var diags syntax.Diagnostics
-
-	for _, kvp := range tmpl.Resources.Entries {
-		res := kvp.Value
-		version := res.Options.Version.GetValue()
-		pluginDownloadURL := res.Options.PluginDownloadURL.GetValue()
-
-		if res.Type == nil {
-			diags.Extend(syntax.NodeError(kvp.Value.Syntax(), fmt.Sprintf("Resource declared without a 'type': %q", kvp.Key.Value), ""))
-			continue
-		}
-		pkg := resolvePkgName(res.Type.Value)
+	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
+		pkg := resolvePkgName(typeName)
 		if entry, found := pluginMap[pkg]; found {
-			if version != "" && entry.version != version {
+			if v := version.GetValue(); v != "" && entry.version != v {
 				if entry.version == "" {
-					entry.version = version
+					entry.version = v
 				} else {
-					diags.Extend(ast.ExprError(res.Options.Version, fmt.Sprintf("Provider %v already declared with a conflicting version: %v", pkg, entry.version), ""))
+					r.sdiags.Extend(ast.ExprError(version, fmt.Sprintf("Provider %v already declared with a conflicting version: %v", pkg, entry.version), ""))
 				}
 			}
-			if pluginDownloadURL != "" && entry.pluginDownloadURL != pluginDownloadURL {
+			if url := pluginDownloadURL.GetValue(); url != "" && entry.pluginDownloadURL != url {
 				if entry.pluginDownloadURL == "" {
-					entry.pluginDownloadURL = pluginDownloadURL
+					entry.pluginDownloadURL = url
 				} else {
-					diags.Extend(ast.ExprError(res.Options.PluginDownloadURL, fmt.Sprintf("Provider %v already declared with a conflicting plugin download URL: %v", pkg, entry.pluginDownloadURL), ""))
+					r.sdiags.Extend(ast.ExprError(pluginDownloadURL, fmt.Sprintf("Provider %v already declared with a conflicting plugin download URL: %v", pkg, entry.pluginDownloadURL), ""))
 				}
 			}
 		} else {
 			pluginMap[pkg] = &pluginEntry{
-				version:           version,
-				pluginDownloadURL: pluginDownloadURL,
+				version:           version.GetValue(),
+				pluginDownloadURL: pluginDownloadURL.GetValue(),
 			}
 		}
 	}
+
+	diags := newRunner(tmpl, nil).Run(walker{
+		VisitResource: func(r *Runner, node resourceNode) bool {
+			res := node.Value
+
+			if res.Type == nil {
+				r.sdiags.Extend(syntax.NodeError(node.Value.Syntax(), fmt.Sprintf("Resource declared without a 'type': %q", node.Key.Value), ""))
+				return true
+			}
+			acceptType(r, res.Type.Value, res.Options.Version, res.Options.PluginDownloadURL)
+
+			return true
+		},
+		VisitExpr: func(ctx *evalContext, expr ast.Expr) bool {
+			if expr, ok := expr.(*ast.InvokeExpr); ok {
+				if expr.Token == nil {
+					ctx.Runner.sdiags.Extend(syntax.NodeError(expr.Syntax(), fmt.Sprintf("Invoke declared without a 'function' type"), ""))
+					return true
+				}
+				acceptType(ctx.Runner, expr.Token.GetValue(), expr.CallOpts.Version, expr.CallOpts.PluginDownloadURL)
+			}
+			return true
+		},
+	})
 
 	if diags.HasErrors() {
 		return nil, diags

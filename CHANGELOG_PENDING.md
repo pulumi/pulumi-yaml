@@ -21,5 +21,5 @@
 - Respect import option on resource.
   [#367](https://github.com/pulumi/pulumi-yaml/issues/367)
 
-- Don't reject `get` resources with required properties.
-  [#373](https://github.com/pulumi/pulumi-yaml/pull/373)
+- Discover Invokes during `GetReferencedPlugins`.
+  [#381](https://github.com/pulumi/pulumi-yaml/pull/381)
