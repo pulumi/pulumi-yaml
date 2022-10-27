@@ -56,6 +56,28 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 
 	// Precompute dependencies for each resource
 	intermediates := map[string]graphNode{}
+	// The list of keys to intermediates in the order they were first added.
+	sortedIntermediatesKeys := []string{}
+
+	// Add a new node to intermediates.
+	addIntermediate := func(key string, node graphNode) {
+		_, duplicate := intermediates[key]
+		intermediates[key] = node
+		if !duplicate {
+			sortedIntermediatesKeys = append(sortedIntermediatesKeys, key)
+		}
+	}
+
+	// A list of graphNodes from intermediates in the order they were inserted in.
+	// This ensures iteration order is deterministic.
+	intermediateValues := func() []graphNode {
+		sorted := make([]graphNode, len(sortedIntermediatesKeys))
+		for i, k := range sortedIntermediatesKeys {
+			sorted[i] = intermediates[k]
+		}
+		return sorted
+	}
+
 	dependencies := map[string][]*ast.StringExpr{}
 	for _, kvp := range t.Configuration.Entries {
 		cname := kvp.Key.Value
@@ -65,7 +87,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			intermediates[cname] = node
+			addIntermediate(cname, node)
 			dependencies[cname] = nil
 
 			// Special case: configuration goes first
@@ -81,7 +103,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			intermediates[rname] = node
+			addIntermediate(rname, node)
 			dependencies[rname] = GetResourceDependencies(r)
 		}
 	}
@@ -93,7 +115,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			intermediates[vname] = node
+			addIntermediate(vname, node)
 			dependencies[vname] = GetVariableDependencies(kvp)
 		}
 	}
@@ -147,7 +169,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	// Repeatedly visit the first unvisited unode until none are left
 	for {
 		progress := false
-		for _, e := range intermediates {
+		for _, e := range intermediateValues() {
 			if !visited[e.key().Value] {
 				if visit(e.key()) {
 					progress = true
