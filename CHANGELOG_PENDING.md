@@ -23,3 +23,6 @@
 
 - Discover Invokes during `GetReferencedPlugins`.
   [#381](https://github.com/pulumi/pulumi-yaml/pull/381)
+
+- Escaped interpolated strings now remove one extra dollar sign.
+  [#382](https://github.com/pulumi/pulumi-yaml/pull/382)
