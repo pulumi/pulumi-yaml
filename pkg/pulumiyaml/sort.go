@@ -60,7 +60,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 	sortedIntermediatesKeys := []string{}
 
 	// Add a new node to intermediates.
-	addItermediate := func(key string, node graphNode) {
+	addIntermediate := func(key string, node graphNode) {
 		_, duplicate := intermediates[key]
 		intermediates[key] = node
 		if !duplicate {
@@ -87,7 +87,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			addItermediate(cname, node)
+			addIntermediate(cname, node)
 			dependencies[cname] = nil
 
 			// Special case: configuration goes first
@@ -103,7 +103,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			addItermediate(rname, node)
+			addIntermediate(rname, node)
 			dependencies[rname] = GetResourceDependencies(r)
 		}
 	}
@@ -115,7 +115,7 @@ func topologicallySortedResources(t *ast.TemplateDecl) ([]graphNode, syntax.Diag
 		diags = append(diags, cdiags...)
 
 		if !cdiags.HasErrors() {
-			addItermediate(vname, node)
+			addIntermediate(vname, node)
 			dependencies[vname] = GetVariableDependencies(kvp)
 		}
 	}
