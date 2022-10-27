@@ -146,7 +146,10 @@ type InterpolateExpr struct {
 func (n *InterpolateExpr) String() string {
 	var str strings.Builder
 	for _, p := range n.Parts {
-		str.WriteString(strings.ReplaceAll(p.Text, "$$", "$"))
+		// un-escape the string back to its original form
+		// this is necessary because the parser will escape the string
+		// so when we print it back out as string, we need to un-escape it
+		str.WriteString(strings.ReplaceAll(p.Text, "$", "$$"))
 		if p.Value != nil {
 			fmt.Fprintf(&str, "${%v}", p.Value)
 		}
