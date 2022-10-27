@@ -117,17 +117,12 @@ func (x *StringExpr) GetValue() string {
 
 // StringSyntax creates a new string literal expression with the given value and associated syntax.
 func StringSyntax(node *syntax.StringNode) *StringExpr {
-	parts, diags := parseInterpolate(node, node.Value())
-	if diags.HasErrors() {
-		return &StringExpr{exprNode: expr(node), Value: node.Value()}
-	}
-
-	if len(parts) == 1 && parts[0].Value == nil {
-		interpolated := &InterpolateExpr{Parts: parts}
-		return &StringExpr{exprNode: expr(node), Value: interpolated.String()}
-	}
-
 	return &StringExpr{exprNode: expr(node), Value: node.Value()}
+}
+
+// StringSyntaxValue creates a new string literal expression with the given syntax and value.
+func StringSyntaxValue(node *syntax.StringNode, value string) *StringExpr {
+	return &StringExpr{exprNode: expr(node), Value: value}
 }
 
 // String creates a new string literal expression with the given value.
@@ -303,7 +298,7 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 			case 1:
 				switch {
 				case interpolate.Parts[0].Value == nil:
-					return StringSyntax(node), diags
+					return StringSyntaxValue(node, interpolate.Parts[0].Text), diags
 				case interpolate.Parts[0].Text == "":
 					return &SymbolExpr{
 						exprNode: expr(node),
