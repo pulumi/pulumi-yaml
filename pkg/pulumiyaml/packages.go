@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/iancoleman/strcase"
@@ -174,6 +175,17 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 			PluginDownloadURL: meta.pluginDownloadURL,
 		})
 	}
+
+	sort.Slice(plugins, func(i, j int) bool {
+		pI, pJ := plugins[i], plugins[j]
+		if pI.Package != pJ.Package {
+			return pI.Package < pJ.Package
+		}
+		if pI.Version != pJ.Version {
+			return pI.Version < pJ.Version
+		}
+		return pI.PluginDownloadURL < pJ.PluginDownloadURL
+	})
 
 	return plugins, nil
 }

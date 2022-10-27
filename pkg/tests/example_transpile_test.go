@@ -28,7 +28,6 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
 var (
@@ -42,26 +41,6 @@ var (
 		"stackreference-consumer",
 		// PCL does not have stringAssets
 		"getting-started",
-	}
-
-	// failingCompile examples are known to produce valid PCL, but produce
-	// invalid transpiled code.
-	failingCompile = map[string]LanguageList{
-		"stackreference-producer": Dotnet.And(Golang),
-		"stackreference-consumer": AllLanguages().Except(Python),
-		"random":                  Dotnet.And(Nodejs),
-		"azure-static-website":    AllLanguages(),
-		"aws-static-website":      AllLanguages().Except(Python),
-		"webserver":               AllLanguages().Except(Nodejs),
-		"azure-container-apps":    AllLanguages(),
-		"webserver-json":          AllLanguages().Except(Nodejs),
-		"aws-eks":                 AllLanguages().Except(Python), // plain inputs
-		"cue-eks":                 AllLanguages().Except(Python), // plain inputs
-		"azure-app-service":       Dotnet.And(Golang),
-		"pulumi-variable":         AllLanguages().Except(Python),
-		"kubernetes":              Golang, // returning string instead of *string in ApplyT
-		"readme": (Dotnet.And( // https://github.com/pulumi/pulumi/issues/9642
-			Golang)), // https://github.com/pulumi/pulumi/issues/9692
 	}
 )
 
@@ -227,8 +206,6 @@ func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 		}
 	}
 }
-
-type projectGeneratorFunc func(directory string, project workspace.Project, p *pcl.Program) error
 
 type LanguageList struct {
 	list []string
