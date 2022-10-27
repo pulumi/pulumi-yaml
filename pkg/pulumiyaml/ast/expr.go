@@ -120,6 +120,11 @@ func StringSyntax(node *syntax.StringNode) *StringExpr {
 	return &StringExpr{exprNode: expr(node), Value: node.Value()}
 }
 
+// StringSyntaxValue creates a new string literal expression with the given syntax and value.
+func StringSyntaxValue(node *syntax.StringNode, value string) *StringExpr {
+	return &StringExpr{exprNode: expr(node), Value: value}
+}
+
 // String creates a new string literal expression with the given value.
 func String(value string) *StringExpr {
 	return &StringExpr{Value: value}
@@ -141,6 +146,9 @@ type InterpolateExpr struct {
 func (n *InterpolateExpr) String() string {
 	var str strings.Builder
 	for _, p := range n.Parts {
+		// un-escape the string back to its original form
+		// this is necessary because the parser will escape the string
+		// so when we print it back out as string, we need to un-escape it
 		str.WriteString(strings.ReplaceAll(p.Text, "$", "$$"))
 		if p.Value != nil {
 			fmt.Fprintf(&str, "${%v}", p.Value)
@@ -293,7 +301,7 @@ func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 			case 1:
 				switch {
 				case interpolate.Parts[0].Value == nil:
-					return StringSyntax(node), diags
+					return StringSyntaxValue(node, interpolate.Parts[0].Text), diags
 				case interpolate.Parts[0].Text == "":
 					return &SymbolExpr{
 						exprNode: expr(node),

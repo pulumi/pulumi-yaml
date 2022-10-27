@@ -1613,6 +1613,32 @@ variables:
 	})
 }
 
+func TestEscapingInterpolationInTemplate(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-readfile
+runtime: yaml
+variables:
+    world: world
+    interpolated: hello ${world}!
+    escaped: hello $${world}!
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	testTemplate(t, tmpl, func(e *programEvaluator) {
+		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		requireNoErrors(t, tmpl, diags)
+		result, ok := e.variables["interpolated"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, "hello world!", result)
+
+		result, ok = e.variables["escaped"].(string)
+		assert.True(t, ok)
+		assert.Equal(t, "hello ${world}!", result)
+	})
+}
+
 func TestJoinForbidsNonStringArgs(t *testing.T) {
 	t.Parallel()
 
