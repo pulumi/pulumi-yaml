@@ -117,6 +117,16 @@ func (x *StringExpr) GetValue() string {
 
 // StringSyntax creates a new string literal expression with the given value and associated syntax.
 func StringSyntax(node *syntax.StringNode) *StringExpr {
+	parts, diags := parseInterpolate(node, node.Value())
+	if diags.HasErrors() {
+		return &StringExpr{exprNode: expr(node), Value: node.Value()}
+	}
+
+	if len(parts) == 1 && parts[0].Value == nil {
+		interpolated := &InterpolateExpr{Parts: parts}
+		return &StringExpr{exprNode: expr(node), Value: interpolated.String()}
+	}
+
 	return &StringExpr{exprNode: expr(node), Value: node.Value()}
 }
 
@@ -141,7 +151,7 @@ type InterpolateExpr struct {
 func (n *InterpolateExpr) String() string {
 	var str strings.Builder
 	for _, p := range n.Parts {
-		str.WriteString(strings.ReplaceAll(p.Text, "$", "$$"))
+		str.WriteString(strings.ReplaceAll(p.Text, "$$", "$"))
 		if p.Value != nil {
 			fmt.Fprintf(&str, "${%v}", p.Value)
 		}
