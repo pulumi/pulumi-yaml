@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -64,6 +65,9 @@ resources:
 			calls = calls + 1
 			switch args.TypeToken {
 			case testResourceToken:
+				// Its important that this function returns only after step (1) has
+				// triggered.
+				time.Sleep(time.Millisecond * 5)
 				return idAttr, resource.PropertyMap{
 					"bar": resource.NewArrayProperty([]resource.PropertyValue{
 						resource.NewNumberProperty(42),
