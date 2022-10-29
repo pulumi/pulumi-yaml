@@ -154,7 +154,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		defer loader.Close()
 
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(ctx, template, loader)
+		return pulumiyaml.RunTemplate(ctx, template, req.GetConfig(), loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())

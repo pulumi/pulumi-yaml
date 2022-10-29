@@ -289,10 +289,11 @@ func (r *Runner) setDefaultProviders() error {
 }
 
 // PrepareTemplate prepares a template for converting or running
-func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
-	// set up context-free runner
-	r := newRunner(t, loader)
-
+func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
+	// for pulumi convert
+	if r == nil {
+		r = newRunner(t, loader)
+	}
 	// runner hooks up default providers
 	err := r.setDefaultProviders()
 	if err != nil {
@@ -309,8 +310,14 @@ func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	r, diags, err := PrepareTemplate(t, loader)
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
+	r := newRunner(t, loader)
+	err := r.setIntermediates(config)
+	if err != nil {
+		return err
+	}
+
+	r, diags, err := PrepareTemplate(t, r, loader)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -322,7 +329,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader)
 	}
 
 	// runtime evaluation here
-	diags.Extend(r.Evaluate(ctx)...)
+	diags.Extend(r.Evaluate(ctx, config)...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -575,7 +582,8 @@ type Evaluator interface {
 
 type programEvaluator struct {
 	*evalContext
-	pulumiCtx *pulumi.Context
+	pulumiCtx     *pulumi.Context
+	runtimeConfig map[string]string
 }
 
 func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -620,7 +628,6 @@ func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}
 }
 
 func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
-
 	ctx := r.newContext(node)
 	c, ok := e.registerConfig(node)
 	if !ok {
@@ -684,52 +691,19 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
-func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+func (r *Runner) Evaluate(ctx *pulumi.Context, config map[string]string) syntax.Diagnostics {
 	eCtx := r.newContext(nil)
-	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
+	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx, runtimeConfig: config})
 }
 
-func getPulumiConfNodes() ([]configNode, error) {
-	var projConf map[string]interface{}
-	projConfStr, ok := os.LookupEnv(pulumi.EnvConfig)
-	if !ok || projConfStr == "" {
-		return nil, nil
-	} else if err := json.Unmarshal([]byte(projConfStr), &projConf); err != nil {
-		return nil, err
-	}
-
-	var projConfSecretsKeys []string
-	isSecretKey := make(map[string]bool)
-	projConfStr, ok = os.LookupEnv(pulumi.EnvConfigSecretKeys)
-	if !ok || projConfStr == "" {
-		// do nothing if no secret keys set
-	} else if err := json.Unmarshal([]byte(projConfStr), &projConfSecretsKeys); err != nil {
-		return nil, err
-	} else {
-		for _, k := range projConfSecretsKeys {
-			isSecretKey[k] = true
-		}
-	}
-
-	nodes := make([]configNode, len(projConf))
+func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
+	nodes := make([]configNode, len(config))
 	idx := 0
-	for k, v := range projConf {
-		var typ ctypes.Type
-		switch v.(type) {
-		case string:
-			typ = ctypes.String
-		case bool:
-			typ = ctypes.Boolean
-		// type checking here is incomplete/ probably wrong right now
-		case int, float64:
-			typ = ctypes.Number
-		}
-
+	for k, v := range config {
 		n := configNodeEnv{
-			Key:    k,
-			Value:  v,
-			Type:   typ,
-			Secret: isSecretKey[k],
+			Key:   k,
+			Value: v,
+			Type:  getConfigType(v),
 		}
 		nodes[idx] = n
 		idx++
@@ -737,7 +711,28 @@ func getPulumiConfNodes() ([]configNode, error) {
 	return nodes, nil
 }
 
-func (r *Runner) ensureSetup(ctx *pulumi.Context) {
+// ensureSetupCtxless is called for convert and runtime evaluation
+func (r *Runner) setIntermediates(config map[string]string) error {
+	r.intermediates = []graphNode{}
+	confNodes, err := getPulumiConfNodes(config)
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return err
+	}
+	// Topologically sort the intermediates based on implicit and explicit dependencies
+	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
+	r.sdiags.Extend(rdiags...)
+	if rdiags.HasErrors() {
+		return err
+	}
+	if intermediates != nil {
+		r.intermediates = intermediates
+	}
+	return nil
+}
+
+// ensureSetup is called at runtime evaluation
+func (r *Runner) ensureSetup(ctx *pulumi.Context, config map[string]string) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
@@ -755,34 +750,31 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 		"stack":   stack,
 	}
 	r.cwd = cwd
+}
 
-	r.intermediates = []graphNode{}
-
-	confNodes, err := getPulumiConfNodes()
-	if err != nil {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return
+func getConfigType(v string) ctypes.Type {
+	if _, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return ctypes.Int
 	}
-
-	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
-	r.sdiags.Extend(rdiags...)
-	if rdiags.HasErrors() {
-		return
+	if _, err := strconv.ParseBool(v); err == nil {
+		return ctypes.Boolean
 	}
-	if intermediates != nil {
-		r.intermediates = intermediates
+	if _, err := strconv.ParseFloat(v, 64); err == nil {
+		return ctypes.Number
 	}
+	return ctypes.String
 }
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 	var ctx *pulumi.Context
+	var config map[string]string
 
 	switch eval := e.(type) {
 	case programEvaluator:
 		ctx = eval.pulumiCtx
+		config = eval.runtimeConfig
 	}
-	r.ensureSetup(ctx)
+	r.ensureSetup(ctx, config)
 
 	returnDiags := func() syntax.Diagnostics {
 		r.sdiags.mutex.Lock()
@@ -1470,7 +1462,7 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 	var receiver interface{}
 	if res, ok := e.resources[resourceName]; ok {
 		receiver = res
-	} else if p, ok := e.config[resourceName]; ok {
+	} else if p, ok := e.runtimeConfig[resourceName]; ok {
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v

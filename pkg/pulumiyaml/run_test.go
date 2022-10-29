@@ -277,7 +277,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		if diags.HasErrors() {
 			return diags
 		}
-		err := runner.Evaluate(ctx)
+		err := runner.Evaluate(ctx, nil)
 		if err.HasErrors() {
 			return err
 		}
@@ -315,7 +315,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		err := runner.Evaluate(ctx)
+		err := runner.Evaluate(ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -1503,7 +1503,7 @@ variables:
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var hasRun = false
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx).HasErrors())
+		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx, nil).HasErrors())
 		s := e.variables["mySecret"].(pulumi.Output)
 		require.True(t, pulumi.IsSecret(s))
 		out := s.ApplyT(func(x interface{}) (interface{}, error) {
@@ -1539,7 +1539,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["textData"].(string)
 		assert.True(t, ok)
@@ -1606,7 +1606,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["foo-bar"].(string)
 		assert.True(t, ok)
@@ -1628,7 +1628,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["interpolated"].(string)
 		assert.True(t, ok)
@@ -1844,13 +1844,13 @@ resources:
 }
 
 func TestGetPulumiConfNodes(t *testing.T) {
-	validJSON := `{
-    "confStr" : "foo",
-    "confNum" : 2,
-	"confBool": true
-}`
-	t.Setenv(pulumi.EnvConfig, validJSON)
-	confNodes, err := getPulumiConfNodes()
+	t.Parallel()
+	configMap := map[string]string{
+		"confStr":  "foo",
+		"confNum":  "2",
+		"confBool": "true",
+	}
+	confNodes, err := getPulumiConfNodes(configMap)
 	assert.Nil(t, err)
 	assert.Len(t, confNodes, 3)
 	for _, n := range confNodes {
@@ -1865,23 +1865,4 @@ func TestGetPulumiConfNodes(t *testing.T) {
 			assert.IsType(t, ctypes.Boolean, envN.Type)
 		}
 	}
-
-	invalidJSON := `{
-    "conf1" : "foo,
-    "conf2" : "bar"
-}`
-	t.Setenv(pulumi.EnvConfig, invalidJSON)
-	_, err = getPulumiConfNodes()
-	assert.Error(t, err)
-
-	emptyStr := ""
-	t.Setenv(pulumi.EnvConfig, emptyStr)
-	confNodes, err = getPulumiConfNodes()
-	assert.Nil(t, err)
-	assert.Nil(t, confNodes)
-
-	// os.Unset(envVar)
-	// confNodes, err = getPulumiConfNodes()
-	// assert.Nil(t, err)
-	// assert.Nil(t, confNodes)
 }
