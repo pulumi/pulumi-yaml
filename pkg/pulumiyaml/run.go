@@ -1462,6 +1462,8 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 	var receiver interface{}
 	if res, ok := e.resources[resourceName]; ok {
 		receiver = res
+	} else if p, ok := e.config[resourceName]; ok {
+		receiver = p
 	} else if p, ok := e.runtimeConfig[resourceName]; ok {
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
