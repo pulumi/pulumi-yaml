@@ -85,7 +85,7 @@ resources:
 		ctx.Log = log
 		r := newRunner(template, newMockPackageMap())
 		hoistedRunner = r
-		diags := r.Evaluate(ctx)
+		diags := r.Evaluate(ctx, nil)
 		// 1. This test demonstrates that the synchronous output of evaluate is nil
 		// as the invalid expression is inside an apply
 		assert.False(t, diags.HasErrors())

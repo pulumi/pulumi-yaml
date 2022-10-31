@@ -35,7 +35,7 @@ outputs:
 	mocks := &testMonitor{}
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		diags := runner.Evaluate(ctx)
+		diags := runner.Evaluate(ctx, nil)
 		requireNoErrors(t, template, diags)
 		ectx := runner.newContext(nil)
 		programEvaluator := programEvaluator{
@@ -333,7 +333,7 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		err := runner.Evaluate(ctx)
+		err := runner.Evaluate(ctx, nil)
 		if err != nil {
 			return err
 		}
