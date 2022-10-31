@@ -290,7 +290,8 @@ func (r *Runner) setDefaultProviders() error {
 
 // PrepareTemplate prepares a template for converting or running
 func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
-	// for pulumi convert
+	// If running a template also, we need to pass a runner through, since setting intermediates
+	// requires config via the pulumi Context
 	if r == nil {
 		r = newRunner(t, loader)
 	}
@@ -312,7 +313,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	err := r.ensureSetupCtxless(config)
+	err := r.setIntermediates(config)
 	if err != nil {
 		return err
 	}
@@ -329,7 +330,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 	}
 
 	// runtime evaluation here
-	diags.Extend(r.Evaluate(ctx, config)...)
+	diags.Extend(r.Evaluate(ctx)...)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -377,7 +378,7 @@ type Runner struct {
 
 	sdiags syncDiags
 
-	ctxlessSetupDone bool
+	intermediatesSet bool
 
 	// Used to store sorted nodes. A non `nil` value indicates that the runner
 	// is already setup for running.
@@ -584,8 +585,7 @@ type Evaluator interface {
 
 type programEvaluator struct {
 	*evalContext
-	pulumiCtx     *pulumi.Context
-	runtimeConfig map[string]string
+	pulumiCtx *pulumi.Context
 }
 
 func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -693,9 +693,9 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
-func (r *Runner) Evaluate(ctx *pulumi.Context, config map[string]string) syntax.Diagnostics {
+func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	eCtx := r.newContext(nil)
-	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx, runtimeConfig: config})
+	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
 func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
@@ -713,9 +713,9 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 	return nodes, nil
 }
 
-// ensureSetupCtxless is called for convert and runtime evaluation
-func (r *Runner) ensureSetupCtxless(config map[string]string) error {
-	if r.ctxlessSetupDone {
+// setIntermediates is called for convert and runtime evaluation
+func (r *Runner) setIntermediates(config map[string]string) error {
+	if r.intermediatesSet {
 		return nil
 	}
 
@@ -735,13 +735,14 @@ func (r *Runner) ensureSetupCtxless(config map[string]string) error {
 		r.intermediates = intermediates
 	}
 
-	r.ctxlessSetupDone = true
+	r.intermediatesSet = true
 	return nil
 }
 
 // ensureSetup is called at runtime evaluation
-func (r *Runner) ensureSetup(ctx *pulumi.Context, config map[string]string) {
-	r.ensureSetupCtxless(config)
+func (r *Runner) ensureSetup(ctx *pulumi.Context) {
+	// Our tests need to set intermediates, even though they don't have runtime config
+	r.setIntermediates(nil)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -777,14 +778,12 @@ func getConfigType(v string) ctypes.Type {
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 	var ctx *pulumi.Context
-	var config map[string]string
 
 	switch eval := e.(type) {
 	case programEvaluator:
 		ctx = eval.pulumiCtx
-		config = eval.runtimeConfig
 	}
-	r.ensureSetup(ctx, config)
+	r.ensureSetup(ctx)
 
 	returnDiags := func() syntax.Diagnostics {
 		r.sdiags.mutex.Lock()
@@ -1473,8 +1472,6 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 	if res, ok := e.resources[resourceName]; ok {
 		receiver = res
 	} else if p, ok := e.config[resourceName]; ok {
-		receiver = p
-	} else if p, ok := e.runtimeConfig[resourceName]; ok {
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v
