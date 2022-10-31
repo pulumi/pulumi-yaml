@@ -698,17 +698,27 @@ func (r *Runner) Evaluate(ctx *pulumi.Context, config map[string]string) syntax.
 
 func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 	nodes := make([]configNode, len(config))
+	var errors multierror.Error
 	idx := 0
 	for k, v := range config {
+		// We default types to strings to avoid error cascades on mis-typed values.
+		typ := ctypes.String
+		var value interface{} = v
+		if v, t, err := getConfigNode(v); err == nil {
+			typ = t
+			value = v
+		} else {
+			errors.Errors = append(errors.Errors, err)
+		}
 		n := configNodeEnv{
 			Key:   k,
-			Value: v,
-			Type:  getConfigType(v),
+			Value: value,
+			Type:  typ,
 		}
 		nodes[idx] = n
 		idx++
 	}
-	return nodes, nil
+	return nodes, errors.ErrorOrNil()
 }
 
 // ensureSetupCtxless is called for convert and runtime evaluation
@@ -752,17 +762,27 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context, config map[string]string) {
 	r.cwd = cwd
 }
 
-func getConfigType(v string) ctypes.Type {
-	if _, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return ctypes.Int
+// getConfigNode retrieves a runtime value and type from a config node.
+func getConfigNode(v string) (interface{}, ctypes.Type, error) {
+	// scalar config values are represented as their go literals, while arrays and objects
+	// are represented as JSON.
+	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return i, ctypes.Int, nil
 	}
-	if _, err := strconv.ParseBool(v); err == nil {
-		return ctypes.Boolean
+	if b, err := strconv.ParseBool(v); err == nil {
+		return b, ctypes.Boolean, nil
 	}
-	if _, err := strconv.ParseFloat(v, 64); err == nil {
-		return ctypes.Number
+	if f, err := strconv.ParseFloat(v, 64); err == nil {
+		return f, ctypes.Number, nil
 	}
-	return ctypes.String
+
+	var value interface{}
+	if err := json.Unmarshal([]byte(v), &value); err == nil {
+		typ, err := ctypes.TypeValue(value)
+		return value, typ, err
+	}
+
+	return v, ctypes.String, nil
 }
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
