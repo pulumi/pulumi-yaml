@@ -277,9 +277,9 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		if diags.HasErrors() {
 			return diags
 		}
-		err := runner.Evaluate(ctx, nil)
-		if err.HasErrors() {
-			return err
+		diags = runner.Evaluate(ctx, nil)
+		if diags.HasErrors() {
+			return diags
 		}
 		if callback != nil {
 			eCtx := runner.newContext(nil)
@@ -495,7 +495,7 @@ configuration:
 		})
 	testRan := false
 	err := testTemplateDiags(t, tmpl, func(e *programEvaluator) {
-
+		fmt.Println(e.config, e.runtimeConfig)
 		// Secret because declared secret in configuration
 		assert.True(t, pulumi.IsSecret(e.config["foo"].(pulumi.Output)))
 		// Secret because declared secret in in config

@@ -312,7 +312,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	err := r.setIntermediates(config)
+	err := r.ensureSetupCtxless(config)
 	if err != nil {
 		return err
 	}
@@ -376,6 +376,8 @@ type Runner struct {
 	cwd string
 
 	sdiags syncDiags
+
+	ctxlessSetupDone bool
 
 	// Used to store sorted nodes. A non `nil` value indicates that the runner
 	// is already setup for running.
@@ -712,7 +714,11 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 }
 
 // ensureSetupCtxless is called for convert and runtime evaluation
-func (r *Runner) setIntermediates(config map[string]string) error {
+func (r *Runner) ensureSetupCtxless(config map[string]string) error {
+	if r.ctxlessSetupDone {
+		return nil
+	}
+
 	r.intermediates = []graphNode{}
 	confNodes, err := getPulumiConfNodes(config)
 	if err != nil {
@@ -728,11 +734,15 @@ func (r *Runner) setIntermediates(config map[string]string) error {
 	if intermediates != nil {
 		r.intermediates = intermediates
 	}
+
+	r.ctxlessSetupDone = true
 	return nil
 }
 
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context, config map[string]string) {
+	r.ensureSetupCtxless(config)
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
