@@ -277,9 +277,9 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		if diags.HasErrors() {
 			return diags
 		}
-		err := runner.Evaluate(ctx, nil)
-		if err.HasErrors() {
-			return err
+		diags = runner.Evaluate(ctx)
+		if diags.HasErrors() {
+			return diags
 		}
 		if callback != nil {
 			eCtx := runner.newContext(nil)
@@ -315,7 +315,7 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		err := runner.Evaluate(ctx, nil)
+		err := runner.Evaluate(ctx)
 		if err != nil {
 			return err
 		}
@@ -495,7 +495,6 @@ configuration:
 		})
 	testRan := false
 	err := testTemplateDiags(t, tmpl, func(e *programEvaluator) {
-
 		// Secret because declared secret in configuration
 		assert.True(t, pulumi.IsSecret(e.config["foo"].(pulumi.Output)))
 		// Secret because declared secret in in config
@@ -1503,7 +1502,7 @@ variables:
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var hasRun = false
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx, nil).HasErrors())
+		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx).HasErrors())
 		s := e.variables["mySecret"].(pulumi.Output)
 		require.True(t, pulumi.IsSecret(s))
 		out := s.ApplyT(func(x interface{}) (interface{}, error) {
@@ -1539,7 +1538,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
+		diags := e.evalContext.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["textData"].(string)
 		assert.True(t, ok)
@@ -1606,7 +1605,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
+		diags := e.evalContext.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["foo-bar"].(string)
 		assert.True(t, ok)
@@ -1628,7 +1627,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx, nil)
+		diags := e.evalContext.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["interpolated"].(string)
 		assert.True(t, ok)
