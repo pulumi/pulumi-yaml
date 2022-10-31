@@ -133,13 +133,15 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
 	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
 	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
-		Project:     req.GetProject(),
-		Stack:       req.GetStack(),
-		Config:      req.GetConfig(),
-		Parallel:    int(req.GetParallel()),
-		DryRun:      req.GetDryRun(),
-		MonitorAddr: req.GetMonitorAddress(),
-		EngineAddr:  host.engineAddress,
+		Project:          req.GetProject(),
+		Stack:            req.GetStack(),
+		Config:           req.GetConfig(),
+		ConfigSecretKeys: req.GetConfigSecretKeys(),
+		Organization:     req.Organization,
+		Parallel:         int(req.GetParallel()),
+		DryRun:           req.GetDryRun(),
+		MonitorAddr:      req.GetMonitorAddress(),
+		EngineAddr:       host.engineAddress,
 	})
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil

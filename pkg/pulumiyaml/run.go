@@ -313,9 +313,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	err := r.setIntermediates(config)
-	if err != nil {
-		return err
+	r.setIntermediates(config)
+	if r.sdiags.HasErrors() {
+		return &r.sdiags
 	}
 
 	r, diags, err := PrepareTemplate(t, r, loader)
@@ -724,29 +724,28 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 }
 
 // setIntermediates is called for convert and runtime evaluation
-func (r *Runner) setIntermediates(config map[string]string) error {
+func (r *Runner) setIntermediates(config map[string]string) {
 	if r.intermediatesSet {
-		return nil
+		return
 	}
 
 	r.intermediates = []graphNode{}
 	confNodes, err := getPulumiConfNodes(config)
 	if err != nil {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return err
+		return
 	}
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
 	r.sdiags.Extend(rdiags...)
 	if rdiags.HasErrors() {
-		return err
+		return
 	}
 	if intermediates != nil {
 		r.intermediates = intermediates
 	}
 
 	r.intermediatesSet = true
-	return nil
 }
 
 // ensureSetup is called at runtime evaluation
@@ -920,17 +919,19 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 				"Cannot mark a configuration value as not secret"+
 					" if the associated config value is secret")
 		}
+
+		// We only want to mark a value as secret if it is not already secret. If
+		// isSecretInConfig is true, we will retrieve a secret value and thus won't need
+		// to mark it as secret (since it already will be).
 		if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
 			markSecret = true
 		}
-	case configNodeEnv:
-		if intm.Secret {
-			return pulumi.ToSecret(intm.Value), true
-		}
-		return intm.Value, true
-	// We should never reach the default
 	default:
-		return e.errorf(nil, "internal error: unexpected config type %T", intm)
+		v := intm.value()
+		if e.pulumiCtx.IsConfigSecret(intm.key().GetValue()) {
+			v = pulumi.ToSecret(v)
+		}
+		return v, true
 	}
 
 	var v interface{}

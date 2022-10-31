@@ -1883,6 +1883,7 @@ func TestGetPulumiConfNodes(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
 			value, typ, err := getConfigNode(tt.input)
 			if tt.err != nil {
 				assert.ErrorContains(t, err, tt.err.Error())

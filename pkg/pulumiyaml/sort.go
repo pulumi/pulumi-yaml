@@ -58,10 +58,9 @@ func (e configNodeYaml) value() interface{} {
 }
 
 type configNodeEnv struct {
-	Key    string
-	Value  interface{}
-	Type   config.Type
-	Secret bool
+	Key   string
+	Value interface{}
+	Type  config.Type
 }
 
 func (e configNodeEnv) valueKind() string {
