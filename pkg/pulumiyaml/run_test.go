@@ -1844,24 +1844,52 @@ resources:
 
 func TestGetPulumiConfNodes(t *testing.T) {
 	t.Parallel()
-	configMap := map[string]string{
-		"confStr":  "foo",
-		"confNum":  "2",
-		"confBool": "true",
+	tests := []struct {
+		input string
+		typ   ctypes.Type
+		value interface{}
+		err   error
+	}{
+		{
+			input: "foo",
+			typ:   ctypes.String,
+			value: "foo",
+		},
+		{
+			input: "2.0",
+			typ:   ctypes.Number,
+			value: 2.0,
+		},
+		{
+			input: "1",
+			typ:   ctypes.Int,
+			value: int64(1),
+		},
+		{
+			input: "true",
+			typ:   ctypes.Boolean,
+			value: true,
+		},
+		{
+			input: `["a", "b", "c"]`,
+			typ:   ctypes.StringList,
+			value: []interface{}{"a", "b", "c"},
+		},
+		{
+			input: `["one", 2]`,
+			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
+		},
 	}
-	confNodes, err := getPulumiConfNodes(configMap)
-	assert.Nil(t, err)
-	assert.Len(t, confNodes, 3)
-	for _, n := range confNodes {
-		envN, ok := n.(configNodeEnv)
-		assert.True(t, ok)
-		switch envN.Key {
-		case "confStr":
-			assert.IsType(t, ctypes.String, envN.Type)
-		case "confNum":
-			assert.IsType(t, ctypes.Number, envN.Type)
-		case "confBool":
-			assert.IsType(t, ctypes.Boolean, envN.Type)
-		}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.input, func(t *testing.T) {
+			value, typ, err := getConfigNode(tt.input)
+			if tt.err != nil {
+				assert.ErrorContains(t, err, tt.err.Error())
+			} else {
+				assert.Equal(t, tt.typ, typ)
+				assert.Equal(t, tt.value, value)
+			}
+		})
 	}
 }
