@@ -57,6 +57,12 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 		return model.VariableReference(v), nil
 	}
 	if v, ok := imp.resources[name]; ok {
+		// TODO: This comparison is not 100% sound, since hint may be a union that
+		// includes a `string` type but does not include the resource type itself.
+		//
+		// The solution is to expose IsAssignable from pulumiyaml.Typing, but for that to
+		// be reliable we would need to harden a lot of our top-sort algorithm against
+		// missing nodes.
 		exportID := codegen.UnwrapType(hint) == schema.StringType
 		if isAccess || !exportID {
 			return model.VariableReference(v), nil
