@@ -29,3 +29,6 @@
 
 - Escaped interpolated strings now remove one extra dollar sign.
   [#382](https://github.com/pulumi/pulumi-yaml/pull/382)
+
+- Only insert "id" in ejected resource refs when the receiver type is a string.
+  [#389](https://github.com/pulumi/pulumi-yaml/pull/389)
