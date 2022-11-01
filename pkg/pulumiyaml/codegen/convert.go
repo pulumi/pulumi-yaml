@@ -61,12 +61,14 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 	if diags.HasErrors() {
 		return "", diags, nil
 	}
-
+	fmt.Println("prepared template succesffuly")
 	templateBody, tdiags := ImportTemplate(template, pkgLoader)
 	diags = diags.Extend(tdiags.HCL())
 	if diags.HasErrors() {
 		return "", diags, nil
 	}
+	fmt.Println("imported template succesffuly")
+
 	programText := fmt.Sprintf("%v", templateBody)
 
 	return programText, nil, nil

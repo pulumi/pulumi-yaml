@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
@@ -166,11 +167,18 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
-			return false
+			if isPotentialConfig(name.Value) {
+				intermediates[name.Value] = configNodeEnv{
+					Key: name.Value,
+				}
+				e = intermediates[name.Value]
+				addIntermediate(name.Value, e)
+			} else {
+				diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
+				return false
+			}
 		}
 		kind := e.valueKind()
-
 		if visiting[name.Value] {
 			diags.Extend(ast.ExprError(
 				name,
@@ -197,7 +205,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 		return true
 	}
 
-	// Repeatedly visit the first unvisited unode until none are left
+	// Repeatedly visit the first unvisited node until none are left
 	for {
 		progress := false
 		for _, e := range intermediateValues() {
@@ -233,4 +241,8 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 		return diags
 	}
 	return diags
+}
+
+func isPotentialConfig(name string) bool {
+	return len(strings.Split(name, ":")) == 2
 }
