@@ -27,6 +27,7 @@ type importer struct {
 	referencedStacks []string
 
 	loader          pulumiyaml.PackageLoader
+	typing          pulumiyaml.Typing
 	configuration   map[string]*model.Variable
 	variables       map[string]*model.Variable
 	stackReferences map[string]*model.Variable
@@ -47,7 +48,7 @@ var null = &model.Variable{
 
 // importRef imports a reference to a config variable or resource. These entities all correspond to top-level variables
 // in the Pulumi program, so each reference is imported as a scope traversal expression.
-func (imp *importer) importRef(node ast.Expr, name string, environment map[string]model.Expression, isAccess bool) (model.Expression, syntax.Diagnostics) {
+func (imp *importer) importRef(node ast.Expr, name string, environment map[string]model.Expression, isAccess bool, hint schema.Type) (model.Expression, syntax.Diagnostics) {
 	// `pulumi` is not a real variable, so it doesn't make sense to look it up.
 	contract.Assertf(name != pulumiyaml.PulumiVarName, "%[1]T: %[1]v", node)
 	if v, ok := imp.configuration[name]; ok {
@@ -57,9 +58,11 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 		return model.VariableReference(v), nil
 	}
 	if v, ok := imp.resources[name]; ok {
-		if isAccess {
+		exportID := codegen.UnwrapType(hint) == schema.StringType
+		if isAccess || !exportID {
 			return model.VariableReference(v), nil
 		}
+
 		return &model.ScopeTraversalExpression{
 			Traversal: hcl.Traversal{hcl.TraverseRoot{Name: v.Name}, hcl.TraverseAttr{Name: "id"}},
 			Parts:     []model.Traversable{v, model.DynamicType},
@@ -117,7 +120,7 @@ func (imp *importer) pulumiPropertyAccess(node ast.Expr, accessors []ast.Propert
 	}
 }
 
-func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAccess, environment map[string]model.Expression) (model.Expression, syntax.Diagnostics) {
+func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAccess, environment map[string]model.Expression, hint schema.Type) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	accessors := access.Accessors
@@ -126,7 +129,7 @@ func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAcc
 		return f, diags
 	}
 
-	receiver, rdiags := imp.importRef(node, accessors[0].(*ast.PropertyName).Name, environment, len(accessors) > 1)
+	receiver, rdiags := imp.importRef(node, accessors[0].(*ast.PropertyName).Name, environment, len(accessors) > 1, hint)
 	diags.Extend(rdiags...)
 
 	traversal, parts := hcl.Traversal{}, []model.Traversable{model.DynamicType}
@@ -172,7 +175,7 @@ func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions 
 		parts = append(parts, plainLit(part.Text))
 
 		if part.Value != nil {
-			ref, rdiags := imp.importPropertyAccess(node, part.Value, environment)
+			ref, rdiags := imp.importPropertyAccess(node, part.Value, environment, nil)
 			diags.Extend(rdiags...)
 
 			parts = append(parts, ref)
@@ -470,7 +473,7 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 		if f, ok, diags := imp.pulumiPropertyAccess(node, node.Property.Accessors); ok {
 			return f, diags
 		}
-		return imp.importPropertyAccess(node, node.Property, nil)
+		return imp.importPropertyAccess(node, node.Property, nil, hint)
 	case ast.BuiltinExpr:
 		return imp.importBuiltin(node)
 	default:
@@ -1071,8 +1074,16 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 // ImportTemplate converts a YAML template to a PCL definition.
 func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*model.Body, syntax.Diagnostics) {
+	// We are ignoring errors since runner will be treated as advisory
+	runner, _, _ := pulumiyaml.PrepareTemplate(file, nil, loader)
+	var typing pulumiyaml.Typing
+	if runner != nil {
+		// We ignore diags, since typing is advisory
+		typing, _ = pulumiyaml.TypeCheck(runner)
+	}
 	imp := importer{
 		loader:          loader,
+		typing:          typing,
 		configuration:   map[string]*model.Variable{},
 		variables:       map[string]*model.Variable{},
 		stackReferences: map[string]*model.Variable{},
