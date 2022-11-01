@@ -6,6 +6,9 @@
 - Warn on non camelCase names.
   [#362](https://github.com/pulumi/pulumi-yaml/pull/362)
 
+- Recognize the new core project-level `config` block.
+  [#369](https://github.com/pulumi/pulumi-yaml/pull/369)
+
 ### Bug Fixes
 
 - Allow interpolations for `AssetOrArchive` function values
