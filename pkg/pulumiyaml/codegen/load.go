@@ -27,7 +27,6 @@ type importer struct {
 	referencedStacks []string
 
 	loader          pulumiyaml.PackageLoader
-	typing          pulumiyaml.Typing
 	configuration   map[string]*model.Variable
 	variables       map[string]*model.Variable
 	stackReferences map[string]*model.Variable
@@ -1074,16 +1073,9 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 // ImportTemplate converts a YAML template to a PCL definition.
 func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*model.Body, syntax.Diagnostics) {
-	// We are ignoring errors since runner will be treated as advisory
-	runner, _, _ := pulumiyaml.PrepareTemplate(file, nil, loader)
-	var typing pulumiyaml.Typing
-	if runner != nil {
-		// We ignore diags, since typing is advisory
-		typing, _ = pulumiyaml.TypeCheck(runner)
-	}
+
 	imp := importer{
 		loader:          loader,
-		typing:          typing,
 		configuration:   map[string]*model.Variable{},
 		variables:       map[string]*model.Variable{},
 		stackReferences: map[string]*model.Variable{},
