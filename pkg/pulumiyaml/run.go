@@ -129,6 +129,10 @@ func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Di
 	if tdiags.HasErrors() {
 		return nil, diags, nil
 	}
+	// TODO: warn if using old configuration block
+	// if t.Configuration.Entries != nil {
+	// 	diags = append(diags, syntax.Warning(nil, "Pulumi.yaml: root-level `configuration` field is deprecated; please use `config` instead.", ""))
+	// }
 
 	return t, diags, nil
 }
@@ -285,10 +289,12 @@ func (r *Runner) setDefaultProviders() error {
 }
 
 // PrepareTemplate prepares a template for converting or running
-func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
-	// set up context-free runner
-	r := newRunner(t, loader)
-
+func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
+	// If running a template also, we need to pass a runner through, since setting intermediates
+	// requires config via the pulumi Context
+	if r == nil {
+		r = newRunner(t, loader)
+	}
 	// runner hooks up default providers
 	err := r.setDefaultProviders()
 	if err != nil {
@@ -305,8 +311,14 @@ func PrepareTemplate(t *ast.TemplateDecl, loader PackageLoader) (*Runner, syntax
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
-	r, diags, err := PrepareTemplate(t, loader)
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
+	r := newRunner(t, loader)
+	r.setIntermediates(config)
+	if r.sdiags.HasErrors() {
+		return &r.sdiags
+	}
+
+	r, diags, err := PrepareTemplate(t, r, loader)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -616,18 +628,17 @@ func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}
 }
 
 func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
-
 	ctx := r.newContext(node)
 	c, ok := e.registerConfig(node)
 	if !ok {
-		e.config[node.Key.Value] = poisonMarker{}
-		msg := fmt.Sprintf("Error registering config [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		e.config[node.key().Value] = poisonMarker{}
+		msg := fmt.Sprintf("Error registering config [%v]: %v", node.key().Value, ctx.sdiags.Error())
 		err := e.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{}) //nolint:errcheck
 		if err != nil {
 			return false
 		}
 	} else {
-		e.config[node.Key.Value] = c
+		e.config[node.key().Value] = c
 	}
 	return true
 }
@@ -685,7 +696,59 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
+func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
+	nodes := make([]configNode, len(config))
+	var errors multierror.Error
+	idx := 0
+	for k, v := range config {
+		// We default types to strings to avoid error cascades on mis-typed values.
+		typ := ctypes.String
+		var value interface{} = v
+		if v, t, err := getConfigNode(v); err == nil {
+			typ = t
+			value = v
+		} else {
+			errors.Errors = append(errors.Errors, err)
+		}
+		n := configNodeEnv{
+			Key:   k,
+			Value: value,
+			Type:  typ,
+		}
+		nodes[idx] = n
+		idx++
+	}
+	return nodes, errors.ErrorOrNil()
+}
+
+// setIntermediates is called for convert and runtime evaluation
+func (r *Runner) setIntermediates(config map[string]string) {
+	if r.intermediates != nil {
+		return
+	}
+
+	r.intermediates = []graphNode{}
+	confNodes, err := getPulumiConfNodes(config)
+	if err != nil {
+		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
+		return
+	}
+	// Topologically sort the intermediates based on implicit and explicit dependencies
+	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
+	r.sdiags.Extend(rdiags...)
+	if rdiags.HasErrors() {
+		return
+	}
+	if intermediates != nil {
+		r.intermediates = intermediates
+	}
+}
+
+// ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
+	// Our tests need to set intermediates, even though they don't have runtime config
+	r.setIntermediates(nil)
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
@@ -703,18 +766,29 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 		"stack":   stack,
 	}
 	r.cwd = cwd
+}
 
-	r.intermediates = []graphNode{}
+// getConfigNode retrieves a runtime value and type from a config node.
+func getConfigNode(v string) (interface{}, ctypes.Type, error) {
+	// scalar config values are represented as their go literals, while arrays and objects
+	// are represented as JSON.
+	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return i, ctypes.Int, nil
+	}
+	if b, err := strconv.ParseBool(v); err == nil {
+		return b, ctypes.Boolean, nil
+	}
+	if f, err := strconv.ParseFloat(v, 64); err == nil {
+		return f, ctypes.Number, nil
+	}
 
-	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t)
-	r.sdiags.Extend(rdiags...)
-	if rdiags.HasErrors() {
-		return
+	var value interface{}
+	if err := json.Unmarshal([]byte(v), &value); err == nil {
+		typ, err := ctypes.TypeValue(value)
+		return value, typ, err
 	}
-	if intermediates != nil {
-		r.intermediates = intermediates
-	}
+
+	return v, ctypes.String, nil
 }
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
@@ -739,7 +813,7 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 		switch kvp := kvp.(type) {
 		case configNode:
 			if ctx != nil {
-				err := ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.Key.Value), &pulumi.LogArgs{})
+				err := ctx.Log.Debug(fmt.Sprintf("Registering config [%v]", kvp.key().Value), &pulumi.LogArgs{})
 				if err != nil {
 					return returnDiags()
 				}
@@ -781,62 +855,79 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 }
 
 func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
-	k, c := intm.Key.Value, intm.Value
-
-	// If we implement global type checking, the type of configuration variables
-	// can be inferred and this requirement relaxed.
-	if c.Type == nil && c.Default == nil {
-		return e.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
-	}
-
-	var defaultValue interface{}
 	var expectedType ctypes.Type
-	if c.Default != nil {
-		d, ok := e.evaluateExpr(c.Default)
-		if !ok {
-			return nil, false
+	var isSecretInConfig, markSecret bool
+	var defaultValue interface{}
+	var k string
+	var intmKey ast.Expr
+
+	switch intm := intm.(type) {
+	case configNodeYaml:
+		k, intmKey = intm.Key.Value, intm.Key
+		c := intm.Value
+		// If we implement global type checking, the type of configuration variables
+		// can be inferred and this requirement relaxed.
+		if c.Type == nil && c.Default == nil {
+			return e.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
 		}
-		var err error
-		expectedType, err = ctypes.TypeValue(d)
-		if err != nil {
-			return e.error(c.Default, err.Error())
+		if c.Default != nil {
+			d, ok := e.evaluateExpr(c.Default)
+			if !ok {
+				return nil, false
+			}
+			var err error
+			expectedType, err = ctypes.TypeValue(d)
+			if err != nil {
+				return e.error(c.Default, err.Error())
+			}
+			defaultValue = d
 		}
-		defaultValue = d
-	}
+		if c.Type != nil {
+			t, ok := ctypes.Parse(c.Type.Value)
+			if !ok {
+				return e.errorf(c.Type,
+					"unexpected configuration type '%s': valid types are %s",
+					c.Type.Value, ctypes.ConfigTypes)
+			}
 
-	if c.Type != nil {
-		t, ok := ctypes.Parse(c.Type.Value)
-		if !ok {
-			return e.errorf(c.Type,
-				"unexpected configuration type '%s': valid types are %s",
-				c.Type.Value, ctypes.ConfigTypes)
+			// We have both a default value and a explicit type. Make sure they
+			// agree.
+			if ctypes.IsValidType(expectedType) && t != expectedType {
+				return e.errorf(intm.Key,
+					"type mismatch: default value of type %s but type %s was specified",
+					expectedType, t)
+			}
+
+			expectedType = t
+
+		}
+		// A value is considered secret if either it is either marked as secret in
+		// the config section or the configuration section.
+		//
+		// We only want to execute a TrySecret* if the value is secret in the config
+		// section. It the value is specified as secret only in the configuration
+		// section, we call Try* normally, and later wrap the value with
+		// `pulumi.ToSecret`.
+		isSecretInConfig = e.pulumiCtx.IsConfigSecret(e.pulumiCtx.Project() + ":" + k)
+
+		if isSecretInConfig && c.Secret != nil && !c.Secret.Value {
+			return e.error(c.Secret,
+				"Cannot mark a configuration value as not secret"+
+					" if the associated config value is secret")
 		}
 
-		// We have both a default value and a explicit type. Make sure they
-		// agree.
-		if ctypes.IsValidType(expectedType) && t != expectedType {
-			return e.errorf(intm.Key,
-				"type mismatch: default value of type %s but type %s was specified",
-				expectedType, t)
+		// We only want to mark a value as secret if it is not already secret. If
+		// isSecretInConfig is true, we will retrieve a secret value and thus won't need
+		// to mark it as secret (since it already will be).
+		if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
+			markSecret = true
 		}
-
-		expectedType = t
-
-	}
-
-	// A value is considered secret if either it is either marked as secret in
-	// the config section or the configuration section.
-	//
-	// We only want to execute a TrySecret* if the value is secret in the config
-	// section. It the value is specified as secret only in the configuration
-	// section, we call Try* normally, and later wrap the value with
-	// `pulumi.ToSecret`.
-	isSecretInConfig := e.pulumiCtx.IsConfigSecret(e.pulumiCtx.Project() + ":" + k)
-
-	if isSecretInConfig && c.Secret != nil && !c.Secret.Value {
-		return e.error(c.Secret,
-			"Cannot mark a configuration value as not secret"+
-				" if the associated config value is secret")
+	default:
+		v := intm.value()
+		if e.pulumiCtx.IsConfigSecret(intm.key().GetValue()) {
+			v = pulumi.ToSecret(v)
+		}
+		return v, true
 	}
 
 	var v interface{}
@@ -911,16 +1002,17 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
 		v = defaultValue
 	} else if err != nil {
-		return e.errorf(intm.Key, err.Error())
+		return e.errorf(intmKey, err.Error())
 	}
 
 	contract.Assertf(v != nil, "let an uninitialized var slip through")
 
 	// The value was marked secret in the configuration section, but in the
 	// config section. We need to wrap it in `pulumi.ToSecret`.
-	if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
+	if markSecret {
 		v = pulumi.ToSecret(v)
 	}
+
 	return v, true
 }
 

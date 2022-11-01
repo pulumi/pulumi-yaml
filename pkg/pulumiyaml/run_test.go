@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -276,9 +277,9 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 		if diags.HasErrors() {
 			return diags
 		}
-		err := runner.Evaluate(ctx)
-		if err.HasErrors() {
-			return err
+		diags = runner.Evaluate(ctx)
+		if diags.HasErrors() {
+			return diags
 		}
 		if callback != nil {
 			eCtx := runner.newContext(nil)
@@ -494,7 +495,6 @@ configuration:
 		})
 	testRan := false
 	err := testTemplateDiags(t, tmpl, func(e *programEvaluator) {
-
 		// Secret because declared secret in configuration
 		assert.True(t, pulumi.IsSecret(e.config["foo"].(pulumi.Output)))
 		// Secret because declared secret in in config
@@ -1840,4 +1840,57 @@ resources:
 		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
 		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
 	})
+}
+
+func TestGetPulumiConfNodes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		typ   ctypes.Type
+		value interface{}
+		err   error
+	}{
+		{
+			input: "foo",
+			typ:   ctypes.String,
+			value: "foo",
+		},
+		{
+			input: "2.0",
+			typ:   ctypes.Number,
+			value: 2.0,
+		},
+		{
+			input: "1",
+			typ:   ctypes.Int,
+			value: int64(1),
+		},
+		{
+			input: "true",
+			typ:   ctypes.Boolean,
+			value: true,
+		},
+		{
+			input: `["a", "b", "c"]`,
+			typ:   ctypes.StringList,
+			value: []interface{}{"a", "b", "c"},
+		},
+		{
+			input: `["one", 2]`,
+			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			value, typ, err := getConfigNode(tt.input)
+			if tt.err != nil {
+				assert.ErrorContains(t, err, tt.err.Error())
+			} else {
+				assert.Equal(t, tt.typ, typ)
+				assert.Equal(t, tt.value, value)
+			}
+		})
+	}
 }
