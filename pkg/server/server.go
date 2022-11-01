@@ -89,7 +89,7 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	pkgs, pluginDiags := pulumiyaml.GetReferencedPlugins(template)
 	diags.Extend(pluginDiags...)
 	if diags.HasErrors() {
-		// We currently swallow the error to allow runtime config to evaluate
+		// We currently swallow the error to allow project config to evaluate
 		// Specifically, if one sets a config key via the CLI but not within the `config` block
 		// of their YAML program, it would error.
 		return &pulumirpc.GetRequiredPluginsResponse{}, nil
