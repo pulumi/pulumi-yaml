@@ -511,7 +511,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		typeExpr = "string"
 	}
 
-	_, ok := imp.configuration[name]
+	configName, ok := imp.configuration[name]
 	contract.Assert(ok)
 
 	var defaultValue model.Expression
@@ -526,12 +526,16 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	// TODO(pdg): secret configuration -- requires changes in PCL
 
 	configDef := &model.Block{
-		Type: "config",
-		// The raw config value might not be a valid identifier, but the value needs to be
-		// preserved. It is the responcibility of the caller to adjust kvp.Key.GetValue()
-		// so it is valid in the target language.
-		Labels: []string{kvp.Key.GetValue(), typeExpr},
-		Body:   &model.Body{},
+		Type:   "config",
+		Labels: []string{configName.Name, typeExpr},
+		Body: &model.Body{
+			Items: []model.BodyItem{
+				&model.Attribute{
+					Name:  pcl.LogicalNamePropertyKey,
+					Value: quotedLit(kvp.Key.GetValue()),
+				},
+			},
+		},
 	}
 	if defaultValue != nil {
 		configDef.Body.Items = append(configDef.Body.Items, &model.Attribute{
@@ -923,14 +927,10 @@ func (imp *importer) assignNames() {
 		"cwd",
 	)
 
-	assign := func(name, suffix string, literal bool) *model.Variable {
+	assign := func(name, suffix string) *model.Variable {
 		assignName := func(name, suffix string) string {
 
-			name = makeLegalIdentifier(name)
-			// TODO: Remove this when pcl supports logical names for config vars
-			if !literal {
-				name = camel(name)
-			}
+			name = camel(makeLegalIdentifier(name))
 			if !assigned.Has(name) {
 				assigned.Add(name)
 				return name
@@ -952,7 +952,7 @@ func (imp *importer) assignNames() {
 	}
 
 	// TODO: do this in source order
-	assignNames := func(m map[string]*model.Variable, suffix string, literal bool) {
+	assignNames := func(m map[string]*model.Variable, suffix string) {
 		names := make([]string, 0, len(m))
 		for n := range m {
 			names = append(names, n)
@@ -960,15 +960,15 @@ func (imp *importer) assignNames() {
 		sort.Strings(names)
 
 		for _, n := range names {
-			m[n] = assign(n, suffix, literal)
+			m[n] = assign(n, suffix)
 		}
 	}
 
-	assignNames(imp.configuration, "", true)
-	assignNames(imp.outputs, "", false)
-	assignNames(imp.variables, "Var", false)
-	assignNames(imp.stackReferences, "Stack", false)
-	assignNames(imp.resources, "Resource", false)
+	assignNames(imp.configuration, "")
+	assignNames(imp.outputs, "")
+	assignNames(imp.variables, "Var")
+	assignNames(imp.stackReferences, "Stack")
+	assignNames(imp.resources, "Resource")
 }
 
 func (imp *importer) findStackReferences(node ast.Expr) {

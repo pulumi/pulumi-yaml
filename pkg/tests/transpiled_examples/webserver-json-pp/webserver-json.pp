@@ -1,4 +1,5 @@
-config InstanceType string {
+config instanceType string {
+	__logicalName = "InstanceType"
 	default = "t3.micro"
 }
 
@@ -18,7 +19,7 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 
 resource webServer "aws:ec2/instance:Instance" {
 	__logicalName = "WebServer"
-	instanceType = InstanceType
+	instanceType = instanceType
 	ami = invoke("aws:index/getAmi:getAmi", {
 		filters = [{
 			name = "name",
