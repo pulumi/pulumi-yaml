@@ -32,6 +32,9 @@ type importer struct {
 	stackReferences map[string]*model.Variable
 	resources       map[string]*model.Variable
 	outputs         map[string]*model.Variable
+
+	// if this is a pulumi convert
+	isConvert bool
 }
 
 type packageInfo struct {
@@ -75,6 +78,12 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 	}
 	if x, ok := environment[name]; ok {
 		return x, nil
+	}
+
+	// If this is a pulumi convert, we treat missing names of the form {foo}:{bar} as potential
+	// project config keys, and naively return a string expression
+	if isPotentialConfig(name) {
+		return &model.LiteralValueExpression{Value: cty.StringVal(name)}, nil
 	}
 
 	return &model.ScopeTraversalExpression{
@@ -163,7 +172,6 @@ func (imp *importer) importPropertyAccess(node ast.Expr, access *ast.PropertyAcc
 // provided, references to map elements are replaced with the corresponding elements.
 func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions *ast.ObjectExpr) (model.Expression, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
-
 	var environment map[string]model.Expression
 	if substitutions != nil {
 		environment := map[string]model.Expression{}
@@ -178,7 +186,6 @@ func (imp *importer) importInterpolate(node *ast.InterpolateExpr, substitutions 
 	var parts []model.Expression
 	for _, part := range node.Parts {
 		parts = append(parts, plainLit(part.Text))
-
 		if part.Value != nil {
 			ref, rdiags := imp.importPropertyAccess(node, part.Value, environment, nil)
 			diags.Extend(rdiags...)
@@ -1050,7 +1057,6 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 			Body:   &model.Body{},
 		})
 	}
-
 	// Import resources.
 	for _, kvp := range file.Resources.Entries {
 		resource, rdiags := imp.importResource(kvp, latestPkgInfo)
@@ -1089,4 +1095,8 @@ func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*m
 		outputs:         map[string]*model.Variable{},
 	}
 	return imp.importTemplate(file)
+}
+
+func isPotentialConfig(name string) bool {
+	return strings.Count(name, ":") == 1
 }

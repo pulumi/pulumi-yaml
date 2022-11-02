@@ -166,7 +166,7 @@ outputs:
 
 	confNodes, err := getPulumiConfNodes(nil)
 	assert.Nil(t, err)
-	_, diags = topologicallySortedResources(tmpl, confNodes)
+	_, diags = topologicallySortedResources(tmpl, confNodes, false)
 	requireNoErrors(t, tmpl, diags)
 }
 

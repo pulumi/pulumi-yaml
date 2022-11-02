@@ -76,7 +76,7 @@ func (e configNodeEnv) value() interface{} {
 	return e.Value
 }
 
-func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
+func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode, allowMissingNodes bool) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -167,7 +167,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			if isPotentialConfig(name.Value) {
+			if allowMissingNodes && isPotentialConfig(name.Value) {
 				intermediates[name.Value] = configNodeEnv{
 					Key: name.Value,
 				}
@@ -244,5 +244,5 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 }
 
 func isPotentialConfig(name string) bool {
-	return strings.Count(name, ":") == 2
+	return strings.Count(name, ":") == 1
 }

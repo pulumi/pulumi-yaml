@@ -733,9 +733,14 @@ func (r *Runner) setIntermediates(config map[string]string) {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
 	}
+
 	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
+	// We allow missing nodes if config is nil because pulumi convert does not have
+	// access to project config.
+	intermediates, rdiags := topologicallySortedResources(r.t, confNodes, config == nil)
 	r.sdiags.Extend(rdiags...)
+	// If config is nil, we ignore diags since convert does not have access to a context,
+	// so we are unable to resolve project config
 	if rdiags.HasErrors() {
 		return
 	}
@@ -805,6 +810,8 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 		defer r.sdiags.mutex.Unlock()
 		return r.sdiags.diags
 	}
+	// If ctx is nil, we ignore diags since converting a template does not have access
+	// to the context for project config
 	if r.sdiags.HasErrors() {
 		return returnDiags()
 	}
