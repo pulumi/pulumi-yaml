@@ -1,6 +1,43 @@
 CHANGELOG
 =========
 
+## 1.0.0 (2022-11-02)
+
+### Improvements
+
+- Ensure that constant values passed to enums are valid.
+  [#357](https://github.com/pulumi/pulumi-yaml/pull/357)
+
+- Warn on non camelCase names.
+  [#362](https://github.com/pulumi/pulumi-yaml/pull/362)
+
+- Recognize the new core project-level `config` block.
+  [#369](https://github.com/pulumi/pulumi-yaml/pull/369)
+
+### Bug Fixes
+
+- Allow interpolations for `AssetOrArchive` function values
+  [#341](https://github.com/pulumi/pulumi-yaml/pull/341)
+
+- Clarify the lifetimes when calling `codegen.Eject`. This is a breaking change to the
+  `codegen.Eject` API.
+  [#358](https://github.com/pulumi/pulumi-yaml/pull/358)
+
+- Quote generated strings that could be numbers.
+  [#363](https://github.com/pulumi/pulumi-yaml/issues/363)
+
+- Respect import option on resource.
+  [#367](https://github.com/pulumi/pulumi-yaml/issues/367)
+
+- Discover Invokes during `GetReferencedPlugins`.
+  [#381](https://github.com/pulumi/pulumi-yaml/pull/381)
+
+- Escaped interpolated strings now remove one extra dollar sign.
+  [#382](https://github.com/pulumi/pulumi-yaml/pull/382)
+
+- Only insert "id" in ejected resource refs when the receiver type is a string.
+  [#389](https://github.com/pulumi/pulumi-yaml/pull/389)
+
 ## 0.5.3 (2022-07-12)
 
 ### Improvements
@@ -20,7 +57,6 @@ CHANGELOG
 
 - Warn when using the reserved prefix `Fn::` as a map key.
   [#272](https://github.com/pulumi/pulumi-yaml/pull/272)
-
 
 ## 0.5.2 (2022-06-02)
 
@@ -90,11 +126,11 @@ CHANGELOG
 
 ### Improvements
 
-* [language] integrated support for using another program or script to generate YAML
+- [language] integrated support for using another program or script to generate YAML
 
-* [CLI] full `pulumi convert` support including support for "compilers"
+- [CLI] full `pulumi convert` support including support for "compilers"
 
-* [codegen] Docs generation
+- [codegen] Docs generation
 
 ## 0.2.0 (2022-04-26)
 

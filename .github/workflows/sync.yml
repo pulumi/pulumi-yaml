@@ -21,3 +21,8 @@ jobs:
           COMMIT_PREFIX: "(pulumi-bot)"
           PR_LABELS: |
             impact/no-changelog-required
+          # Forces examples to regenerate in pulumi/pulumi
+          version-set: |
+            {
+              "name": "not-current"
+            }
