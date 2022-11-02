@@ -244,5 +244,5 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 }
 
 func isPotentialConfig(name string) bool {
-	return len(strings.Split(name, ":")) == 2
+	return strings.Count(name, ":") == 2
 }
