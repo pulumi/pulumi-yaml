@@ -53,41 +53,44 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
 	// nil runner passed in since template is not executed and we can use pkgLoader
-	_, tdiags, err := pulumiyaml.PrepareTemplate(template, nil, pkgLoader)
+	r, tdiags, err := pulumiyaml.PrepareTemplate(template, nil, pkgLoader)
 	if err != nil {
 		return "", diags, err
 	}
 	diags = diags.Extend(tdiags.HCL())
-	if diags.HasErrors() {
-		return "", diags, nil
-	}
+
+	pulumiyaml.InjectMissingNodes(r, template)
 
 	templateBody, tdiags := ImportTemplate(template, pkgLoader)
 	diags = diags.Extend(tdiags.HCL())
-	if diags.HasErrors() {
-		return "", diags, nil
+	if templateBody == nil {
+		// This is a irrecoverable error, so we make sure the error field is non-nil
+		return "", diags, diags
 	}
 	programText := fmt.Sprintf("%v", templateBody)
 
-	return programText, nil, nil
+	if programText == "" {
+		return "", diags, diags
+	}
+
+	return programText, diags, nil
 }
 
 func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*pcl.Program, hcl.Diagnostics, error) {
-	programText, diags, err := ConvertTemplateIL(template, loader)
-	if err != nil {
-		return nil, diags, err
+	programText, yamlDiags, err := ConvertTemplateIL(template, loader)
+	if err != nil || programText == "" {
+		return nil, yamlDiags, err
 	}
-	if diags.HasErrors() {
-		return nil, diags, fmt.Errorf("internal error: %w", diags)
-	}
+
 	parser := hclsyntax.NewParser()
 	if err := parser.ParseFile(strings.NewReader(programText), "program.pp"); err != nil {
-		return nil, diags, err
+		return nil, yamlDiags, err
 	}
-	diags = diags.Extend(parser.Diagnostics)
+	diags := parser.Diagnostics
 	if diags.HasErrors() {
-		return nil, diags, nil
+		return nil, append(yamlDiags, diags...), diags
 	}
+
 	bindOpts := []pcl.BindOption{
 		pcl.SkipResourceTypechecking,
 		pcl.AllowMissingProperties,
@@ -95,14 +98,15 @@ func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*p
 	}
 	bindOpts = append(bindOpts, pcl.Loader(loader))
 	program, pdiags, err := pcl.BindProgram(parser.Files, bindOpts...)
+	diags = diags.Extend(pdiags)
 	if err != nil {
-		return nil, diags, err
+		return nil, append(yamlDiags, diags...), err
 	}
-	if pdiags.HasErrors() {
-		return nil, diags, fmt.Errorf("internal error: %w", pdiags)
+	if pdiags.HasErrors() || program == nil {
+		return nil, append(yamlDiags, diags...), fmt.Errorf("internal error: %w", pdiags)
 	}
 
-	return program, diags, nil
+	return program, append(yamlDiags, diags...), nil
 }
 
 // ConvertTemplate converts a Pulumi YAML template to a target language using PCL as an intermediate representation.
