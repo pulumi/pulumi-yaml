@@ -17,7 +17,7 @@ jobs:
         with:
           GH_PAT: ${{ secrets.PULUMI_BOT_TOKEN }}
           TEAM_REVIEWERS: Platform
-          PR_BODY: "This PR syncs changes to the codegen'd PCL files from the latest `pulumi/yaml` release.\nThis PR was run with PULUMI_ACCEPT=true. You need to manually confirm that changes are valid before accepting."
+          PR_BODY: "This PR syncs changes to the codegen'd PCL files from the latest `pulumi/yaml` release.\nTo program-generate new/modified examples, please fork this branch and run `cd pkg/codegen && PULUMI_ACCEPT=true go test -timeout 1h -tags all,smoke -run '^TestGenerateProgram$' ./...`."
           COMMIT_PREFIX: "(pulumi-bot)"
           PR_LABELS: |
             impact/no-changelog-required
