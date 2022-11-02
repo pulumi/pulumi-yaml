@@ -511,7 +511,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		typeExpr = "string"
 	}
 
-	configVar, ok := imp.configuration[name]
+	_, ok := imp.configuration[name]
 	contract.Assert(ok)
 
 	var defaultValue model.Expression
@@ -526,8 +526,11 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	// TODO(pdg): secret configuration -- requires changes in PCL
 
 	configDef := &model.Block{
-		Type:   "config",
-		Labels: []string{configVar.Name, typeExpr},
+		Type: "config",
+		// The raw config value might not be a valid identifier, but the value needs to be
+		// preserved. It is the responcibility of the caller to adjust kvp.Key.GetValue()
+		// so it is valid in the target language.
+		Labels: []string{kvp.Key.GetValue(), typeExpr},
 		Body:   &model.Body{},
 	}
 	if defaultValue != nil {

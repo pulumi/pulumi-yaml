@@ -2187,9 +2187,7 @@ func listStrings(v *ast.StringListDecl) []string {
 func InjectMissingNodes(r *Runner, template *ast.TemplateDecl) {
 	for _, node := range r.intermediates {
 		if node, ok := node.(missingNode); ok {
-			fmt.Printf("Found missing node: %s\n", node.name.GetValue())
 			if isGlobalConfigName(node.name.GetValue()) {
-				fmt.Printf("Injecting node: %s\n", node.name.GetValue())
 				template.Configuration.Entries = append(template.Configuration.Entries,
 					ast.ConfigMapEntry{
 						Key:   node.key(),
