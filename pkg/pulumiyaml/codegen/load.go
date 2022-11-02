@@ -78,7 +78,7 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 	}
 
 	return &model.ScopeTraversalExpression{
-		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: name}},
+		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: camel(makeLegalIdentifier(name))}},
 		Parts:     []model.Traversable{model.DynamicType},
 	}, syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf("unknown config, variable, or resource '%v'", name), "")}
 }
