@@ -32,9 +32,6 @@ type importer struct {
 	stackReferences map[string]*model.Variable
 	resources       map[string]*model.Variable
 	outputs         map[string]*model.Variable
-
-	// if this is a pulumi convert
-	isConvert bool
 }
 
 type packageInfo struct {
