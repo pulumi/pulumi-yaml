@@ -923,9 +923,14 @@ func (imp *importer) assignNames() {
 		"cwd",
 	)
 
-	assign := func(name, suffix string) *model.Variable {
+	assign := func(name, suffix string, literal bool) *model.Variable {
 		assignName := func(name, suffix string) string {
-			name = camel(makeLegalIdentifier(name))
+
+			name = makeLegalIdentifier(name)
+			// TODO: Remove this when pcl supports logical names for config vars
+			if !literal {
+				name = camel(name)
+			}
 			if !assigned.Has(name) {
 				assigned.Add(name)
 				return name
@@ -947,7 +952,7 @@ func (imp *importer) assignNames() {
 	}
 
 	// TODO: do this in source order
-	assignNames := func(m map[string]*model.Variable, suffix string) {
+	assignNames := func(m map[string]*model.Variable, suffix string, literal bool) {
 		names := make([]string, 0, len(m))
 		for n := range m {
 			names = append(names, n)
@@ -955,15 +960,15 @@ func (imp *importer) assignNames() {
 		sort.Strings(names)
 
 		for _, n := range names {
-			m[n] = assign(n, suffix)
+			m[n] = assign(n, suffix, literal)
 		}
 	}
 
-	assignNames(imp.configuration, "")
-	assignNames(imp.outputs, "")
-	assignNames(imp.variables, "Var")
-	assignNames(imp.stackReferences, "Stack")
-	assignNames(imp.resources, "Resource")
+	assignNames(imp.configuration, "", true)
+	assignNames(imp.outputs, "", false)
+	assignNames(imp.variables, "Var", false)
+	assignNames(imp.stackReferences, "Stack", false)
+	assignNames(imp.resources, "Resource", false)
 }
 
 func (imp *importer) findStackReferences(node ast.Expr) {

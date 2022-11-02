@@ -1,4 +1,4 @@
-config instanceType string {
+config InstanceType string {
 	default = "t3.micro"
 }
 
@@ -23,7 +23,7 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 
 resource webServer "aws:ec2/instance:Instance" {
 	__logicalName = "WebServer"
-	instanceType = instanceType
+	instanceType = InstanceType
 	ami = ec2Ami
 	userData = "#!/bin/bash\necho 'Hello, World from ${webSecGrp.arn}!' > index.html\nnohup python -m SimpleHTTPServer 80 &"
 	vpcSecurityGroupIds = [webSecGrp.id]
