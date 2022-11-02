@@ -78,7 +78,7 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 	}
 
 	return &model.ScopeTraversalExpression{
-		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: name}},
+		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: camel(makeLegalIdentifier(name))}},
 		Parts:     []model.Traversable{model.DynamicType},
 	}, syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf("unknown config, variable, or resource '%v'", name), "")}
 }
@@ -511,7 +511,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		typeExpr = "string"
 	}
 
-	configVar, ok := imp.configuration[name]
+	configName, ok := imp.configuration[name]
 	contract.Assert(ok)
 
 	var defaultValue model.Expression
@@ -527,8 +527,15 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 
 	configDef := &model.Block{
 		Type:   "config",
-		Labels: []string{configVar.Name, typeExpr},
-		Body:   &model.Body{},
+		Labels: []string{configName.Name, typeExpr},
+		Body: &model.Body{
+			Items: []model.BodyItem{
+				&model.Attribute{
+					Name:  pcl.LogicalNamePropertyKey,
+					Value: quotedLit(kvp.Key.GetValue()),
+				},
+			},
+		},
 	}
 	if defaultValue != nil {
 		configDef.Body.Items = append(configDef.Body.Items, &model.Attribute{
@@ -922,6 +929,7 @@ func (imp *importer) assignNames() {
 
 	assign := func(name, suffix string) *model.Variable {
 		assignName := func(name, suffix string) string {
+
 			name = camel(makeLegalIdentifier(name))
 			if !assigned.Has(name) {
 				assigned.Add(name)

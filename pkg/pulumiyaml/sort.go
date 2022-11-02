@@ -75,6 +75,18 @@ func (e configNodeEnv) value() interface{} {
 	return e.Value
 }
 
+type missingNode struct {
+	name *ast.StringExpr
+}
+
+func (e missingNode) key() *ast.StringExpr {
+	return e.name
+}
+
+func (missingNode) valueKind() string {
+	return "missing node"
+}
+
 func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
@@ -167,7 +179,8 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 		e, ok := intermediates[name.Value]
 		if !ok {
 			diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
-			return false
+			e = missingNode{name}
+			addIntermediate(name.Value, e)
 		}
 		kind := e.valueKind()
 
