@@ -180,7 +180,12 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
-func (r *Runner) setDefaultProviders() error {
+// Set default providers for resources and invokes.
+//
+// This function communicates errors by appending to the internal diags field of `r`.
+// It is the responsibility of the caller to verify that no err diags were appended if
+// that should prevent proceeding.
+func (r *Runner) setDefaultProviders() {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
 	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
@@ -196,7 +201,9 @@ func (r *Runner) setDefaultProviders() error {
 				}
 			}
 		} else if v.DefaultProvider != nil {
-			return errors.New("cannot set defaultProvider on non-provider resource")
+			r.sdiags.Extend(syntax.NodeError(
+				v.DefaultProvider.Syntax(),
+				"cannot set defaultProvider on non-provider resource", ""))
 		}
 	}
 
@@ -282,10 +289,10 @@ func (r *Runner) setDefaultProviders() error {
 		},
 	})
 
-	if diags.HasErrors() {
-		return diags
-	}
-	return nil
+	// This function communicates errors by appending to the internal diags field of `r`.
+	// It is the responsibility of the caller to verify that no err diags were appended if
+	// that should prevent proceeding.
+	contract.IgnoreError(diags)
 }
 
 // PrepareTemplate prepares a template for converting or running
@@ -295,25 +302,27 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	if r == nil {
 		r = newRunner(t, loader)
 	}
+
+	// We are preemptively calling r.setIntermediates. We are forcing tolerating missing
+	// nodes, ensuring the process can continue even for invalid templates. Diags will
+	// still be reported normally.
+	//
+	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
+	// to r.setDefaultProviders.
+	r.setIntermediates(nil, true /*force*/)
+
 	// runner hooks up default providers
-	err := r.setDefaultProviders()
-	if err != nil {
-		return nil, nil, err
-	}
+	r.setDefaultProviders()
 
 	// runner type checks nodes
 	_, diags := TypeCheck(r)
-	if diags.HasErrors() {
-		return nil, diags, nil
-	}
-
 	return r, diags, nil
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	r.setIntermediates(config)
+	r.setIntermediates(config, false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
 	}
@@ -722,21 +731,24 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 }
 
 // setIntermediates is called for convert and runtime evaluation
-func (r *Runner) setIntermediates(config map[string]string) {
+//
+// If force is true, set intermediates even if errors were encountered
+// Errors will always be reflected in r.sdiags.
+func (r *Runner) setIntermediates(config map[string]string, force bool) {
 	if r.intermediates != nil {
 		return
 	}
 
 	r.intermediates = []graphNode{}
 	confNodes, err := getPulumiConfNodes(config)
-	if err != nil {
+	if err != nil && !force {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
 	}
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
 	r.sdiags.Extend(rdiags...)
-	if rdiags.HasErrors() {
+	if rdiags.HasErrors() && !force {
 		return
 	}
 	if intermediates != nil {
@@ -747,7 +759,7 @@ func (r *Runner) setIntermediates(config map[string]string) {
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// Our tests need to set intermediates, even though they don't have runtime config
-	r.setIntermediates(nil)
+	r.setIntermediates(nil, false)
 
 	cwd, err := os.Getwd()
 	if err != nil {

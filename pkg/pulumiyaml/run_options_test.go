@@ -160,7 +160,8 @@ variables:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		assert.Equal(t, runner.setDefaultProviders(), nil)
+		runner.setDefaultProviders()
+		requireNoErrors(t, template, runner.sdiags.diags)
 		diags := runner.Evaluate(ctx)
 		requireNoErrors(t, template, diags)
 		return nil
