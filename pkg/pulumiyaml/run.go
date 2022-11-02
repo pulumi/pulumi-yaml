@@ -854,6 +854,8 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 			if !e.EvalResource(r, kvp) {
 				return returnDiags()
 			}
+		case missingNode:
+			// We ignore this intentionally
 		}
 	}
 
@@ -2177,4 +2179,27 @@ func listStrings(v *ast.StringListDecl) []string {
 		a[i] = s.Value
 	}
 	return a
+}
+
+// Edit the template with the goal of making it valid.
+//
+// This is a best effort function, and does not guarantee a valid template.
+func InjectMissingNodes(r *Runner, template *ast.TemplateDecl) {
+	for _, node := range r.intermediates {
+		if node, ok := node.(missingNode); ok {
+			fmt.Printf("Found missing node: %s\n", node.name.GetValue())
+			if isGlobalConfigName(node.name.GetValue()) {
+				fmt.Printf("Injecting node: %s\n", node.name.GetValue())
+				template.Configuration.Entries = append(template.Configuration.Entries,
+					ast.ConfigMapEntry{
+						Key:   node.key(),
+						Value: &ast.ConfigParamDecl{},
+					})
+			}
+		}
+	}
+}
+
+func isGlobalConfigName(s string) bool {
+	return strings.Count(s, ":") == 1
 }
