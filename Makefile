@@ -87,7 +87,6 @@ get_schemas:
 # assuming both repos follow gopath conventions, copy *.pp files into testdata
 PULUMI_DIR := ../pulumi
 get_testdata:
-	rsync -avm --include='*.pp' --include='*/' --exclude='*' --exclude='.*' \
-		--include="synthetic.json" \
+	rsync -avm --exclude='transpiled_examples' --include='*.pp' --include='*/' --exclude='*' --exclude='.*' \
 		'${PULUMI_DIR}/pkg/codegen/testing/test/testdata/' \
 		./pkg/pulumiyaml/testing/test/testdata/

@@ -11,12 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
-	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,8 +23,6 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	pcodegen "github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 )
 
@@ -119,36 +115,8 @@ func TestGenerateExamples(t *testing.T) {
 	}
 }
 
-var defaultPlugins = []pulumiyaml.Plugin{
-	{Package: "aws", Version: "5.4.0"},
-	{Package: "azure-native", Version: "1.56.0"},
-	{Package: "azure", Version: "4.18.0"},
-	{Package: "kubernetes", Version: "3.7.2"},
-	{Package: "random", Version: "4.2.0"},
-	{Package: "eks", Version: "0.40.0"},
-	{Package: "aws-native", Version: "0.13.0"},
-	{Package: "docker", Version: "3.1.0"},
-	{Package: "awsx", Version: "1.0.0-beta.5"},
-
-	// Extra packages are to satisfy the versioning requirement of aws-eks.
-	// While the schemas are not the correct version, we rely on not
-	// depending on the difference between them.
-	{Package: "kubernetes", Version: "3.0.0"},
-	{Package: "aws", Version: "4.37.1"},
-}
-
 func newPluginLoader() schema.ReferenceLoader {
-	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
-		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
-			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
-		}, deploytest.WithPath(schemaLoadPath))
-	}
-	var pluginLoaders []*deploytest.PluginLoader
-	for _, p := range defaultPlugins {
-		pluginLoaders = append(pluginLoaders, host(tokens.Package(p.Package), semver.MustParse(p.Version)))
-	}
-
-	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
+	return schema.NewPluginLoader(utils.NewHost(schemaLoadPath))
 }
 
 type mockPackageLoader struct{ schema.ReferenceLoader }
