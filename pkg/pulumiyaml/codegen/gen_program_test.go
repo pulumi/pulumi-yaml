@@ -190,7 +190,7 @@ func TestGenerateProgram(t *testing.T) {
 				// Reason: A python only test.
 			case "simple-range":
 				// Pulumi YAML does not support ranges
-			case "read-file-func":
+			case "read-file-func", "python-regress-10914":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
 			default:

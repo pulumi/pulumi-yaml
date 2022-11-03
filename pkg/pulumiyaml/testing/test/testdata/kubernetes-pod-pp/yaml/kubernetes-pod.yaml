@@ -11,6 +11,8 @@ resources:
         containers:
           - name: nginx
             image: nginx:1.14-alpine
+            ports:
+              - containerPort: 80
             resources:
               limits:
                 memory: 20Mi
