@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/blang/semver"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -17,10 +16,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
-	"github.com/pulumi/pulumi/pkg/v3/resource/deploy/deploytest"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -63,17 +59,7 @@ func (l testPackageLoader) Close() {}
 
 func newPluginLoader() schema.Loader {
 	schemaLoadPath := filepath.Join("..", "testing", "test", "testdata")
-	host := func(pkg tokens.Package, version semver.Version) *deploytest.PluginLoader {
-		return deploytest.NewProviderLoader(pkg, version, func() (plugin.Provider, error) {
-			return utils.NewProviderLoader(pkg.String())(schemaLoadPath)
-		}, deploytest.WithPath(schemaLoadPath))
-	}
-	var pluginLoaders []*deploytest.PluginLoader
-	for _, p := range defaultPlugins {
-		pluginLoaders = append(pluginLoaders, host(tokens.Package(p.Package), semver.MustParse(p.Version)))
-	}
-
-	return schema.NewPluginLoader(deploytest.NewPluginHost(nil, nil, nil, pluginLoaders...))
+	return schema.NewPluginLoader(utils.NewHost(schemaLoadPath))
 }
 
 var rootPluginLoader = newPluginLoader()
@@ -204,7 +190,7 @@ func TestGenerateProgram(t *testing.T) {
 				// Reason: A python only test.
 			case "simple-range":
 				// Pulumi YAML does not support ranges
-			case "read-file-func":
+			case "read-file-func", "python-regress-10914":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
 			default:

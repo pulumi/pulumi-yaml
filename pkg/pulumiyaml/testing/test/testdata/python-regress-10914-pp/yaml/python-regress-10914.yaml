@@ -1,0 +1,47 @@
+configuration:
+  instanceType:
+    type: string
+    default: t2.micro
+resources:
+  secGroup:
+    type: aws:ec2:SecurityGroup
+    properties:
+      description: Enable HTTP access
+      ingress:
+        - fromPort: 80
+          toPort: 80
+          protocol: tcp
+          cidrBlocks:
+            - 0.0.0.0/0
+      tags:
+        Name: web-secgrp
+  server:
+    type: aws:ec2:Instance
+    properties:
+      instanceType: ${instanceType}
+      vpcSecurityGroupIds:
+        - ${secGroup.id}
+      userData: ${userData}
+      ami: ${ami}
+      tags:
+        Name: web-server-www
+variables:
+  ami:
+    fn::invoke:
+      Function: aws:ec2:getAmi
+      Arguments:
+        filters:
+          - name: name
+            values:
+              - amzn-ami-hvm-*
+        owners:
+          - '137112412989'
+        mostRecent: true
+      Return: id
+  userData: |-
+    #!/bin/bash
+    echo "Hello, World from Pulumi!" > index.html
+    nohup python -m SimpleHTTPServer 80 &
+outputs:
+  publicIP: ${server.publicIp}
+  publicDNS: ${server.publicDns}
