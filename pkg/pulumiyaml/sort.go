@@ -240,17 +240,10 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 	if other, found := intermediates[name]; found {
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))
-		} else if isConfigNode(node) && isConfigNode(other) {
-			diags = append(diags, syntax.Warning(nil, fmt.Sprintf("%s set in both `config` and `configuration`", name), ""))
 		} else {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("%s %s cannot have the same name as %s %s", node.valueKind(), name, other.valueKind(), name), ""))
 		}
 		return diags
 	}
 	return diags
-}
-
-func isConfigNode(n graphNode) bool {
-	_, ok := n.(configNode)
-	return ok
 }
