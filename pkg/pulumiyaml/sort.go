@@ -46,7 +46,7 @@ type configNode interface {
 type configNodeYaml ast.ConfigMapEntry
 
 func (e configNodeYaml) valueKind() string {
-	return "configYaml"
+	return "config"
 }
 
 func (e configNodeYaml) key() *ast.StringExpr {
