@@ -64,7 +64,7 @@ type configNodeEnv struct {
 }
 
 func (e configNodeEnv) valueKind() string {
-	return "config"
+	return "configEnv"
 }
 
 func (e configNodeEnv) key() *ast.StringExpr {
@@ -238,6 +238,10 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 	}
 
 	if other, found := intermediates[name]; found {
+		// if duplicate key from config/ configuration, do not warn about using configuration again
+		if isConfigNodeEnv(node) || isConfigNodeEnv(other) {
+			return diags
+		}
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))
 		} else {
@@ -246,4 +250,9 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 		return diags
 	}
 	return diags
+}
+
+func isConfigNodeEnv(n graphNode) bool {
+	_, ok := n.(configNodeEnv)
+	return ok
 }
