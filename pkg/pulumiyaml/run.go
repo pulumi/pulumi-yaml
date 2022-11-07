@@ -709,6 +709,8 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 	var errors multierror.Error
 	idx := 0
 	for k, v := range config {
+		// Strip the project prefix
+		k := strings.Split(k, ":")[1]
 		// We default types to strings to avoid error cascades on mis-typed values.
 		typ := ctypes.String
 		var value interface{} = v
