@@ -1,6 +1,6 @@
 name: simple-kubernetes
 runtime: yaml
-config:
+configuration:
   hostname:
     default: example.com
     type: String
