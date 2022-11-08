@@ -129,10 +129,9 @@ func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Di
 	if tdiags.HasErrors() {
 		return nil, diags, nil
 	}
-	// TODO: warn if using old configuration block
-	// if t.Configuration.Entries != nil {
-	// 	diags = append(diags, syntax.Warning(nil, "Pulumi.yaml: root-level `configuration` field is deprecated; please use `config` instead.", ""))
-	// }
+	if t.Configuration.Entries != nil {
+		diags = append(diags, syntax.Warning(nil, "Pulumi.yaml: root-level `configuration` field is deprecated; please use `config` instead.", ""))
+	}
 
 	return t, diags, nil
 }
@@ -710,6 +709,8 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 	var errors multierror.Error
 	idx := 0
 	for k, v := range config {
+		// Strip the project prefix
+		k := strings.Split(k, ":")[1]
 		// We default types to strings to avoid error cascades on mis-typed values.
 		typ := ctypes.String
 		var value interface{} = v
