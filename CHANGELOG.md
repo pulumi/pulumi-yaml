@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.0.1 (2022-11-02)
+
+### Improvements
+
+- Allow ejecting when relying on `config` nodes.
+  [#393](https://github.com/pulumi/pulumi-yaml/pull/393)
+
 ## 1.0.0 (2022-11-02)
 
 ### Improvements
