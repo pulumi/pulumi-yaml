@@ -238,8 +238,8 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 	}
 
 	if other, found := intermediates[name]; found {
-		// if duplicate key from config and configuration, do not warn about using configuration again
-		if (isConfigNodeEnv(node) && isConfigNodeYAML(other)) || (isConfigNodeEnv(other) && isConfigNodeYAML(node)) {
+		// if duplicate key from config/ configuration, do not warn about using configuration again
+		if isConfigNodeEnv(node) || isConfigNodeEnv(other) {
 			return diags
 		}
 		if node.valueKind() == other.valueKind() {
@@ -254,10 +254,5 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 func isConfigNodeEnv(n graphNode) bool {
 	_, ok := n.(configNodeEnv)
-	return ok
-}
-
-func isConfigNodeYAML(n graphNode) bool {
-	_, ok := n.(configNodeYaml)
 	return ok
 }
