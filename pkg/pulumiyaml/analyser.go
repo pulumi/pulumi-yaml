@@ -1083,6 +1083,17 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	if optional {
 		typ = &schema.OptionalType{ElementType: typ}
 	}
+	// check for incompatible types between config/ configuration
+	if typExisting, ok := tc.configuration[k]; ok {
+		if typExisting.String() != typ.String() {
+			ctx := r.newContext(node)
+			ctx.sdiags.diags.Extend(syntax.NodeError(node.key().Syntax(), fmt.Sprintf("config key cannot have conflicting types %v, %v",
+				codegen.UnwrapType(typExisting), codegen.UnwrapType(typ)), ""))
+			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
+				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typ)))
+			return false
+		}
+	}
 	tc.configuration[k] = typ
 	return true
 }

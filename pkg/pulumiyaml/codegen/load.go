@@ -995,6 +995,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	var diags syntax.Diagnostics
 
 	// Declare config variables, resources, and outputs.
+
 	for _, kvp := range append(file.Configuration.Entries, file.Config.Entries...) {
 		imp.configuration[kvp.Key.Value] = nil
 	}
@@ -1022,7 +1023,6 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 		if config != nil {
 			items = append(items, config)
-			seenConfig[kvp.Key.Value] = true
 		}
 	}
 
