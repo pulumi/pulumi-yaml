@@ -8,6 +8,8 @@ type Template struct {
 	Description string `json:",omitempty" yaml:",omitempty"`
 	// Configuration allows the template to be conditional based on Pulumi configuration values.
 	Configuration map[string]*Configuration `json:",omitempty" yaml:",omitempty"`
+	// Config is the configuration from the project-level `config` block.
+	Config map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Variables declares variables that will be used in the template.
 	Variables map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Resources is a required section that declares resources you want to include in the stack.

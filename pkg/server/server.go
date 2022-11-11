@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"os"
+	"strings"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
@@ -157,9 +158,17 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 			return err
 		}
 		defer loader.Close()
-
+		conf := make(map[string]string)
+		// Strip the project prefix
+		projPrefix := pctx.Project() + ":"
+		for k, v := range req.GetConfig() {
+			if strings.HasPrefix(k, projPrefix) {
+				k = strings.Split(k, projPrefix)[1]
+			}
+			conf[k] = v
+		}
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(ctx, template, req.GetConfig(), loader)
+		return pulumiyaml.RunTemplate(ctx, template, conf, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
