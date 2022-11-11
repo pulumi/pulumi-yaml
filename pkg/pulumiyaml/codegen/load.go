@@ -1016,7 +1016,6 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	var items []model.BodyItem
 
 	// Import config.
-	seenConfig := make(map[string]bool)
 	for _, kvp := range append(file.Configuration.Entries, file.Config.Entries...) {
 		config, cdiags := imp.importConfig(kvp)
 		diags.Extend(cdiags...)

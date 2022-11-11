@@ -162,9 +162,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		// Strip the project prefix
 		projPrefix := pctx.Project() + ":"
 		for k, v := range req.GetConfig() {
-			if strings.HasPrefix(k, projPrefix) {
-				k = strings.Split(k, projPrefix)[1]
-			}
+			k = strings.TrimPrefix(k, projPrefix)
 			conf[k] = v
 		}
 		// Now "evaluate" the template.

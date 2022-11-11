@@ -1,4 +1,5 @@
 ### Improvements
+
 - Parse `config` block for `pulumi convert`.
   [#407](https://github.com/pulumi/pulumi-yaml/pull/407)
 
