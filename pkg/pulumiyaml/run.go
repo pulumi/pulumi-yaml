@@ -1503,15 +1503,8 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v
-	} else if v, ok := e.config[stripConfigNamespace(resourceName)]; ok {
-		receiver = v
-		e.addDiag(&syntax.Diagnostic{
-			Diagnostic: hcl.Diagnostic{
-				Severity: hcl.DiagWarning,
-				Summary:  "Project config keys should not be namespaced;",
-				Detail:   fmt.Sprintf("Use %s instead of %s", stripConfigNamespace(resourceName), resourceName),
-			},
-		})
+	} else if p, ok := e.config[stripConfigNamespace(resourceName)]; ok {
+		receiver = p
 	} else {
 		return e.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))
 	}
