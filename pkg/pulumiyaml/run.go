@@ -1503,7 +1503,7 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v
-	} else if p, ok := e.config[stripConfigNamespace(resourceName)]; ok {
+	} else if p, ok := e.config[stripConfigNamespace(e.pulumiCtx.Project(), resourceName)]; ok {
 		receiver = p
 	} else {
 		return e.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))

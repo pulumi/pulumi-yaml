@@ -158,7 +158,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 			return err
 		}
 		defer loader.Close()
-		conf := make(map[string]string)
+		conf := make(map[string]string, len(req.GetConfig()))
 		// Strip the project prefix
 		projPrefix := pctx.Project() + ":"
 		for k, v := range req.GetConfig() {

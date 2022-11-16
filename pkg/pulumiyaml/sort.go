@@ -167,10 +167,10 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			if e2, ok := intermediates[stripConfigNamespace(name.Value)]; ok {
+			if e2, ok := intermediates[stripConfigNamespace(t.Name.Value, name.Value)]; ok {
 				e = e2
 			} else {
-				diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
+				diags.Extend(ast.ExprError(name, fmt.Sprintf("resource, variable, or config value %q not found", name.Value), ""))
 				return false
 			}
 		}
@@ -249,9 +249,9 @@ func isConfigNodeEnv(n graphNode) bool {
 	return ok
 }
 
-func stripConfigNamespace(s string) string {
+func stripConfigNamespace(n, s string) string {
 	tok := strings.Split(s, ":")
-	if len(tok) == 2 {
+	if len(tok) == 2 && tok[0] == n {
 		return tok[1]
 	}
 	return s
