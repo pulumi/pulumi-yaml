@@ -4,6 +4,7 @@ package tests
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,5 +27,24 @@ func TestTypeCheckError(t *testing.T) {
 `)
 		},
 	})
+}
 
+func TestMismatchedConfigType(t *testing.T) {
+	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
+		f: func(t *testing.T, stderr string) {
+			assert.Contains(t, stderr,
+				`config key foo cannot have conflicting types string, integer`)
+		},
+	})
+}
+
+func TestProjectConfigRef(t *testing.T) {
+	testWrapper(t, integrationDir("project-config-ref"), ExpectFailure, StderrValidator{
+		f: func(t *testing.T, stderr string) {
+			assert.Contains(t, stderr,
+				`resource, variable, or config value "wrong-namespace:foo" not found`)
+			assert.False(t, strings.Contains(stderr,
+				`resource, variable, or config value "project-config-ref:foo" not found`))
+		},
+	})
 }

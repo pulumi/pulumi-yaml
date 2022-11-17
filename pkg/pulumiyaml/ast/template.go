@@ -102,16 +102,27 @@ func (d *ConfigMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics 
 	entries := make([]ConfigMapEntry, obj.Len(), obj.Len())
 	for i := range entries {
 		kvp := obj.Index(i)
+		if _, ok := kvp.Value.(*syntax.ObjectNode); !ok {
+			valueExpr, vdiags := ParseExpr(kvp.Value)
+			diags.Extend(vdiags...)
+			entries[i] = ConfigMapEntry{
+				syntax: kvp,
+				Key:    StringSyntax(kvp.Key),
+				Value: &ConfigParamDecl{
+					Value: valueExpr,
+				},
+			}
+		} else {
+			var v *ConfigParamDecl
+			vname := fmt.Sprintf("%s.%s", name, kvp.Key.Value())
+			vdiags := parseField(vname, reflect.ValueOf(&v).Elem(), kvp.Value)
+			diags.Extend(vdiags...)
 
-		var v *ConfigParamDecl
-		vname := fmt.Sprintf("%s.%s", name, kvp.Key.Value())
-		vdiags := parseField(vname, reflect.ValueOf(&v).Elem(), kvp.Value)
-		diags.Extend(vdiags...)
-
-		entries[i] = ConfigMapEntry{
-			syntax: kvp,
-			Key:    StringSyntax(kvp.Key),
-			Value:  v,
+			entries[i] = ConfigMapEntry{
+				syntax: kvp,
+				Key:    StringSyntax(kvp.Key),
+				Value:  v,
+			}
 		}
 	}
 	d.Entries = entries
@@ -263,6 +274,7 @@ type ConfigParamDecl struct {
 	Type    *StringExpr
 	Secret  *BooleanExpr
 	Default Expr
+	Value   Expr
 }
 
 func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
@@ -459,8 +471,10 @@ type TemplateDecl struct {
 
 	syntax syntax.Node
 
+	Name          *StringExpr
 	Description   *StringExpr
 	Configuration ConfigMapDecl
+	Config        ConfigMapDecl
 	Variables     VariablesMapDecl
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl

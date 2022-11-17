@@ -53,13 +53,11 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
 	// nil runner passed in since template is not executed and we can use pkgLoader
-	r, tdiags, err := pulumiyaml.PrepareTemplate(template, nil, pkgLoader)
+	_, tdiags, err := pulumiyaml.PrepareTemplate(template, nil, pkgLoader)
 	if err != nil {
 		return "", diags, err
 	}
 	diags = diags.Extend(tdiags.HCL())
-
-	pulumiyaml.InjectMissingNodes(r, template)
 
 	templateBody, tdiags := ImportTemplate(template, pkgLoader)
 	diags = diags.Extend(tdiags.HCL())

@@ -993,9 +993,9 @@ func (imp *importer) findStackReferences(node ast.Expr) {
 
 func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
-
 	// Declare config variables, resources, and outputs.
-	for _, kvp := range file.Configuration.Entries {
+
+	for _, kvp := range append(file.Configuration.Entries, file.Config.Entries...) {
 		imp.configuration[kvp.Key.Value] = nil
 	}
 	for _, kvp := range file.Resources.Entries {
@@ -1016,7 +1016,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	var items []model.BodyItem
 
 	// Import config.
-	for _, kvp := range file.Configuration.Entries {
+	for _, kvp := range append(file.Configuration.Entries, file.Config.Entries...) {
 		config, cdiags := imp.importConfig(kvp)
 		diags.Extend(cdiags...)
 

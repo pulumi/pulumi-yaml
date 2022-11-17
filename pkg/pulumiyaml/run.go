@@ -709,8 +709,6 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 	var errors multierror.Error
 	idx := 0
 	for k, v := range config {
-		// Strip the project prefix
-		k := strings.Split(k, ":")[1]
 		// We default types to strings to avoid error cascades on mis-typed values.
 		typ := ctypes.String
 		var value interface{} = v
@@ -855,8 +853,6 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 			if !e.EvalResource(r, kvp) {
 				return returnDiags()
 			}
-		case missingNode:
-			// We ignore this intentionally
 		}
 	}
 
@@ -1507,6 +1503,8 @@ func (e *programEvaluator) evaluatePropertyAccess(expr ast.Expr, access *ast.Pro
 		receiver = p
 	} else if v, ok := e.variables[resourceName]; ok {
 		receiver = v
+	} else if p, ok := e.config[stripConfigNamespace(e.pulumiCtx.Project(), resourceName)]; ok {
+		receiver = p
 	} else {
 		return e.error(expr, fmt.Sprintf("resource or variable named %q could not be found", resourceName))
 	}
@@ -2180,25 +2178,4 @@ func listStrings(v *ast.StringListDecl) []string {
 		a[i] = s.Value
 	}
 	return a
-}
-
-// Edit the template with the goal of making it valid.
-//
-// This is a best effort function, and does not guarantee a valid template.
-func InjectMissingNodes(r *Runner, template *ast.TemplateDecl) {
-	for _, node := range r.intermediates {
-		if node, ok := node.(missingNode); ok {
-			if isGlobalConfigName(node.name.GetValue()) {
-				template.Configuration.Entries = append(template.Configuration.Entries,
-					ast.ConfigMapEntry{
-						Key:   node.key(),
-						Value: &ast.ConfigParamDecl{},
-					})
-			}
-		}
-	}
-}
-
-func isGlobalConfigName(s string) bool {
-	return strings.Count(s, ":") == 1
 }
