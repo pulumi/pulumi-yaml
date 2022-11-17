@@ -1,0 +1,8 @@
+name: project-config-ref
+runtime: yaml
+config:
+  foo: "hello world"
+variables:
+  valid1: ${foo}
+  valid2: ${project-config-ref:foo}
+  invalid: ${wrong-namespace:foo}

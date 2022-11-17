@@ -250,9 +250,5 @@ func isConfigNodeEnv(n graphNode) bool {
 }
 
 func stripConfigNamespace(n, s string) string {
-	tok := strings.Split(s, ":")
-	if len(tok) == 2 && tok[0] == n {
-		return tok[1]
-	}
-	return s
+	return strings.TrimPrefix(s, n+":")
 }
