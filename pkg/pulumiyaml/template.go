@@ -4,10 +4,14 @@ package pulumiyaml
 
 // Template is a YAML or JSON structure which defines a Pulumi stack containing cloud infrastructure resources.
 type Template struct {
+	// Name is the project name
+	Name string `json:",omitempty" yaml:",omitempty"`
 	// Description is an informational bit of metadata about this template.
 	Description string `json:",omitempty" yaml:",omitempty"`
 	// Configuration allows the template to be conditional based on Pulumi configuration values.
 	Configuration map[string]*Configuration `json:",omitempty" yaml:",omitempty"`
+	// Config is the configuration from the project-level `config` block.
+	Config map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Variables declares variables that will be used in the template.
 	Variables map[string]interface{} `json:",omitempty" yaml:",omitempty"`
 	// Resources is a required section that declares resources you want to include in the stack.

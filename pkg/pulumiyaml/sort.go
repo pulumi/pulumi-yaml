@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
@@ -73,18 +74,6 @@ func (e configNodeEnv) key() *ast.StringExpr {
 
 func (e configNodeEnv) value() interface{} {
 	return e.Value
-}
-
-type missingNode struct {
-	name *ast.StringExpr
-}
-
-func (e missingNode) key() *ast.StringExpr {
-	return e.name
-}
-
-func (missingNode) valueKind() string {
-	return "missing node"
 }
 
 func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
@@ -178,9 +167,12 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			diags.Extend(ast.ExprError(name, fmt.Sprintf("resource %q not found", name.Value), ""))
-			e = missingNode{name}
-			addIntermediate(name.Value, e)
+			if e2, ok := intermediates[stripConfigNamespace(t.Name.Value, name.Value)]; ok {
+				e = e2
+			} else {
+				diags.Extend(ast.ExprError(name, fmt.Sprintf("resource, variable, or config value %q not found", name.Value), ""))
+				return false
+			}
 		}
 		kind := e.valueKind()
 
@@ -255,4 +247,8 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 func isConfigNodeEnv(n graphNode) bool {
 	_, ok := n.(configNodeEnv)
 	return ok
+}
+
+func stripConfigNamespace(n, s string) string {
+	return strings.TrimPrefix(s, n+":")
 }
