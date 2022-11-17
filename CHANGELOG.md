@@ -1,6 +1,24 @@
 CHANGELOG
 =========
 
+## 1.0.3 (2022-11-17)
+
+### Improvements
+
+- Parse `config` block for `pulumi convert`.
+  [#407](https://github.com/pulumi/pulumi-yaml/pull/407)
+
+### Bug Fixes
+
+## 1.0.2 (2022-11-08)
+
+### Improvements
+
+### Bug Fixes
+
+- Do not error on duplicate config keys.
+  [#402](https://github.com/pulumi/pulumi-yaml/pull/402)
+
 ## 1.0.1 (2022-11-02)
 
 ### Improvements
