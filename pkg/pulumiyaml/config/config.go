@@ -139,7 +139,7 @@ func Parse(s string) (Type, bool) {
 		return Boolean, true
 	case "number":
 		return Number, true
-	case "int":
+	case "int", "integer":
 		return Int, true
 	default:
 		return nil, false
