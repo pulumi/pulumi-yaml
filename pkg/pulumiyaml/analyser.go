@@ -1085,7 +1085,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if typExisting.String() != typ.String() {
+		if !tc.compatibleType(typExisting, typ) {
 			ctx := r.newContext(node)
 			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typ)))
@@ -1094,6 +1094,15 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	tc.configuration[k] = typ
 	return true
+}
+
+func (tc *typeCache) compatibleType(a, b schema.Type) bool {
+	if a.String() == b.String() {
+		return true
+	} else if (a == schema.IntType && b == schema.NumberType) || (b == schema.IntType && a == schema.NumberType) {
+		return true
+	}
+	return false
 }
 
 func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {
