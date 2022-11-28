@@ -1056,7 +1056,7 @@ func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 
 func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	k := node.key().Value
-	var typ schema.Type = &schema.InvalidType{}
+	var typCurrent schema.Type = &schema.InvalidType{}
 	var optional bool
 
 	switch n := node.(type) {
@@ -1065,44 +1065,47 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 		switch {
 		case v.Default != nil:
 			// We have a default, so the type is optional
-			typ = tc.exprs[v.Default]
+			typCurrent = tc.exprs[v.Default]
 			optional = true
 		case v.Type != nil:
 			ctype, ok := ctypes.Parse(v.Type.Value)
 			if ok {
-				typ = ctype.Schema()
+				typCurrent = ctype.Schema()
 			}
 		}
 	case configNodeEnv:
 		if n.Type != nil {
-			typ = n.Type.Schema()
+			typCurrent = n.Type.Schema()
 		}
 	}
 
-	typ = &schema.InputType{ElementType: typ}
+	typCurrent = &schema.InputType{ElementType: typCurrent}
 	if optional {
-		typ = &schema.OptionalType{ElementType: typ}
+		typCurrent = &schema.OptionalType{ElementType: typCurrent}
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if !tc.compatibleType(typExisting, typ) {
+		if typMatch, ok := tc.isConfigEquivalent(typExisting, typCurrent); !ok {
 			ctx := r.newContext(node)
 			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
-				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typ)))
+				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
 			return false
+		} else {
+			typCurrent = typMatch
 		}
 	}
-	tc.configuration[k] = typ
+	tc.configuration[k] = typCurrent
 	return true
 }
 
-func (tc *typeCache) compatibleType(a, b schema.Type) bool {
+func (tc *typeCache) isConfigEquivalent(a, b schema.Type) (schema.Type, bool) {
+	a, b = codegen.UnwrapType(a), codegen.UnwrapType(b)
 	if a.String() == b.String() {
-		return true
+		return a, true
 	} else if (a == schema.IntType && b == schema.NumberType) || (b == schema.IntType && a == schema.NumberType) {
-		return true
+		return schema.NumberType, true
 	}
-	return false
+	return nil, false
 }
 
 func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {

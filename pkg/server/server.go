@@ -204,3 +204,8 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 func (host *yamlLanguageHost) About(ctx context.Context, req *emptypb.Empty) (*pulumirpc.AboutResponse, error) {
 	return &pulumirpc.AboutResponse{}, nil
 }
+
+func (host *yamlLanguageHost) RunPlugin(*pulumirpc.RunPluginRequest, pulumirpc.LanguageRuntime_RunPluginServer) error {
+	// No plugins to run for YAML
+	return nil
+}
