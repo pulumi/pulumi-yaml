@@ -1085,7 +1085,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if typMatch, ok := tc.isConfigEquivalent(typExisting, typCurrent); !ok {
+		if typMatch, ok := unifyConfigType(typExisting, typCurrent); !ok {
 			ctx := r.newContext(node)
 			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
@@ -1098,7 +1098,8 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	return true
 }
 
-func (tc *typeCache) isConfigEquivalent(a, b schema.Type) (schema.Type, bool) {
+// checks for config type compatibility
+func unifyConfigType(a, b schema.Type) (schema.Type, bool) {
 	a, b = codegen.UnwrapType(a), codegen.UnwrapType(b)
 	if a.String() == b.String() {
 		return a, true

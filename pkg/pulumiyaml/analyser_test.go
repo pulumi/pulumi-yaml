@@ -308,3 +308,40 @@ func TestTypePropertyAccess(t *testing.T) {
 		})
 	}
 }
+
+// tests for type compatibility, i.e. int&number are compatible, int&string are not
+func TestConfigCompatibility(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		typeA      schema.Type
+		typeB      schema.Type
+		compatible bool
+	}{
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.IntType,
+			compatible: true,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.NumberType,
+			compatible: true,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.StringType,
+			compatible: false,
+		},
+	}
+
+	for _, c := range cases { //nolint:paralleltest
+		// false positive. The parallel call is below
+
+		c := c
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+			_, ok := unifyConfigType(c.typeA, c.typeB)
+			assert.Equal(t, c.compatible, ok)
+		})
+	}
+}
