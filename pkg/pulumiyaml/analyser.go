@@ -1091,7 +1091,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 		if isConfigEnv {
 			curVal = v
 		}
-		if typMatch, ok := unifyConfigType(typExisting, typCurrent, curVal); !ok {
+		if typMatch, ok := unifyConfigType(typExisting, typCurrent, node.value()); !ok {
 			ctx := r.newContext(node)
 			ctx.error(nil, fmt.Sprintf(`config key "%s" cannot have conflicting types %v, %v`,
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
