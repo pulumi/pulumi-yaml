@@ -329,8 +329,13 @@ func TestConfigCompatibility(t *testing.T) {
 		},
 		{
 			typeA:      schema.IntType,
-			typeB:      schema.StringType,
+			typeB:      schema.BoolType,
 			compatible: false,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.StringType,
+			compatible: true,
 		},
 	}
 
@@ -340,7 +345,7 @@ func TestConfigCompatibility(t *testing.T) {
 		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			_, ok := unifyConfigType(c.typeA, c.typeB)
+			_, ok := unifyConfigType(c.typeA, c.typeB, nil)
 			assert.Equal(t, c.compatible, ok)
 		})
 	}

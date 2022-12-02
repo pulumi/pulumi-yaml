@@ -33,7 +33,7 @@ func TestMismatchedConfigType(t *testing.T) {
 	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
 			assert.Contains(t, stderr,
-				`config key foo cannot have conflicting types string, integer`)
+				`config key foo cannot have conflicting types boolean, integer`)
 		},
 	})
 }

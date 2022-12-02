@@ -1055,7 +1055,8 @@ func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 }
 
 func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
-	k := node.key().Value
+	k, v := node.key().Value, node.value()
+	isConfigEnv := false
 	var typCurrent schema.Type = &schema.InvalidType{}
 	var optional bool
 
@@ -1077,6 +1078,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 		if n.Type != nil {
 			typCurrent = n.Type.Schema()
 		}
+		isConfigEnv = true
 	}
 
 	typCurrent = &schema.InputType{ElementType: typCurrent}
@@ -1085,9 +1087,13 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if typMatch, ok := unifyConfigType(typExisting, typCurrent); !ok {
+		var curVal interface{}
+		if isConfigEnv {
+			curVal = v
+		}
+		if typMatch, ok := unifyConfigType(typExisting, typCurrent, curVal); !ok {
 			ctx := r.newContext(node)
-			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
+			ctx.error(nil, fmt.Sprintf(`config key "%s" cannot have conflicting types %v, %v`,
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
 			return false
 		} else {
@@ -1098,13 +1104,32 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	return true
 }
 
-// checks for config type compatibility
-func unifyConfigType(a, b schema.Type) (schema.Type, bool) {
-	a, b = codegen.UnwrapType(a), codegen.UnwrapType(b)
-	if a.String() == b.String() {
-		return a, true
-	} else if (a == schema.IntType && b == schema.NumberType) || (b == schema.IntType && a == schema.NumberType) {
+// Checks for config type compatibility between an already registered/ old config key with a new key.
+// We allow Int to fall back to Number.
+// We also allow a new non-String key to fall back to String
+// since parsing CLI-set config types is a best effort and may actually be intended as a String.
+// If the new key is a String with a defined value, and the old key is not, then we
+// parse the new key to determine if it can fall back to the old key's type
+// (i.e. "16" would be valid as an Int but "foo" would not.)
+// TODO: remove the last case once `configuration` is deprecated.
+func unifyConfigType(oldType, newType schema.Type, newVal interface{}) (schema.Type, bool) {
+	oldType, newType = codegen.UnwrapType(oldType), codegen.UnwrapType(newType)
+	if oldType.String() == newType.String() {
+		return oldType, true
+	} else if (oldType == schema.IntType && newType == schema.NumberType) || (newType == schema.IntType && oldType == schema.NumberType) {
 		return schema.NumberType, true
+	} else if oldType == schema.StringType {
+		return schema.StringType, true
+	} else if newType == schema.StringType {
+		if v, ok := newVal.(string); !ok {
+			return nil, false
+		} else if _, err := strconv.ParseInt(v, 10, 64); err == nil && oldType == schema.IntType {
+			return schema.IntType, true
+		} else if _, err := strconv.ParseBool(v); err == nil && oldType == schema.BoolType {
+			return schema.BoolType, true
+		} else if _, err := strconv.ParseFloat(v, 64); err == nil && oldType == schema.NumberType {
+			return schema.NumberType, true
+		}
 	}
 	return nil, false
 }
