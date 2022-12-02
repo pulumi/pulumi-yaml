@@ -313,41 +313,46 @@ func TestTypePropertyAccess(t *testing.T) {
 func TestConfigCompatibility(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		oldType    schema.Type
-		newType    schema.Type
-		newVal     interface{}
+		typeA      schema.Type
+		typeB      schema.Type
+		valB       interface{}
 		compatible bool
 	}{
 		{
-			oldType:    schema.IntType,
-			newType:    schema.IntType,
+			typeA:      schema.IntType,
+			typeB:      schema.IntType,
 			compatible: true,
 		},
 		{
-			oldType:    schema.IntType,
-			newType:    schema.NumberType,
-			compatible: true,
-		},
-		{
-			oldType:    schema.IntType,
-			newType:    schema.BoolType,
+			typeA:      schema.IntType,
+			typeB:      schema.NumberType,
 			compatible: false,
 		},
 		{
-			oldType:    schema.StringType,
-			newType:    schema.AnyType,
+			typeA:      schema.NumberType,
+			typeB:      schema.IntType,
 			compatible: true,
 		},
 		{
-			oldType:    schema.IntType,
-			newType:    schema.StringType,
-			newVal:     "10",
+			typeA:      schema.IntType,
+			typeB:      schema.BoolType,
+			compatible: false,
+		},
+		{
+			typeA:      schema.StringType,
+			typeB:      schema.AnyType,
 			compatible: true,
 		},
 		{
-			oldType:    schema.IntType,
-			newType:    schema.StringType,
-			newVal:     "foo",
+			typeA:      schema.IntType,
+			typeB:      schema.StringType,
+			valB:       "10",
+			compatible: true,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.StringType,
+			valB:       "foo",
 			compatible: false,
 		},
 	}
@@ -358,7 +363,7 @@ func TestConfigCompatibility(t *testing.T) {
 		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			_, ok := unifyConfigType(c.oldType, c.newType, c.newVal)
+			ok := isTypeCompatible(c.typeA, c.typeB, c.valB)
 			assert.Equal(t, c.compatible, ok)
 		})
 	}
