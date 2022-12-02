@@ -8,4 +8,5 @@ group:
       exclude: |
         .gitignore
         go.mod
+        pkg/tests/transpiled_examples/cue-static-web-app
       deleteOrphaned: true
