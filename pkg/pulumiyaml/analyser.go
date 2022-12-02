@@ -1105,12 +1105,11 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 }
 
 // Checks for config type compatibility between an already registered/ old config key with a new key.
-// We allow Int to fall back to Number.
-// We also allow a new non-String key to fall back to String
-// since parsing CLI-set config types is a best effort and may actually be intended as a String.
-// If the new key is a String with a defined value, and the old key is not, then we
-// parse the new key to determine if it can fall back to the old key's type
-// (i.e. "16" would be valid as an Int but "foo" would not.)
+// Config types are compatible if
+// - They are the same type.
+// - We are assigning an integer to a number.
+// - We are assigning any type to a string.
+// - We are assigning a string to some type T *and* the string can be unambiguously parsed into T.
 // TODO: remove the last case once `configuration` is deprecated.
 func unifyConfigType(oldType, newType schema.Type, newVal interface{}) (schema.Type, bool) {
 	oldType, newType = codegen.UnwrapType(oldType), codegen.UnwrapType(newType)
