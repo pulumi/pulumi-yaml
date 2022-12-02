@@ -1115,7 +1115,7 @@ func unifyConfigType(oldType, newType schema.Type, newVal interface{}) (schema.T
 	oldType, newType = codegen.UnwrapType(oldType), codegen.UnwrapType(newType)
 	if oldType.String() == newType.String() {
 		return oldType, true
-	} else if (oldType == schema.IntType && newType == schema.NumberType) || (newType == schema.IntType && oldType == schema.NumberType) {
+	} else if newType == schema.IntType && oldType == schema.NumberType {
 		return schema.NumberType, true
 	} else if oldType == schema.StringType {
 		return schema.StringType, true
