@@ -1087,8 +1087,8 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	if typExisting, ok := tc.configuration[k]; ok {
 		if !isTypeCompatible(typExisting, typCurrent, v) {
 			ctx := r.newContext(node)
-			ctx.errorf(node.Key(), `config key "%s" cannot have conflicting types %v, %v`,
-				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
+			ctx.errorf(node.key(), `config key "%s" cannot have conflicting types %v, %v`,
+				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent))
 			return false
 		} else {
 			typCurrent = typExisting
