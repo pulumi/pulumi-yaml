@@ -1085,7 +1085,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if ok := isTypeCompatible(typExisting, typCurrent, v); !ok {
+		if !isTypeCompatible(typExisting, typCurrent, v) {
 			ctx := r.newContext(node)
 			ctx.error(nil, fmt.Sprintf(`config key "%s" cannot have conflicting types %v, %v`,
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
