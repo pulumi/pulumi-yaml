@@ -1055,7 +1055,7 @@ func (tc *typeCache) typeVariable(r *Runner, node variableNode) bool {
 }
 
 func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
-	k := node.key().Value
+	k, v := node.key().Value, node.value()
 	var typCurrent schema.Type = &schema.InvalidType{}
 	var optional bool
 
@@ -1085,28 +1085,46 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	}
 	// check for incompatible types between config/ configuration
 	if typExisting, ok := tc.configuration[k]; ok {
-		if typMatch, ok := unifyConfigType(typExisting, typCurrent); !ok {
+		if !isTypeCompatible(typExisting, typCurrent, v) {
 			ctx := r.newContext(node)
-			ctx.error(nil, fmt.Sprintf("config key %s cannot have conflicting types %v, %v",
-				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent)))
+			ctx.errorf(node.key(), `config key "%s" cannot have conflicting types %v, %v`,
+				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent))
 			return false
 		} else {
-			typCurrent = typMatch
+			typCurrent = typExisting
 		}
 	}
 	tc.configuration[k] = typCurrent
 	return true
 }
 
-// checks for config type compatibility
-func unifyConfigType(a, b schema.Type) (schema.Type, bool) {
-	a, b = codegen.UnwrapType(a), codegen.UnwrapType(b)
-	if a.String() == b.String() {
-		return a, true
-	} else if (a == schema.IntType && b == schema.NumberType) || (b == schema.IntType && a == schema.NumberType) {
-		return schema.NumberType, true
+// Checks for config type compatibility between types A and B, and if B can be assigned to A.
+// Config types are compatible if
+// - They are the same type.
+// - We are assigning an integer to a number.
+// - We are assigning any type to a string.
+// - We are assigning a string to some type T *and* the string can be unambiguously parsed into T.
+// TODO: remove the last case once `configuration` is deprecated.
+func isTypeCompatible(typeA, typeB schema.Type, valB interface{}) bool {
+	typeA, typeB = codegen.UnwrapType(typeA), codegen.UnwrapType(typeB)
+	if typeA.String() == typeB.String() {
+		return true
+	} else if typeA == schema.NumberType && typeB == schema.IntType {
+		return true
+	} else if typeA == schema.StringType {
+		return true
+	} else if typeB == schema.StringType {
+		if v, ok := valB.(string); !ok {
+			return false
+		} else if _, err := strconv.ParseInt(v, 10, 64); err == nil && typeA == schema.IntType {
+			return true
+		} else if _, err := strconv.ParseBool(v); err == nil && typeA == schema.BoolType {
+			return true
+		} else if _, err := strconv.ParseFloat(v, 64); err == nil && typeA == schema.NumberType {
+			return true
+		}
 	}
-	return nil, false
+	return false
 }
 
 func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {

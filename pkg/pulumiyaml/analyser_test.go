@@ -315,6 +315,7 @@ func TestConfigCompatibility(t *testing.T) {
 	cases := []struct {
 		typeA      schema.Type
 		typeB      schema.Type
+		valB       interface{}
 		compatible bool
 	}{
 		{
@@ -325,11 +326,33 @@ func TestConfigCompatibility(t *testing.T) {
 		{
 			typeA:      schema.IntType,
 			typeB:      schema.NumberType,
+			compatible: false,
+		},
+		{
+			typeA:      schema.NumberType,
+			typeB:      schema.IntType,
+			compatible: true,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.BoolType,
+			compatible: false,
+		},
+		{
+			typeA:      schema.StringType,
+			typeB:      schema.AnyType,
 			compatible: true,
 		},
 		{
 			typeA:      schema.IntType,
 			typeB:      schema.StringType,
+			valB:       "10",
+			compatible: true,
+		},
+		{
+			typeA:      schema.IntType,
+			typeB:      schema.StringType,
+			valB:       "foo",
 			compatible: false,
 		},
 	}
@@ -340,7 +363,7 @@ func TestConfigCompatibility(t *testing.T) {
 		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
-			_, ok := unifyConfigType(c.typeA, c.typeB)
+			ok := isTypeCompatible(c.typeA, c.typeB, c.valB)
 			assert.Equal(t, c.compatible, ok)
 		})
 	}

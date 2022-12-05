@@ -4,5 +4,5 @@ config:
   foo: 3
 configuration:
   foo:
-    type: string
-    default: "bar"
+    type: bool
+    default: true
