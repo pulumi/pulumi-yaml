@@ -1,8 +1,9 @@
 name: stackreference-consumer
 runtime: yaml
-outputs:
-  referencedImageName:
-    fn::stackReference:
+resources:
+  stackRef:
+    type: pulumi:pulumi:StackReference
+    properties:
       # These are placeholders that our test environment replaces.
       #
       # If you're using this sample:
@@ -10,5 +11,6 @@ outputs:
       # * Stack name is determined when you run "pulumi up" for the first time, such as "dev"
       #
       # So you might use "alice/infra-project-name/dev", as an example.
-      - PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
-      - imageName
+      name: PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
+outputs:
+  referencedImageName: ${stackRef}

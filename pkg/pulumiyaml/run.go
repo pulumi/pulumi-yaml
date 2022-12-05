@@ -1376,7 +1376,11 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.AssetArchiveExpr:
 		return e.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
-		return e.evaluateBuiltinStackReference(x)
+		e.addErrDiag(x.Syntax().Syntax().Range(),
+			"'fn::stackreference' is deprecated",
+			"Please use `pulumi:pulumi:StackReference`; see"+
+				"https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences")
+		return nil, false
 	case *ast.SecretExpr:
 		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
@@ -1933,35 +1937,6 @@ func (e *programEvaluator) evaluateBuiltinAssetArchive(v *ast.AssetArchiveExpr) 
 	}
 
 	return pulumi.NewAssetArchive(m), true
-}
-
-func (e *programEvaluator) evaluateBuiltinStackReference(v *ast.StackReferenceExpr) (interface{}, bool) {
-	stackRef, ok := e.stackRefs[v.StackName.Value]
-	if !ok {
-		var err error
-		stackRef, err = pulumi.NewStackReference(e.pulumiCtx, v.StackName.Value, &pulumi.StackReferenceArgs{})
-		if err != nil {
-			return e.error(v.StackName, err.Error())
-		}
-		e.stackRefs[v.StackName.Value] = stackRef
-	}
-
-	property, ok := e.evaluateExpr(v.PropertyName)
-	if !ok {
-		return nil, false
-	}
-
-	propertyStringOutput := pulumi.ToOutput(property).ApplyT(func(n interface{}) (string, error) {
-		s, ok := n.(string)
-		if !ok {
-			e.error(v.PropertyName,
-				fmt.Sprintf("expected property name argument to fn::stackReference to be a string, got %v", typeString(n)),
-			)
-		}
-		return s, nil
-	}).(pulumi.StringOutput)
-
-	return stackRef.GetOutput(propertyStringOutput), true
 }
 
 func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}, bool) {

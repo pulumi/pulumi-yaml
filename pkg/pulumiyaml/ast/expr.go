@@ -281,7 +281,7 @@ func Object(entries ...ObjectProperty) *ObjectExpr {
 //     accesses, it is treated as a string literal. Otherwise, it it treated as an interpolated string.
 //   - *syntax.ObjectNode is parses as either an *ObjectExpr or a BuiltinExpr. If the object contains a single key and
 //     that key names a builtin function ("fn::invoke", "fn::join", "fn::select",
-//     "fn::*Asset", "fn::*Archive", or "fn::stackReference"), then the object is parsed as the corresponding BuiltinExpr.
+//     "fn::*Asset", or "fn::*Archive"), then the object is parsed as the corresponding BuiltinExpr.
 //     Otherwise, the object is parsed as a *syntax.ObjectNode.
 func ParseExpr(node syntax.Node) (Expr, syntax.Diagnostics) {
 	switch node := node.(type) {
@@ -700,16 +700,6 @@ func StackReferenceSyntax(node *syntax.ObjectNode, name *StringExpr, args *ListE
 	}
 }
 
-func StackReference(stackName string, propertyName Expr) *StackReferenceExpr {
-	name, stackNameX := String("fn::stackReference"), String(stackName)
-
-	return &StackReferenceExpr{
-		builtinNode:  builtin(nil, name, List(stackNameX, propertyName)),
-		StackName:    stackNameX,
-		PropertyName: propertyName,
-	}
-}
-
 type SecretExpr struct {
 	builtinNode
 
@@ -773,7 +763,10 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	case "fn::split":
 		set("fn::split", parseSplit)
 	case "fn::stackreference":
-		set("fn::stackReference", parseStackReference)
+		diags = append(diags, syntax.Error(kvp.Key.Syntax().Range(),
+			`'fn::stackreference' is deprecated; please use 'pulumi:pulumi:StackReference' instead`,
+			`see "https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences for more info.`))
+		return nil, diags, false
 	case "fn::assetarchive":
 		set("fn::assetArchive", parseAssetArchive)
 	case "fn::secret":
@@ -934,20 +927,6 @@ func parseToBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, 
 
 func parseFromBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	return FromBase64Syntax(node, name, args), nil
-}
-
-func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
-	list, ok := args.(*ListExpr)
-	if !ok || len(list.Elements) != 2 {
-		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::stackReference must be a two-valued list", "")}
-	}
-
-	stackName, ok := list.Elements[0].(*StringExpr)
-	if !ok {
-		return nil, syntax.Diagnostics{ExprError(args, "the first argument to fn::stackReference must be a string literal", "")}
-	}
-
-	return StackReferenceSyntax(node, name, list, stackName, list.Elements[1]), nil
 }
 
 func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {

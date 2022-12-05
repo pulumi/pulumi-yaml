@@ -244,7 +244,6 @@ func (imp *importer) importSplit(node *ast.SplitExpr) (model.Expression, syntax.
 // - `fn::invoke` is imported as a call to `invoke`
 // - `fn::join` is imported as either a template expression or a call to `join`
 // - `fn::split` is imported as a call to `split`
-// - `fn::stackReference` is imported as a reference to the named stack
 func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, syntax.Diagnostics) {
 	switch node := node.(type) {
 	case *ast.StringAssetExpr:
@@ -335,40 +334,6 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		}, diags
 	case *ast.SplitExpr:
 		return imp.importSplit(node)
-	case *ast.StackReferenceExpr:
-		stackName := node.StackName.Value
-		stackVar := imp.stackReferences[stackName]
-
-		propertyName, diags := imp.importExpr(node.PropertyName, nil)
-
-		if str, ok := propertyName.(*model.LiteralValueExpression); ok {
-			return &model.ScopeTraversalExpression{
-				Traversal: hcl.Traversal{
-					hcl.TraverseRoot{Name: stackVar.Name},
-					hcl.TraverseAttr{Name: "outputs"},
-					hcl.TraverseAttr{Name: str.Value.AsString()},
-				},
-				Parts: []model.Traversable{
-					stackVar,
-					model.DynamicType,
-					model.DynamicType,
-				},
-			}, diags
-		}
-
-		return &model.IndexExpression{
-			Collection: &model.ScopeTraversalExpression{
-				Traversal: hcl.Traversal{
-					hcl.TraverseRoot{Name: stackVar.Name},
-					hcl.TraverseAttr{Name: "outputs"},
-				},
-				Parts: []model.Traversable{
-					stackVar,
-					model.DynamicType,
-				},
-			},
-			Key: propertyName,
-		}, diags
 	case *ast.ReadFileExpr:
 		var diags syntax.Diagnostics
 
