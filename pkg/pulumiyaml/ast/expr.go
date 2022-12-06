@@ -774,6 +774,9 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::split", parseSplit)
 	case "fn::stackreference":
 		set("fn::stackReference", parseStackReference)
+		diags = append(diags, syntax.Warning(kvp.Key.Syntax().Range(),
+			`'fn::stackReference' is deprecated; please use 'pulumi:pulumi:StackReference' instead`,
+			`see "https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences for more info.`))
 	case "fn::assetarchive":
 		set("fn::assetArchive", parseAssetArchive)
 	case "fn::secret":
