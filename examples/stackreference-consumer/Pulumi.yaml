@@ -13,4 +13,4 @@ resources:
       # So you might use "alice/infra-project-name/dev", as an example.
       name: PLACEHOLDER_ORG_NAME/stackreference-producer/PLACEHOLDER_STACK_NAME
 outputs:
-  referencedImageName: ${stackRef.imageName}
+  referencedImageName: ${stackRef.outputs["imageName"]}
