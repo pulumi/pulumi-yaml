@@ -107,7 +107,7 @@ jobs:
       - name: Fixup go.mod if we're not targeting 1.17x
         run: |
           if [ "${{ matrix.go-version }}" != "1.17.x" ]; then
-            go mod tidy
+            go mod tidy -compat=1.17
           fi
       - name: Test
         run: make test
