@@ -1,0 +1,21 @@
+name: image-yaml
+description: A minimal Pulumi YAML program
+runtime: yaml
+config: {}
+variables: {}
+resources:
+  docker-provider:
+    type: pulumi:providers:docker
+    defaultProvider: true
+    options:
+      version: 4.0.0-alpha.0
+  image:
+    type: docker:Image
+    properties:
+      imageName: pulumi.example.com/test-yaml:tag1
+      skipPush: true
+      build:
+        dockerfile: Dockerfile
+        context: .
+outputs:
+  imageName: ${image.imageName}

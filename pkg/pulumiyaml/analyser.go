@@ -563,9 +563,13 @@ func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to sc
 func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value)
+	version, err := ParseVersion(v.Options.Version)
 	if err != nil {
-		ctx.sdiags.diags.Extend(syntax.NodeError(v.Syntax(), fmt.Sprintf("error resolving type of resource %v: %v", k, err), ""))
+		ctx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
+		return true
+	}
+	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value, version)
+	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
@@ -736,7 +740,12 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourc
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
-	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value)
+	version, err := ParseVersion(t.CallOpts.Version)
+	if err != nil {
+		ctx.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
+		return true
+	}
+	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value, version)
 	if err != nil {
 		_, b := ctx.error(t, err.Error())
 		return b
