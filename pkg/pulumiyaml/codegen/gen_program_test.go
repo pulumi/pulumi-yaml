@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -28,7 +29,7 @@ var defaultPlugins = []pulumiyaml.Plugin{
 	{Package: "random", Version: "4.2.0"},
 	{Package: "eks", Version: "0.40.0"},
 	{Package: "aws-native", Version: "0.13.0"},
-	{Package: "docker", Version: "3.1.0"},
+	{Package: "docker", Version: "4.0.0-alpha.0"},
 	{Package: "awsx", Version: "1.0.0-beta.5"},
 
 	// Extra packages are to satisfy the versioning requirement of aws-eks.
@@ -43,12 +44,12 @@ var defaultPlugins = []pulumiyaml.Plugin{
 
 type testPackageLoader struct{ *testing.T }
 
-func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+func (l testPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
 	if name == "test" {
 		return FakePackage{l.T}, nil
 	}
 
-	pkg, err := schema.LoadPackageReference(rootPluginLoader, name, nil)
+	pkg, err := schema.LoadPackageReference(rootPluginLoader, name, version)
 	if err != nil {
 		return nil, err
 	}

@@ -42,8 +42,8 @@ resources:
 		diagStrings = append(diagStrings, diagString(v))
 	}
 	expectedErrors := []string{
-		"<stdin>:5:11: error resolving type of resource dockerImageFull: The resource type [docker:image:Image] is not supported in YAML at this time, see: https://github.com/pulumi/pulumi-docker/issues/132",
-		"<stdin>:7:11: error resolving type of resource dockerImageShort: The resource type [docker:Image] is not supported in YAML at this time, see: https://github.com/pulumi/pulumi-docker/issues/132",
+		"<stdin>:5:11: error resolving type of resource dockerImageFull: Docker Image resources are not supported in YAML without an explicit version, see: https://github.com/pulumi/pulumi-yaml/issues/421",
+		"<stdin>:7:11: error resolving type of resource dockerImageShort: Docker Image resources are not supported in YAML without an explicit version, see: https://github.com/pulumi/pulumi-yaml/issues/421",
 		"<stdin>:9:11: error resolving type of resource kubeCustomResource: The resource type [kubernetes:apiextensions.k8s.io:CustomResource] is not supported in YAML at this time, see: https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 		"<stdin>:11:11: error resolving type of resource kubeKustomizeDir: The resource type [kubernetes:kustomize:Directory] is not supported in YAML at this time, see: https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 		"<stdin>:13:11: error resolving type of resource kubeYamlConfigFile: The resource type [kubernetes:yaml:ConfigFile] is not supported in YAML at this time, see: https://github.com/pulumi/pulumi-kubernetes/issues/1971",
