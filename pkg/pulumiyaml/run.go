@@ -1376,6 +1376,10 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.AssetArchiveExpr:
 		return e.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
+		e.addWarnDiag(x.Syntax().Syntax().Range(),
+			"'fn::stackReference' is deprecated",
+			"Please use `pulumi:pulumi:StackReference`; see"+
+				"https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences")
 		return e.evaluateBuiltinStackReference(x)
 	case *ast.SecretExpr:
 		return e.evaluateBuiltinSecret(x)
