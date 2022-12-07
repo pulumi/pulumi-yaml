@@ -216,10 +216,10 @@ func (r *Runner) setDefaultProviders() {
 			}
 			pkgName := strings.Split(v.Type.Value, ":")[0]
 
-			if _, ok := defaultProviderInfoMap[pkgName]; !ok {
+			defaultProviderInfo, ok := defaultProviderInfoMap[pkgName]
+			if !ok {
 				return true
 			}
-			defaultProviderInfo := defaultProviderInfoMap[pkgName]
 
 			if v.Options.Provider == nil {
 				if v.Options.Version != nil && v.Options.Version.Value != defaultProviderInfo.version.Value {
@@ -240,6 +240,7 @@ func (r *Runner) setDefaultProviders() {
 				}
 
 				v.Options.Provider = expr
+				v.Options.Version = defaultProviderInfo.version
 			}
 			return true
 		},
@@ -276,6 +277,7 @@ func (r *Runner) setDefaultProviders() {
 						return false
 					}
 					t.CallOpts.Provider = expr
+					t.CallOpts.Version = defaultProviderInfo.version
 				}
 			}
 			return true
@@ -1034,7 +1036,17 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	props := make(map[string]interface{})
 	overallOk := true
 
-	pkg, typ, err := ResolveResource(e.pkgLoader, v.Type.Value)
+	var opts []pulumi.ResourceOption
+	version, err := ParseVersion(v.Options.Version)
+	if err != nil {
+		e.error(v.Options.Version, fmt.Sprintf("error parsing version of resource %v: %v", k, err))
+		return nil, true
+	}
+	if version != nil {
+		opts = append(opts, pulumi.Version(version.String()))
+	}
+
+	pkg, typ, err := ResolveResource(e.pkgLoader, v.Type.Value, version)
 	if err != nil {
 		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		overallOk = false
@@ -1058,7 +1070,6 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		return p, isPoison
 	}
 
-	var opts []pulumi.ResourceOption
 	if v.Options.AdditionalSecretOutputs != nil {
 		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
 	}
@@ -1162,9 +1173,6 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 	}
 
-	if v.Options.Version != nil {
-		opts = append(opts, pulumi.Version(v.Options.Version.Value))
-	}
 	if v.Options.PluginDownloadURL != nil {
 		opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
 	}
@@ -1376,6 +1384,10 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 	case *ast.AssetArchiveExpr:
 		return e.evaluateBuiltinAssetArchive(x)
 	case *ast.StackReferenceExpr:
+		e.addWarnDiag(x.Syntax().Syntax().Range(),
+			"'fn::stackReference' is deprecated",
+			"Please use `pulumi:pulumi:StackReference`; see"+
+				"https://www.pulumi.com/docs/intro/concepts/stack/#stackreferences")
 		return e.evaluateBuiltinStackReference(x)
 	case *ast.SecretExpr:
 		return e.evaluateBuiltinSecret(x)
@@ -1718,7 +1730,12 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		_, functionName, err := ResolveFunction(e.pkgLoader, t.Token.Value)
+		version, err := ParseVersion(t.CallOpts.Version)
+		if err != nil {
+			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
+			return nil, true
+		}
+		_, functionName, err := ResolveFunction(e.pkgLoader, t.Token.Value, version)
 		if err != nil {
 			return e.error(t, err.Error())
 		}

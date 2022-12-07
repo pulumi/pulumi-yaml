@@ -293,7 +293,11 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
-		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value)
+		version, err := pulumiyaml.ParseVersion(node.CallOpts.Version)
+		if err != nil {
+			return nil, syntax.Diagnostics{ast.ExprError(node.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err), "")}
+		}
+		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value, version)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -652,11 +656,7 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry, latestPkgInfo map
 // gets the latest package version specified on a resource
 func (imp *importer) getLatestPkgInfoResource(kvp ast.ResourcesMapEntry, pkgInfo map[string]*packageInfo) syntax.Diagnostics {
 	resource := kvp.Value
-
-	pkg, _, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
-	if err != nil {
-		return syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
-	}
+	pkg := pulumiyaml.ResolvePkgName(resource.Type.Value)
 
 	if resource.Options.Version != nil {
 		url := ""
@@ -665,14 +665,14 @@ func (imp *importer) getLatestPkgInfoResource(kvp ast.ResourcesMapEntry, pkgInfo
 		}
 		v1, err := semver.Make(resource.Options.Version.Value)
 		if err == nil {
-			if p, ok := pkgInfo[pkg.Name()]; ok {
+			if p, ok := pkgInfo[pkg]; ok {
 				v2, _ := semver.Make(p.version)
 				if v1.Compare(v2) == 1 {
 					p.version = resource.Options.Version.Value
 					p.pluginDownloadURL = url
 				}
 			} else {
-				pkgInfo[pkg.Name()] = &packageInfo{
+				pkgInfo[pkg] = &packageInfo{
 					version:           resource.Options.Version.Value,
 					pluginDownloadURL: url,
 				}
@@ -722,7 +722,14 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 	resourceVar, ok := imp.resources[name]
 	contract.Assert(ok)
 
-	pkg, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value)
+	var diags syntax.Diagnostics
+
+	version, err := pulumiyaml.ParseVersion(resource.Options.Version)
+	if err != nil {
+		diags.Extend(ast.ExprError(resource.Options.Version, fmt.Sprintf("unable to parse resource %v provider version: %v", name, err), ""))
+		return nil, diags
+	}
+	pkg, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value, version)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
@@ -730,7 +737,6 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 	contract.Assertf(props != nil,
 		"token(%s) was obtained by the same ResolveResource call as pkg(%s),"+
 			" so must produce a non nil value", token.String(), pkg.Name())
-	var diags syntax.Diagnostics
 	items := []model.BodyItem{
 		&model.Attribute{
 			Name:  pcl.LogicalNamePropertyKey,

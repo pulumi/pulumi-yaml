@@ -7,7 +7,7 @@ schemas=(
   "aws@4.26.0"
   "aws-native@0.13.0"
   "awsx@1.0.0-beta.5@${awsx_url}"
-  "docker@3.1.0"
+  "docker@4.0.0-alpha.0"
   "eks@0.40.0"
   "eks@0.37.1"
   "random@4.3.1"

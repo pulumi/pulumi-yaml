@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
@@ -37,6 +38,13 @@ var (
 		"stackreference-consumer",
 		// PCL does not have stringAssets
 		"getting-started",
+	}
+
+	pclBindOpts = map[string][]pcl.BindOption{
+		// pulumi/pulumi#11572
+		"azure-app-service": {pcl.SkipResourceTypechecking},
+
+		"aws-static-website": {pcl.SkipResourceTypechecking},
 	}
 )
 
@@ -129,8 +137,8 @@ func newPluginLoader() schema.ReferenceLoader {
 
 type mockPackageLoader struct{ schema.ReferenceLoader }
 
-func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
-	pkg, err := schema.LoadPackageReference(l.ReferenceLoader, name, nil)
+func (l mockPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
+	pkg, err := schema.LoadPackageReference(l.ReferenceLoader, name, version)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +148,12 @@ func (l mockPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) 
 func (l mockPackageLoader) Close() {}
 
 func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]byte, hcl.Diagnostics, error) {
+	// nil runner passed in since template is not executed and we can use pkgLoader
+	_, tdiags, err := pulumiyaml.PrepareTemplate(file, nil, rootPluginLoader)
+	if err != nil {
+		return nil, tdiags.HCL(), err
+	}
+
 	templateBody, tdiags := codegen.ImportTemplate(file, rootPluginLoader)
 	diags := tdiags.HCL()
 	if tdiags.HasErrors() {
@@ -151,7 +165,9 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]b
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	_, pdiags, err := pcl.BindProgram(parser.Files, pcl.Loader(rootPluginLoader.ReferenceLoader))
+	bindOpts := append(pclBindOpts[strings.TrimSuffix(fileName, ".pp")],
+		pcl.Loader(rootPluginLoader.ReferenceLoader))
+	_, pdiags, err := pcl.BindProgram(parser.Files, bindOpts...)
 	if err != nil {
 		return []byte(program), diags, err
 	}

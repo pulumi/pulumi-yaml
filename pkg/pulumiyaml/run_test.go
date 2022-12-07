@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -34,7 +35,7 @@ type MockPackageLoader struct {
 	packages map[string]Package
 }
 
-func (m MockPackageLoader) LoadPackage(name string) (Package, error) {
+func (m MockPackageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
 	if pkg, found := m.packages[name]; found {
 		return pkg, nil
 	}

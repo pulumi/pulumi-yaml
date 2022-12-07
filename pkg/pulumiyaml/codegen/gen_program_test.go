@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/blang/semver"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -20,35 +21,14 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-var defaultPlugins = []pulumiyaml.Plugin{
-	{Package: "aws", Version: "5.4.0"},
-	{Package: "azure-native", Version: "1.56.0"},
-	{Package: "azure", Version: "4.18.0"},
-	{Package: "kubernetes", Version: "3.7.2"},
-	{Package: "random", Version: "4.2.0"},
-	{Package: "eks", Version: "0.40.0"},
-	{Package: "aws-native", Version: "0.13.0"},
-	{Package: "docker", Version: "3.1.0"},
-	{Package: "awsx", Version: "1.0.0-beta.5"},
-
-	// Extra packages are to satisfy the versioning requirement of aws-eks.
-	// While the schemas are not the correct version, we rely on not
-	// depending on the difference between them.
-	{Package: "kubernetes", Version: "3.0.0"},
-
-	// not a real plugin, but a real schema
-	{Package: "synthetic", Version: "0.1.0"},
-	{Package: "other", Version: "0.1.0"},
-}
-
 type testPackageLoader struct{ *testing.T }
 
-func (l testPackageLoader) LoadPackage(name string) (pulumiyaml.Package, error) {
+func (l testPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
 	if name == "test" {
 		return FakePackage{l.T}, nil
 	}
 
-	pkg, err := schema.LoadPackageReference(rootPluginLoader, name, nil)
+	pkg, err := schema.LoadPackageReference(rootPluginLoader, name, version)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +173,8 @@ func TestGenerateProgram(t *testing.T) {
 			case "read-file-func", "python-regress-10914":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
+			case "traverse-union-repro":
+				// Reason: this example is known to be invalid
 			default:
 				l = append(l, tt)
 			}

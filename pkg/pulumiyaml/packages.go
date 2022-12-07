@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
@@ -58,7 +59,7 @@ type Package interface {
 }
 
 type PackageLoader interface {
-	LoadPackage(name string) (Package, error)
+	LoadPackage(name string, version *semver.Version) (Package, error)
 	Close()
 }
 
@@ -68,8 +69,8 @@ type packageLoader struct {
 	host plugin.Host
 }
 
-func (l packageLoader) LoadPackage(name string) (Package, error) {
-	pkg, err := l.ReferenceLoader.LoadPackageReference(name, nil)
+func (l packageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
+	pkg, err := l.ReferenceLoader.LoadPackageReference(name, version)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 	pluginMap := map[string]*pluginEntry{}
 
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
-		pkg := resolvePkgName(typeName)
+		pkg := ResolvePkgName(typeName)
 		if entry, found := pluginMap[pkg]; found {
 			if v := version.GetValue(); v != "" && entry.version != v {
 				if entry.version == "" {
@@ -190,7 +191,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 	return plugins, nil
 }
 
-func resolvePkgName(typeString string) string {
+func ResolvePkgName(typeString string) string {
 	typeParts := strings.Split(typeString, ":")
 
 	// If it's pulumi:providers:aws, the package name is the last label:
@@ -201,14 +202,14 @@ func resolvePkgName(typeString string) string {
 	return typeParts[0]
 }
 
-func loadPackage(loader PackageLoader, typeString string) (Package, error) {
+func loadPackage(loader PackageLoader, typeString string, version *semver.Version) (Package, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return nil, fmt.Errorf("invalid type token %q", typeString)
 	}
 
-	packageName := resolvePkgName(typeString)
-	pkg, err := loader.LoadPackage(packageName)
+	packageName := ResolvePkgName(typeString)
+	pkg, err := loader.LoadPackage(packageName, version)
 	if errors.Is(err, schema.ErrGetSchemaNotImplemented) {
 		return nil, fmt.Errorf("error loading schema for %q: %w", packageName, err)
 	} else if err != nil {
@@ -218,9 +219,13 @@ func loadPackage(loader PackageLoader, typeString string) (Package, error) {
 	return pkg, nil
 }
 
-var disallowedResourceNames = map[string]string{
-	"docker:image:Image": "https://github.com/pulumi/pulumi-docker/issues/132",
-	"docker:Image":       "https://github.com/pulumi/pulumi-docker/issues/132",
+// Unavailable in Docker versions <4.
+var docker3ResourceNames = map[string]struct{}{
+	"docker:image:Image": {},
+	"docker:Image":       {},
+}
+
+var kubernetesResourceNames = map[string]string{
 	"kubernetes:apiextensions.k8s.io:CustomResource": "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 	"kubernetes:kustomize:Directory":                 "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
 	"kubernetes:yaml:ConfigFile":                     "https://github.com/pulumi/pulumi-kubernetes/issues/1971",
@@ -235,8 +240,14 @@ var helmResourceNames = map[string]struct{}{
 // ResolveResource determines the appropriate package for a resource, loads that package, then calls
 // the package's ResolveResource method to determine the canonical name of the resource, returning
 // both the package and the canonical name.
-func ResolveResource(loader PackageLoader, typeString string) (Package, ResourceTypeToken, error) {
-	if issue, found := disallowedResourceNames[typeString]; found {
+func ResolveResource(loader PackageLoader, typeString string, version *semver.Version) (Package, ResourceTypeToken, error) {
+	if _, found := docker3ResourceNames[typeString]; found {
+		if version == nil || version.Major <= 3 {
+			return nil, "", fmt.Errorf("Docker Image resources are not supported in YAML without an explicit version, see: https://github.com/pulumi/pulumi-yaml/issues/421")
+		}
+	}
+
+	if issue, found := kubernetesResourceNames[typeString]; found {
 		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
 	}
 
@@ -244,7 +255,7 @@ func ResolveResource(loader PackageLoader, typeString string) (Package, Resource
 		return nil, "", fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
 	}
 
-	pkg, err := loadPackage(loader, typeString)
+	pkg, err := loadPackage(loader, typeString, version)
 	if err != nil {
 		return nil, "", err
 	}
@@ -260,8 +271,8 @@ func ResolveResource(loader PackageLoader, typeString string) (Package, Resource
 // ResolveFunction determines the appropriate package for a function, loads that package, then calls
 // the package's ResolveFunction method to determine the canonical name of the function, returning
 // both the package and the canonical name.
-func ResolveFunction(loader PackageLoader, typeString string) (Package, FunctionTypeToken, error) {
-	pkg, err := loadPackage(loader, typeString)
+func ResolveFunction(loader PackageLoader, typeString string, version *semver.Version) (Package, FunctionTypeToken, error) {
+	pkg, err := loadPackage(loader, typeString, version)
 	if err != nil {
 		return nil, "", err
 	}
