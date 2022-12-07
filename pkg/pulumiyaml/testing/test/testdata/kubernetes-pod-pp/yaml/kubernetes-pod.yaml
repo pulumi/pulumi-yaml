@@ -3,7 +3,6 @@ resources:
     type: kubernetes:core/v1:Pod
     properties:
       apiVersion: v1
-      kind: Pod
       metadata:
         namespace: foo
         name: bar
@@ -17,3 +16,6 @@ resources:
               limits:
                 memory: 20Mi
                 cpu: 0.2
+variables:
+  # Test that we can assign from a constant without type errors
+  kind: ${bar.kind}
