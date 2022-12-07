@@ -38,7 +38,6 @@ resources:
     type: azure-native:web:KubeEnvironment
     properties:
       resourceGroupName: ${resourceGroup.name}
-      environmentType: Managed
       appLogsConfiguration:
         destination: "log-analytics"
         logAnalyticsConfiguration:

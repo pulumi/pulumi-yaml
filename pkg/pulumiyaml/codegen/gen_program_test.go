@@ -193,6 +193,8 @@ func TestGenerateProgram(t *testing.T) {
 			case "read-file-func", "python-regress-10914":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
+			case "traverse-union-repro":
+				// Reason: this example is known to be invalid
 			default:
 				l = append(l, tt)
 			}

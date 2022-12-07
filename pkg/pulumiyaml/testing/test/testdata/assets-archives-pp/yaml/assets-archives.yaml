@@ -23,25 +23,25 @@ resources:
       source:
         fn::RemoteAsset: https://pulumi.test
   testFileArchive:
-    type: aws:s3:BucketObject
+    type: aws:lambda:Function
     properties:
-      bucket: ${siteBucket.id}
+      role: ${siteBucket.arn}
       # Reference the s3.Bucket object
-      source:
+      code:
         fn::FileArchive: file.tar.gz
   testRemoteArchive:
-    type: aws:s3:BucketObject
+    type: aws:lambda:Function
     properties:
-      bucket: ${siteBucket.id}
+      role: ${siteBucket.arn}
       # Reference the s3.Bucket object
-      source:
+      code:
         fn::RemoteArchive: https://pulumi.test/foo.tar.gz
   testAssetArchive:
-    type: aws:s3:BucketObject
+    type: aws:lambda:Function
     properties:
-      bucket: ${siteBucket.id}
+      role: ${siteBucket.arn}
       # Reference the s3.Bucket object
-      source:
+      code:
         fn::AssetArchive:
           file.txt:
             fn::FileAsset: file.txt
