@@ -26,8 +26,6 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -38,6 +36,8 @@ import (
 // yamlLanguageHost implements the LanguageRuntimeServer interface
 // for use as an API endpoint.
 type yamlLanguageHost struct {
+	pulumirpc.UnimplementedLanguageRuntimeServer
+
 	engineAddress string
 	tracing       string
 	compiler      string
@@ -205,8 +205,4 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 // About returns information about the runtime for this language.
 func (host *yamlLanguageHost) About(ctx context.Context, req *emptypb.Empty) (*pulumirpc.AboutResponse, error) {
 	return &pulumirpc.AboutResponse{}, nil
-}
-
-func (host *yamlLanguageHost) RunPlugin(*pulumirpc.RunPluginRequest, pulumirpc.LanguageRuntime_RunPluginServer) error {
-	return status.Errorf(codes.Unimplemented, "method RunPlugin not implemented")
 }
