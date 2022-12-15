@@ -8,3 +8,6 @@
   [#423](https://github.com/pulumi/pulumi-yaml/pull/423)
 
 ### Bug Fixes
+
+- Avoid panicing for non-string map keys
+  [#428](https://github.com/pulumi/pulumi-yaml/pull/428)
