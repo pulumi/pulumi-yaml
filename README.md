@@ -20,7 +20,7 @@ resources:
   index.html:
     type: aws:s3:BucketObject
     properties:
-      bucket: ${my-bucket}
+      bucket: ${my-bucket.id}
       source:
         fn::stringAsset: <h1>Hello, world!</h1>
       acl: public-read
@@ -58,7 +58,8 @@ resources:
           fromPort: 80
           toPort: 80
           cidrBlocks: ["0.0.0.0/0"]
-    protect: true
+    options:
+      protect: true
   WebServer:
     type: aws:ec2:Instance
     properties:
