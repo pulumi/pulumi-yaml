@@ -496,6 +496,20 @@ func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
 	}
 }
 
+func (g *generator) asKey(e model.Expression) *syn.StringNode {
+	r := g.expr(e)
+	if s, ok := r.(*syn.StringNode); ok {
+		return s
+	}
+	g.diags = append(g.diags, &hcl.Diagnostic{
+		Severity: hcl.DiagWarning,
+		Summary:  "Unchecked cast to string",
+		Detail:   fmt.Sprintf("A node of type %T was coerced into a map key of type string.", r),
+		Subject:  e.SyntaxNode().Range().Ptr(),
+	})
+	return syn.StringSyntax(r.Syntax(), r.String())
+}
+
 func (g *generator) expr(e model.Expression) syn.Node {
 	switch e := e.(type) {
 	case *model.LiteralValueExpression:
@@ -590,7 +604,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	case *model.ObjectConsExpression:
 		entries := make([]syn.ObjectPropertyDef, len(e.Items))
 		for i, e := range e.Items {
-			key := g.expr(e.Key).(*syn.StringNode)
+			key := g.asKey(e.Key)
 			value := g.expr(e.Value)
 			entries[i] = syn.ObjectProperty(key, value)
 		}

@@ -4,6 +4,8 @@ resources:
     properties:
       name: example_policy
       path: /
+      tags:
+        '3': 4
       policy:
         fn::invoke:
           Function: aws:iam:getPolicyDocument
