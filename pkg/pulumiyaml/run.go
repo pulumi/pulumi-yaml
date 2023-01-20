@@ -1212,7 +1212,6 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 		isComponent = result
 	}
-
 	constants := pkg.ResourceConstants(typ)
 	for k, v := range constants {
 		props[k] = v
@@ -1359,6 +1358,8 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluatePropertyAccess(x, x.Property)
 	case *ast.InvokeExpr:
 		return e.evaluateBuiltinInvoke(x)
+	case *ast.MethodExpr:
+		return e.evaluateBuiltinMethodCall(x)
 	case *ast.JoinExpr:
 		return e.evaluateBuiltinJoin(x)
 	case *ast.SplitExpr:
@@ -1756,6 +1757,35 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		return retv, true
 	})
 	return performInvoke(args)
+}
+
+func (e *programEvaluator) evaluateBuiltinMethodCall(t *ast.MethodExpr) (interface{}, bool) {
+	args, ok := e.evaluateExpr(t.CallArgs)
+	if !ok {
+		return nil, false
+	}
+
+	performCall := e.lift(func(args ...interface{}) (interface{}, bool) {
+		r, ok := e.evaluateExpr(t.ResourceName)
+		if !ok {
+			e.error(t.ResourceName, fmt.Sprintf("unable to resolve resource name: %v", t.ResourceName))
+			return nil, false
+		}
+		res := r.(lateboundResource)
+
+		_, functionName, err := ResolveFunction(e.pkgLoader, t.FuncToken.Value, nil)
+		if err != nil {
+			return e.error(t, err.Error())
+		}
+
+		if output, err := e.pulumiCtx.Call(string(functionName), pulumi.ToMap(args[0].(map[string]interface{})),
+			pulumi.AnyOutput{}, res.CustomResource()); err != nil {
+			return e.error(t, err.Error())
+		} else {
+			return output, true
+		}
+	})
+	return performCall(args)
 }
 
 func (e *programEvaluator) evaluateBuiltinJoin(v *ast.JoinExpr) (interface{}, bool) {

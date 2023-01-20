@@ -7,6 +7,9 @@
   provider `docker:Image` resource.
   [#423](https://github.com/pulumi/pulumi-yaml/pull/423)
 
+- Introduce `fn::method` function for resource methods.
+  [#431](https://github.com/pulumi/pulumi-yaml/pull/431)
+
 ### Bug Fixes
 
 - Avoid panicing for non-string map keys
