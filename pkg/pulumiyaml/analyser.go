@@ -858,16 +858,23 @@ func (tc *typeCache) typeMethodCall(ctx *evalContext, t *ast.MethodExpr) bool {
 	inputs := map[string]schema.Type{}
 	if hint.Inputs != nil {
 		for _, input := range hint.Inputs.Properties {
+<<<<<<< HEAD
 			// do not allow __self__ argument
 			if input.Name == SelfKeyword {
 				continue
 			}
+=======
+>>>>>>> 9e35b07 (Expose `fn::method` function for resource method calls)
 			existing = append(existing, input.Name)
 			inputs[input.Name] = input.Type
 		}
 	}
 	fmtr := yamldiags.NonExistantFieldFormatter{
+<<<<<<< HEAD
 		ParentLabel: fmt.Sprintf("Method %s", functionName.String()),
+=======
+		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
+>>>>>>> 9e35b07 (Expose `fn::method` function for resource method calls)
 		Fields:      existing,
 		MaxElements: 5,
 	}
@@ -877,7 +884,11 @@ func (tc *typeCache) typeMethodCall(ctx *evalContext, t *ast.MethodExpr) bool {
 			if typ, ok := inputs[k]; !ok {
 				summary, detail := fmtr.MessageWithDetail(k, k)
 				subject := prop.Key.Syntax().Syntax().Range()
+<<<<<<< HEAD
 				ctx.addErrDiag(subject, summary, detail)
+=======
+				ctx.addWarnDiag(subject, summary, detail)
+>>>>>>> 9e35b07 (Expose `fn::method` function for resource method calls)
 			} else {
 				tc.exprs[prop.Value] = typ
 			}
