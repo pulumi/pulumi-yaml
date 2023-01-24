@@ -1099,9 +1099,8 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 			ctx.errorf(node.key(), `config key "%s" cannot have conflicting types %v, %v`,
 				k, codegen.UnwrapType(typExisting), codegen.UnwrapType(typCurrent))
 			return false
-		} else {
-			typCurrent = typExisting
 		}
+		typCurrent = typExisting
 	}
 	tc.configuration[k] = typCurrent
 	return true
