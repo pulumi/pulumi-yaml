@@ -86,6 +86,10 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
+func (m MockPackage) Version() *semver.Version {
+	return nil
+}
+
 func inputProperties(token string, props ...schema.Property) *schema.ResourceType {
 	p := make([]*schema.Property, 0, len(props))
 	for _, prop := range props {

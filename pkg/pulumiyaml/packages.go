@@ -17,6 +17,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
 type ResourceTypeToken string
@@ -37,6 +38,8 @@ func (ftt FunctionTypeToken) String() string {
 type Package interface {
 	// Returns the name of the package.
 	Name() string
+	// Returns the version of the package.
+	Version() *semver.Version
 	// Given a type name, look up that type in a package's defined resources and return a canonical
 	// type name. The lookup may take the form of trying alternate names or aliases.
 	//
@@ -241,12 +244,6 @@ var helmResourceNames = map[string]struct{}{
 // the package's ResolveResource method to determine the canonical name of the resource, returning
 // both the package and the canonical name.
 func ResolveResource(loader PackageLoader, typeString string, version *semver.Version) (Package, ResourceTypeToken, error) {
-	if _, found := docker3ResourceNames[typeString]; found {
-		if version == nil || version.Major <= 3 {
-			return nil, "", fmt.Errorf("Docker Image resources are not supported in YAML without an explicit version, see: https://github.com/pulumi/pulumi-yaml/issues/421")
-		}
-	}
-
 	if issue, found := kubernetesResourceNames[typeString]; found {
 		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
 	}
@@ -258,6 +255,15 @@ func ResolveResource(loader PackageLoader, typeString string, version *semver.Ve
 	pkg, err := loadPackage(loader, typeString, version)
 	if err != nil {
 		return nil, "", err
+	}
+
+	if _, found := docker3ResourceNames[typeString]; found {
+		// To avoid requiring the user to manually specify the version to use, we check if
+		// the *resolved* pkg version is greater then 4.*.
+		if v := pkg.Version(); v == nil || v.Major <= 3 {
+			contract.Assertf(version == nil || version.Major <= 3, "make sure we have not requested an appropriately versioned package")
+			return nil, "", fmt.Errorf("Docker Image resources are not supported in YAML without major version >= 4, see: https://github.com/pulumi/pulumi-yaml/issues/421")
+		}
 	}
 
 	canonicalName, err := pkg.ResolveResource(typeString)
