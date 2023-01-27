@@ -36,6 +36,12 @@ type MockPackageLoader struct {
 }
 
 func (m MockPackageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
+	if version != nil {
+		// See if there is a version specific package
+		if pkg, found := m.packages[name+"@"+version.String()]; found {
+			return pkg, nil
+		}
+	}
 	if pkg, found := m.packages[name]; found {
 		return pkg, nil
 	}
@@ -45,6 +51,7 @@ func (m MockPackageLoader) LoadPackage(name string, version *semver.Version) (Pa
 func (m MockPackageLoader) Close() {}
 
 type MockPackage struct {
+	version          *semver.Version
 	isComponent      func(typeName string) (bool, error)
 	resolveResource  func(typeName string) (ResourceTypeToken, error)
 	resolveFunction  func(typeName string) (FunctionTypeToken, error)
@@ -86,6 +93,10 @@ func (m MockPackage) Name() string {
 	return "test"
 }
 
+func (m MockPackage) Version() *semver.Version {
+	return m.version
+}
+
 func inputProperties(token string, props ...schema.Property) *schema.ResourceType {
 	p := make([]*schema.Property, 0, len(props))
 	for _, prop := range props {
@@ -120,9 +131,22 @@ func function(token string, inputs, outputs []schema.Property) *schema.Function 
 }
 
 func newMockPackageMap() PackageLoader {
+	version := func(tag string) *semver.Version {
+		v := semver.MustParse(tag)
+		return &v
+	}
 	return MockPackageLoader{
 		packages: map[string]Package{
 			"aws": MockPackage{},
+			"docker": MockPackage{
+				version: version("4.0.0"),
+				resourceTypeHint: func(typeName string) *schema.ResourceType {
+					return inputProperties(typeName)
+				},
+			},
+			"docker@3.0.0": MockPackage{
+				version: version("3.0.0"),
+			},
 			"test": MockPackage{
 				resourceTypeHint: func(typeName string) *schema.ResourceType {
 					switch typeName {
