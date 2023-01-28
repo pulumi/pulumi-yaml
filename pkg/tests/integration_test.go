@@ -29,6 +29,7 @@ func TestTypeCheckError(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestMismatchedConfigType(t *testing.T) {
 	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
@@ -38,6 +39,7 @@ func TestMismatchedConfigType(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // uses parallel programtest
 func TestProjectConfigRef(t *testing.T) {
 	testWrapper(t, integrationDir("project-config-ref"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
