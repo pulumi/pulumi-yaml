@@ -857,6 +857,13 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
+	if resource.Options.DeletedWith != nil {
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "deletedWith",
+			Value: quotedLit(resource.Options.DeletedWith.Syntax().String()),
+		})
+	}
+
 	if len(resourceOptions.Body.Items) > 0 {
 		items = append(items, resourceOptions)
 	}
