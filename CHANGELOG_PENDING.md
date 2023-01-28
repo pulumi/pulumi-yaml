@@ -10,12 +10,9 @@
 - Introduce `fn::method` function for resource methods.
   [#431](https://github.com/pulumi/pulumi-yaml/pull/431)
 
-<<<<<<< HEAD
 - Add support for the `deletedWith` resource option.
   [#437](https://github.com/pulumi/pulumi-yaml/pull/437)
 
-=======
->>>>>>> 9e35b07 (Expose `fn::method` function for resource method calls)
 ### Bug Fixes
 
 - Avoid panicing for non-string map keys

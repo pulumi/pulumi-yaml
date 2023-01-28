@@ -670,6 +670,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 	switch f.Name {
 	case pcl.Invoke:
 		return g.MustInvoke(f, "")
+	case "method":
+		return wrapFn("method", g.expr(f.Args[0]))
 	case "fileArchive", "remoteArchive", "assetArchive",
 		"fileAsset", "stringAsset", "remoteAsset":
 		return wrapFn(strcase.ToPascal(f.Name), g.expr(f.Args[0]))
