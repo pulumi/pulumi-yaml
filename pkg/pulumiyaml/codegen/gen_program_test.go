@@ -194,8 +194,6 @@ func TestGenerateProgram(t *testing.T) {
 				l = append(l, tt)
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
-			case "simplified-invokes":
-				// https://github.com/pulumi/pulumi-yaml/issues/438
 			case "regress-node-12507":
 				// https://github.com/pulumi/pulumi-yaml/issues/494
 			case "config-variables":
