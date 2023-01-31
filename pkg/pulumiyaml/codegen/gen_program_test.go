@@ -179,6 +179,8 @@ func TestGenerateProgram(t *testing.T) {
 				l = append(l, tt)
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
+			case "simplified-invokes":
+				// https://github.com/pulumi/pulumi-yaml/issues/438
 			default:
 				l = append(l, tt)
 			}

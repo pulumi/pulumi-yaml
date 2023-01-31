@@ -1182,6 +1182,17 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if b := v.Options.RetainOnDelete; b != nil {
 		opts = append(opts, pulumi.RetainOnDelete(b.Value))
 	}
+	if v.Options.DeletedWith != nil {
+		deletedWithOpt, ok := e.evaluateResourceValuedOption(v.Options.DeletedWith, "deletedWith")
+		if ok {
+			if p, ok := deletedWithOpt.(poisonMarker); ok {
+				return p, true
+			}
+			opts = append(opts, pulumi.DeletedWith(deletedWithOpt.CustomResource()))
+		} else {
+			overallOk = false
+		}
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.

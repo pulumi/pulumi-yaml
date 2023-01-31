@@ -857,6 +857,18 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
+	if resource.Options.DeletedWith != nil {
+		ref, err := imp.getResourceRefItem(resource.Options.DeletedWith, name, "deletedWith")
+		if err != nil {
+			diags.Extend(err)
+		} else {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name:  "deletedWith",
+				Value: ref,
+			})
+		}
+	}
+
 	if len(resourceOptions.Body.Items) > 0 {
 		items = append(items, resourceOptions)
 	}

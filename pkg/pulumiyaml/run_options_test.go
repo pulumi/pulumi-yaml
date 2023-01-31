@@ -69,6 +69,8 @@ resources:
     type: test:resource:trivial
   res-dependency:
     type: test:resource:trivial
+  res-container:
+    type: test:resource:trivial
   res-a:
     type: test:component:type
     options:
@@ -79,6 +81,10 @@ resources:
       parent: ${res-parent}
       dependsOn:
       - ${res-dependency}
+  res-b:
+    type: test:resource:trivial
+    options:
+      deletedWith: ${res-container}
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
