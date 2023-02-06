@@ -322,6 +322,42 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			return fn, diags
 		}
 		return relativeTraversal(fn, node.Return.Value), diags
+	case *ast.MethodExpr:
+		var diags syntax.Diagnostics
+
+		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.FuncToken.Value, nil)
+		if err != nil {
+			return nil, syntax.Diagnostics{ast.ExprError(node.FuncToken, fmt.Sprintf("unable to resolve function name: %v", err), "")}
+		}
+
+		// functionName := strings.Split(string(functionNameTok), "/")[2]
+		resName := node.ResourceName.Syntax().String()
+		if strings.HasPrefix(resName, "${") && strings.HasSuffix(resName, "}") {
+			resName = strings.TrimSuffix(strings.TrimPrefix(resName, "${"), "}")
+		}
+		// function := quotedLit(resName + "::" + functionName)
+		function := quotedLit(string(functionName))
+
+		callArgs := []model.Expression{function}
+		if node.CallArgs != nil {
+			inputs := pkg.FunctionTypeHint(functionName).Inputs
+			args, adiags := imp.importExpr(node.CallArgs, inputs)
+			diags.Extend(adiags...)
+
+			callArgs = append(callArgs, args)
+		} else {
+			callArgs = append(callArgs, &model.ObjectConsExpression{})
+		}
+		node.FuncToken = ast.String(node.ResourceName.Syntax().String())
+
+		fmt.Println("resName", resName)
+		fn := &model.FunctionCallExpression{
+			Name: "method",
+			Args: callArgs,
+			Res:  resName,
+		}
+		return fn, diags
+
 	case *ast.JoinExpr:
 		return imp.importJoin(node)
 	case *ast.SelectExpr:

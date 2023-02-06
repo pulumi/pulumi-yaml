@@ -18,6 +18,8 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
+const SelfKeyword = "__self__"
+
 // Query the typing of a typed program.
 //
 // If the program failed to establish the type of a variable, then `*schema.InvalidType`
@@ -64,12 +66,13 @@ func (tc *typeCache) TypeExpr(expr ast.Expr) schema.Type {
 }
 
 type typeCache struct {
-	resources     map[*ast.ResourceDecl]schema.Type
-	configuration map[string]schema.Type
-	outputs       map[string]schema.Type
-	exprs         map[ast.Expr]schema.Type
-	resourceNames map[string]*ast.ResourceDecl
-	variableNames map[string]ast.Expr
+	resources       map[*ast.ResourceDecl]schema.Type
+	configuration   map[string]schema.Type
+	outputs         map[string]schema.Type
+	exprs           map[ast.Expr]schema.Type
+	resourceNames   map[string]*ast.ResourceDecl
+	resourceMethods map[string][]*schema.Method
+	variableNames   map[string]ast.Expr
 }
 
 func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, typ schema.Type) {
@@ -574,6 +577,8 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
+	tc.resourceMethods[node.Key.Value] = hint.Resource.Methods
+
 	var allProperties []string
 	for _, prop := range hint.Resource.InputProperties {
 		allProperties = append(allProperties, prop.Name)
@@ -797,7 +802,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		if o := hint.Outputs; o != nil {
 			for _, output := range o.Properties {
 				fields = append(fields, output.Name)
-				if strings.ToLower(t.Return.Value) == strings.ToLower(output.Name) {
+				if strings.EqualFold(t.Return.Value, output.Name) {
 					returnType = output.Type
 					validReturn = true
 				}
@@ -817,6 +822,66 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		}
 	} else {
 		tc.exprs[t] = hint.Outputs
+	}
+	return true
+}
+
+func (tc *typeCache) typeMethodCall(ctx *evalContext, t *ast.MethodExpr) bool {
+	res := tc.resourceNames[t.ResourceName.Property.String()]
+	version, err := ParseVersion(res.Options.Version)
+	if err != nil {
+		ctx.error(res.Options.Version, fmt.Sprintf("unable to parse resource provider version: %v", err))
+		return true
+	}
+	// Attempt to resolve the method if a full token is given, i.e. google-native:container/v1:Cluster/getKubeconfig
+	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.FuncToken.Value, version)
+	if err != nil {
+		// If invalid, look up resource's methods to derive the token from the name, i.e. getKubeconfig
+		matched := false
+		if methods, ok := tc.resourceMethods[t.ResourceName.Property.String()]; ok {
+			for _, m := range methods {
+				if m.Name == t.FuncToken.Value {
+					pkg, functionName, err = ResolveFunction(ctx.pkgLoader, m.Function.Token, version)
+					t.FuncToken.Value = functionName.String()
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched && err != nil {
+			_, b := ctx.error(t, err.Error())
+			return b
+		}
+	}
+	var existing []string
+	hint := pkg.FunctionTypeHint(functionName)
+	inputs := map[string]schema.Type{}
+	if hint.Inputs != nil {
+		for _, input := range hint.Inputs.Properties {
+			// do not allow __self__ argument
+			if input.Name == SelfKeyword {
+				continue
+			}
+			existing = append(existing, input.Name)
+			inputs[input.Name] = input.Type
+		}
+	}
+	fmtr := yamldiags.NonExistantFieldFormatter{
+		ParentLabel: fmt.Sprintf("Method %s", functionName.String()),
+		Fields:      existing,
+		MaxElements: 5,
+	}
+	if t.CallArgs != nil {
+		for _, prop := range t.CallArgs.Entries {
+			k := prop.Key.(*ast.StringExpr).Value
+			if typ, ok := inputs[k]; !ok {
+				summary, detail := fmtr.MessageWithDetail(k, k)
+				subject := prop.Key.Syntax().Syntax().Range()
+				ctx.addErrDiag(subject, summary, detail)
+			} else {
+				tc.exprs[prop.Value] = typ
+			}
+		}
 	}
 	return true
 }
@@ -962,6 +1027,8 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	switch t := t.(type) {
 	case *ast.InvokeExpr:
 		return tc.typeInvoke(ctx, t)
+	case *ast.MethodExpr:
+		return tc.typeMethodCall(ctx, t)
 	case *ast.SymbolExpr:
 		return tc.typeSymbol(ctx, t)
 	case *ast.StringExpr:
@@ -1158,9 +1225,10 @@ func newTypeCache() *typeCache {
 				},
 			},
 		},
-		resources:     map[*ast.ResourceDecl]schema.Type{},
-		configuration: map[string]schema.Type{},
-		resourceNames: map[string]*ast.ResourceDecl{},
+		resources:       map[*ast.ResourceDecl]schema.Type{},
+		configuration:   map[string]schema.Type{},
+		resourceNames:   map[string]*ast.ResourceDecl{},
+		resourceMethods: map[string][]*schema.Method{},
 		variableNames: map[string]ast.Expr{
 			PulumiVarName: pulumiExpr,
 		},

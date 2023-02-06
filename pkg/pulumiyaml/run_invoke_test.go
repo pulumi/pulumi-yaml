@@ -215,6 +215,31 @@ runtime: yaml
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestMethodCall(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+resources:
+  res-a:
+    type: test:resourcewithmethods:type
+    properties:
+      foo: oof
+variables:
+  var-a:
+    fn::method:
+      method: test:method:type
+      resource: ${res-a}
+outputs:
+  v: ${var-a}
+name: test-yaml
+runtime: yaml
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	diags := testInvokeDiags(t, tmpl, func(r *Runner) {})
+	requireNoErrors(t, tmpl, diags)
+}
+
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
@@ -239,6 +264,10 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Ru
 				return nil, nil
 			case "test:invoke:poison":
 				return nil, fmt.Errorf("Don't eat the poison")
+			case "test:method:type":
+				return resource.PropertyMap{
+					"retval": resource.NewStringProperty("oof"),
+				}, nil
 			}
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
@@ -272,6 +301,17 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Ru
 				assert.Equal(t, "", args.Provider)
 				assert.Equal(t, "", args.ID)
 
+				return "not-tested-here", resource.PropertyMap{
+					"foo":    resource.NewStringProperty("qux"),
+					"bar":    resource.NewStringProperty("oof"),
+					"out":    resource.NewStringProperty("tuo"),
+					"outNum": resource.NewNumberProperty(1),
+				}, nil
+			case testResourceWithMethodsToken:
+				assert.Equal(t, testResourceWithMethodsToken, args.TypeToken)
+				assert.Equal(t, resource.f)
+				assert.Equal(t, "", args.Provider)
+				assert.Equal(t, "", args.ID)
 				return "not-tested-here", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
 					"bar":    resource.NewStringProperty("oof"),

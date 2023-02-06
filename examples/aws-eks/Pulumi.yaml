@@ -14,6 +14,10 @@ variables:
       arguments:
         vpcId: ${vpcId}
       return: ids
+  kubeconfig:
+    fn::method:
+      method: getKubeconfig
+      resource: ${cluster}
 resources:
   cluster:
     type: eks:Cluster

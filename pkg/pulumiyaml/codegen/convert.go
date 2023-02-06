@@ -70,6 +70,7 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 	if programText == "" {
 		return "", diags, diags
 	}
+	fmt.Println(programText)
 
 	return programText, diags, nil
 }

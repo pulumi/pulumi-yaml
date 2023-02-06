@@ -30,6 +30,7 @@ var packageReadmeFile string
 
 const testComponentToken = "test:component:type"
 const testResourceToken = "test:resource:type"
+const testResourceWithMethodsToken = "test:resourcewithmethods:type"
 
 type MockPackageLoader struct {
 	packages map[string]Package
@@ -112,6 +113,22 @@ func inputProperties(token string, props ...schema.Property) *schema.ResourceTyp
 	}
 }
 
+func inputPropertiesWithMethods(token string, methods []*schema.Method, props ...schema.Property) *schema.ResourceType {
+	p := make([]*schema.Property, 0, len(props))
+	for _, prop := range props {
+		prop := prop
+		p = append(p, &prop)
+	}
+	return &schema.ResourceType{
+		Resource: &schema.Resource{
+			Token:           token,
+			InputProperties: p,
+			Properties:      p,
+			Methods:         methods,
+		},
+	}
+}
+
 func function(token string, inputs, outputs []schema.Property) *schema.Function {
 	pIn := make([]*schema.Property, 0, len(inputs))
 	pOut := make([]*schema.Property, 0, len(outputs))
@@ -173,6 +190,20 @@ func newMockPackageMap() PackageLoader {
 							Name: "foo",
 							Type: schema.StringType,
 						})
+					case testResourceWithMethodsToken:
+						return inputPropertiesWithMethods(typeName, []*schema.Method{
+							{
+								Name: "fooFunc",
+								Function: &schema.Function{
+									Token:      "test:method:type",
+									ReturnType: schema.BoolType,
+								},
+							},
+						},
+							schema.Property{
+								Name: "foo",
+								Type: schema.StringType,
+							})
 					default:
 						return inputProperties(typeName)
 					}

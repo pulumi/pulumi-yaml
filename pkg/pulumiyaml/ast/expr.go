@@ -472,6 +472,24 @@ func Invoke(token string, callArgs *ObjectExpr, callOpts InvokeOptionsDecl, ret 
 	}
 }
 
+// MethodExpr is a function expression that invokes a Pulumi resource method by type token + resource.
+type MethodExpr struct {
+	builtinNode
+
+	FuncToken    *StringExpr
+	ResourceName *SymbolExpr
+	CallArgs     *ObjectExpr
+}
+
+func MethodSyntax(node *syntax.ObjectNode, name *StringExpr, args *ObjectExpr, token *StringExpr, resourceName *SymbolExpr, callArgs *ObjectExpr) *MethodExpr {
+	return &MethodExpr{
+		builtinNode:  builtin(node, name, args),
+		FuncToken:    token,
+		ResourceName: resourceName,
+		CallArgs:     callArgs,
+	}
+}
+
 // ToJSON returns the underlying structure as a json string.
 type ToJSONExpr struct {
 	builtinNode
@@ -760,6 +778,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 	switch strings.ToLower(kvp.Key.Value()) {
 	case "fn::invoke":
 		set("fn::invoke", parseInvoke)
+	case "fn::method":
+		set("fn::method", parseMethod)
 	case "fn::join":
 		set("fn::join", parseJoin)
 	case "fn::tojson":
@@ -896,6 +916,62 @@ func parseInvoke(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, sy
 	}
 
 	return InvokeSyntax(node, name, obj, function, arguments, opts, ret), diags
+}
+
+func parseMethod(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	obj, ok := args.(*ObjectExpr)
+	if !ok {
+		return nil, syntax.Diagnostics{ExprError(args, "the argument to fn::method must be an object containing 'resource', 'method', and 'arguments'", "")}
+	}
+	var methodExpr, selfExpr, argumentsExpr Expr
+	var diags syntax.Diagnostics
+
+	for i := 0; i < len(obj.Entries); i++ {
+		kvp := obj.Entries[i]
+		if str, ok := kvp.Key.(*StringExpr); ok {
+			switch strings.ToLower(str.Value) {
+			case "method":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "method", str.GetValue()))
+				methodExpr = kvp.Value
+			case "resource":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "resource", str.GetValue()))
+				selfExpr = kvp.Value
+			case "arguments":
+				diags.Extend(syntax.UnexpectedCasing(str.syntax.Syntax().Range(), "arguments", str.GetValue()))
+				argumentsExpr = kvp.Value
+			}
+		}
+	}
+
+	method, ok := methodExpr.(*StringExpr)
+	if !ok {
+		if methodExpr == nil {
+			diags.Extend(ExprError(obj, "missing method name ('method')", ""))
+		} else {
+			diags.Extend(ExprError(methodExpr, "method name must be a string literal", ""))
+		}
+	}
+
+	self, ok := selfExpr.(*SymbolExpr)
+	if !ok {
+		if selfExpr == nil {
+			diags.Extend(ExprError(obj, "missing resource name ('resource')", ""))
+		} else {
+			diags.Extend(ExprError(selfExpr, "resource key must reference a declared resource", ""))
+		}
+	}
+
+	arguments, ok := argumentsExpr.(*ObjectExpr)
+	if !ok && argumentsExpr != nil {
+		diags.Extend(ExprError(argumentsExpr, "function arguments ('arguments') must be an object", ""))
+	}
+
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	return MethodSyntax(node, name, obj, method, self, arguments), diags
+
 }
 
 func parseJoin(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
