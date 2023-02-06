@@ -1446,6 +1446,9 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walk(ctx, opts.RetainOnDelete) {
 		return false
 	}
+	if !e.walk(ctx, opts.DeletedWith) {
+		return false
+	}
 
 	if ct := opts.CustomTimeouts; ct != nil {
 		if !e.walk(ctx, ct.Create) {

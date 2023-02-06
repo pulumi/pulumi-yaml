@@ -141,6 +141,10 @@ func (m FakePackage) Name() string {
 	return "fake"
 }
 
+func (m FakePackage) Version() *semver.Version {
+	return nil
+}
+
 //nolint:paralleltest // mutates environment variables
 func TestGenerateProgram(t *testing.T) {
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
@@ -175,6 +179,8 @@ func TestGenerateProgram(t *testing.T) {
 				l = append(l, tt)
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
+			case "simplified-invokes":
+				// https://github.com/pulumi/pulumi-yaml/issues/438
 			default:
 				l = append(l, tt)
 			}
