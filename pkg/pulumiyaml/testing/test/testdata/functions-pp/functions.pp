@@ -10,4 +10,4 @@ resource bucket "aws:s3:Bucket" {
 
 encoded2 = toBase64(bucket.id)
 
-decoded2 = fromBase64(bucket.id)
+decoded2 = fromBase64(encoded2)
