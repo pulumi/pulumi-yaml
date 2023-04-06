@@ -8,6 +8,7 @@ resources:
   nginx:
     type: awsx:ecs:FargateService
     properties:
+      assignPublicIp: true
       cluster: ${cluster.arn}
       taskDefinitionArgs:
         container:
