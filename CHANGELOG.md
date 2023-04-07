@@ -1,6 +1,18 @@
 CHANGELOG
 =========
 
+## 1.1.0 (2023-04-06)
+
+### Improvements
+
+- Add support for the `deletedWith` resource option.
+  [#437](https://github.com/pulumi/pulumi-yaml/pull/437)
+
+### Bug Fixes
+
+- Avoid panicing for non-string map keys
+  [#428](https://github.com/pulumi/pulumi-yaml/pull/428)
+
 ## 1.0.4 (2022-12-07)
 
 ### Improvements
