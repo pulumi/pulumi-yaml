@@ -15,4 +15,4 @@ variables:
   encoded2:
     fn::toBase64: ${bucket.id}
   decoded2:
-    fn::fromBase64: ${bucket.id}
+    fn::fromBase64: ${encoded2}
