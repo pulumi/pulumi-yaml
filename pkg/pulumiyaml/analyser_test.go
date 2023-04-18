@@ -302,7 +302,7 @@ func TestTypePropertyAccess(t *testing.T) {
 				actualMsg += m + ":" + s + "\n"
 				return &schema.InvalidType{}
 			}
-			actualType := typePropertyAccess(nil, c.root, "start", c.list, setError)
+			actualType := typePropertyAccess(nil, nil, c.root, "start", c.list, setError)
 			assert.Equal(t, c.expectedType, displayType(actualType))
 			assert.Equal(t, c.errMsg, strings.TrimSuffix(actualMsg, "\n"))
 		})

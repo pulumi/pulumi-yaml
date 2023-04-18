@@ -111,7 +111,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(template, newMockPackageMap())
+		runner := NewRunner(template, newMockPackageMap())
 		diags := runner.Evaluate(ctx)
 		requireNoErrors(t, template, diags)
 		return nil
@@ -165,7 +165,7 @@ variables:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		runner := newRunner(template, newMockPackageMap())
+		runner := NewRunner(template, newMockPackageMap())
 		runner.setDefaultProviders()
 		requireNoErrors(t, template, runner.sdiags.diags)
 		diags := runner.Evaluate(ctx)

@@ -28,14 +28,17 @@ func (l *interceptingLog) Debug(msg string, args *pulumi.LogArgs) error {
 	l.debugMessages = append(l.debugMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Info(msg string, args *pulumi.LogArgs) error {
 	l.infoMessages = append(l.infoMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Warn(msg string, args *pulumi.LogArgs) error {
 	l.warnMessages = append(l.warnMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Error(msg string, args *pulumi.LogArgs) error {
 	l.errorMessages = append(l.errorMessages, msg)
 	return nil
@@ -83,7 +86,7 @@ resources:
 	var hoistedRunner *Runner
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		ctx.Log = log
-		r := newRunner(template, newMockPackageMap())
+		r := NewRunner(template, newMockPackageMap())
 		hoistedRunner = r
 		diags := r.Evaluate(ctx)
 		// 1. This test demonstrates that the synchronous output of evaluate is nil

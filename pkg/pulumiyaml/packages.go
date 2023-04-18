@@ -143,7 +143,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 		}
 	}
 
-	diags := newRunner(tmpl, nil).Run(walker{
+	diags := NewRunner(tmpl, nil).Run(walker{
 		VisitResource: func(r *Runner, node resourceNode) bool {
 			res := node.Value
 
