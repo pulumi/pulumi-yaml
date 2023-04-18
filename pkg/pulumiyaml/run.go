@@ -38,7 +38,7 @@ import (
 // MainTemplate is the assumed name of the JSON template file.
 // TODO: would be nice to permit multiple files, but we'd need to know which is "main", and there's
 // no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
-// One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
+// One idea is to hijack Pulumi.yaml's "main" directive and then just globally topo-sort the rest.
 const MainTemplate = "Main"
 
 // Load a template from the current working directory
@@ -77,7 +77,7 @@ func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDe
 // Load a template from the current working directory.
 func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
-	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
+	// The last of these will actually read the program from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	var filename string
 	var bs []byte
@@ -301,7 +301,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	// If running a template also, we need to pass a runner through, since setting intermediates
 	// requires config via the pulumi Context
 	if r == nil {
-		r = newRunner(t, loader)
+		r = NewRunner(t, loader)
 	}
 
 	// We are preemptively calling r.setIntermediates. We are forcing tolerating missing
@@ -316,13 +316,13 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	r.setDefaultProviders()
 
 	// runner type checks nodes
-	_, diags := TypeCheck(r)
+	_, diags := TypeCheck(r, nil)
 	return r, diags, nil
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
-	r := newRunner(t, loader)
+	r := NewRunner(t, loader)
 	r.setIntermediates(config, false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
@@ -345,6 +345,30 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 		return diags
 	}
 	return nil
+}
+
+// RunTemplate runs the programEvaluator against a template using the given request/settings.
+func RunInlineTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, inputs map[string]interface{}, loader PackageLoader) (map[string]interface{}, error) {
+	r := NewRunner(t, loader)
+	r.inputs = inputs
+
+	r, diags, err := PrepareTemplate(t, r, loader)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	if err != nil {
+		return nil, err
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	// runtime evaluation here
+	diags.Extend(r.Evaluate(ctx)...)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+	return r.outputs, nil
 }
 
 type syncDiags struct {
@@ -383,6 +407,9 @@ type Runner struct {
 	variables map[string]interface{}
 	resources map[string]lateboundResource
 	stackRefs map[string]*pulumi.StackReference
+
+	inputs  map[string]interface{}
+	outputs map[string]interface{}
 
 	cwd string
 
@@ -571,7 +598,7 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
-func newRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
+func NewRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
 	return &Runner{
 		t:         t,
 		pkgLoader: p,
@@ -579,6 +606,9 @@ func newRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
 		variables: make(map[string]interface{}),
 		resources: make(map[string]lateboundResource),
 		stackRefs: make(map[string]*pulumi.StackReference),
+
+		// leave inputs nil for feature detection of inline inputs
+		outputs: make(map[string]interface{}),
 	}
 }
 
@@ -683,7 +713,6 @@ func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 		e.resources[node.Key.Value] = res
 	}
 	return true
-
 }
 
 func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
@@ -697,6 +726,7 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 		}
 	} else if _, poisoned := out.(poisonMarker); !poisoned {
 		e.pulumiCtx.Export(node.Key.Value, out)
+		e.outputs[node.Key.Value] = out
 	}
 	return true
 }
@@ -2030,7 +2060,7 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 			return pulumi.NewFileAsset(path), true
 		case *ast.RemoteArchiveExpr:
 			if !isConstant {
-				return e.error(s, "Argument to fn::remoteArchiveExpr must be a constantr")
+				return e.error(s, "Argument to fn::remoteArchiveExpr must be a constant")
 			}
 			return pulumi.NewRemoteArchive(value), true
 		case *ast.RemoteAssetExpr:

@@ -60,7 +60,33 @@ func (tc *typeCache) TypeOutput(name string) schema.Type {
 
 func (tc *typeCache) TypeExpr(expr ast.Expr) schema.Type {
 	return tc.exprs[expr]
+}
 
+type TypeCheckerOptions struct {
+	// maxSuggestions is the maximum number of elements to show as alternate options.
+	maxSuggestions int
+}
+
+// WithMaxSuggestions is an option setter for maxSuggestedAlternatives
+func (o TypeCheckerOptions) WithMaxSuggestions(max int) *TypeCheckerOptions {
+	copy := o
+	copy.maxSuggestions = max
+	return &copy
+}
+
+func NewTypeCheckerOptions() *TypeCheckerOptions {
+	tc := TypeCheckerOptions{
+		maxSuggestions: 5,
+	}
+
+	return &tc
+}
+
+func (o *TypeCheckerOptions) MaxSuggestions() int {
+	if o == nil || o.maxSuggestions <= 0 {
+		return 5
+	}
+	return o.maxSuggestions
 }
 
 type typeCache struct {
@@ -70,6 +96,8 @@ type typeCache struct {
 	exprs         map[ast.Expr]schema.Type
 	resourceNames map[string]*ast.ResourceDecl
 	variableNames map[string]ast.Expr
+
+	opts *TypeCheckerOptions
 }
 
 func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, typ schema.Type) {
@@ -408,7 +436,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 				}
 				fmtr := yamldiags.NonExistantFieldFormatter{
 					ParentLabel:         dispType(to),
-					MaxElements:         5,
+					MaxElements:         tc.opts.MaxSuggestions(),
 					Fields:              fields,
 					FieldsAreProperties: true,
 				}
@@ -581,7 +609,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	fmtr := yamldiags.NonExistantFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
 		Fields:              allProperties,
-		MaxElements:         5,
+		MaxElements:         tc.opts.MaxSuggestions(),
 		FieldsAreProperties: true,
 	}
 
@@ -624,7 +652,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	fmtr = yamldiags.NonExistantFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
 		Fields:              statePropNames,
-		MaxElements:         5,
+		MaxElements:         tc.opts.MaxSuggestions(),
 		FieldsAreProperties: true,
 	}
 	tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Get.State.Entries, stateProps)
@@ -682,7 +710,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 			fmtr := yamldiags.NonExistantFieldFormatter{
 				ParentLabel:         "resource options",
 				Fields:              allOptions,
-				MaxElements:         5,
+				MaxElements:         tc.opts.MaxSuggestions(),
 				FieldsAreProperties: false,
 			}
 			optionsLower := map[string]struct{}{}
@@ -762,7 +790,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	fmtr := yamldiags.NonExistantFieldFormatter{
 		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
 		Fields:      existing,
-		MaxElements: 5,
+		MaxElements: tc.opts.MaxSuggestions(),
 	}
 	if t.CallArgs != nil {
 		for _, prop := range t.CallArgs.Entries {
@@ -806,7 +834,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		fmtr := yamldiags.NonExistantFieldFormatter{
 			ParentLabel:         t.Token.Value,
 			Fields:              fields,
-			MaxElements:         5,
+			MaxElements:         tc.opts.MaxSuggestions(),
 			FieldsAreProperties: true,
 		}
 		if hint.Outputs == nil || !validReturn {
@@ -842,13 +870,14 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 		return typ
 	}
 
-	tc.exprs[t] = typePropertyAccess(ctx, typ, runningName, t.Property.Accessors[1:], setError)
+	tc.exprs[t] = typePropertyAccess(ctx, tc.opts, typ, runningName, t.Property.Accessors[1:], setError)
 	return true
 }
 
-func typePropertyAccess(ctx *evalContext, root schema.Type,
-	runningName string, accessors []ast.PropertyAccessor,
-	setError func(summary, detail string) *schema.InvalidType) schema.Type {
+func typePropertyAccess(ctx *evalContext, opts *TypeCheckerOptions,
+	root schema.Type, runningName string, accessors []ast.PropertyAccessor,
+	setError func(summary, detail string) *schema.InvalidType,
+) schema.Type {
 	if len(accessors) == 0 {
 		return root
 	}
@@ -856,7 +885,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		var possibilities OrderedTypeSet
 		errs := []*notAssignable{}
 		for _, subtypes := range root.ElementTypes {
-			t := typePropertyAccess(ctx, subtypes, runningName, accessors,
+			t := typePropertyAccess(ctx, opts, subtypes, runningName, accessors,
 				func(summary, detail string) *schema.InvalidType {
 					errs = append(errs, &notAssignable{reason: summary, property: subtypes.String()})
 					return &schema.InvalidType{}
@@ -918,13 +947,13 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			fmtr := yamldiags.NonExistantFieldFormatter{
 				ParentLabel:         runningName,
 				Fields:              propertyList,
-				MaxElements:         5,
+				MaxElements:         opts.MaxSuggestions(),
 				FieldsAreProperties: true,
 			}
 			summary, detail := fmtr.MessageWithDetail(accessor.Name, accessor.Name)
 			return setError(summary, detail)
 		}
-		return typePropertyAccess(ctx, newType, runningName+"."+accessor.Name, accessors[1:], setError)
+		return typePropertyAccess(ctx, opts, newType, runningName+"."+accessor.Name, accessors[1:], setError)
 	case *ast.PropertySubscript:
 		err := func(typ, msg string) *schema.InvalidType {
 			return setError(
@@ -938,14 +967,14 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			if _, ok := accessor.Index.(string); ok {
 				return err(" via string", "Index via string is only allowed on Maps")
 			}
-			return typePropertyAccess(ctx, root.ElementType,
+			return typePropertyAccess(ctx, opts, root.ElementType,
 				runningName+fmt.Sprintf("[%d]", accessor.Index.(int)),
 				accessors[1:], setError)
 		case *schema.MapType:
 			if _, ok := accessor.Index.(int); ok {
 				return err(" via number", "Index via number is only allowed on Arrays")
 			}
-			return typePropertyAccess(ctx, root.ElementType,
+			return typePropertyAccess(ctx, opts, root.ElementType,
 				runningName+fmt.Sprintf("[%q]", accessor.Index.(string)),
 				accessors[1:], setError)
 		case *schema.InvalidType:
@@ -1040,14 +1069,15 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 				tc.exprs[t] = &schema.InvalidType{
 					Diagnostics: []*hcl.Diagnostic{
 						{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", arr)},
-					}}
-
+					},
+				}
 			}
 		} else {
 			tc.exprs[t] = &schema.InvalidType{
 				Diagnostics: []*hcl.Diagnostic{
 					{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", t.Values)},
-				}}
+				},
+			}
 		}
 	default:
 		tc.exprs[t] = &schema.InvalidType{
@@ -1141,7 +1171,7 @@ func (tc *typeCache) typeOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	return true
 }
 
-func newTypeCache() *typeCache {
+func newTypeCache(opts *TypeCheckerOptions) *typeCache {
 	pulumiExpr := ast.Object(
 		ast.ObjectProperty{Key: ast.String("cwd")},
 		ast.ObjectProperty{Key: ast.String("project")},
@@ -1165,11 +1195,12 @@ func newTypeCache() *typeCache {
 			PulumiVarName: pulumiExpr,
 		},
 		outputs: map[string]schema.Type{},
+		opts:    opts,
 	}
 }
 
-func TypeCheck(r *Runner) (Typing, syntax.Diagnostics) {
-	types := newTypeCache()
+func TypeCheck(r *Runner, opts *TypeCheckerOptions) (Typing, syntax.Diagnostics) {
+	types := newTypeCache(opts)
 
 	// Set roots
 	diags := r.Run(walker{
@@ -1252,6 +1283,7 @@ func (e walker) EvalConfig(r *Runner, node configNode) bool {
 	}
 	return true
 }
+
 func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
@@ -1269,6 +1301,7 @@ func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	}
 	return true
 }
+
 func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
@@ -1287,6 +1320,7 @@ func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	}
 	return true
 }
+
 func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
