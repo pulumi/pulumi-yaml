@@ -17,6 +17,19 @@ resources:
     properties:
       website:
         indexDocument: index.html
+  # The ownershipControls and publicAccessBlock resources are required as of April 2023
+  # https://aws.amazon.com/blogs/aws/heads-up-amazon-s3-security-changes-are-coming-in-april-of-2023/
+  ownershipControls:
+    type: aws:s3:BucketOwnershipControls
+    properties:
+      bucket: ${my-bucket}
+      rule:
+        objectOwnership: ObjectWriter
+  publicAccessBlock:
+    type: aws:s3:BucketPublicAccessBlock
+    properties:
+      bucket: ${my-bucket}
+      blockPublicAcls: false
   index.html:
     type: aws:s3:BucketObject
     properties:
@@ -25,6 +38,9 @@ resources:
         fn::stringAsset: <h1>Hello, world!</h1>
       acl: public-read
       contentType: text/html
+    options:
+      dependsOn:
+        - ${ownershipControls}
 outputs:
   bucketEndpoint: http://${my-bucket.websiteEndpoint}
 ```
