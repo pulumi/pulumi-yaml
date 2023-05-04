@@ -1,5 +1,5 @@
 
-# Amazon EKS Cluster
+# Amazon ECS Cluster
 
 This example deploys an ECS Cluster with a Fargate service, served behind an Application Load
 Balancer.
