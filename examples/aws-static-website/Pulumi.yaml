@@ -7,6 +7,13 @@ resources:
     properties:
       websiteConfiguration:
         indexDocument: index.html
+      # The ownershipControls and publicAccessBlock resources are required as of April 2023
+      # https://aws.amazon.com/blogs/aws/heads-up-amazon-s3-security-changes-are-coming-in-april-of-2023/
+      publicAccessBlockConfiguration:
+        blockPublicAcls: false
+      ownershipControls:
+        rules:
+          - objectOwnership: ObjectWriter
   index.html:
     type: aws:s3:BucketObject
     properties:
@@ -23,22 +30,6 @@ resources:
         fn::fileAsset: ./www/favicon.png
       acl: public-read
       contentType: image/png
-  bucketPolicy:
-    type: aws:s3:BucketPolicy
-    properties:
-      bucket: ${site-bucket}
-      policy: |
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": "*",
-              "Action": ["s3:GetObject"],
-              "Resource": ["${site-bucket.arn}/*"]
-            }
-          ]
-        }
 outputs:
   bucketName: ${site-bucket.bucketName}
   websiteUrl: ${site-bucket.websiteURL}
