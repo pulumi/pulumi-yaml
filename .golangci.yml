@@ -3,24 +3,38 @@ run:
 linters:
   enable-all: false
   enable:
-    - deadcode
     - errcheck
-    - goconst
     - gofmt
     - revive
     - gosec
     - govet
     - ineffassign
     - misspell
+    - nolintlint
     - nakedret
-    - structcheck
     - unconvert
-    - varcheck
+    - unused
     - paralleltest
-  disable:
-    - lll
-    - staticcheck # Disabled due to OOM errors in golangci-lint@v1.18.0
-    - megacheck # Disabled due to OOM errors in golangci-lint@v1.18.0
+
+linters-settings:
+  nakedret:
+    # Make an issue if func has more lines of code than this setting, and it has naked returns.
+    # Default: 30
+    max-func-lines: 60
+  nolintlint:
+    # Some linter exclusions are added to generated or templated files
+    # pre-emptively.
+    # Don't complain about these.
+    allow-unused: true
+  govet:
+    enable:
+      - nilness
+      # Reject comparisons of reflect.Value with DeepEqual or '=='.
+      - reflectvaluecompare
+      # Reject sort.Slice calls with a non-slice argument.
+      - sortslice
+      # Detect write to struct/arrays by-value that aren't read again.
+      - unusedwrite
 
 issues:
   exclude-rules:
@@ -28,3 +42,14 @@ issues:
     # Parameter names are useful; replacing them with '_' is undesirable.
     - linters: [revive]
       text: 'unused-parameter: parameter \S+ seems to be unused, consider removing or renaming it as _'
+
+    # staticcheck already has smarter checks for empty blocks.
+    # revive's empty-block linter has false positives.
+    # For example, as of writing this, the following is not allowed.
+    #   for foo() { }
+    - linters: [revive]
+      text: 'empty-block: this block is empty, you can remove it'
+
+  exclude:
+    # https://github.com/pulumi/pulumi/issues/9469
+    - 'Name is deprecated: Name returns the variable or declaration name of the resource'

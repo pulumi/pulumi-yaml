@@ -122,7 +122,7 @@ func (e InvalidFieldBagFormatter) MessageWithDetail(field string) (string, strin
 	}
 
 	// We have matches but none are exact
-	detail := fmt.Sprintf("Did you mean ")
+	detail := "Did you mean "
 	addBag := func(bag BagOrdering) {
 		if len(bag.BagName) == 1 {
 			detail += fmt.Sprintf("'%s' under '%s'", bag.Property, bag.BagName[0])
@@ -140,7 +140,7 @@ func (e InvalidFieldBagFormatter) MessageWithDetail(field string) (string, strin
 	} else {
 		detail += "one of the following:\n"
 		for _, bag := range bags {
-			detail += fmt.Sprintf("  * ")
+			detail += "  * "
 			addBag(bag)
 			detail += "\n"
 		}

@@ -5,7 +5,6 @@ package tests
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,7 +77,7 @@ func makeAbs(path string) string {
 func TestGenerateExamples(t *testing.T) {
 	t.Parallel()
 
-	examples, err := ioutil.ReadDir(examplesPath)
+	examples, err := os.ReadDir(examplesPath)
 	require.NoError(t, err)
 	//nolint:paralleltest // not directly using the loop variable, but instead using dir.Name() in subtests
 	for _, dir := range examples {

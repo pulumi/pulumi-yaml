@@ -88,7 +88,7 @@ func (d Diagnostics) Error() string {
 			} else {
 				sb.WriteString("\n-warning: ")
 			}
-			sb.WriteString(fmt.Sprintf("%s", diag.Error()))
+			sb.WriteString(diag.Error())
 		}
 		return sb.String()
 	}

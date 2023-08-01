@@ -64,7 +64,7 @@ func (d *StringListDecl) parse(name string, node syntax.Node) syntax.Diagnostics
 
 	var diags syntax.Diagnostics
 
-	elements := make([]*StringExpr, list.Len(), list.Len())
+	elements := make([]*StringExpr, list.Len())
 	for i := range elements {
 		ename := fmt.Sprintf("%s[%d]", name, i)
 		ediags := parseField(ename, reflect.ValueOf(&elements[i]).Elem(), list.Index(i))
@@ -99,7 +99,7 @@ func (d *ConfigMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics 
 
 	var diags syntax.Diagnostics
 
-	entries := make([]ConfigMapEntry, obj.Len(), obj.Len())
+	entries := make([]ConfigMapEntry, obj.Len())
 	for i := range entries {
 		kvp := obj.Index(i)
 		if _, ok := kvp.Value.(*syntax.ObjectNode); !ok {
@@ -154,7 +154,7 @@ func (d *VariablesMapDecl) parse(name string, node syntax.Node) syntax.Diagnosti
 
 	var diags syntax.Diagnostics
 
-	entries := make([]VariablesMapEntry, obj.Len(), obj.Len())
+	entries := make([]VariablesMapEntry, obj.Len())
 	for i := range entries {
 		kvp := obj.Index(i)
 
@@ -196,7 +196,7 @@ func (d *ResourcesMapDecl) parse(name string, node syntax.Node) syntax.Diagnosti
 
 	var diags syntax.Diagnostics
 
-	entries := make([]ResourcesMapEntry, obj.Len(), obj.Len())
+	entries := make([]ResourcesMapEntry, obj.Len())
 	for i := range entries {
 		kvp := obj.Index(i)
 
@@ -248,7 +248,7 @@ func (d *PropertyMapDecl) parse(name string, node syntax.Node) syntax.Diagnostic
 
 	var diags syntax.Diagnostics
 
-	entries := make([]PropertyMapEntry, obj.Len(), obj.Len())
+	entries := make([]PropertyMapEntry, obj.Len())
 	for i := range entries {
 		kvp := obj.Index(i)
 
@@ -615,7 +615,7 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 		key := kvp.Key.Value()
 		var hasMatch bool
 		for _, f := range reflect.VisibleFields(t) {
-			if f.IsExported() && strings.ToLower(f.Name) == strings.ToLower(key) {
+			if f.IsExported() && strings.EqualFold(f.Name, key) {
 				diags.Extend(syntax.UnexpectedCasing(kvp.Key.Syntax().Range(), camel(f.Name), key))
 				diags.Extend(parseField(camel(f.Name), v.FieldByIndex(f.Index), kvp.Value)...)
 				hasMatch = true

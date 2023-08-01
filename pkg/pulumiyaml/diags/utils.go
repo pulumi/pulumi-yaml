@@ -44,9 +44,7 @@ func editDistance(a, b string) int {
 
 func sortByEditDistance(words []string, comparedTo string) []string {
 	w := make([]string, len(words))
-	for i := range words {
-		w[i] = words[i]
-	}
+	copy(w, words)
 	m := map[string]int{}
 	v := func(s string) int {
 		d, ok := m[s]
