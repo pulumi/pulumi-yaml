@@ -30,6 +30,11 @@ on:
         default: ''
         required: false
         type: string
+      coverage:
+        description: "Collects coverage stats"
+        default: false
+        required: false
+        type: boolean
     secrets:
       PULUMI_ACCESS_TOKEN:   { required: false }
       AWS_ACCESS_KEY_ID:     { required: false }
@@ -39,6 +44,7 @@ on:
       ARM_CLIENT_SECRET:     { required: false }
       ARM_SUBSCRIPTION_ID:   { required: false }
       ARM_TENANT_ID:         { required: false }
+      CODECOV_TOKEN:         { required: false }
 
 
 env:
@@ -121,7 +127,22 @@ jobs:
           path: ${{ steps.list-schemas.outputs.schemas }}
 
       - name: Test
+        if: ${{ !inputs.coverage }}
         run: make test
+      - name: Test with Coverage
+        if: ${{ inputs.coverage }}
+        run: make test_cover
+
+      - name: Upload coverage data
+        if: ${{ inputs.coverage }}
+        uses: codecov/codecov-action@v3
+        with:
+          directory: coverage
+          files: "*"
+          fail_ci_if_error: false
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
     strategy:
       fail-fast: false
       matrix:

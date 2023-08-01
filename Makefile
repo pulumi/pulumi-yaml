@@ -15,6 +15,8 @@ PLUGIN_VERSION_AZURE_NATIVE := 1.99.1
 PLUGIN_VERSION_RANDOM       := 4.12.1
 GO                          := go
 
+BUILD_FLAGS ?=
+
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
 
@@ -58,15 +60,33 @@ lint-copyright:
 
 build:: ensure
 	mkdir -p ./bin
-	${GO} build -o ./bin -p ${CONCURRENCY} ./cmd/...
+	${GO} build $(BUILD_FLAGS) -o ./bin -p ${CONCURRENCY} ./cmd/...
 
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins get_schemas
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  ${GO} test -v --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./pkg/...
+	  ${GO} test -v --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./...
+
+# Runs tests with code coverage tracking.
+# Two output files are generated in the coverage/ directory:
+#
+#  unit.out        unit test coverage
+#  integration.out integration test coverage
+#
+# Integration test coverage is only generated for tests that invoke the
+# pulumi-language-yaml executable.
+.phony: test_cover
+test_cover: export GOEXPERIMENT = coverageredesign
+test_cover: get_plugins get_schemas
+	make build BUILD_FLAGS="-cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
+	rm -rf coverage && mkdir -p coverage
+	$(eval COVERDIR := $(shell mktemp -d))
+	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" GOCOVERDIR=$(COVERDIR) \
+	     ${GO} test -v --timeout 30m -coverprofile=coverage/unit.out -coverpkg=./... ./...
+	go tool covdata textfmt -i=$(COVERDIR) -o=coverage/integration.out
 
 test_short::
-	${GO} test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./pkg/...
+	${GO} test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./...
 
 test_live:: PULUMI_LIVE_TEST = true
 test_live:: test_live_prereq test
