@@ -1,0 +1,27 @@
+resources:
+  foo:
+    type: random:RandomShuffle
+    properties:
+      inputs:
+        - |-
+          just one
+          newline
+        - |-
+          foo
+          bar
+          baz
+          qux
+          quux
+          qux
+        - |
+          {
+              "a": 1,
+              "b": 2,
+              "c": [
+                "foo",
+                "bar",
+                "baz",
+                "qux",
+                "quux"
+              ]
+          }

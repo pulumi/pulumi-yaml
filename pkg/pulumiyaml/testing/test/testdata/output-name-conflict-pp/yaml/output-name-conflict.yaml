@@ -1,0 +1,6 @@
+configuration:
+  cidrBlock:
+    type: string
+    default: Test config variable
+outputs:
+  cidrBlock: ${cidrBlock}

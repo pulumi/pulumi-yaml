@@ -164,17 +164,34 @@ func TestGenerateProgram(t *testing.T) {
 				// https://github.com/pulumi/pulumi-yaml/issues/229
 			case "azure-sa":
 				// Reason: has dependencies between config variables
-			case "aws-eks", "aws-s3-folder":
+			case "aws-eks", "aws-s3-folder", "simple-splat":
 				// Reason: missing splat
 				//
 				// Note: aws-s3-folder errors with
 				// 14,27-52: the asset parameter must be a string literal; the asset parameter must be a string literal
 				// But the actual error is that it is using a Splat operator.
-			case "python-resource-names":
+			case "components":
+				// https://github.com/pulumi/pulumi-yaml/issues/476
+			case "logical-name":
+				// https://github.com/pulumi/pulumi-yaml/issues/477
+			case "unknown-resource":
+				// https://github.com/pulumi/pulumi-yaml/issues/478
+			case "optional-complex-config":
+				// https://github.com/pulumi/pulumi-yaml/issues/479
+			case "interpolated-string-keys":
+				// https://github.com/pulumi/pulumi-yaml/issues/480
+			case "functions", "throw-not-implemented", "single-or-none":
+				// Pulumi YAML does not functions:
+				// secret or unsecret, notImplemented, singleOrNone.
+			case "python-resource-names", "python-reserved", "snowflake-python-12998":
 				// Reason: A python only test.
-			case "simple-range":
+			case "simple-range", "entries-function",
+				"iterating-optional-range-expressions",
+				"invoke-inside-conditional-range":
 				// Pulumi YAML does not support ranges
-			case "read-file-func", "python-regress-10914":
+			case "dynamic-entries":
+				// Pulumi YAML does not support for loops.
+			case "read-file-func", "python-regress-10914", "unknown-invoke":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
 			case "traverse-union-repro":
