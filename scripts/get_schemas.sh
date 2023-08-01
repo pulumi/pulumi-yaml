@@ -10,6 +10,7 @@ schemas=(
   "docker@4.0.0-alpha.0"
   "eks@0.40.0"
   "eks@0.37.1"
+  "random@4.11.2"
   "random@4.3.1"
   "random@4.2.0"
   "kubernetes@3.7.2"
