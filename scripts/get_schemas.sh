@@ -1,5 +1,7 @@
 #!/bin/bash
 
+LIST_ONLY=${LIST_ONLY:-false}
+
 default_url_template='https://raw.githubusercontent.com/pulumi/pulumi-_NAME_/v_VERSION_/provider/cmd/pulumi-resource-_NAME_/schema.json'
 awsx_url='https://raw.githubusercontent.com/pulumi/pulumi-awsx/v_VERSION_/awsx/schema.json'
 function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/pkg/codegen/testing/test/testdata/$1-$2.json"; }
@@ -46,6 +48,12 @@ for s in "${schemas[@]}"; do
 
 
   FILEPATH="pkg/pulumiyaml/testing/test/testdata/${NAME}-${VERSION}.json"
+
+  if [ "${LIST_ONLY}" = "true" ]; then
+      echo "${FILEPATH}"
+      continue
+  fi
+
   if [ -f "${FILEPATH}" ]; then
     FOUND=$(jq -r '.version' "${FILEPATH}") &&
       if ! [ "$FOUND" = "${VERSION}" ]; then
