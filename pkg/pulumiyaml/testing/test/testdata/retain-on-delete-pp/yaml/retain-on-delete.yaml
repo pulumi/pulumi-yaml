@@ -1,0 +1,4 @@
+resources:
+  foo:
+    type: random:RandomPet
+    options: {}

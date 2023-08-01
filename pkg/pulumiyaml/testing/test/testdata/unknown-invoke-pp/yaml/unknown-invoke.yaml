@@ -1,0 +1,12 @@
+variables:
+  data:
+    fn::invoke:
+      Function: unknown:getData
+      Arguments:
+        input: hello
+  values:
+    fn::invoke:
+      Function: unknown:eks:moduleValues
+      Arguments: {}
+outputs:
+  content: ${data.content}

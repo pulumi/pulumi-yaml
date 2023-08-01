@@ -1,0 +1,5 @@
+outputs:
+  output_true: true
+  output_false: false
+  output_number: 4
+  output_string: hello

@@ -1,0 +1,7 @@
+resources:
+  cluster:
+    type: aws:ecs:Cluster
+  nginx:
+    type: awsx:ecs:FargateService
+    properties:
+      cluster: ${cluster.arn}

@@ -1,0 +1,114 @@
+resources:
+  # Create a security group that permits HTTP ingress and unrestricted egress.
+  webSecurityGroup:
+    type: aws:ec2:SecurityGroup
+    properties:
+      vpcId: ${vpc.id}
+      egress:
+        - protocol: '-1'
+          fromPort: 0
+          toPort: 0
+          cidrBlocks:
+            - 0.0.0.0/0
+      ingress:
+        - protocol: tcp
+          fromPort: 80
+          toPort: 80
+          cidrBlocks:
+            - 0.0.0.0/0
+  # Create an ECS cluster to run a container-based service.
+  cluster:
+    type: aws:ecs:Cluster
+  # Create an IAM role that can be used by our service's task.
+  taskExecRole:
+    type: aws:iam:Role
+    properties:
+      assumeRolePolicy:
+        fn::toJSON:
+          Version: 2008-10-17
+          Statement:
+            - Sid:
+              Effect: Allow
+              Principal:
+                Service: ecs-tasks.amazonaws.com
+              Action: sts:AssumeRole
+  taskExecRolePolicyAttachment:
+    type: aws:iam:RolePolicyAttachment
+    properties:
+      role: ${taskExecRole.name}
+      policyArn: arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  # Create a load balancer to listen for HTTP traffic on port 80.
+  webLoadBalancer:
+    type: aws:elasticloadbalancingv2:LoadBalancer
+    properties:
+      subnets: ${subnets.ids}
+      securityGroups:
+        - ${webSecurityGroup.id}
+  webTargetGroup:
+    type: aws:elasticloadbalancingv2:TargetGroup
+    properties:
+      port: 80
+      protocol: HTTP
+      targetType: ip
+      vpcId: ${vpc.id}
+  webListener:
+    type: aws:elasticloadbalancingv2:Listener
+    properties:
+      loadBalancerArn: ${webLoadBalancer.arn}
+      port: 80
+      defaultActions:
+        - type: forward
+          targetGroupArn: ${webTargetGroup.arn}
+  # Spin up a load balanced service running NGINX
+  appTask:
+    type: aws:ecs:TaskDefinition
+    properties:
+      family: fargate-task-definition
+      cpu: '256'
+      memory: '512'
+      networkMode: awsvpc
+      requiresCompatibilities:
+        - FARGATE
+      executionRoleArn: ${taskExecRole.arn}
+      containerDefinitions:
+        fn::toJSON:
+          - name: my-app
+            image: nginx
+            portMappings:
+              - containerPort: 80
+                hostPort: 80
+                protocol: tcp
+  appService:
+    type: aws:ecs:Service
+    properties:
+      cluster: ${cluster.arn}
+      desiredCount: 5
+      launchType: FARGATE
+      taskDefinition: ${appTask.arn}
+      networkConfiguration:
+        assignPublicIp: true
+        subnets: ${subnets.ids}
+        securityGroups:
+          - ${webSecurityGroup.id}
+      loadBalancers:
+        - targetGroupArn: ${webTargetGroup.arn}
+          containerName: my-app
+          containerPort: 80
+    options:
+      dependson:
+        - ${webListener}
+variables:
+  # Read the default VPC and public subnets, which we will use.
+  vpc:
+    fn::invoke:
+      Function: aws:ec2:getVpc
+      Arguments:
+        default: true
+  subnets:
+    fn::invoke:
+      Function: aws:ec2:getSubnetIds
+      Arguments:
+        vpcId: ${vpc.id}
+outputs:
+  # Export the resulting web address.
+  url: ${webLoadBalancer.dnsName}

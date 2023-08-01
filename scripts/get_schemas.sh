@@ -27,6 +27,10 @@ schemas=(
   "google-native@0.18.2"
   $(pulumi_schema synthetic 1.0.0)
   $(pulumi_schema other 0.1.0)
+  $(pulumi_schema splat 1.0.0)
+  $(pulumi_schema std 1.0.0) # there's no pulumi-std 1.0.0
+  $(pulumi_schema snowflake 0.66.1) # not a real pulumi-snowflake schema
+  $(pulumi_schema using-dashes 1.0.0)
 )
 
 for s in "${schemas[@]}"; do
