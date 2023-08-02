@@ -21,3 +21,10 @@ linters:
     - lll
     - staticcheck # Disabled due to OOM errors in golangci-lint@v1.18.0
     - megacheck # Disabled due to OOM errors in golangci-lint@v1.18.0
+
+issues:
+  exclude-rules:
+    # Don't warn on unused parameters.
+    # Parameter names are useful; replacing them with '_' is undesirable.
+    - linters: [revive]
+      text: 'unused-parameter: parameter \S+ seems to be unused, consider removing or renaming it as _'
