@@ -103,6 +103,23 @@ jobs:
         with:
           repo: cue-lang/cue
           version: v0.4.3
+
+      - id: list-schemas
+        name: List required schemas
+        run: |
+          # ref: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#example-of-a-multiline-string
+          {
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "schemas<<$EOF"
+            LIST_ONLY=true ./scripts/get_schemas.sh
+            echo "$EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Restore cached schemas
+        uses: actions/cache@v3
+        with:
+          key: ${{ hashFiles('scripts/get_schemas.sh') }}
+          path: ${{ steps.list-schemas.outputs.schemas }}
+
       - name: Test
         run: make test
     strategy:
