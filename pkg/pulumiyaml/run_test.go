@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	b64 "encoding/base64"
 	"encoding/json"
@@ -1918,4 +1919,90 @@ func TestGetPulumiConfNodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// This test checks that resource properties that are unavailable during preview are marked
+// unknown.
+func TestHandleUnknownPropertiesDuringPreview(t *testing.T) {
+	t.Parallel()
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		e := &programEvaluator{
+			pulumiCtx: ctx,
+			evalContext: &evalContext{
+				Runner: &Runner{
+					t: &ast.TemplateDecl{},
+					resources: map[string]lateboundResource{
+						"image": &mockLateboundResource{
+							resourceSchema: &schema.Resource{
+								InputProperties: []*schema.Property{
+									{
+										Name: "imageName",
+										Type: schema.StringType,
+									},
+								},
+								Properties: []*schema.Property{
+									{
+										Name: "baseImageName",
+										Type: schema.StringType,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		node, diags := ast.ParseExpr(syntax.String("${image.baseImageName}"))
+		require.False(t, diags.HasErrors())
+
+		symbolExpr, ok := node.(*ast.SymbolExpr)
+		require.True(t, ok)
+
+		result, ok := e.evaluatePropertyAccess(symbolExpr, symbolExpr.Property)
+		require.True(t, ok)
+		require.False(t, e.sdiags.HasErrors())
+
+		ctx.Export("unexpected-unknown-property", result.(pulumi.AnyOutput))
+
+		return nil
+	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `unexpected unknown property value for "unexpected-unknown-property"`)
+}
+
+type mockLateboundResource struct {
+	resourceSchema *schema.Resource
+}
+
+var _ lateboundResource = (*mockLateboundResource)(nil)
+
+// GetOutputs returns the resource's outputs.
+func (st mockLateboundResource) GetOutputs() pulumi.Output {
+	panic("not implemented")
+}
+
+// GetOutput returns the named output of the resource.
+func (st *mockLateboundResource) GetOutput(k string) pulumi.Output {
+	panic("not implemented")
+}
+
+func (st *mockLateboundResource) CustomResource() *pulumi.CustomResourceState {
+	panic("not implemented")
+}
+
+func (st *mockLateboundResource) ProviderResource() *pulumi.ProviderResourceState {
+	panic("not implemented")
+}
+
+func (st *mockLateboundResource) ElementType() reflect.Type {
+	panic("not implemented")
+}
+
+func (st *mockLateboundResource) GetRawOutputs() pulumi.Output {
+	return pulumi.Any(resource.PropertyMap{})
+}
+
+func (st *mockLateboundResource) GetResourceSchema() *schema.Resource {
+	return st.resourceSchema
 }
