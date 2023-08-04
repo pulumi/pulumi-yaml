@@ -1,4 +1,5 @@
 // Copyright 2022, Pulumi Corporation.  All rights reserved.
+// Make the test run.
 
 package pulumiyaml
 
