@@ -23,6 +23,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -440,6 +441,7 @@ type lateboundResource interface {
 	CustomResource() *pulumi.CustomResourceState
 	ProviderResource() *pulumi.ProviderResourceState
 	GetRawOutputs() pulumi.Output
+	GetResourceSchema() *schema.Resource
 }
 
 // lateboundCustomResourceState is a resource state that stores all computed outputs into a single
@@ -447,8 +449,9 @@ type lateboundResource interface {
 // up front the shape of the expected outputs.
 type lateboundCustomResourceState struct {
 	pulumi.CustomResourceState
-	name    string
-	Outputs pulumi.MapOutput `pulumi:""`
+	name           string
+	Outputs        pulumi.MapOutput `pulumi:""`
+	resourceSchema *schema.Resource
 }
 
 // GetOutputs returns the resource's outputs.
@@ -483,10 +486,15 @@ func (st *lateboundCustomResourceState) GetRawOutputs() pulumi.Output {
 	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
 }
 
+func (st *lateboundCustomResourceState) GetResourceSchema() *schema.Resource {
+	return st.resourceSchema
+}
+
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
-	name    string
-	Outputs pulumi.MapOutput `pulumi:""`
+	name           string
+	Outputs        pulumi.MapOutput `pulumi:""`
+	resourceSchema *schema.Resource
 }
 
 // GetOutputs returns the resource's outputs.
@@ -521,6 +529,10 @@ func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
 	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
 }
 
+func (st *lateboundProviderResourceState) GetResourceSchema() *schema.Resource {
+	return st.resourceSchema
+}
+
 type poisonMarker struct{}
 
 // GetOutputs returns the resource's outputs.
@@ -546,6 +558,10 @@ func (poisonMarker) ElementType() reflect.Type {
 }
 
 func (st poisonMarker) GetRawOutputs() pulumi.Output {
+	return nil
+}
+
+func (st poisonMarker) GetResourceSchema() *schema.Resource {
 	return nil
 }
 
@@ -1198,14 +1214,18 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	// whether the type token indicates a special provider type.
 	var state lateboundResource
 	var res pulumi.Resource
+	var resourceSchema *schema.Resource
+	if resType := pkg.ResourceTypeHint(typ); resType != nil {
+		resourceSchema = resType.Resource
+	}
 	isProvider := false
 	if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-		r := lateboundProviderResourceState{name: k}
+		r := lateboundProviderResourceState{name: k, resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 		isProvider = true
 	} else {
-		r := lateboundCustomResourceState{name: k}
+		r := lateboundCustomResourceState{name: k, resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 	}
@@ -1552,7 +1572,31 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 					} else if ok && sub.Name == "urn" {
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
-					return evaluateAccessF(x.GetRawOutputs(), accessors)
+
+					outputs := x.GetRawOutputs()
+					if outputs != nil {
+						outputs = outputs.ApplyT(
+							func(rawOutputs interface{}) (interface{}, error) {
+								outputs, ok := rawOutputs.(resource.PropertyMap)
+								if !ok {
+									return rawOutputs, nil
+								}
+								resourceSchema := x.GetResourceSchema()
+								if resourceSchema == nil {
+									return outputs, nil
+								}
+								newOutputs := outputs.Copy()
+								for _, v := range resourceSchema.Properties {
+									if _, ok := newOutputs[resource.PropertyKey(v.Name)]; !ok {
+										newOutputs[resource.PropertyKey(v.Name)] = resource.PropertyValue{
+											V: unknownOutput(),
+										}
+									}
+								}
+								return newOutputs, nil
+							})
+					}
+					return evaluateAccessF(outputs, accessors)
 				}
 				return x, true
 			case resource.PropertyMap:
