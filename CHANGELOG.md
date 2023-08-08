@@ -1,6 +1,14 @@
 CHANGELOG
 =========
 
+## 1.2.0 (2023-08-08)
+
+### Improvements
+
+- Pre-built binaries of pulumi-language-yaml are now built with Go 1.20.
+- Upgrade to Pulumi v3.76.
+- Fix unknown resource outputs causing the program to fail during preview.
+
 ## 1.1.0 (2023-04-06)
 
 ### Improvements
