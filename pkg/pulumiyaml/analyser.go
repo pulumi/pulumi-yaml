@@ -797,7 +797,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		if o := hint.Outputs; o != nil {
 			for _, output := range o.Properties {
 				fields = append(fields, output.Name)
-				if strings.ToLower(t.Return.Value) == strings.ToLower(output.Name) {
+				if strings.EqualFold(t.Return.Value, output.Name) {
 					returnType = output.Type
 					validReturn = true
 				}
@@ -1222,11 +1222,7 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %T", x))
 	}
-	if !e.VisitExpr(ctx, x) {
-		return false
-	}
-
-	return true
+	return e.VisitExpr(ctx, x)
 }
 
 func (e walker) EvalConfig(r *Runner, node configNode) bool {

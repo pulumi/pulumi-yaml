@@ -158,7 +158,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 		VisitExpr: func(ctx *evalContext, expr ast.Expr) bool {
 			if expr, ok := expr.(*ast.InvokeExpr); ok {
 				if expr.Token == nil {
-					ctx.Runner.sdiags.Extend(syntax.NodeError(expr.Syntax(), fmt.Sprintf("Invoke declared without a 'function' type"), ""))
+					ctx.Runner.sdiags.Extend(syntax.NodeError(expr.Syntax(), "Invoke declared without a 'function' type", ""))
 					return true
 				}
 				acceptType(ctx.Runner, expr.Token.GetValue(), expr.CallOpts.Version, expr.CallOpts.PluginDownloadURL)

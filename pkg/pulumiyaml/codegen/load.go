@@ -516,7 +516,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	}
 
 	configName, ok := imp.configuration[name]
-	contract.Assert(ok)
+	contract.Assertf(ok, "key %q not found in configuration map", name)
 
 	var defaultValue model.Expression
 	if config.Default != nil {
@@ -554,7 +554,6 @@ func (imp *importer) getResourceRefList(optionField ast.Expr, name string, field
 	var diags syntax.Diagnostics
 
 	elems, ok := optionField.(*ast.ListExpr)
-	var resourceNames []string
 	if !ok {
 		diags.Extend(ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a list of resource expressions, got '%v'", field, name, reflect.TypeOf(elems)), ""))
 	}
@@ -566,7 +565,6 @@ func (imp *importer) getResourceRefList(optionField ast.Expr, name string, field
 			continue
 		}
 		resourceName := sym.Property.Accessors[0].(*ast.PropertyName).Name
-		resourceNames = append(resourceNames, resourceName)
 		if resourceVar, ok := imp.resources[resourceName]; ok {
 			refs = append(refs, model.VariableReference(resourceVar))
 		} else {
@@ -627,7 +625,7 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry, latestPkgInfo map
 	var diags syntax.Diagnostics
 	name, value := kvp.Key.Value, kvp.Value
 	_, ok := imp.variables[name]
-	contract.Assert(ok)
+	contract.Assertf(ok, "variable %q not found", name)
 
 	v, vdiags := imp.importExpr(value, nil)
 	diags.Extend(vdiags...)
@@ -711,8 +709,6 @@ func (imp *importer) getLatestPkgInfoVariable(kvp ast.VariablesMapEntry, pkgInfo
 			}
 		}
 	}
-
-	return
 }
 
 // importResource imports a YAML resource as a PCL resource.
@@ -720,7 +716,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 	name, resource := kvp.Key.Value, kvp.Value
 
 	resourceVar, ok := imp.resources[name]
-	contract.Assert(ok)
+	contract.Assertf(ok, "resource %q not found", name)
 
 	var diags syntax.Diagnostics
 
@@ -893,7 +889,7 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 	name := kvp.Key.Value
 
 	outputVar, ok := imp.outputs[name]
-	contract.Assert(ok)
+	contract.Assertf(ok, "output %q not found", name)
 
 	x, diags := imp.importExpr(kvp.Value, nil)
 
@@ -1068,7 +1064,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	// TODO: this isn't supported by PCL.
 	for _, name := range imp.referencedStacks {
 		stackVar, ok := imp.stackReferences[name]
-		contract.Assert(ok)
+		contract.Assertf(ok, "stack reference %q not found", name)
 
 		items = append(items, &model.Block{
 			Type:   "stackReference",

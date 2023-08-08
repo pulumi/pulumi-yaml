@@ -7,7 +7,7 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -84,7 +84,7 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 
 	for filename, data := range files {
 		outPath := path.Join(directory, filename)
-		err := ioutil.WriteFile(outPath, data, 0600)
+		err := os.WriteFile(outPath, data, 0600)
 		if err != nil {
 			return fmt.Errorf("could not write output program: %w", err)
 		}
@@ -165,7 +165,7 @@ func (g *generator) genNode(n pcl.Node) {
 
 func unquoteInterpolation(n syn.Node) *syn.StringNode {
 	s, ok := n.(*syn.StringNode)
-	contract.Assert(ok)
+	contract.Assertf(ok, "Expected a string node, got %T", n)
 	v := strings.TrimPrefix(s.Value(), "${")
 	v = strings.TrimSuffix(v, "}")
 	return syn.String(v)
@@ -178,7 +178,7 @@ func mustCoerceBoolean(n syn.Node) *syn.BooleanNode {
 	case *syn.StringNode:
 		return syn.Boolean(n.Value() == "true")
 	default:
-		panic(fmt.Sprintf("Could not coerce type %[1]T to a boolean: '%[1]#v'", n))
+		panic(fmt.Sprintf("Could not coerce type %[1]T to a boolean: '%#[1]v'", n))
 	}
 }
 
@@ -200,7 +200,7 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 	if opts.DependsOn != nil {
 		elems := g.expr(opts.DependsOn)
 		_, ok := elems.(*syn.ListNode)
-		contract.Assert(ok)
+		contract.Assertf(ok, "Expected a list node, got %T", elems)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependson"), elems))
 	}
 	if opts.IgnoreChanges != nil {
@@ -222,12 +222,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 
 func (g *generator) genResource(n *pcl.Resource) {
 	properties := make([]syn.ObjectPropertyDef, len(n.Inputs))
-	var additionalSecrets []*syn.StringNode
 	for i, input := range n.Inputs {
 		value := input.Value
 		if f, ok := value.(*model.FunctionCallExpression); ok && f.Name == "secret" {
-			contract.Assert(len(f.Args) == 1)
-			additionalSecrets = append(additionalSecrets, syn.String(input.Name))
+			contract.Assertf(len(f.Args) == 1, "Expected exactly one argument to secret, got %d", len(f.Args))
 			value = f.Args[0]
 		}
 		v := g.expr(value)
@@ -528,7 +526,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			return syn.Boolean(e.Value.True())
 		default:
 			contract.Failf("Unexpected LiteralValueExpression (%[1]v): %[1]v", e.Type(), e)
-			panic(nil)
+			panic("unreachable")
 		}
 
 	case *model.FunctionCallExpression:
@@ -729,14 +727,14 @@ type Invoke struct {
 }
 
 func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn.ObjectNode {
-	contract.Assert(f.Name == pcl.Invoke)
-	contract.Assert(len(f.Args) > 0)
+	contract.Assertf(f.Name == pcl.Invoke, "MustInvoke called on non-invoke function: %v", f.Name)
+	contract.Assertf(len(f.Args) > 0, "Invoke called with no arguments: %v", f.Name)
 	name := collapseToken(g.expr(f.Args[0]).(*syn.StringNode).Value())
 
 	var arguments syn.Node
 	if len(f.Args) > 1 {
 		_, ok := f.Args[1].(*model.ObjectConsExpression)
-		contract.Assert(ok)
+		contract.Assertf(ok, "Expected ObjectConsExpression as second argument, got %T", f.Args[1])
 		arguments = g.expr(f.Args[1])
 	}
 

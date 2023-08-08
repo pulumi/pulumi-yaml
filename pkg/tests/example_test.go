@@ -84,6 +84,9 @@ func TestExampleStackreference(t *testing.T) {
 			//
 			// See: https://github.com/pulumi/pulumi-yaml/issues/6#issuecomment-1028306579
 			err = filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
 				if path == dir {
 					return nil
 				}
@@ -98,9 +101,9 @@ func TestExampleStackreference(t *testing.T) {
 					return err
 				}
 				template := string(bytes)
-				template = strings.Replace(template, "PLACEHOLDER_ORG_NAME", org, -1)
-				template = strings.Replace(template, "PLACEHOLDER_STACK_NAME", sourceStackName, -1)
-				// nolint:gosec // temporary file, no secrets, non-executable
+				template = strings.ReplaceAll(template, "PLACEHOLDER_ORG_NAME", org)
+				template = strings.ReplaceAll(template, "PLACEHOLDER_STACK_NAME", sourceStackName)
+				//nolint:gosec // temporary file, no secrets, non-executable
 				err = os.WriteFile(path, []byte(template), 0644)
 				if err != nil {
 					return err
