@@ -554,7 +554,6 @@ func (imp *importer) getResourceRefList(optionField ast.Expr, name string, field
 	var diags syntax.Diagnostics
 
 	elems, ok := optionField.(*ast.ListExpr)
-	var resourceNames []string
 	if !ok {
 		diags.Extend(ast.ExprError(optionField, fmt.Sprintf("expected %v of resource '%v' to be a list of resource expressions, got '%v'", field, name, reflect.TypeOf(elems)), ""))
 	}
@@ -566,7 +565,6 @@ func (imp *importer) getResourceRefList(optionField ast.Expr, name string, field
 			continue
 		}
 		resourceName := sym.Property.Accessors[0].(*ast.PropertyName).Name
-		resourceNames = append(resourceNames, resourceName)
 		if resourceVar, ok := imp.resources[resourceName]; ok {
 			refs = append(refs, model.VariableReference(resourceVar))
 		} else {
