@@ -180,6 +180,19 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 	}
 }
 
+// validateResources does some basic validation of each resource to provide
+// error messages for any missing required fields.
+func (r *Runner) validateResources() {
+	for _, resource := range r.t.Resources.Entries {
+		v := resource.Value
+		if v.Type == nil {
+			r.sdiags.Extend(syntax.NodeError(
+				v.Syntax(),
+				fmt.Sprintf("Required field 'type' is missing on resource \"%s\"", resource.Key.Value), ""))
+		}
+	}
+}
+
 // Set default providers for resources and invokes.
 //
 // This function communicates errors by appending to the internal diags field of `r`.
@@ -190,7 +203,7 @@ func (r *Runner) setDefaultProviders() {
 	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
 		// check if this is a provider resource
-		if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
+		if v.Type != nil && strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
@@ -212,6 +225,11 @@ func (r *Runner) setDefaultProviders() {
 		VisitResource: func(r *Runner, node resourceNode) bool {
 			k, v := node.Key.Value, node.Value
 			ctx := r.newContext(node)
+
+			if v.Type == nil {
+				return false
+			}
+
 			if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
 				return true
 			}
@@ -312,6 +330,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
 	// to r.setDefaultProviders.
 	r.setIntermediates(nil, true /*force*/)
+
+	// do some basic validation of each resource
+	r.validateResources()
 
 	// runner hooks up default providers
 	r.setDefaultProviders()

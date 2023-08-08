@@ -2006,3 +2006,30 @@ func (st *mockLateboundResource) GetRawOutputs() pulumi.Output {
 func (st *mockLateboundResource) GetResourceSchema() *schema.Resource {
 	return st.resourceSchema
 }
+
+// TestResourceMissingType ensures that we fail with an error message when a resource is missing a type.
+func TestResourceMissingType(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  my-resource:
+    foo: bar
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
+		},
+		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return RunTemplate(ctx, template, nil, newMockPackageMap())
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
+}
