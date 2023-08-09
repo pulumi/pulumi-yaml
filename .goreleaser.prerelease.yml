@@ -26,3 +26,17 @@ builds:
   - -w
   - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
   main: ./cmd/pulumi-language-yaml/
+- id: pulumi-converter-yaml
+  binary: pulumi-converter-yaml
+  goarch:
+  - amd64
+  - arm64
+  goos:
+  - darwin
+  - windows
+  - linux
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
+  main: ./cmd/pulumi-converter-yaml/
