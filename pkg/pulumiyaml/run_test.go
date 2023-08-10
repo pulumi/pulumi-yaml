@@ -2033,3 +2033,54 @@ resources:
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }
+
+// This test checks that resource properties that are unavailable during preview are marked unknown.
+// Regression test for https://github.com/pulumi/pulumi-yaml/issues/489.
+func TestHandleUnknownNestedPropertiesDuringPreview(t *testing.T) {
+	t.Parallel()
+	// Pretty much a copy of TestHandleUnknownPropertiesDuringPreview but with an index expression
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		e := &programEvaluator{
+			pulumiCtx: ctx,
+			evalContext: &evalContext{
+				Runner: &Runner{
+					t: &ast.TemplateDecl{},
+					resources: map[string]lateboundResource{
+						"image": &mockLateboundResource{
+							resourceSchema: &schema.Resource{
+								InputProperties: []*schema.Property{
+									{
+										Name: "imageName",
+										Type: schema.StringType,
+									},
+								},
+								Properties: []*schema.Property{
+									{
+										Name: "baseImageName",
+										Type: &schema.ArrayType{ElementType: schema.StringType},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		node, diags := ast.ParseExpr(syntax.String("${image.baseImageName[0]}"))
+		require.False(t, diags.HasErrors())
+
+		symbolExpr, ok := node.(*ast.SymbolExpr)
+		require.True(t, ok)
+
+		result, ok := e.evaluatePropertyAccess(symbolExpr, symbolExpr.Property)
+		require.True(t, ok)
+		require.False(t, e.sdiags.HasErrors())
+
+		ctx.Export("unexpected-unknown-property", result.(pulumi.AnyOutput))
+
+		return nil
+	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `unexpected unknown property value for "unexpected-unknown-property"`)
+}
