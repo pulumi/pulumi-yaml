@@ -1583,6 +1583,15 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 	Loop:
 		for {
 			switch x := receiver.(type) {
+			case pulumi.Output:
+				// If the receiver is an output, we need to apply it to get the value.
+				return x.ApplyT(func(v interface{}) (interface{}, error) {
+					result, ok := evaluateAccessF(v, accessors)
+					if !ok {
+						return nil, fmt.Errorf("runtime error")
+					}
+					return result, nil
+				}), true
 			case lateboundResource:
 				// Peak ahead at the next accessor to implement .urn and .id:
 				if len(accessors) >= 1 {
