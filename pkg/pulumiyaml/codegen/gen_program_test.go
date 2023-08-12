@@ -189,7 +189,7 @@ func TestGenerateProgram(t *testing.T) {
 				"iterating-optional-range-expressions",
 				"invoke-inside-conditional-range":
 				// Pulumi YAML does not support ranges
-			case "dynamic-entries":
+			case "dynamic-entries", "csharp-typed-for-expressions":
 				// Pulumi YAML does not support for loops.
 			case "read-file-func", "python-regress-10914", "unknown-invoke":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
@@ -198,6 +198,8 @@ func TestGenerateProgram(t *testing.T) {
 				// Reason: this example is known to be invalid
 			case "simplified-invokes":
 				// https://github.com/pulumi/pulumi-yaml/issues/438
+			case "regress-node-12507":
+				// https://github.com/pulumi/pulumi-yaml/issues/494
 			default:
 				l = append(l, tt)
 			}
