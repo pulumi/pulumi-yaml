@@ -1603,7 +1603,10 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 					}
 
 					outputs := x.GetRawOutputs()
-					if outputs != nil {
+
+					// If we're in a preview, mark missing outputs in the schema as unknown.
+					// unknownOutput values will break in an actual deployment.
+					if outputs != nil && e.pulumiCtx.DryRun() {
 						outputs = outputs.ApplyT(
 							func(rawOutputs interface{}) (interface{}, error) {
 								outputs, ok := rawOutputs.(resource.PropertyMap)

@@ -1966,9 +1966,10 @@ func TestHandleUnknownPropertiesDuringPreview(t *testing.T) {
 		ctx.Export("unexpected-unknown-property", result.(pulumi.AnyOutput))
 
 		return nil
-	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), `unexpected unknown property value for "unexpected-unknown-property"`)
+	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}), func(ri *pulumi.RunInfo) {
+		ri.DryRun = true
+	})
+	assert.NoError(t, err)
 }
 
 type mockLateboundResource struct {
@@ -2080,7 +2081,63 @@ func TestHandleUnknownNestedPropertiesDuringPreview(t *testing.T) {
 		ctx.Export("unexpected-unknown-property", result.(pulumi.AnyOutput))
 
 		return nil
-	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), `unexpected unknown property value for "unexpected-unknown-property"`)
+	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}), func(ri *pulumi.RunInfo) {
+		ri.DryRun = true
+	})
+	assert.NoError(t, err)
+}
+
+// This test checks that unknown outputs are marked in preview and not during update.
+// Regression test for https://github.com/pulumi/pulumi-yaml/issues/492.
+func TestUnknownsDuringPreviewNotUpdate(t *testing.T) {
+	t.Parallel()
+	// Pretty much a copy of TestHandleUnknownPropertiesDuringPreview but with an index expression
+	runProgram := func(isPreview bool) error {
+		return pulumi.RunErr(func(ctx *pulumi.Context) error {
+			e := &programEvaluator{
+				pulumiCtx: ctx,
+				evalContext: &evalContext{
+					Runner: &Runner{
+						t: &ast.TemplateDecl{},
+						resources: map[string]lateboundResource{
+							"image": &mockLateboundResource{
+								resourceSchema: &schema.Resource{
+									InputProperties: []*schema.Property{
+										{
+											Name: "imageName",
+											Type: schema.StringType,
+										},
+									},
+									Properties: []*schema.Property{
+										{
+											Name: "baseImageName",
+											Type: &schema.ArrayType{ElementType: schema.StringType},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			node, diags := ast.ParseExpr(syntax.String("${image.baseImageName[0]}"))
+			require.False(t, diags.HasErrors())
+
+			symbolExpr, ok := node.(*ast.SymbolExpr)
+			require.True(t, ok)
+
+			result, ok := e.evaluatePropertyAccess(symbolExpr, symbolExpr.Property)
+			require.True(t, ok)
+			require.False(t, e.sdiags.HasErrors())
+
+			ctx.Export("unexpected-unknown-property", result.(pulumi.AnyOutput))
+
+			return nil
+		}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}), func(ri *pulumi.RunInfo) {
+			ri.DryRun = isPreview
+		})
+	}
+	assert.NoError(t, runProgram(true))
+	assert.Error(t, runProgram(false))
 }
