@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 
 	yamlgen "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
@@ -94,8 +96,17 @@ func (*yamlConverter) ConvertProgram(ctx context.Context,
 
 // Launches the converter RPC endpoint
 func main() {
+	cancelch := make(chan bool)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	go func() {
+		<-ctx.Done()
+		cancel() // deregister the interrupt handler
+		close(cancelch)
+	}()
+
 	// Fire up a gRPC server, letting the kernel choose a free port for us.
 	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
+		Cancel: cancelch,
 		Init: func(srv *grpc.Server) error {
 			pulumirpc.RegisterConverterServer(srv, plugin.NewConverterServer(&yamlConverter{}))
 			return nil
