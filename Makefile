@@ -68,22 +68,17 @@ test:: build get_plugins get_schemas
 	  ${GO} test -v --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./...
 
 # Runs tests with code coverage tracking.
-# Two output files are generated in the coverage/ directory:
-#
-#  unit.out        unit test coverage
-#  integration.out integration test coverage
-#
-# Integration test coverage is only generated for tests that invoke the
-# pulumi-language-yaml executable.
+# Generates a coverage report in the coverage directory.
 .phony: test_cover
 test_cover: export GOEXPERIMENT = coverageredesign
 test_cover: get_plugins get_schemas
-	make build BUILD_FLAGS="-cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
-	rm -rf coverage && mkdir -p coverage
+	@make build BUILD_FLAGS="-cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
+	@rm -rf coverage && mkdir -p coverage
 	$(eval COVERDIR := $(shell mktemp -d))
-	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" GOCOVERDIR=$(COVERDIR) \
-	     ${GO} test -v --timeout 30m -coverprofile=coverage/unit.out -coverpkg=./... ./...
-	go tool covdata textfmt -i=$(COVERDIR) -o=coverage/integration.out
+	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
+	     ${GO} run ./scripts/gocov -coverdir=$(COVERDIR) -coverpkg=./... -v ./... -- -test.timeout=30m
+	@go tool covdata textfmt -i=$(COVERDIR) -o=coverage/cover.out
+	@go tool covdata percent -i=$(COVERDIR) # also print a console report
 
 test_short::
 	${GO} test --timeout 30m -short -count 1 -parallel ${CONCURRENCY} ./...
