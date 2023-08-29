@@ -1,6 +1,17 @@
 CHANGELOG
 =========
 
+## 1.3.0 (2023-08-29)
+
+### Improvements
+
+- Update pulumi/pulumi to v3.78.1
+  [#493](https://github.com/pulumi/pulumi-yaml/pull/493)
+
+- Publish pulumi-converter-yaml.
+
+- Plugins: clean up resources and exit cleanly on receiving SIGINT or CTRL_BREAK.
+
 ## 1.2.1 (2023-08-10)
 
 ### Bug Fixes
