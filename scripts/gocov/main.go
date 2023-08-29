@@ -33,6 +33,13 @@
 //	# Do this:
 //	gocov ./... -- -test.run TestFoo
 //
+// # gotestsum
+//
+// To use gocov with gotestsum, use the following command:
+//
+//	// Include other gocov flags as needed.
+//	gotestsum --raw-command -- gocov -test2json ./...
+//
 // # Why
 //
 // This is a workaround for Go's integration test coverage tracking
@@ -99,6 +106,12 @@ type params struct {
 	// Be more verbose.
 	Verbose bool
 
+	// Turn the output into a machine-readable JSON stream
+	// using https://pkg.go.dev/cmd/test2json.
+	//
+	// Note that this is not the same as 'go test -json'.
+	Test2JSON bool
+
 	// Directory where coverage profiles are written.
 	CoverDir string
 
@@ -122,6 +135,8 @@ func (p *params) Parse(args []string) error {
 	// Don't use flag defaults.
 	// We'll set them ourselves after parsing.
 	flag.BoolVar(&p.Verbose, "v", false, "be more verbose")
+	flag.BoolVar(&p.Test2JSON, "test2json", false,
+		"turn the output into a machine-readable JSON stream")
 	flag.StringVar(&p.CoverDir, "coverdir", "",
 		"directory where coverage profiles are written (default: coverage)")
 	flag.StringVar(&p.CoverPkg, "coverpkg", "",
@@ -193,7 +208,12 @@ func (cmd *mainCmd) run(p *params) (err error) {
 
 		// Convenience: if -verbose is set, make sure so is -test.v.
 		// (No need to dedupe flags; 'go test' handles this just fine.)
-		p.TestFlags = append(p.TestFlags, "-test.v")
+		if !p.Test2JSON {
+			p.TestFlags = append(p.TestFlags, "-test.v")
+		}
+	}
+	if p.Test2JSON {
+		p.TestFlags = append(p.TestFlags, "-test.v=test2json")
 	}
 
 	cwd, err := cmd.Getwd()
@@ -268,7 +288,14 @@ func (cmd *mainCmd) run(p *params) (err error) {
 			continue
 		}
 
-		if err := cmd.testPackage(p.CoverDir, p.TestFlags, pkg, testBin); err != nil {
+		r := testPackageRequest{
+			CoverDir:   p.CoverDir,
+			Flags:      p.TestFlags,
+			Package:    pkg,
+			TestBinary: testBin,
+			Test2JSON:  p.Test2JSON,
+		}
+		if err := cmd.testPackage(r); err != nil {
 			errs[i] = fmt.Errorf("test package %v: %w", pkg.ImportPath, err)
 		}
 	}
@@ -325,26 +352,43 @@ func (cmd *mainCmd) buildPackage(binDir, coverpkg string, pkg goPackage) (string
 	return binPath, nil
 }
 
+type testPackageRequest struct {
+	CoverDir   string    // directory to write coverage data to
+	Flags      []string  // test flags
+	Package    goPackage // package being tested
+	TestBinary string    // path to test binary
+	Test2JSON  bool      // whether to use test2json
+}
+
 // testPackage runs the test binary testBin testing package pkg
 // with the provided flags.
-func (cmd *mainCmd) testPackage(
-	coverDir string,
-	flags []string,
-	pkg goPackage,
-	testBin string,
-) error {
+func (cmd *mainCmd) testPackage(r testPackageRequest) error {
 	// test.gocoverdir is an undocumented flag that tells the test binary
 	// where to write coverage data.
 	// See https://github.com/golang/go/issues/51430#issuecomment-1344711300
-	flags = append(flags, "-test.gocoverdir="+coverDir)
+	flags := append(r.Flags, "-test.gocoverdir="+r.CoverDir)
 
-	testCmd := exec.Command(testBin, flags...)
+	var testCmd *exec.Cmd
+	if r.Test2JSON {
+		// Run the test binary through test2json.
+		args := []string{
+			"tool", "test2json",
+			"-t",                 // add timestamps
+			"-p", r.Package.Name, // add package name
+			r.TestBinary,
+		}
+
+		testCmd = exec.Command("go", append(args, flags...)...) //nolint:gosec
+	} else {
+		testCmd = exec.Command(r.TestBinary, flags...) //nolint:gosec
+	}
+
 	testCmd.Stdout = cmd.Stdout
 	testCmd.Stderr = cmd.Stderr
-	testCmd.Dir = pkg.Dir // tests always run in the package directory
-	testCmd.Env = append(cmd.Environ(), "GOCOVERDIR="+coverDir)
+	testCmd.Dir = r.Package.Dir // tests always run in the package directory
+	testCmd.Env = append(cmd.Environ(), "GOCOVERDIR="+r.CoverDir)
 
-	cmd.debugf("*** %v", testCmd.Args)
+	cmd.debugf("*** %v", testCmd)
 	if err := testCmd.Run(); err != nil {
 		return fmt.Errorf("run test binary: %w", err)
 	}
