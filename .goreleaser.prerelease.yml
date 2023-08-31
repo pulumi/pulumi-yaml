@@ -9,8 +9,14 @@ snapshot:
 checksum:
   name_template: "{{ .ProjectName }}-{{ .Version }}-checksums.txt"
 archives:
-- id: archive
+- id: language
   name_template: '{{ .Binary }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}'
+  builds:
+    - pulumi-language-yaml
+- id: converter
+  name_template: '{{ .Binary }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}'
+  builds:
+    - pulumi-converter-yaml
 builds:
 - id: pulumi-language-yaml
   binary: pulumi-language-yaml
