@@ -112,6 +112,9 @@ type params struct {
 	// Note that this is not the same as 'go test -json'.
 	Test2JSON bool
 
+	// Enables data race detection in tests.
+	Race bool
+
 	// Directory where coverage profiles are written.
 	CoverDir string
 
@@ -137,6 +140,8 @@ func (p *params) Parse(args []string) error {
 	flag.BoolVar(&p.Verbose, "v", false, "be more verbose")
 	flag.BoolVar(&p.Test2JSON, "test2json", false,
 		"turn the output into a machine-readable JSON stream")
+	flag.BoolVar(&p.Race, "race", false,
+		"enable data race detection in tests")
 	flag.StringVar(&p.CoverDir, "coverdir", "",
 		"directory where coverage profiles are written (default: coverage)")
 	flag.StringVar(&p.CoverPkg, "coverpkg", "",
@@ -268,12 +273,17 @@ func (cmd *mainCmd) run(p *params) (err error) {
 		}
 	}
 	sort.Strings(coverPkgs)
-	coverPkgsArg := strings.Join(coverPkgs, ",")
 
 	// Build the test binaries with coverage tracking.
 	testBinaries := make([]string, len(packages))
 	for i, pkg := range packages {
-		testBinaries[i], err = cmd.buildPackage(binDir, coverPkgsArg, pkg)
+		req := buildPackageRequest{
+			Dir:       binDir,
+			Package:   pkg,
+			CoverPkgs: coverPkgs,
+			Race:      p.Race,
+		}
+		testBinaries[i], err = cmd.buildPackage(req)
 		if err != nil {
 			return fmt.Errorf("build package %v: %w", pkg.ImportPath, err)
 		}
@@ -302,16 +312,23 @@ func (cmd *mainCmd) run(p *params) (err error) {
 	return errors.Join(errs...)
 }
 
+type buildPackageRequest struct {
+	Dir       string    // destination directory for test binary
+	Package   goPackage // package to build tests for
+	CoverPkgs []string  // import paths of packages to track coverage for
+	Race      bool      // whether to enable data race detection
+}
+
 // buildPackage builds the given package and returns the path to its test binary.
 // Returns an empty path if the package has no tests.
-func (cmd *mainCmd) buildPackage(binDir, coverpkg string, pkg goPackage) (string, error) {
+func (cmd *mainCmd) buildPackage(r buildPackageRequest) (string, error) {
 	// Test binaries are typically named $pkg.test after the package name.
 	// Since we're placing them all in the same directory,
 	// we'll want to ensure there are no name collisions.
 	// We can use os.CreateTemp to generate unique names.
 	var binPath string
 	{
-		f, err := os.CreateTemp(binDir, pkg.Name+".test")
+		f, err := os.CreateTemp(r.Dir, r.Package.Name+".test")
 		if err != nil {
 			return "", fmt.Errorf("create temp file: %w", err)
 		}
@@ -326,16 +343,21 @@ func (cmd *mainCmd) buildPackage(binDir, coverpkg string, pkg goPackage) (string
 		}
 	}
 
-	// Build the test binary with coverage instrumentation.
-	buildCmd := exec.Command("go", "test", "-c", //nolint:gosec
+	args := []string{"test", "-c",
 		"-cover",
-		"-coverpkg="+coverpkg,
+		"-coverpkg=" + strings.Join(r.CoverPkgs, ","),
 		"-o", binPath,
-		pkg.ImportPath,
-	)
+	}
+	if r.Race {
+		args = append(args, "-race")
+	}
+	args = append(args, r.Package.ImportPath)
+
+	// Build the test binary with coverage instrumentation.
+	buildCmd := exec.Command("go", args...) //nolint:gosec
 	buildCmd.Stdout = cmd.Stdout
 	buildCmd.Stderr = cmd.Stderr
-	buildCmd.Dir = pkg.Dir
+	buildCmd.Dir = r.Package.Dir
 	cmd.debugf("*** %v", buildCmd)
 	if err := buildCmd.Run(); err != nil {
 		return "", fmt.Errorf("build test binary: %w", err)
