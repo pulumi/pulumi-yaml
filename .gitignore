@@ -15,3 +15,4 @@ command-output/
 obj/
 __pycache__/
 node_modules/
+/coverage
