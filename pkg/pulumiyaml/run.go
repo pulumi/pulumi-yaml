@@ -1169,8 +1169,26 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 	}
 	if v.Options.Protect != nil {
-		opts = append(opts, pulumi.Protect(v.Options.Protect.Value))
+		protectValue, ok := e.evaluateExpr(v.Options.Protect)
+		if ok {
+			if !hasOutputs(protectValue) {
+				protect, ok := protectValue.(bool)
+				if ok {
+					opts = append(opts, pulumi.Protect(protect))
+				} else {
+					e.error(v.Options.Protect, "protect must be a boolean value")
+					overallOk = false
+				}
+			} else {
+				e.error(v.Options.Protect, "protect must be not be an output")
+				overallOk = false
+			}
+		} else {
+			e.error(v.Options.Protect, "couldn't evaluate the 'protect' resource option")
+			overallOk = false
+		}
 	}
+
 	if v.Options.Provider != nil {
 		providerOpt, ok := e.evaluateResourceValuedOption(v.Options.Provider, "provider")
 		if ok {

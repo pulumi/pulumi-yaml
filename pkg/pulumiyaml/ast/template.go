@@ -307,7 +307,7 @@ type ResourceOptionsDecl struct {
 	IgnoreChanges           *StringListDecl
 	Import                  *StringExpr
 	Parent                  Expr
-	Protect                 *BooleanExpr
+	Protect                 Expr
 	Provider                Expr
 	Providers               Expr
 	Version                 *StringExpr
@@ -328,7 +328,7 @@ func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr,
-	parent Expr, protect *BooleanExpr, provider, providers Expr, version *StringExpr,
+	parent Expr, protect Expr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl,
 	retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
 
@@ -355,7 +355,7 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
-	protect *BooleanExpr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
+	protect Expr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
 	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
 
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,

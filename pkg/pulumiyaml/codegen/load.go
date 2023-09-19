@@ -794,10 +794,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 			})
 		}
 	}
-	if resource.Options.Protect != nil && resource.Options.Protect.Value {
+	if resource.Options.Protect != nil {
+		protectExpr, vdiags := imp.importExpr(resource.Options.Protect, schema.BoolType)
+		diags.Extend(vdiags...)
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
-			Value: &model.LiteralValueExpression{Value: cty.BoolVal(resource.Options.Protect.Value)},
+			Value: protectExpr,
 		})
 	}
 	// latest package settings takes precedence over a set provider/ version/ url

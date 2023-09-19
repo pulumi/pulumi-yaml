@@ -60,6 +60,10 @@ func TestResourceOptions(t *testing.T) {
 	const text = `
 name: test-yaml
 runtime: yaml
+configuration:
+  shouldProtect:
+    default: false
+    type: boolean
 resources:
   provider-a:
     type: pulumi:providers:test
@@ -71,6 +75,8 @@ resources:
     type: test:resource:trivial
   res-container:
     type: test:resource:trivial
+    options:
+      protect: ${shouldProtect}
   res-a:
     type: test:component:type
     options:
