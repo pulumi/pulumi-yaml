@@ -94,17 +94,6 @@ func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	return LoadYAMLBytes(filename, bs)
 }
 
-// Load a template from the current working directory
-func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
-
-	return LoadYAML(filepath.Base(path), f)
-}
-
 // LoadYAML decodes a YAML template from an io.Reader.
 func LoadYAML(filename string, r io.Reader) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	bytes, err := io.ReadAll(r)
