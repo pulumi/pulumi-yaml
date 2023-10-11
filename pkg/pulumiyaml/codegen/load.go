@@ -661,17 +661,17 @@ func (imp *importer) getLatestPkgInfoResource(kvp ast.ResourcesMapEntry, pkgInfo
 		if resource.Options.PluginDownloadURL != nil {
 			url = resource.Options.PluginDownloadURL.Value
 		}
-		v1, err := semver.Make(resource.Options.Version.Value)
-		if err == nil {
+		v1, err := pulumiyaml.ParseVersion(resource.Options.Version)
+		if err == nil && v1 != nil {
 			if p, ok := pkgInfo[pkg]; ok {
 				v2, _ := semver.Make(p.version)
 				if v1.Compare(v2) == 1 {
-					p.version = resource.Options.Version.Value
+					p.version = v1.String()
 					p.pluginDownloadURL = url
 				}
 			} else {
 				pkgInfo[pkg] = &packageInfo{
-					version:           resource.Options.Version.Value,
+					version:           v1.String(),
 					pluginDownloadURL: url,
 				}
 			}
@@ -693,17 +693,17 @@ func (imp *importer) getLatestPkgInfoVariable(kvp ast.VariablesMapEntry, pkgInfo
 		if v.CallOpts.PluginDownloadURL != nil {
 			url = v.CallOpts.PluginDownloadURL.Value
 		}
-		v1, err := semver.Make(v.CallOpts.Version.Value)
-		if err == nil {
+		v1, err := pulumiyaml.ParseVersion(v.CallOpts.Version)
+		if err == nil && v1 != nil {
 			if p, ok := pkgInfo[pkgName]; ok {
 				v2, _ := semver.Make(p.version)
 				if v1.Compare(v2) == 1 {
-					p.version = v.CallOpts.Version.Value
+					p.version = v1.String()
 					p.pluginDownloadURL = url
 				}
 			} else {
 				pkgInfo[pkgName] = &packageInfo{
-					version:           v.CallOpts.Version.Value,
+					version:           v1.String(),
 					pluginDownloadURL: url,
 				}
 			}
@@ -829,10 +829,13 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 			}
 		}
 		if resource.Options.Version != nil {
-			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
-				Name:  "version",
-				Value: quotedLit(resource.Options.Version.Value),
-			})
+			parsedVersion, err := pulumiyaml.ParseVersion(resource.Options.Version)
+			if err == nil && parsedVersion != nil {
+				resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+					Name:  "version",
+					Value: quotedLit(parsedVersion.String()),
+				})
+			}
 		}
 		if resource.Options.PluginDownloadURL != nil {
 			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{

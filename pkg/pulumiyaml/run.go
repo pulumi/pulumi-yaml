@@ -19,6 +19,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/blang/semver"
+
 	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl/v2"
@@ -197,7 +199,7 @@ func (r *Runner) validateResources() {
 // This function communicates errors by appending to the internal diags field of `r`.
 // It is the responsibility of the caller to verify that no err diags were appended if
 // that should prevent proceeding.
-func (r *Runner) setDefaultProviders() {
+func (r *Runner) setDefaultProviders(e programEvaluator) {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
 	for _, resource := range r.t.Resources.Entries {
 		v := resource.Value
@@ -206,8 +208,22 @@ func (r *Runner) setDefaultProviders() {
 			pkgName := strings.Split(v.Type.Value, "pulumi:providers:")[1]
 			// check if it's set as a default provider
 			if v.DefaultProvider != nil && v.DefaultProvider.Value {
+				var version string
+				if v.Options.Version != nil {
+					if providerVersionExpr, ok := e.evaluateExpr(v.Options.Version); ok {
+						if hasOutputs(providerVersionExpr) {
+							r.sdiags.Extend(syntax.NodeError(
+								v.Options.Version.Syntax(), "version cannot be an output", ""))
+						}
+
+						if providerVersion, ok := providerVersionExpr.(string); ok {
+							version = providerVersion
+						}
+					}
+				}
+
 				defaultProviderInfoMap[pkgName] = &providerInfo{
-					version:           v.Options.Version,
+					version:           version,
 					pluginDownloadURL: v.Options.PluginDownloadURL,
 					providerName:      resource.Key,
 				}
@@ -240,11 +256,21 @@ func (r *Runner) setDefaultProviders() {
 			}
 
 			if v.Options.Provider == nil {
-				if v.Options.Version != nil && v.Options.Version.Value != defaultProviderInfo.version.Value {
-					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
-						"Version conflicts with the default provider version",
-						fmt.Sprintf("Try removing this option on resource \"%s\"", k))
+				if v.Options.Version != nil {
+					if versionExpr, ok := e.evaluateExpr(v.Options.Version); ok {
+						if hasOutputs(versionExpr) {
+							r.sdiags.Extend(syntax.NodeError(
+								v.Options.Version.Syntax(), "version cannot be an output", ""))
+						}
+
+						if version, ok := versionExpr.(string); ok && version != defaultProviderInfo.version {
+							ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+								"Version conflicts with the default provider version",
+								fmt.Sprintf("Try removing this option on resource \"%s\"", k))
+						}
+					}
 				}
+
 				if v.Options.PluginDownloadURL != nil && v.Options.PluginDownloadURL.Value != defaultProviderInfo.pluginDownloadURL.Value {
 					ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
 						"PluginDownloadURL conflicts with the default provider URL",
@@ -258,7 +284,10 @@ func (r *Runner) setDefaultProviders() {
 				}
 
 				v.Options.Provider = expr
-				v.Options.Version = defaultProviderInfo.version
+				if defaultProviderInfo.version != "" {
+					// if the version of the default provider is specified, set it
+					v.Options.Version = ast.String(defaultProviderInfo.version)
+				}
 			}
 			return true
 		},
@@ -295,7 +324,10 @@ func (r *Runner) setDefaultProviders() {
 						return false
 					}
 					t.CallOpts.Provider = expr
-					t.CallOpts.Version = defaultProviderInfo.version
+					if defaultProviderInfo.version != "" {
+						// if the version of the default provider is specified, set it
+						t.CallOpts.Version = ast.String(defaultProviderInfo.version)
+					}
 				}
 			}
 			return true
@@ -334,7 +366,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	r.validateResources()
 
 	// runner hooks up default providers
-	r.setDefaultProviders()
+	r.setDefaultProviders(programEvaluator{
+		evalContext: r.newContext(nil),
+	})
 
 	// runner type checks nodes
 	_, diags := TypeCheck(r)
@@ -392,7 +426,7 @@ func (d *syncDiags) HasErrors() bool {
 }
 
 type providerInfo struct {
-	version           *ast.StringExpr
+	version           string
 	pluginDownloadURL *ast.StringExpr
 	providerName      *ast.StringExpr
 }
@@ -1073,11 +1107,23 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	overallOk := true
 
 	var opts []pulumi.ResourceOption
-	version, err := ParseVersion(v.Options.Version)
-	if err != nil {
-		e.error(v.Options.Version, fmt.Sprintf("error parsing version of resource %v: %v", k, err))
-		return nil, true
+
+	var version *semver.Version
+	if v.Options.Version != nil {
+		if versionExpr, ok := e.evaluateExpr(v.Options.Version); ok {
+			versionText, ok := versionExpr.(string)
+			if ok {
+				parsedVersion, err := semver.ParseTolerant(versionText)
+				if err != nil {
+					e.error(v.Options.Version, fmt.Sprintf("error parsing version of resource %v: %v", k, err))
+					return nil, true
+				}
+
+				version = &parsedVersion
+			}
+		}
 	}
+
 	if version != nil {
 		opts = append(opts, pulumi.Version(version.String()))
 	}
@@ -1230,6 +1276,27 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.PluginDownloadURL != nil {
 		opts = append(opts, pulumi.PluginDownloadURL(v.Options.PluginDownloadURL.Value))
 	}
+
+	if v.Options.Version != nil {
+		versionValue, ok := e.evaluateExpr(v.Options.Version)
+		if ok {
+			if !hasOutputs(versionValue) {
+				if version, ok := versionValue.(string); ok {
+					opts = append(opts, pulumi.Version(version))
+				} else {
+					e.error(v.Options.Version, "version must be a string value")
+					overallOk = false
+				}
+			} else {
+				e.error(v.Options.Version, "version must be not be an output")
+				overallOk = false
+			}
+		} else {
+			e.error(v.Options.Version, "couldn't evaluate the 'version' resource option")
+			overallOk = false
+		}
+	}
+
 	if v.Options.ReplaceOnChanges != nil {
 		opts = append(opts, pulumi.ReplaceOnChanges(listStrings(v.Options.ReplaceOnChanges)))
 	}
@@ -1800,8 +1867,15 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 	var opts []pulumi.InvokeOption
 
 	if t.CallOpts.Version != nil {
-		opts = append(opts, pulumi.Version(t.CallOpts.Version.Value))
+		if versionExpr, ok := e.evaluateExpr(t.CallOpts.Version); ok {
+			if version, ok := versionExpr.(string); ok {
+				opts = append(opts, pulumi.Version(version))
+			}
+		} else {
+			e.error(t.CallOpts.Version, "unable to evaluate version")
+		}
 	}
+
 	if t.CallOpts.PluginDownloadURL != nil {
 		opts = append(opts, pulumi.PluginDownloadURL(t.CallOpts.PluginDownloadURL.Value))
 	}
@@ -1835,11 +1909,30 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
-		version, err := ParseVersion(t.CallOpts.Version)
-		if err != nil {
-			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
-			return nil, true
+
+		var version *semver.Version
+		if t.CallOpts.Version != nil {
+			versionExpr, ok := e.evaluateExpr(t.CallOpts.Version)
+			if ok {
+				verionText, ok := versionExpr.(string)
+				if ok {
+					parsedVersion, err := semver.ParseTolerant(verionText)
+					if err != nil {
+						e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
+						return nil, true
+					}
+
+					version = &parsedVersion
+				} else {
+					e.error(t.CallOpts.Version, "version was not a string")
+					return nil, true
+				}
+			} else {
+				e.error(t.CallOpts.Version, "unable to evaluate version")
+				return nil, true
+			}
 		}
+
 		_, functionName, err := ResolveFunction(e.pkgLoader, t.Token.Value, version)
 		if err != nil {
 			return e.error(t, err.Error())
