@@ -317,7 +317,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	//
 	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
 	// to r.setDefaultProviders.
-	r.setIntermediates(nil, true /*force*/)
+	r.setIntermediates(nil, nil, true /*force*/)
 
 	// do some basic validation of each resource
 	r.validateResources()
@@ -331,9 +331,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config, configTypes map[string]string, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	r.setIntermediates(config, false)
+	r.setIntermediates(config, configTypes, false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
 	}
@@ -731,27 +731,24 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
-func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
+func getPulumiConfNodes(config, configTypes map[string]string) ([]configNode, error) {
 	nodes := make([]configNode, len(config))
 	var errors multierror.Error
 	idx := 0
 	for k, v := range config {
-		// We default types to strings to avoid error cascades on mis-typed values.
-		typ := ctypes.String
-		var value interface{} = v
-		if v, t, err := getConfigNode(v); err == nil {
-			typ = t
-			value = v
+		if v, t, err := getConfigNode(v, configTypes[k]); err == nil {
+			typ := t
+			value := v
+			n := configNodeEnv{
+				Key:   k,
+				Value: value,
+				Type:  typ,
+			}
+			nodes[idx] = n
+			idx++
 		} else {
 			errors.Errors = append(errors.Errors, err)
 		}
-		n := configNodeEnv{
-			Key:   k,
-			Value: value,
-			Type:  typ,
-		}
-		nodes[idx] = n
-		idx++
 	}
 	return nodes, errors.ErrorOrNil()
 }
@@ -760,13 +757,13 @@ func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
 //
 // If force is true, set intermediates even if errors were encountered
 // Errors will always be reflected in r.sdiags.
-func (r *Runner) setIntermediates(config map[string]string, force bool) {
+func (r *Runner) setIntermediates(config, configTypes map[string]string, force bool) {
 	if r.intermediates != nil {
 		return
 	}
 
 	r.intermediates = []graphNode{}
-	confNodes, err := getPulumiConfNodes(config)
+	confNodes, err := getPulumiConfNodes(config, configTypes)
 	if err != nil && !force {
 		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
 		return
@@ -785,7 +782,7 @@ func (r *Runner) setIntermediates(config map[string]string, force bool) {
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// Our tests need to set intermediates, even though they don't have runtime config
-	r.setIntermediates(nil, false)
+	r.setIntermediates(nil, nil, false)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -807,25 +804,30 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 }
 
 // getConfigNode retrieves a runtime value and type from a config node.
-func getConfigNode(v string) (interface{}, ctypes.Type, error) {
+func getConfigNode(v string, typ string) (interface{}, ctypes.Type, error) {
 	// scalar config values are represented as their go literals, while arrays and objects
 	// are represented as JSON.
-	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return i, ctypes.Int, nil
+	switch typ {
+	case "integer":
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return i, ctypes.Int, nil
+		}
+	case "number":
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f, ctypes.Number, nil
+		}
+	case "boolean":
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b, ctypes.Boolean, nil
+		}
+	case "string":
+		return v, ctypes.String, nil
 	}
-	if b, err := strconv.ParseBool(v); err == nil {
-		return b, ctypes.Boolean, nil
-	}
-	if f, err := strconv.ParseFloat(v, 64); err == nil {
-		return f, ctypes.Number, nil
-	}
-
 	var value interface{}
 	if err := json.Unmarshal([]byte(v), &value); err == nil {
 		typ, err := ctypes.TypeValue(value)
 		return value, typ, err
 	}
-
 	return v, ctypes.String, nil
 }
 

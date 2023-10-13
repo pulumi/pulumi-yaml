@@ -167,8 +167,15 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 			k = strings.TrimPrefix(k, projPrefix)
 			conf[k] = v
 		}
+		confTypes := make(map[string]string, len(req.GetConfigTypes()))
+		// Strip the project prefix
+		for k, v := range req.GetConfigTypes() {
+			k = strings.TrimPrefix(k, projPrefix)
+			confTypes[k] = v
+		}
+
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(ctx, template, conf, loader)
+		return pulumiyaml.RunTemplate(ctx, template, conf, confTypes, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())

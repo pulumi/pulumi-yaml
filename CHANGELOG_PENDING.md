@@ -7,6 +7,8 @@
 
 - Plugins: clean up resources and exit cleanly on receiving SIGINT or CTRL_BREAK.
 
+- Handle types in the yaml config better.
+
 ### Bug Fixes
 
 - Allow `protect` resource option to be set dynamically.

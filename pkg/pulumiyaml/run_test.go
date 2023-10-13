@@ -1903,6 +1903,7 @@ func TestGetPulumiConfNodes(t *testing.T) {
 		},
 		{
 			input: `["one", 2]`,
+			typ:   ctypes.StringList,
 			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
 		},
 	}
@@ -1910,7 +1911,7 @@ func TestGetPulumiConfNodes(t *testing.T) {
 		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			value, typ, err := getConfigNode(tt.input)
+			value, typ, err := getConfigNode(tt.input, tt.typ.String())
 			if tt.err != nil {
 				assert.ErrorContains(t, err, tt.err.Error())
 			} else {
@@ -2030,7 +2031,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }
