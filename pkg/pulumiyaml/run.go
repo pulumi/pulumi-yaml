@@ -794,7 +794,7 @@ func (r *Runner) setIntermediates(project string, config map[string]string, conf
 
 	r.intermediates = []graphNode{}
 	var confNodes []configNode
-	if configPropertyMap != nil && len(configPropertyMap) > 0 {
+	if len(configPropertyMap) > 0 {
 		confNodes = getConfNodesFromMap(project, configPropertyMap)
 	} else {
 		var err error

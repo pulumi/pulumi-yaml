@@ -12,6 +12,7 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
+	github.com/pulumi/pulumi/pkg/v3 v3.78.2-0.20231017093938-2b6d978ae2c1
 	github.com/pulumi/pulumi/sdk/v3 v3.89.1-0.20231017130252-e9cc3ff1ae82
 	github.com/spf13/afero v1.9.5
 	github.com/stretchr/testify v1.8.4
@@ -171,7 +172,6 @@ require (
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/esc v0.5.2 // indirect
-	github.com/pulumi/pulumi/pkg/v3 v3.78.2-0.20231017093938-2b6d978ae2c1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
