@@ -6,7 +6,8 @@ default_url_template='https://raw.githubusercontent.com/pulumi/pulumi-_NAME_/v_V
 awsx_url='https://raw.githubusercontent.com/pulumi/pulumi-awsx/v_VERSION_/awsx/schema.json'
 function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/pkg/codegen/testing/test/testdata/$1-$2.json"; }
 schemas=(
-  "aws@4.26.0"
+  "aws@4.37.1"
+  "aws@5.16.2"
   "aws-native@0.13.0"
   "awsx@1.0.0-beta.5@${awsx_url}"
   "docker@4.0.0-alpha.0"
