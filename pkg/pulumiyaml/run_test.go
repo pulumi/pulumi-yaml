@@ -4,15 +4,15 @@ package pulumiyaml
 
 import (
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
-
-	b64 "encoding/base64"
-	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
+
+	b64 "encoding/base64"
 
 	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -29,8 +29,10 @@ import (
 //go:embed README.md
 var packageReadmeFile string
 
-const testComponentToken = "test:component:type"
-const testResourceToken = "test:resource:type"
+const (
+	testComponentToken = "test:component:type"
+	testResourceToken  = "test:resource:type"
+)
 
 type MockPackageLoader struct {
 	packages map[string]Package
@@ -209,7 +211,8 @@ func newMockPackageMap() PackageLoader {
 					}
 				},
 			},
-		}}
+		},
+	}
 }
 
 type testMonitor struct {
@@ -260,7 +263,6 @@ func setConfig(t *testing.T, m resource.PropertyMap) {
 func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*programEvaluator)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 			switch args.TypeToken {
 			case testResourceToken:
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
@@ -324,7 +326,6 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 	// Same mocks as in testTemplateDiags but without assertions, just pure syntax checking.
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 			switch args.TypeToken {
 			case testResourceToken:
 				return "someID", resource.PropertyMap{
@@ -561,7 +562,6 @@ configuration:
 		"<stdin>:5:13: Cannot mark a configuration value as not secret if the associated config value is secret")
 	assert.Len(t, diagStrings, 1)
 	require.True(t, diags.HasErrors())
-
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
@@ -715,7 +715,6 @@ func TestJSONDiags(t *testing.T) {
 }
 
 func TestPropertyAccessVarMap(t *testing.T) {
-
 	t.Parallel()
 
 	const text = `
@@ -768,7 +767,6 @@ resources:
 		diagString(diags[1]))
 	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on 'test:resource:type'",
 		diagString(diags[0]))
-
 }
 
 func TestPropertyAccess(t *testing.T) {
@@ -1152,7 +1150,6 @@ func TestSelect(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expected, v)
 				}
-
 			})
 		})
 	}
@@ -1359,7 +1356,8 @@ func TestFromBase64(t *testing.T) {
 						ast.String("My4xN"),
 						ast.String("DE1OTI="),
 					),
-				}},
+				},
+			},
 			expected: "3.141592",
 		},
 		{
@@ -1403,7 +1401,6 @@ func TestFromBase64(t *testing.T) {
 			})
 		})
 	}
-
 }
 
 func TestToBase64(t *testing.T) {
@@ -1428,7 +1425,8 @@ func TestToBase64(t *testing.T) {
 						ast.String("3"),
 						ast.String("141592"),
 					),
-				}},
+				},
+			},
 			expected: "3.141592",
 		},
 		{
@@ -1481,7 +1479,6 @@ func TestToBase64(t *testing.T) {
 			})
 		})
 	}
-
 }
 
 func TestSub(t *testing.T) {
@@ -1526,7 +1523,7 @@ variables:
     fn::secret: my-special-secret
 `
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	var hasRun = false
+	hasRun := false
 	testTemplate(t, tmpl, func(e *programEvaluator) {
 		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx).HasErrors())
 		s := e.variables["mySecret"].(pulumi.Output)
@@ -2030,7 +2027,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }

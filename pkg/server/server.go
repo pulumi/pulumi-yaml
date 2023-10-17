@@ -19,9 +19,9 @@ package server
 import (
 	"context"
 	"os"
-	"strings"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -80,7 +80,8 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
-	req *pulumirpc.GetRequiredPluginsRequest) (*pulumirpc.GetRequiredPluginsResponse, error) {
+	req *pulumirpc.GetRequiredPluginsRequest,
+) (*pulumirpc.GetRequiredPluginsResponse, error) {
 	template, diags, err := host.loadTemplate()
 	if err != nil {
 		return nil, err
@@ -136,18 +137,25 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return &pulumirpc.RunResponse{Error: "failed to load template"}, nil
 	}
 
+	confPropMap, err := plugin.UnmarshalProperties(req.GetConfigPropertyMap(),
+		plugin.MarshalOptions{KeepUnknowns: true, KeepSecrets: true, SkipInternalKeys: true})
+	if err != nil {
+		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	}
+
 	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
 	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
 	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
-		Project:          req.GetProject(),
-		Stack:            req.GetStack(),
-		Config:           req.GetConfig(),
-		ConfigSecretKeys: req.GetConfigSecretKeys(),
-		Organization:     req.Organization,
-		Parallel:         int(req.GetParallel()),
-		DryRun:           req.GetDryRun(),
-		MonitorAddr:      req.GetMonitorAddress(),
-		EngineAddr:       host.engineAddress,
+		Project:           req.GetProject(),
+		Stack:             req.GetStack(),
+		Config:            req.GetConfig(),
+		ConfigSecretKeys:  req.GetConfigSecretKeys(),
+		ConfigPropertyMap: confPropMap,
+		Organization:      req.Organization,
+		Parallel:          int(req.GetParallel()),
+		DryRun:            req.GetDryRun(),
+		MonitorAddr:       req.GetMonitorAddress(),
+		EngineAddr:        host.engineAddress,
 	})
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
@@ -160,15 +168,9 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 			return err
 		}
 		defer loader.Close()
-		conf := make(map[string]string, len(req.GetConfig()))
-		// Strip the project prefix
-		projPrefix := pctx.Project() + ":"
-		for k, v := range req.GetConfig() {
-			k = strings.TrimPrefix(k, projPrefix)
-			conf[k] = v
-		}
+
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(ctx, template, conf, loader)
+		return pulumiyaml.RunTemplate(pctx, template, req.GetConfig(), confPropMap, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
