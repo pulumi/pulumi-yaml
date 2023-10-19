@@ -25,7 +25,7 @@ func (e NonExistentFieldFormatter) fieldsName() string {
 
 // Get a single line message.
 func (e NonExistentFieldFormatter) Message(field, fieldLabel string) string {
-	return fmt.Sprintf("%s %s", e.messageHeader(fieldLabel), e.messageBody(field))
+	return fmt.Sprintf("%s. %s", e.messageHeader(fieldLabel), e.messageBody(field))
 }
 
 // A message broken up into a top level and detail line
