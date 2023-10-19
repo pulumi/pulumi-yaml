@@ -44,7 +44,12 @@ func (e NonExistentFieldFormatter) messageBody(field string) string {
 	}
 	list := strings.Join(existing, ", ")
 	if len(existing) > e.MaxElements && e.MaxElements != 0 {
-		list = fmt.Sprintf("%s and %d others", strings.Join(existing[:5], ", "), len(existing)-e.MaxElements)
+		extraLength := len(existing) - e.MaxElements
+		pluralOther := "others"
+		if extraLength == 1 {
+			pluralOther = "other"
+		}
+		list = fmt.Sprintf("%s and %d %s", strings.Join(existing[:e.MaxElements], ", "), extraLength, pluralOther)
 	}
 	return fmt.Sprintf("Existing %s are: %s", e.fieldsName(), list)
 }
