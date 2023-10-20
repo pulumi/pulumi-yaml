@@ -741,33 +741,6 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
-func getPulumiConfNodes(project string, config map[string]string) ([]configNode, error) {
-	projPrefix := project + ":"
-	nodes := make([]configNode, len(config))
-	var errors multierror.Error
-	idx := 0
-	for k, v := range config {
-		k = strings.TrimPrefix(k, projPrefix)
-		// We default types to strings to avoid error cascades on mis-typed values.
-		typ := ctypes.String
-		var value interface{} = v
-		if v, t, err := getConfigNode(v); err == nil {
-			typ = t
-			value = v
-		} else {
-			errors.Errors = append(errors.Errors, err)
-		}
-		n := configNodeEnv{
-			Key:   k,
-			Value: value,
-			Type:  typ,
-		}
-		nodes[idx] = n
-		idx++
-	}
-	return nodes, errors.ErrorOrNil()
-}
-
 func getConfNodesFromMap(project string, configPropertyMap resource.PropertyMap) []configNode {
 	projPrefix := project + ":"
 	nodes := make([]configNode, len(configPropertyMap))
