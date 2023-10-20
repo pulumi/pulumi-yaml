@@ -164,8 +164,7 @@ outputs:
 	})
 	wantPlugins.Equal(t, gotPlugins)
 
-	confNodes, err := getPulumiConfNodes("", nil)
-	assert.Nil(t, err)
+	confNodes := []configNode{}
 	_, diags = topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 }

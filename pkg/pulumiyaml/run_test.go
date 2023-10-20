@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -1863,59 +1862,6 @@ resources:
 		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
 		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
 	})
-}
-
-func TestGetPulumiConfNodes(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		input string
-		typ   ctypes.Type
-		value interface{}
-		err   error
-	}{
-		{
-			input: "foo",
-			typ:   ctypes.String,
-			value: "foo",
-		},
-		{
-			input: "2.0",
-			typ:   ctypes.Number,
-			value: 2.0,
-		},
-		{
-			input: "1",
-			typ:   ctypes.Int,
-			value: int64(1),
-		},
-		{
-			input: "true",
-			typ:   ctypes.Boolean,
-			value: true,
-		},
-		{
-			input: `["a", "b", "c"]`,
-			typ:   ctypes.StringList,
-			value: []interface{}{"a", "b", "c"},
-		},
-		{
-			input: `["one", 2]`,
-			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.input, func(t *testing.T) {
-			t.Parallel()
-			value, typ, err := getConfigNode(tt.input)
-			if tt.err != nil {
-				assert.ErrorContains(t, err, tt.err.Error())
-			} else {
-				assert.Equal(t, tt.typ, typ)
-				assert.Equal(t, tt.value, value)
-			}
-		})
-	}
 }
 
 // This test checks that resource properties that are unavailable during preview are marked

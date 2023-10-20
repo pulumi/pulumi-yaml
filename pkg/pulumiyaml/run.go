@@ -793,17 +793,8 @@ func (r *Runner) setIntermediates(project string, config map[string]string, conf
 	}
 
 	r.intermediates = []graphNode{}
-	var confNodes []configNode
-	if len(configPropertyMap) > 0 {
-		confNodes = getConfNodesFromMap(project, configPropertyMap)
-	} else {
-		var err error
-		confNodes, err = getPulumiConfNodes(project, config)
-		if err != nil && !force {
-			r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-			return
-		}
-	}
+	confNodes := getConfNodesFromMap(project, configPropertyMap)
+
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
 	r.sdiags.Extend(rdiags...)
@@ -837,29 +828,6 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 		"stack":   stack,
 	}
 	r.cwd = cwd
-}
-
-// getConfigNode retrieves a runtime value and type from a config node.
-func getConfigNode(v string) (interface{}, ctypes.Type, error) {
-	// scalar config values are represented as their go literals, while arrays and objects
-	// are represented as JSON.
-	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return i, ctypes.Int, nil
-	}
-	if b, err := strconv.ParseBool(v); err == nil {
-		return b, ctypes.Boolean, nil
-	}
-	if f, err := strconv.ParseFloat(v, 64); err == nil {
-		return f, ctypes.Number, nil
-	}
-
-	var value interface{}
-	if err := json.Unmarshal([]byte(v), &value); err == nil {
-		typ, err := ctypes.TypeValue(value)
-		return value, typ, err
-	}
-
-	return v, ctypes.String, nil
 }
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {

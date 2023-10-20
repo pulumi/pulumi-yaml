@@ -1088,10 +1088,6 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 		if ok {
 			typCurrent = ctype.Schema()
 		}
-	case configNodeEnv:
-		if n.Type != nil {
-			typCurrent = n.Type.Schema()
-		}
 	}
 
 	typCurrent = &schema.InputType{ElementType: typCurrent}
