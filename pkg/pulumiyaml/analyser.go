@@ -406,7 +406,7 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 				for _, p := range to.Properties {
 					fields = append(fields, p.Name)
 				}
-				fmtr := yamldiags.NonExistantFieldFormatter{
+				fmtr := yamldiags.NonExistentFieldFormatter{
 					ParentLabel:         dispType(to),
 					MaxElements:         5,
 					Fields:              fields,
@@ -578,7 +578,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	for _, prop := range hint.Resource.InputProperties {
 		allProperties = append(allProperties, prop.Name)
 	}
-	fmtr := yamldiags.NonExistantFieldFormatter{
+	fmtr := yamldiags.NonExistentFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
 		Fields:              allProperties,
 		MaxElements:         5,
@@ -621,7 +621,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		}
 		stateProps[i] = &p
 	}
-	fmtr = yamldiags.NonExistantFieldFormatter{
+	fmtr = yamldiags.NonExistentFieldFormatter{
 		ParentLabel:         fmt.Sprintf("Resource %s", typ.String()),
 		Fields:              statePropNames,
 		MaxElements:         5,
@@ -679,7 +679,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 
 	if s := v.Options.Syntax(); s != nil {
 		if o, ok := s.(*syntax.ObjectNode); ok {
-			fmtr := yamldiags.NonExistantFieldFormatter{
+			fmtr := yamldiags.NonExistentFieldFormatter{
 				ParentLabel:         "resource options",
 				Fields:              allOptions,
 				MaxElements:         5,
@@ -706,7 +706,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	return true
 }
 
-func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourceType string, fmtr yamldiags.NonExistantFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
+func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourceType string, fmtr yamldiags.NonExistentFieldFormatter, entries []ast.PropertyMapEntry, props []*schema.Property) {
 	to := &schema.ObjectType{
 		Token:      resourceType,
 		Properties: props,
@@ -759,7 +759,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 			inputs[input.Name] = input.Type
 		}
 	}
-	fmtr := yamldiags.NonExistantFieldFormatter{
+	fmtr := yamldiags.NonExistentFieldFormatter{
 		ParentLabel: fmt.Sprintf("Invoke %s", functionName.String()),
 		Fields:      existing,
 		MaxElements: 5,
@@ -803,7 +803,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 				}
 			}
 		}
-		fmtr := yamldiags.NonExistantFieldFormatter{
+		fmtr := yamldiags.NonExistentFieldFormatter{
 			ParentLabel:         t.Token.Value,
 			Fields:              fields,
 			MaxElements:         5,
@@ -915,7 +915,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			for k := range properties {
 				propertyList = append(propertyList, k)
 			}
-			fmtr := yamldiags.NonExistantFieldFormatter{
+			fmtr := yamldiags.NonExistentFieldFormatter{
 				ParentLabel:         runningName,
 				Fields:              propertyList,
 				MaxElements:         5,
