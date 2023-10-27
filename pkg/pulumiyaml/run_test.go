@@ -1864,6 +1864,122 @@ resources:
 	})
 }
 
+func TestGetConfNodesFromMap(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		project     string
+		propertymap resource.PropertyMap
+		expected    []configNode
+	}{
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"str": resource.NewStringProperty("bar"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"num": resource.NewNumberProperty(42),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "num",
+					v: resource.NewNumberProperty(42),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"bool": resource.NewBoolProperty(true),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "bool",
+					v: resource.NewBoolProperty(true),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"array": resource.NewArrayProperty([]resource.PropertyValue{
+					resource.NewStringProperty("foo"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "array",
+					v: resource.NewArrayProperty([]resource.PropertyValue{
+						resource.NewStringProperty("foo"),
+					}),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"map": resource.NewObjectProperty(resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "map",
+					v: resource.NewObjectProperty(resource.PropertyMap{
+						"foo": resource.NewStringProperty("bar"),
+					}),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"secret": resource.MakeSecret(resource.NewStringProperty("bar")),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "secret",
+					v: resource.MakeSecret(resource.NewStringProperty("bar")),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"test-project:str": resource.NewStringProperty("bar"),
+				"foo":              resource.NewStringProperty("foo"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+				configNodeProp{
+					k: "foo",
+					v: resource.NewStringProperty("foo"),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.project, func(t *testing.T) {
+			t.Parallel()
+			result := getConfNodesFromMap(tt.project, tt.propertymap)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // This test checks that resource properties that are unavailable during preview are marked
 // unknown.
 func TestHandleUnknownPropertiesDuringPreview(t *testing.T) {
