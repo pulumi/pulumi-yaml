@@ -4,15 +4,15 @@ package pulumiyaml
 
 import (
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
-
-	b64 "encoding/base64"
-	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
+
+	b64 "encoding/base64"
 
 	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -22,15 +22,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
 //go:embed README.md
 var packageReadmeFile string
 
-const testComponentToken = "test:component:type"
-const testResourceToken = "test:resource:type"
+const (
+	testComponentToken = "test:component:type"
+	testResourceToken  = "test:resource:type"
+)
 
 type MockPackageLoader struct {
 	packages map[string]Package
@@ -209,7 +210,8 @@ func newMockPackageMap() PackageLoader {
 					}
 				},
 			},
-		}}
+		},
+	}
 }
 
 type testMonitor struct {
@@ -260,7 +262,6 @@ func setConfig(t *testing.T, m resource.PropertyMap) {
 func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*programEvaluator)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 			switch args.TypeToken {
 			case testResourceToken:
 				assert.Equal(t, resource.NewPropertyMapFromMap(map[string]interface{}{
@@ -324,7 +325,6 @@ func testTemplateSyntaxDiags(t *testing.T, template *ast.TemplateDecl, callback 
 	// Same mocks as in testTemplateDiags but without assertions, just pure syntax checking.
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-
 			switch args.TypeToken {
 			case testResourceToken:
 				return "someID", resource.PropertyMap{
@@ -561,7 +561,6 @@ configuration:
 		"<stdin>:5:13: Cannot mark a configuration value as not secret if the associated config value is secret")
 	assert.Len(t, diagStrings, 1)
 	require.True(t, diags.HasErrors())
-
 }
 
 func TestDuplicateKeyDiags(t *testing.T) {
@@ -715,7 +714,6 @@ func TestJSONDiags(t *testing.T) {
 }
 
 func TestPropertyAccessVarMap(t *testing.T) {
-
 	t.Parallel()
 
 	const text = `
@@ -768,7 +766,6 @@ resources:
 		diagString(diags[1]))
 	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on 'test:resource:type'",
 		diagString(diags[0]))
-
 }
 
 func TestPropertyAccess(t *testing.T) {
@@ -1152,7 +1149,6 @@ func TestSelect(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expected, v)
 				}
-
 			})
 		})
 	}
@@ -1359,7 +1355,8 @@ func TestFromBase64(t *testing.T) {
 						ast.String("My4xN"),
 						ast.String("DE1OTI="),
 					),
-				}},
+				},
+			},
 			expected: "3.141592",
 		},
 		{
@@ -1403,7 +1400,6 @@ func TestFromBase64(t *testing.T) {
 			})
 		})
 	}
-
 }
 
 func TestToBase64(t *testing.T) {
@@ -1428,7 +1424,8 @@ func TestToBase64(t *testing.T) {
 						ast.String("3"),
 						ast.String("141592"),
 					),
-				}},
+				},
+			},
 			expected: "3.141592",
 		},
 		{
@@ -1481,7 +1478,6 @@ func TestToBase64(t *testing.T) {
 			})
 		})
 	}
-
 }
 
 func TestSub(t *testing.T) {
@@ -1526,7 +1522,7 @@ variables:
     fn::secret: my-special-secret
 `
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	var hasRun = false
+	hasRun := false
 	testTemplate(t, tmpl, func(e *programEvaluator) {
 		assert.False(t, e.evalContext.Evaluate(e.pulumiCtx).HasErrors())
 		s := e.variables["mySecret"].(pulumi.Output)
@@ -1868,55 +1864,118 @@ resources:
 	})
 }
 
-func TestGetPulumiConfNodes(t *testing.T) {
+func TestGetConfNodesFromMap(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		input string
-		typ   ctypes.Type
-		value interface{}
-		err   error
+		project     string
+		propertymap resource.PropertyMap
+		expected    []configNode
 	}{
 		{
-			input: "foo",
-			typ:   ctypes.String,
-			value: "foo",
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"str": resource.NewStringProperty("bar"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+			},
 		},
 		{
-			input: "2.0",
-			typ:   ctypes.Number,
-			value: 2.0,
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"num": resource.NewNumberProperty(42),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "num",
+					v: resource.NewNumberProperty(42),
+				},
+			},
 		},
 		{
-			input: "1",
-			typ:   ctypes.Int,
-			value: int64(1),
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"bool": resource.NewBoolProperty(true),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "bool",
+					v: resource.NewBoolProperty(true),
+				},
+			},
 		},
 		{
-			input: "true",
-			typ:   ctypes.Boolean,
-			value: true,
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"array": resource.NewArrayProperty([]resource.PropertyValue{
+					resource.NewStringProperty("foo"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "array",
+					v: resource.NewArrayProperty([]resource.PropertyValue{
+						resource.NewStringProperty("foo"),
+					}),
+				},
+			},
 		},
 		{
-			input: `["a", "b", "c"]`,
-			typ:   ctypes.StringList,
-			value: []interface{}{"a", "b", "c"},
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"map": resource.NewObjectProperty(resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "map",
+					v: resource.NewObjectProperty(resource.PropertyMap{
+						"foo": resource.NewStringProperty("bar"),
+					}),
+				},
+			},
 		},
 		{
-			input: `["one", 2]`,
-			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"secret": resource.MakeSecret(resource.NewStringProperty("bar")),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "secret",
+					v: resource.MakeSecret(resource.NewStringProperty("bar")),
+				},
+			},
+		},
+		{
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"test-project:str": resource.NewStringProperty("bar"),
+				"foo":              resource.NewStringProperty("foo"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+				configNodeProp{
+					k: "foo",
+					v: resource.NewStringProperty("foo"),
+				},
+			},
 		},
 	}
+
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.project, func(t *testing.T) {
 			t.Parallel()
-			value, typ, err := getConfigNode(tt.input)
-			if tt.err != nil {
-				assert.ErrorContains(t, err, tt.err.Error())
-			} else {
-				assert.Equal(t, tt.typ, typ)
-				assert.Equal(t, tt.value, value)
-			}
+			result := getConfNodesFromMap(tt.project, tt.propertymap)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -2030,7 +2089,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }

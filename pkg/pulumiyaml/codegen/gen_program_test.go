@@ -183,7 +183,7 @@ func TestGenerateProgram(t *testing.T) {
 			case "functions", "throw-not-implemented", "single-or-none":
 				// Pulumi YAML does not functions:
 				// secret or unsecret, notImplemented, singleOrNone.
-			case "python-resource-names", "python-reserved", "snowflake-python-12998":
+			case "python-resource-names", "python-reserved", "snowflake-python-12998", "python-regress-14037":
 				// Reason: A python only test.
 			case "simple-range", "entries-function",
 				"iterating-optional-range-expressions",
@@ -214,7 +214,7 @@ func TestGenerateProgram(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
 		err = pulumi.RunErr(func(ctx *pulumi.Context) error {
-			return pulumiyaml.RunTemplate(ctx, templateDecl, nil, testPackageLoader{t})
+			return pulumiyaml.RunTemplate(ctx, templateDecl, nil, nil, testPackageLoader{t})
 		}, pulumi.WithMocks("test", "gen", &testMonitor{}), func(ri *pulumi.RunInfo) { ri.DryRun = true })
 		assert.NoError(t, err)
 	}

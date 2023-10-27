@@ -328,7 +328,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	//
 	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
 	// to r.setDefaultProviders.
-	r.setIntermediates(nil, true /*force*/)
+	r.setIntermediates("", nil, nil, true /*force*/)
 
 	// do some basic validation of each resource
 	r.validateResources()
@@ -342,9 +342,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
 	r := newRunner(t, loader)
-	r.setIntermediates(config, false)
+	r.setIntermediates(ctx.Project(), config, configPropertyMap, false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
 	}
@@ -719,7 +719,6 @@ func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 		e.resources[node.Key.Value] = res
 	}
 	return true
-
 }
 
 func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
@@ -742,46 +741,33 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
 }
 
-func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
-	nodes := make([]configNode, len(config))
-	var errors multierror.Error
+func getConfNodesFromMap(project string, configPropertyMap resource.PropertyMap) []configNode {
+	projPrefix := project + ":"
+	nodes := make([]configNode, len(configPropertyMap))
 	idx := 0
-	for k, v := range config {
-		// We default types to strings to avoid error cascades on mis-typed values.
-		typ := ctypes.String
-		var value interface{} = v
-		if v, t, err := getConfigNode(v); err == nil {
-			typ = t
-			value = v
-		} else {
-			errors.Errors = append(errors.Errors, err)
-		}
-		n := configNodeEnv{
-			Key:   k,
-			Value: value,
-			Type:  typ,
+	for k, v := range configPropertyMap {
+		n := configNodeProp{
+			k: strings.TrimPrefix(string(k), projPrefix),
+			v: v,
 		}
 		nodes[idx] = n
 		idx++
 	}
-	return nodes, errors.ErrorOrNil()
+	return nodes
 }
 
 // setIntermediates is called for convert and runtime evaluation
 //
 // If force is true, set intermediates even if errors were encountered
 // Errors will always be reflected in r.sdiags.
-func (r *Runner) setIntermediates(config map[string]string, force bool) {
+func (r *Runner) setIntermediates(project string, config map[string]string, configPropertyMap resource.PropertyMap, force bool) {
 	if r.intermediates != nil {
 		return
 	}
 
 	r.intermediates = []graphNode{}
-	confNodes, err := getPulumiConfNodes(config)
-	if err != nil && !force {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return
-	}
+	confNodes := getConfNodesFromMap(project, configPropertyMap)
+
 	// Topologically sort the intermediates based on implicit and explicit dependencies
 	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
 	r.sdiags.Extend(rdiags...)
@@ -796,7 +782,7 @@ func (r *Runner) setIntermediates(config map[string]string, force bool) {
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// Our tests need to set intermediates, even though they don't have runtime config
-	r.setIntermediates(nil, false)
+	r.setIntermediates("", nil, nil, false)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -815,29 +801,6 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 		"stack":   stack,
 	}
 	r.cwd = cwd
-}
-
-// getConfigNode retrieves a runtime value and type from a config node.
-func getConfigNode(v string) (interface{}, ctypes.Type, error) {
-	// scalar config values are represented as their go literals, while arrays and objects
-	// are represented as JSON.
-	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return i, ctypes.Int, nil
-	}
-	if b, err := strconv.ParseBool(v); err == nil {
-		return b, ctypes.Boolean, nil
-	}
-	if f, err := strconv.ParseFloat(v, 64); err == nil {
-		return f, ctypes.Number, nil
-	}
-
-	var value interface{}
-	if err := json.Unmarshal([]byte(v), &value); err == nil {
-		typ, err := ctypes.TypeValue(value)
-		return value, typ, err
-	}
-
-	return v, ctypes.String, nil
 }
 
 func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
@@ -971,6 +934,8 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 		if (c.Secret != nil && c.Secret.Value) && !isSecretInConfig {
 			markSecret = true
 		}
+	case configNodeProp:
+		return intm.value(), true
 	default:
 		v := intm.value()
 		if e.pulumiCtx.IsConfigSecret(intm.key().GetValue()) {

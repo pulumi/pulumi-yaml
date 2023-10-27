@@ -60,7 +60,6 @@ func (tc *typeCache) TypeOutput(name string) schema.Type {
 
 func (tc *typeCache) TypeExpr(expr ast.Expr) schema.Type {
 	return tc.exprs[expr]
-
 }
 
 type typeCache struct {
@@ -848,7 +847,8 @@ func (tc *typeCache) typeSymbol(ctx *evalContext, t *ast.SymbolExpr) bool {
 
 func typePropertyAccess(ctx *evalContext, root schema.Type,
 	runningName string, accessors []ast.PropertyAccessor,
-	setError func(summary, detail string) *schema.InvalidType) schema.Type {
+	setError func(summary, detail string) *schema.InvalidType,
+) schema.Type {
 	if len(accessors) == 0 {
 		return root
 	}
@@ -1040,14 +1040,15 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 				tc.exprs[t] = &schema.InvalidType{
 					Diagnostics: []*hcl.Diagnostic{
 						{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", arr)},
-					}}
-
+					},
+				}
 			}
 		} else {
 			tc.exprs[t] = &schema.InvalidType{
 				Diagnostics: []*hcl.Diagnostic{
 					{Summary: fmt.Sprintf("Could not derive types from array, since a %T was found instead", t.Values)},
-				}}
+				},
+			}
 		}
 	default:
 		tc.exprs[t] = &schema.InvalidType{
@@ -1082,9 +1083,10 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 				typCurrent = ctype.Schema()
 			}
 		}
-	case configNodeEnv:
-		if n.Type != nil {
-			typCurrent = n.Type.Schema()
+	case configNodeProp:
+		ctype, ok := ctypes.Parse(n.v.TypeString())
+		if ok {
+			typCurrent = ctype.Schema()
 		}
 	}
 
@@ -1247,6 +1249,7 @@ func (e walker) EvalConfig(r *Runner, node configNode) bool {
 	}
 	return true
 }
+
 func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
@@ -1264,6 +1267,7 @@ func (e walker) EvalVariable(r *Runner, node variableNode) bool {
 	}
 	return true
 }
+
 func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
@@ -1282,6 +1286,7 @@ func (e walker) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
 	}
 	return true
 }
+
 func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)

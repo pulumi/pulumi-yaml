@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 )
 
 //see: https://github.com/BurntSushi/go-sumtype
@@ -58,22 +58,21 @@ func (e configNodeYaml) value() interface{} {
 	return e.Value
 }
 
-type configNodeEnv struct {
-	Key   string
-	Value interface{}
-	Type  config.Type
+type configNodeProp struct {
+	k string
+	v resource.PropertyValue
 }
 
-func (e configNodeEnv) valueKind() string {
-	return "configEnv"
+func (e configNodeProp) valueKind() string {
+	return "configProp"
 }
 
-func (e configNodeEnv) key() *ast.StringExpr {
-	return ast.String(e.Key)
+func (e configNodeProp) key() *ast.StringExpr {
+	return ast.String(e.k)
 }
 
-func (e configNodeEnv) value() interface{} {
-	return e.Value
+func (e configNodeProp) value() interface{} {
+	return e.v.V
 }
 
 func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
@@ -231,7 +230,7 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 
 	if other, found := intermediates[name]; found {
 		// if duplicate key from config/ configuration, do not warn about using configuration again
-		if isConfigNodeEnv(node) || isConfigNodeEnv(other) {
+		if isConfigNodeProp(node) || isConfigNodeProp(other) {
 			return diags
 		}
 		if node.valueKind() == other.valueKind() {
@@ -244,8 +243,8 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 	return diags
 }
 
-func isConfigNodeEnv(n graphNode) bool {
-	_, ok := n.(configNodeEnv)
+func isConfigNodeProp(n graphNode) bool {
+	_, ok := n.(configNodeProp)
 	return ok
 }
 
