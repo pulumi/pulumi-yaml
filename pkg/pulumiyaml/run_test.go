@@ -1975,7 +1975,7 @@ func TestGetConfNodesFromMap(t *testing.T) {
 		t.Run(tt.project, func(t *testing.T) {
 			t.Parallel()
 			result := getConfNodesFromMap(tt.project, tt.propertymap)
-			assert.Equal(t, tt.expected, result)
+			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
