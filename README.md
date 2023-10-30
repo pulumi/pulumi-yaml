@@ -107,16 +107,3 @@ The specification for the Pulumi YAML format, and documentation for built-in fun
 
 Contribute to the specification by editing [the markdown file in
 pulumi/pulumi-hugo](https://github.com/pulumi/pulumi-hugo/blob/master/themes/default/content/docs/intro/languages/yaml.md).
-
-## Releasing
-
-To release a new version of `pulumi-yaml`, create a `CHANGELOG.md`
-entry with the new version number, and copy the contents of
-`CHANGELOG_PENDING.md` there.  Once this is merged, create a new tag
-with the version number and push that.  This will kick off the
-automation to create a new GitHub release.  Finally empty the
-`CHANGELOG_PENDING.md` file, so we're ready for accumulating changelog
-entries for the next version.
-
-To release the version to users, `pulumi-yaml` also has to be updated
-in `pulumi/pulumi`.
