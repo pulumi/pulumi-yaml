@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
 
@@ -1865,21 +1864,6 @@ resources:
 	})
 }
 
-func sortConfigNodes(nodes []configNode) []configNode {
-	for _, n := range nodes {
-		switch n := n.(type) {
-		case configNodeProp:
-			continue
-		default:
-			panic(fmt.Sprintf("sorting not implemented for %T", n))
-		}
-	}
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].(configNodeProp).k < nodes[j].(configNodeProp).k
-	})
-	return nodes
-}
-
 func TestGetConfNodesFromMap(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -1991,7 +1975,7 @@ func TestGetConfNodesFromMap(t *testing.T) {
 		t.Run(tt.project, func(t *testing.T) {
 			t.Parallel()
 			result := getConfNodesFromMap(tt.project, tt.propertymap)
-			assert.Equal(t, sortConfigNodes(tt.expected), sortConfigNodes(result))
+			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
