@@ -278,6 +278,11 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		return okIfAssignable(check).WithReason(". '%s' is a Token Type. Token types act like their underlying type", displayType(from))
 	}
 
+	// If our input could be any, then just assume it's mappable and it'll have to be checked at runtime.
+	if from == schema.AnyType {
+		return okIf(true)
+	}
+
 	if schema.IsPrimitiveType(to) {
 		switch to {
 		case schema.AnyType:
