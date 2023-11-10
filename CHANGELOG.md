@@ -1,11 +1,12 @@
 CHANGELOG
 =========
 
-## 1.4.1 (2023-11-10
+## 1.4.1 (2023-11-10)
 
 ### Bug Fixes
 
-- Fix a regression where secret values were not handled correctly. #518
+- Fix a regression where secret values were not handled correctly.
+  [#519](https://github.com/pulumi/pulumi-yaml/pull/519)
 
 ## 1.4.0 (2023-10-27)
 
