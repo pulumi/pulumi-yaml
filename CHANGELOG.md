@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+## 1.4.1 (2023-11-10
+
+### Bug Fixes
+
+- Fix a regression where secret values were not handled correctly. #518
+
 ## 1.4.0 (2023-10-27)
 
 ### Improvements
