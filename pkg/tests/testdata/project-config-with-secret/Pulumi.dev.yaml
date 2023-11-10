@@ -1,0 +1,4 @@
+encryptionsalt: v1:PwAjZw3iFh4=:v1:qNWGvxiJl5aKXRWE:Pq93QCJNE63m/ez6iqvhpQnsTrG60Q==
+config:
+  project-config-with-secret:password:
+    secure: v1:h3/0x/chFHt6XyhE:d05YbhoNRULvz66Qmq5kNzsazCBmUXRy
