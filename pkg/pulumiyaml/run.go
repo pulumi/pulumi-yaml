@@ -935,7 +935,11 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 			markSecret = true
 		}
 	case configNodeProp:
-		return intm.value(), true
+		v := intm.value()
+		if intm.v.IsSecret() {
+			v = pulumi.ToSecret(intm.v)
+		}
+		return v, true
 	default:
 		v := intm.value()
 		if e.pulumiCtx.IsConfigSecret(intm.key().GetValue()) {

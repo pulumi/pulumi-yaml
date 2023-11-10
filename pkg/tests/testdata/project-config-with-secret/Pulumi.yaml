@@ -1,0 +1,8 @@
+name: project-config-with-secret
+runtime: yaml
+description: A minimal Pulumi YAML program
+config:
+  password:
+    type: string
+outputs:
+  my-secret: ${password}
