@@ -58,6 +58,7 @@ func TestExampleAzureAppService(t *testing.T) {
 
 //nolint:paralleltest // uses parallel programtest
 func TestExampleGettingStarted(t *testing.T) {
+	t.Skip("https://github.com/pulumi/pulumi-yaml/issues/523")
 	testWrapper(t, exampleDir("getting-started"), RequireLiveRun, awsConfig)
 }
 
