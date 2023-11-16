@@ -1896,7 +1896,9 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(tmpl, newMockPackageMap())
-		runner.Evaluate(ctx)
+		err := runner.Evaluate(ctx)
+		assert.Len(t, err, 0)
+		assert.Equal(t, err.Error(), "no diagnostics")
 		return nil
 	}, pulumi.WithMocks("project", "stack", mocks))
 	assert.NoError(t, err)
