@@ -1075,9 +1075,6 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		return p, isPoison
 	}
 
-	if v.Options.AdditionalSecretOutputs != nil {
-		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
-	}
 	if v.Options.Aliases != nil {
 		var aliases []pulumi.Alias
 		for _, s := range v.Options.Aliases.Elements {
@@ -1235,6 +1232,14 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		r := lateboundCustomResourceState{name: k, resourceSchema: resourceSchema}
 		state = &r
 		res = &r
+	}
+	if v.Options.AdditionalSecretOutputs != nil {
+		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
+	}
+	for _, prop := range resourceSchema.Properties {
+		if prop.Secret {
+			opts = append(opts, pulumi.AdditionalSecretOutputs([]string{prop.Name}))
+		}
 	}
 
 	if !overallOk || e.sdiags.HasErrors() {
