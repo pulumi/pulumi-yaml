@@ -175,6 +175,16 @@ func newMockPackageMap() PackageLoader {
 							Name: "foo",
 							Type: schema.StringType,
 						})
+					case "test:resource:with-secret":
+						return inputProperties(typeName, schema.Property{
+							Name: "foo",
+							Type: schema.StringType,
+						}, schema.Property{
+							Name:   "bar",
+							Type:   schema.StringType,
+							Secret: true,
+						})
+
 					default:
 						return inputProperties(typeName)
 					}
@@ -1862,6 +1872,34 @@ resources:
 		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
 		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
 	})
+}
+
+func TestResourceWithSecret(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-secret
+runtime: yaml
+resources:
+  sec:
+    type: test:resource:with-secret
+    properties:
+      foo: baz
+      bar: frotz
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, "bar", args.RegisterRPC.GetAdditionalSecretOutputs()[0])
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		runner.Evaluate(ctx)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
 }
 
 func TestGetConfNodesFromMap(t *testing.T) {
