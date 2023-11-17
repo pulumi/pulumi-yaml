@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.4.2 (2023-11-17)
+
+### Bug Fixes
+
+- Fields marked as secret in the provider schema are now correctly
+  handled as secrets. [#526](https://github.com/pulumi/pulumi-yaml/pull/526)
+
 ## 1.4.1 (2023-11-10)
 
 ### Bug Fixes
