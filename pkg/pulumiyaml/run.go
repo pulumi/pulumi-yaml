@@ -1261,8 +1261,25 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		props[k] = v
 	}
 
+	// For a StackReference we always use the name property as ID. We patch up
+	// the resource declaration's ID with this name.
+	isStackReference := v.Type.Value == "pulumi:pulumi:StackReference"
+	if isStackReference {
+		nameProp, ok := props["name"]
+		if !ok {
+			nameProp = k
+			props["name"] = k
+		}
+		name, ok := nameProp.(string)
+		if !ok {
+			e.errorf(kvp.Key, "'name' property must be a string, instead got type %T", name)
+			return nil, false
+		}
+		v.Get.Id = ast.String(name)
+	}
+
 	isRead := v.Get.Id != nil
-	if isRead {
+	if isRead && !isStackReference { // StackReferences have a required name property
 		contract.Assertf(len(props) == 0, "Failed to check that Properties cannot be specified with Get.State")
 		p, isPoison := readIntoProperties(v.Get.State)
 		if isPoison {
