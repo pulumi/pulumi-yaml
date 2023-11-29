@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.4.3 (2023-11-29)
+
+### Bug Fixes
+
+- Fixes StackReference resources so that they are always read.
+  [#529](https://github.com/pulumi/pulumi-yaml/pull/529)
+
 ## 1.4.2 (2023-11-17)
 
 ### Bug Fixes
