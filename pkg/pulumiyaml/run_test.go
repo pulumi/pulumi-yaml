@@ -132,6 +132,9 @@ func function(token string, inputs, outputs []schema.Property) *schema.Function 
 	}
 }
 
+// Returns a pointer to the given value.
+func ptr[T any](v T) *T { return &v }
+
 func newMockPackageMap() PackageLoader {
 	version := func(tag string) *semver.Version {
 		v := semver.MustParse(tag)
@@ -184,6 +187,15 @@ func newMockPackageMap() PackageLoader {
 							Type:   schema.StringType,
 							Secret: true,
 						})
+					case "test:resource:with-alias":
+						return &schema.ResourceType{
+							Resource: &schema.Resource{
+								Token: typeName,
+								Aliases: []*schema.Alias{
+									{Type: ptr("test:resource:old-with-alias")},
+								},
+							},
+						}
 
 					default:
 						return inputProperties(typeName)
@@ -1891,6 +1903,34 @@ resources:
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			assert.Equal(t, "bar", args.RegisterRPC.GetAdditionalSecretOutputs()[0])
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Len(t, err, 0)
+		assert.Equal(t, err.Error(), "no diagnostics")
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithAlias(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-alias
+runtime: yaml
+resources:
+  sec:
+    type: test:resource:with-alias
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			assert.Equal(t, "test:resource:old-with-alias", args.RegisterRPC.GetAliases()[0].GetSpec().Type)
 			return args.Name, args.Inputs, nil
 		},
 	}
