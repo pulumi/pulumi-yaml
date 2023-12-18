@@ -1241,6 +1241,13 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			opts = append(opts, pulumi.AdditionalSecretOutputs([]string{prop.Name}))
 		}
 	}
+	for _, alias := range resourceSchema.Aliases {
+		if alias.Type != nil {
+			opts = append(opts, pulumi.Aliases([]pulumi.Alias{
+				{Type: pulumi.String(*alias.Type)},
+			}))
+		}
+	}
 
 	if !overallOk || e.sdiags.HasErrors() {
 		return nil, false
