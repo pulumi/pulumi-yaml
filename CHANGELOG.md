@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.4.4 (2023-12-18)
+
+### Bug Fixes
+
+- Apply aliases from schema.
+  [#533](https://github.com/pulumi/pulumi-yaml/pull/533)
+
 ## 1.4.3 (2023-11-29)
 
 ### Bug Fixes
