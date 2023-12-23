@@ -200,6 +200,10 @@ func TestGenerateProgram(t *testing.T) {
 				// https://github.com/pulumi/pulumi-yaml/issues/438
 			case "regress-node-12507":
 				// https://github.com/pulumi/pulumi-yaml/issues/494
+			case "config-variables":
+				// Needs config set in order to compile/run.
+				tt.SkipCompile = codegen.NewStringSet("yaml")
+				l = append(l, tt)
 			default:
 				l = append(l, tt)
 			}

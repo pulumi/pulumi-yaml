@@ -1,0 +1,27 @@
+configuration:
+  requiredString:
+    type: string
+  requiredInt:
+    type: int
+  requiredFloat:
+    type: number
+  requiredBool:
+    type: bool
+  requiredAny:
+    type: dynamic
+  optionalString:
+    type: string
+    default: defaultStringValue
+  optionalInt:
+    type: int
+    default: 42
+  optionalFloat:
+    type: number
+    default: 3.14
+  optionalBool:
+    type: bool
+    default: true
+  optionalAny:
+    type: dynamic
+    default:
+      key: value

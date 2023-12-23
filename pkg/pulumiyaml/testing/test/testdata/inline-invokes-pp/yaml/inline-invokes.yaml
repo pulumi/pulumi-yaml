@@ -1,0 +1,10 @@
+resources:
+  webSecurityGroup:
+    type: aws:ec2:SecurityGroup
+    properties:
+      vpcId:
+        fn::invoke:
+          Function: aws:ec2:getVpc
+          Arguments:
+            default: true
+          Return: id
