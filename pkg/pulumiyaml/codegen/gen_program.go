@@ -32,16 +32,6 @@ import (
 func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
 	g := generator{}
 
-	g.logicalNames = map[string]string{}
-	for _, n := range program.Nodes {
-		switch n := n.(type) {
-		case *pcl.Resource:
-			g.logicalNames[n.Name()] = n.LogicalName()
-		case *pcl.OutputVariable:
-			g.logicalNames[n.Name()] = n.LogicalName()
-		}
-	}
-
 	for _, n := range program.Nodes {
 		g.genNode(n)
 	}
@@ -96,7 +86,6 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 type generator struct {
 	diags hcl.Diagnostics
 
-	logicalNames map[string]string
 	// These values can be assembled into a template
 	config    []syn.ObjectPropertyDef
 	resources []syn.ObjectPropertyDef
@@ -239,6 +228,11 @@ func (g *generator) genResource(n *pcl.Resource) {
 	entries := []syn.ObjectPropertyDef{
 		g.TypeProperty(collapseToken(n.Token)),
 	}
+
+	if n.Name() != n.LogicalName() {
+		entries = append(entries, syn.ObjectProperty(syn.String("name"), syn.String(n.LogicalName())))
+	}
+
 	if len(properties) > 0 {
 		entries = append(entries, syn.ObjectProperty(syn.String("properties"), syn.Object(properties...)))
 	}
@@ -248,7 +242,7 @@ func (g *generator) genResource(n *pcl.Resource) {
 	r := syn.Object(entries...)
 
 	g.resources = append(g.resources, syn.ObjectProperty(
-		syn.StringSyntax(trivia(n.Definition), n.LogicalName()), r))
+		syn.StringSyntax(trivia(n.Definition), n.Name()), r))
 }
 
 func (g *generator) genOutputVariable(n *pcl.OutputVariable) {
@@ -561,9 +555,6 @@ func (g *generator) expr(e model.Expression) syn.Node {
 
 	case *model.ScopeTraversalExpression:
 		rootName := e.RootName
-		if logicalName, found := g.logicalNames[rootName]; found {
-			rootName = logicalName
-		}
 		traversal := g.Traversal(e.Traversal).WithRoot(rootName, e.Tokens.Root.Range().Ptr())
 		s := fmt.Sprintf("${%s}", traversal)
 		return syn.String(s)
@@ -639,6 +630,10 @@ func (g *generator) expr(e model.Expression) syn.Node {
 func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
 	entries := []syn.ObjectPropertyDef{
 		g.TypeProperty(n.Type().String()),
+	}
+
+	if n.Name() != n.LogicalName() {
+		entries = append(entries, syn.ObjectProperty(syn.String("name"), syn.String(n.LogicalName())))
 	}
 	if n.DefaultValue != nil {
 		prop := syn.ObjectProperty(syn.String("default"), g.expr(n.DefaultValue))

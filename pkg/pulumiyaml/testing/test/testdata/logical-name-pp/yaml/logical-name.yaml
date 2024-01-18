@@ -1,5 +1,12 @@
+configuration:
+  configLexicalName:
+    type: string
+    name: "cC-Charlie_charlie.\U0001F603⁉️"
 resources:
-  "aA-Alpha_alpha.\U0001F92F⁉️":
+  resourceLexicalName:
     type: random:RandomPet
+    name: "aA-Alpha_alpha.\U0001F92F⁉️"
+    properties:
+      prefix: ${configLexicalName}
 outputs:
-  "bB-Beta_beta.\U0001F49C⁉": "${[\"aA-Alpha_alpha.\U0001F92F⁉️\"].id}"
+  "bB-Beta_beta.\U0001F49C⁉": ${resourceLexicalName.id}

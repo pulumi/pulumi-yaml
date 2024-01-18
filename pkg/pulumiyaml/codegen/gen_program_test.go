@@ -172,8 +172,6 @@ func TestGenerateProgram(t *testing.T) {
 				// But the actual error is that it is using a Splat operator.
 			case "components":
 				// https://github.com/pulumi/pulumi-yaml/issues/476
-			case "logical-name":
-				// https://github.com/pulumi/pulumi-yaml/issues/477
 			case "unknown-resource":
 				// https://github.com/pulumi/pulumi-yaml/issues/478
 			case "optional-complex-config":
@@ -201,6 +199,7 @@ func TestGenerateProgram(t *testing.T) {
 			case "regress-node-12507":
 				// https://github.com/pulumi/pulumi-yaml/issues/494
 			case "config-variables":
+			case "logical-name":
 				// Needs config set in order to compile/run.
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
@@ -218,6 +217,7 @@ func TestGenerateProgram(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Falsef(t, diags.HasErrors(), "%s", diags.Error())
 		err = pulumi.RunErr(func(ctx *pulumi.Context) error {
+
 			return pulumiyaml.RunTemplate(ctx, templateDecl, nil, nil, testPackageLoader{t})
 		}, pulumi.WithMocks("test", "gen", &testMonitor{}), func(ri *pulumi.RunInfo) { ri.DryRun = true })
 		assert.NoError(t, err)
