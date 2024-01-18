@@ -559,6 +559,37 @@ configuration:
 	assert.False(t, found, "We should not get any errors: '%s'", diags)
 }
 
+func TestConfigNames(t *testing.T) { //nolint:paralleltest
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  foo:
+    type: String
+    name: logicalFoo
+  bar:
+    type: String
+`
+
+	tmpl := yamlTemplate(t, text)
+	fooValue := "value from logicalName"
+	barValue := "value from config"
+	setConfig(t,
+		resource.PropertyMap{
+			projectConfigKey("logicalFoo"): resource.NewStringProperty(fooValue),
+			projectConfigKey("bar"):        resource.NewStringProperty(barValue),
+		})
+	testRan := false
+	err := testTemplateDiags(t, tmpl, func(e *programEvaluator) {
+		assert.Equal(t, fooValue, e.config["foo"])
+		assert.Equal(t, barValue, e.config["bar"])
+
+		testRan = true
+	})
+	assert.True(t, testRan, "Our tests didn't run")
+	diags, found := HasDiagnostics(err)
+	assert.False(t, found, "We should not get any errors: '%s'", diags)
+}
+
 func TestConflictingConfigSecrets(t *testing.T) { //nolint:paralleltest
 	const text = `name: test-yaml
 runtime: yaml
@@ -1931,6 +1962,48 @@ resources:
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			t.Logf("args: %+v", args)
 			assert.Equal(t, "test:resource:old-with-alias", args.RegisterRPC.GetAliases()[0].GetSpec().Type)
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Len(t, err, 0)
+		assert.Equal(t, err.Error(), "no diagnostics")
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithLogicalName(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-logical-name
+runtime: yaml
+resources:
+  sourceName:
+    type: test:resource:UsingLogicalName
+    name: actual-registered-name
+
+  sourceNameOnly:
+    type: test:resource:WithoutLogicalName
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			if args.TypeToken == "test:resource:UsingLogicalName" {
+				registeredName := "actual-registered-name"
+				assert.Equal(t, registeredName, args.Name)
+				assert.Equal(t, registeredName, args.RegisterRPC.GetName())
+			} else if args.TypeToken == "test:resource:WithoutLogicalName" {
+				assert.Equal(t, "sourceNameOnly", args.Name)
+				assert.Equal(t, "sourceNameOnly", args.RegisterRPC.GetName())
+			} else {
+				t.Fatalf("unexpected type token: %s", args.TypeToken)
+			}
+
 			return args.Name, args.Inputs, nil
 		},
 	}

@@ -877,6 +877,9 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 	case configNodeYaml:
 		k, intmKey = intm.Key.Value, intm.Key
 		c := intm.Value
+		if c.Name != nil && c.Name.Value != "" {
+			k = c.Name.Value
+		}
 		// If we implement global type checking, the type of configuration variables
 		// can be inferred and this requirement relaxed.
 		if c.Type == nil && c.Default == nil {
@@ -1216,6 +1219,11 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
+	resourceName := k
+	if v.Name != nil && v.Name.Value != "" {
+		resourceName = v.Name.Value
+	}
+
 	var state lateboundResource
 	var res pulumi.Resource
 	var resourceSchema *schema.Resource
@@ -1224,12 +1232,12 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 	isProvider := false
 	if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-		r := lateboundProviderResourceState{name: k, resourceSchema: resourceSchema}
+		r := lateboundProviderResourceState{name: resourceName, resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 		isProvider = true
 	} else {
-		r := lateboundCustomResourceState{name: k, resourceSchema: resourceSchema}
+		r := lateboundCustomResourceState{name: resourceName, resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 	}
@@ -1296,7 +1304,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 
 	// Now register the resulting resource with the engine.
 	if isComponent {
-		err = e.pulumiCtx.RegisterRemoteComponentResource(string(typ), k, untypedArgs(props), res, opts...)
+		err = e.pulumiCtx.RegisterRemoteComponentResource(string(typ), resourceName, untypedArgs(props), res, opts...)
 	} else if isRead {
 		s, ok := e.evaluateExpr(v.Get.Id)
 		if !ok {
@@ -1311,9 +1319,15 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			e.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
 			return nil, false
 		}
-		err = e.pulumiCtx.ReadResource(string(typ), k, pulumi.ID(id), untypedArgs(props), res.(pulumi.CustomResource), opts...)
+		err = e.pulumiCtx.ReadResource(
+			string(typ),
+			resourceName,
+			pulumi.ID(id),
+			untypedArgs(props),
+			res.(pulumi.CustomResource),
+			opts...)
 	} else {
-		err = e.pulumiCtx.RegisterResource(string(typ), k, untypedArgs(props), res, opts...)
+		err = e.pulumiCtx.RegisterResource(string(typ), resourceName, untypedArgs(props), res, opts...)
 	}
 	if err != nil {
 		e.error(kvp.Key, err.Error())
