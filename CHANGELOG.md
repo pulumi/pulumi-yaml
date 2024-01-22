@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.5.0 (2024-01-22)
+
+### Improvements
+
+- Support (logical) name for resources and config variables
+  [#546](https://github.com/pulumi/pulumi-yaml/pull/546)
+
 ## 1.4.5 (2023-12-27)
 
 ### Improvements
