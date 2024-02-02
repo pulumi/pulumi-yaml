@@ -42,8 +42,8 @@ import (
 const MainTemplate = "Main"
 
 // Load a template from the current working directory
-func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	return LoadDir(".")
+func Load(rootDir string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	return LoadDir(rootDir)
 }
 
 func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
@@ -88,7 +88,7 @@ func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	} else if b, err := os.ReadFile(filepath.Join(cwd, "Pulumi.yaml")); err == nil {
 		filename, bs = "Pulumi.yaml", b
 	} else {
-		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
+		return nil, nil, fmt.Errorf("reading template %s from %s: %w", MainTemplate, cwd, err)
 	}
 
 	return LoadYAMLBytes(filename, bs)

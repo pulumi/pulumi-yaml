@@ -29,8 +29,20 @@ import (
 )
 
 // Generate a serializable YAML template.
-func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
+func GenerateProgramWithLocalDependencies(
+	program *pcl.Program,
+	localDependencies map[string]string,
+) (map[string][]byte, hcl.Diagnostics, error) {
 	g := generator{}
+
+	for packageName, version := range localDependencies {
+		if packageName == "pulumi" {
+			// YAML runtime doesn't require a local dependency for pulumi
+			continue
+		}
+
+		g.genLocalDependency(packageName, version)
+	}
 
 	for _, n := range program.Nodes {
 		g.genNode(n)
@@ -55,8 +67,17 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
 }
 
-func GenerateProject(directory string, project workspace.Project, program *pcl.Program) error {
-	files, diagnostics, err := GenerateProgram(program)
+func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error) {
+	return GenerateProgramWithLocalDependencies(program, nil)
+}
+
+func GenerateProject(
+	directory string,
+	project workspace.Project,
+	program *pcl.Program,
+	localDependencies map[string]string,
+) error {
+	files, diagnostics, err := GenerateProgramWithLocalDependencies(program, localDependencies)
 	if err != nil {
 		return err
 	}
@@ -207,6 +228,21 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 	}
 
 	return syn.Object(rOpts...)
+}
+
+func (g *generator) genLocalDependency(packageName string, version string) {
+	resourceOptions := syn.Object(
+		syn.ObjectProperty(syn.String("version"), syn.String(version)),
+	)
+
+	resourceDefinition := syn.Object(
+		g.TypeProperty(fmt.Sprintf("pulumi:providers:%s", packageName)),
+		syn.ObjectProperty(syn.String("defaultProvider"), syn.Boolean(true)),
+		syn.ObjectProperty(syn.String("options"), resourceOptions),
+	)
+
+	resourceName := fmt.Sprintf("default-%s-provider", packageName)
+	g.resources = append(g.resources, syn.ObjectProperty(syn.String(resourceName), resourceDefinition))
 }
 
 func (g *generator) genResource(n *pcl.Resource) {

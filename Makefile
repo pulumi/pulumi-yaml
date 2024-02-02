@@ -1,6 +1,8 @@
 PULUMI_TEST_ORG   ?= $(shell pulumi whoami)
 PULUMI_TEST_OWNER ?= ${PULUMI_TEST_ORG}
 PULUMI_LIVE_TEST  ?= false
+PULUMI_ROOT       ?= $$HOME/.pulumi-dev
+PULUMI_BIN        := $(PULUMI_ROOT)/bin
 export PULUMI_TEST_ORG
 export PULUMI_TEST_OWNER
 
@@ -42,6 +44,9 @@ update_plugin_docs::
 
 install::
 	${GO} install ./cmd/...
+
+install_plugin:
+	GOBIN=$(PULUMI_BIN) go install -C cmd/pulumi-language-yaml
 
 clean::
 	rm -f ./bin/*
@@ -105,3 +110,13 @@ get_testdata:
 	rsync -avm --exclude='transpiled_examples' --include='*.pp' --include='*/' --exclude='*' --exclude='.*' \
 		'${PULUMI_DIR}/pkg/codegen/testing/test/testdata/' \
 		./pkg/pulumiyaml/testing/test/testdata/
+
+CMD_DIR := $(realpath ./cmd)
+# Build the pulumi-test-language binary
+# Assumes the main pulumi repo is a sibling of this repo
+sync-pulumi-test-language:
+	rm -rf ${CMD_DIR}/pulumi-test-language
+	mkdir -p ${CMD_DIR}/pulumi-test-language
+	${GO} build \
+	    -C ${PULUMI_DIR}/cmd/pulumi-test-language \
+		-o '${CMD_DIR}/pulumi-test-language/pulumi-test-language'

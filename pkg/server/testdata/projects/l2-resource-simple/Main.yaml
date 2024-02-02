@@ -1,0 +1,10 @@
+resources:
+  default-simple-provider:
+    type: pulumi:providers:simple
+    defaultProvider: true
+    options:
+      version: 1.0.0
+  res:
+    type: simple:Resource
+    properties:
+      value: true
