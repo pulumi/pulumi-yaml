@@ -1,0 +1,31 @@
+variables:
+  everyArg:
+    fn::invoke:
+      Function: std:AbsMultiArgs
+      Arguments:
+        a: 10
+        b: 20
+        c: 30
+  onlyRequiredArgs:
+    fn::invoke:
+      Function: std:AbsMultiArgs
+      Arguments:
+        a: 10
+  optionalArgs:
+    fn::invoke:
+      Function: std:AbsMultiArgs
+      Arguments:
+        a: 10
+        c: 30
+  nestedUse:
+    fn::invoke:
+      Function: std:AbsMultiArgs
+      Arguments:
+        a: ${everyArg}
+        b:
+          fn::invoke:
+            Function: std:AbsMultiArgs
+            Arguments:
+              a: 42
+outputs:
+  result: ${nestedUse}
