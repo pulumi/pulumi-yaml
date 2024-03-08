@@ -36,4 +36,4 @@ resources:
       version: 5.16.2
 outputs:
   bucketName: ${site-bucket.bucketName}
-  websiteUrl: ${site-bucket.websiteURL}
+  websiteUrl: ${site-bucket.websiteUrl}
