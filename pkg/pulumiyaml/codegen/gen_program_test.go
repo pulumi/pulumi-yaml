@@ -192,10 +192,6 @@ func TestGenerateProgram(t *testing.T) {
 			case "read-file-func", "python-regress-10914", "unknown-invoke":
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
-			case "third-party-package", "simplified-invokes", "using-dashes":
-			// Issue with loading std v1.0.0 not sure why.
-			// panic: expected plugin loader to use cached schema path, but cache was missed for package
-			// other@0.1.0, is an entry in the makefile or setup for this package missing?
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
 			case "regress-node-12507":
