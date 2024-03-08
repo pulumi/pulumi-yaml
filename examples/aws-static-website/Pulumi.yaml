@@ -33,7 +33,7 @@ resources:
   defaultProvider:
     type: pulumi:providers:aws
     options:
-      version: 5.35.0
+      version: 5.16.2
 outputs:
   bucketName: ${site-bucket.bucketName}
   websiteUrl: ${site-bucket.websiteURL}

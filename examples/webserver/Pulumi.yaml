@@ -39,13 +39,13 @@ resources:
   DefaultProvider:
     type: pulumi:providers:aws
     options:
-      version: 5.35.0
+      version: 5.16.2
   UsEast2Provider:
     type: pulumi:providers:aws
     properties:
       region: us-east-2
     options:
-      version: 5.35.0
+      version: 5.16.2
   MyBucket:
     type: aws:s3:Bucket
     options:

@@ -4,7 +4,7 @@ resources:
   cluster:
     type: aws:ecs:Cluster
     options:
-      version: "5.35.0"
+      version: "5.16.2"
   lb:
     type: awsx:lb:ApplicationLoadBalancer
     options:
