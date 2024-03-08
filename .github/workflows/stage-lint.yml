@@ -23,7 +23,7 @@ jobs:
           cache-dependency-path: |
             **/go.sum
       - run: go mod tidy -go=1.19
-      - name: Fail if god mod not tidy
+      - name: Fail if go mod tidy changed go.mod
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             echo "::error go.mod not tidy"
