@@ -139,7 +139,8 @@ type mockPackageLoader struct{ schema.ReferenceLoader }
 func (l mockPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
 	pkg, err := schema.LoadPackageReference(l.ReferenceLoader, name, version)
 	if err != nil {
-		return nil, err
+		m := fmt.Sprintf(`Only plugin versions found under %q can currently be loaded`, schemaLoadPath)
+		return nil, fmt.Errorf("mockPackageLoader(name=%q, version=%v) failed: %w\n%s", name, version, err, m)
 	}
 	return pulumiyaml.NewResourcePackage(pkg), nil
 }
