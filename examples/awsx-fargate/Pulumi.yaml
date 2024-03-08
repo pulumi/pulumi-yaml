@@ -3,10 +3,16 @@ runtime: yaml
 resources:
   cluster:
     type: aws:ecs:Cluster
+    options:
+      version: "5.35.0"
   lb:
     type: awsx:lb:ApplicationLoadBalancer
+    options:
+      version: "1.0.0-beta.5"
   nginx:
     type: awsx:ecs:FargateService
+    options:
+      version: "1.0.0-beta.5"
     properties:
       cluster: ${cluster.arn}
       taskDefinitionArgs:

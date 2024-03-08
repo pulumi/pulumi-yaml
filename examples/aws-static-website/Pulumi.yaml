@@ -30,6 +30,10 @@ resources:
         fn::fileAsset: ./www/favicon.png
       acl: public-read
       contentType: image/png
+  defaultProvider:
+    type: pulumi:providers:aws
+    options:
+      version: 5.35.0
 outputs:
   bucketName: ${site-bucket.bucketName}
   websiteUrl: ${site-bucket.websiteURL}
