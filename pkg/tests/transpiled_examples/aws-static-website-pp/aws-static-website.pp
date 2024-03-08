@@ -52,5 +52,5 @@ output bucketName {
 
 output websiteUrl {
 	__logicalName = "websiteUrl"
-	value = siteBucket.websiteURL
+	value = siteBucket.websiteUrl
 }
