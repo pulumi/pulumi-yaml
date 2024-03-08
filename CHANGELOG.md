@@ -1,6 +1,14 @@
 CHANGELOG
 =========
 
+## Pending
+
+### Improvements
+
+- Update pulumi/pulumi to v3.109.0 I
+
+- Support [PULUMI_DEBUG_PROVIDERS](https://www.pulumi.com/docs/using-pulumi/pulumi-packages/debugging-provider-packages/)
+
 ## 1.5.0 (2024-01-22)
 
 ### Improvements
