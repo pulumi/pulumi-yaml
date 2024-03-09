@@ -19,9 +19,8 @@ func diagString(d *syntax.Diagnostic) string {
 		return fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
 	} else if d.Context != nil {
 		return fmt.Sprintf("%v:%v:%v: %s", d.Context.Filename, d.Context.Start.Line, d.Context.End.Line, d.Summary)
-	} else {
-		return fmt.Sprintf("%v", d.Summary)
 	}
+	return fmt.Sprintf("%v", d.Summary)
 }
 
 func requireNoErrors(t *testing.T, tmpl *ast.TemplateDecl, diags syntax.Diagnostics) {
