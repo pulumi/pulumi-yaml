@@ -4,7 +4,7 @@ LIST_ONLY=${LIST_ONLY:-false}
 
 default_url_template='https://raw.githubusercontent.com/pulumi/pulumi-_NAME_/v_VERSION_/provider/cmd/pulumi-resource-_NAME_/schema.json'
 awsx_url='https://raw.githubusercontent.com/pulumi/pulumi-awsx/v_VERSION_/awsx/schema.json'
-function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/pkg/codegen/testing/test/testdata/$1-$2.json"; }
+function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/tests/testdata/codegen/$1-$2.json"; }
 schemas=(
   "aws@4.37.1"
   "aws@5.16.2"
@@ -64,7 +64,7 @@ for s in "${schemas[@]}"; do
       fi
   fi
   if [ ! -f "${FILEPATH}" ]; then
-    echo "Downloading ${FILEPATH}"
+    echo "Downloading ${FILEPATH} FROM ${URL}"
     curl "${URL}" \
       | jq ".version = \"${VERSION}\"" > "${FILEPATH}"
   fi
