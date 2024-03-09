@@ -64,9 +64,14 @@ configuration:
   shouldProtect:
     default: false
     type: boolean
+  version:
+    default: "1.0.0"
+    type: string
 resources:
   provider-a:
     type: pulumi:providers:test
+    options: 
+      version: ${version}
   provider-b:
     type: pulumi:providers:test
   res-parent:
@@ -98,6 +103,10 @@ resources:
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			switch args.TypeToken {
 			case "pulumi:providers:test":
+				if args.Name == "provider-a" {
+					assert.Equal(t, "1.0.0", args.RegisterRPC.Version)
+				}
+
 				return "providerId", resource.PropertyMap{}, nil
 			case "test:resource:trivial":
 				return "resourceId", resource.PropertyMap{}, nil
@@ -110,7 +119,6 @@ resources:
 				assert.Contains(t, args.RegisterRPC.Dependencies,
 					"urn:pulumi:stackDev::projectFoo::test:resource:trivial::res-dependency",
 				)
-
 				return "anID", resource.PropertyMap{}, nil
 			}
 			return "", resource.PropertyMap{}, fmt.Errorf("Unexpected resource type %s", args.TypeToken)
@@ -172,7 +180,10 @@ variables:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		runner.setDefaultProviders()
+		runner.setDefaultProviders(programEvaluator{
+			evalContext: runner.newContext(nil),
+			pulumiCtx:   ctx,
+		})
 		requireNoErrors(t, template, runner.sdiags.diags)
 		diags := runner.Evaluate(ctx)
 		requireNoErrors(t, template, diags)
