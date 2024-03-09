@@ -18,7 +18,12 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
@@ -53,7 +58,7 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 	}
 }
 
-func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func (host *yamlLanguageHost) loadTemplate(rootDir string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	if host.template != nil {
 		return host.template, host.diags, nil
 	}
@@ -62,9 +67,9 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 	var diags syntax.Diagnostics
 	var err error
 	if host.compiler == "" {
-		template, diags, err = pulumiyaml.Load()
+		template, diags, err = pulumiyaml.Load(rootDir)
 	} else {
-		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "")
+		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, rootDir)
 	}
 	if err != nil {
 		return nil, diags, err
@@ -82,7 +87,7 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest,
 ) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	template, diags, err := host.loadTemplate()
+	template, diags, err := host.loadTemplate(req.Info.RootDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -114,14 +119,7 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
 func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
-	if pwd := req.GetPwd(); pwd != "" {
-		err := os.Chdir(pwd)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	template, diags, err := host.loadTemplate()
+	template, diags, err := host.loadTemplate(req.Info.RootDirectory)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -207,4 +205,58 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 // About returns information about the runtime for this language.
 func (host *yamlLanguageHost) About(ctx context.Context, req *emptypb.Empty) (*pulumirpc.AboutResponse, error) {
 	return &pulumirpc.AboutResponse{}, nil
+}
+
+func (host *yamlLanguageHost) Pack(ctx context.Context, req *pulumirpc.PackRequest) (*pulumirpc.PackResponse, error) {
+	return &pulumirpc.PackResponse{ArtifactPath: req.Version}, nil
+}
+
+func (host *yamlLanguageHost) GenerateProject(
+	context context.Context, req *pulumirpc.GenerateProjectRequest,
+) (*pulumirpc.GenerateProjectResponse, error) {
+	loader, err := schema.NewLoaderClient(req.LoaderTarget)
+	if err != nil {
+		return nil, err
+	}
+
+	var extraOptions []pcl.BindOption
+	if !req.Strict {
+		extraOptions = append(extraOptions, pcl.NonStrictBindOptions()...)
+	}
+
+	// for nodejs, prefer output-versioned invokes
+	extraOptions = append(extraOptions, pcl.PreferOutputVersionedInvokes)
+
+	program, diags, err := pcl.BindDirectory(req.SourceDirectory, loader, extraOptions...)
+	if err != nil {
+		return nil, err
+	}
+	if diags.HasErrors() {
+		rpcDiagnostics := plugin.HclDiagnosticsToRPCDiagnostics(diags)
+
+		return &pulumirpc.GenerateProjectResponse{
+			Diagnostics: rpcDiagnostics,
+		}, nil
+	}
+
+	var project workspace.Project
+	if err := json.Unmarshal([]byte(req.Project), &project); err != nil {
+		return nil, err
+	}
+
+	err = codegen.GenerateProject(req.TargetDirectory, project, program, req.LocalDependencies)
+	if err != nil {
+		return nil, err
+	}
+
+	rpcDiagnostics := plugin.HclDiagnosticsToRPCDiagnostics(diags)
+
+	return &pulumirpc.GenerateProjectResponse{
+		Diagnostics: rpcDiagnostics,
+	}, nil
+}
+
+func (host *yamlLanguageHost) GeneratePackage(
+	context context.Context, req *pulumirpc.GeneratePackageRequest) (*pulumirpc.GeneratePackageResponse, error) {
+	return &pulumirpc.GeneratePackageResponse{}, nil
 }
