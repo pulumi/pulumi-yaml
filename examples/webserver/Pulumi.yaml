@@ -36,10 +36,16 @@ resources:
           nohup python -m SimpleHTTPServer 80 &
       vpcSecurityGroupIds:
         - ${WebSecGrp}
+  DefaultProvider:
+    type: pulumi:providers:aws
+    options:
+      version: 5.16.2
   UsEast2Provider:
     type: pulumi:providers:aws
     properties:
       region: us-east-2
+    options:
+      version: 5.16.2
   MyBucket:
     type: aws:s3:Bucket
     options:
