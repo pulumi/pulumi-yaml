@@ -1,9 +1,12 @@
 CHANGELOG
 =========
 
-## Pending
+## 1.6.0 (2024-03-11)
 
 ### Improvements
+
+- Support (logical) name for resources and config variables
+ [#546](https://github.com/pulumi/pulumi-yaml/pull/546)
 
 - Update pulumi/pulumi to v3.109.0
 
