@@ -123,7 +123,7 @@ resources:
       instanceType: ${InstanceType}
       ami:
         fn::invoke:
-          function: aws:getAmi
+          function: aws:ec2:getAmi
           arguments:
             filters:
               - name: name

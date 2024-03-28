@@ -20,7 +20,7 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 resource webServer "aws:ec2/instance:Instance" {
 	__logicalName = "WebServer"
 	instanceType = instanceType
-	ami = invoke("aws:index/getAmi:getAmi", {
+	ami = invoke("aws:ec2/getAmi:getAmi", {
 		filters = [{
 			name = "name",
 			values = ["amzn2-ami-hvm-2.0.20231218.0-x86_64-ebs"]

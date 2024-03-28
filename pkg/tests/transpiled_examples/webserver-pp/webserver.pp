@@ -3,7 +3,7 @@ config instanceType string {
 	default = "t3.micro"
 }
 
-ec2Ami = invoke("aws:index/getAmi:getAmi", {
+ec2Ami = invoke("aws:ec2/getAmi:getAmi", {
 	filters = [{
 		name = "name",
 		values = ["amzn2-ami-hvm-2.0.20231218.0-x86_64-ebs"]
