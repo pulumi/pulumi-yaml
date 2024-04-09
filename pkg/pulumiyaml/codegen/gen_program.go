@@ -13,6 +13,7 @@ import (
 
 	"github.com/ettle/strcase"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
@@ -522,6 +523,26 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			contract.Failf("Unexpected LiteralValueExpression (%[1]v): %[1]v", e.Type(), e)
 			panic("unreachable")
 		}
+
+	case *model.UnaryOpExpression:
+		if e.Operation == hclsyntax.OpNegate {
+			operand := e.Operand
+			switch operand := operand.(type) {
+			case *model.LiteralValueExpression:
+				if operand.Value.Type().Equals(cty.Number) {
+					v := operand.Value.AsBigFloat()
+					f, _ := v.Float64()
+					return syn.Number(-f)
+				}
+			}
+		}
+
+		YAMLError{
+			kind:   "Unsupported unary operation",
+			detail: fmt.Sprintf("Invalid unary application encountered (only negation of numeric literals is supported at present): %v", e),
+			rng:    e.SyntaxNode().Range(),
+		}.AppendTo(g)
+		return syn.String("Unimplemented")
 
 	case *model.FunctionCallExpression:
 		return g.function(e)
