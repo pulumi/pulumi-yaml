@@ -239,7 +239,13 @@ func TestGenerateProgram(t *testing.T) {
 			OutputFile: "Main.yaml",
 			Check:      check,
 			GenProgram: GenerateProgram,
-			TestCases:  filter(test.PulumiPulumiProgramTests),
+			TestCases: append(
+				filter(test.PulumiPulumiProgramTests),
+				test.ProgramTest{
+					Directory:   "negative-literals",
+					Description: "Negative literals in Pulumi Programs",
+				},
+			),
 		},
 	)
 }
