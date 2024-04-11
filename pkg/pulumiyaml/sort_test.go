@@ -15,12 +15,20 @@ import (
 )
 
 func diagString(d *syntax.Diagnostic) string {
-	if d.Subject != nil {
-		return fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
-	} else if d.Context != nil {
-		return fmt.Sprintf("%v:%v:%v: %s", d.Context.Filename, d.Context.Start.Line, d.Context.End.Line, d.Summary)
+	var s string
+	switch {
+	case d.Subject != nil:
+		s = fmt.Sprintf("%v:%v:%v: %s", d.Subject.Filename, d.Subject.Start.Line, d.Subject.Start.Column, d.Summary)
+	case d.Context != nil:
+		s = fmt.Sprintf("%v:%v:%v: %s", d.Context.Filename, d.Context.Start.Line, d.Context.End.Line, d.Summary)
+	default:
+		s = fmt.Sprintf("%v", d.Summary)
 	}
-	return fmt.Sprintf("%v", d.Summary)
+
+	if d.Detail != "" {
+		s += fmt.Sprintf("; %v", d.Detail)
+	}
+	return s
 }
 
 func requireNoErrors(t *testing.T, tmpl *ast.TemplateDecl, diags syntax.Diagnostics) {

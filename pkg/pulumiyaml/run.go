@@ -1311,18 +1311,42 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			e.error(v.Get.Id, "unable to evaluate get.id")
 			return nil, false
 		}
-		if p, ok := s.(poisonMarker); ok {
-			return p, true
+
+		convertID := func(a any) (pulumi.ID, error) {
+			s, ok := a.(string)
+			if !ok {
+				err := typeCheckerError{
+					expected: "string",
+					found:    fmt.Sprintf("%T", a),
+					location: v.Get.Id,
+				}
+				e.addDiag(err.Diag())
+				return "", err
+			}
+			return pulumi.ID(s), nil
 		}
-		id, ok := s.(string)
-		if !ok {
-			e.errorf(v.Get.Id, "get.id must be a prompt string, instead got type %T", s)
+		var id pulumi.IDInput
+		switch s := s.(type) {
+		case poisonMarker:
+			return s, true
+		case string:
+			id = pulumi.ID(s)
+		case pulumi.AnyOutput:
+			id = s.ApplyT(convertID).(pulumi.IDOutput)
+		default:
+			err := typeCheckerError{
+				expected: "string",
+				found:    fmt.Sprintf("%T", s),
+				location: v.Get.Id,
+			}
+
+			e.addDiag(err.Diag())
 			return nil, false
 		}
 		err = e.pulumiCtx.ReadResource(
 			string(typ),
 			resourceName,
-			pulumi.ID(id),
+			id,
 			untypedArgs(props),
 			res.(pulumi.CustomResource),
 			opts...)
@@ -2312,4 +2336,25 @@ func listStrings(v *ast.StringListDecl) []string {
 		a[i] = s.Value
 	}
 	return a
+}
+
+// typeCheckerError indicates that Pulumi YAML found the wrong type for a situation that
+// the type checker should have caught.
+//
+// typeCheckerError should not be used to indicate that a dynamic cast has failed.
+type typeCheckerError struct {
+	expected, found string
+	location        ast.Expr
+}
+
+func (err typeCheckerError) Error() string {
+	return fmt.Sprintf("%s must be a %s, instead got type %s",
+		err.location.Syntax().String(), err.expected, err.found)
+}
+
+func (err typeCheckerError) Diag() *syntax.Diagnostic {
+	const newIssue = "https://github.com/pulumi/pulumi-yaml/issues/new/choose"
+	return ast.ExprError(err.location, err.Error(),
+		"This indicates a bug in the Pulumi YAML type checker. "+
+			"Please open an issue at "+newIssue)
 }

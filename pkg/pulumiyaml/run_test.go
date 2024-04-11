@@ -815,9 +815,9 @@ resources:
 	diags := testTemplateDiags(t, tmpl, func(e *programEvaluator) {})
 	require.Truef(t, diags.HasErrors(), diags.Error())
 	assert.Len(t, diags, 2)
-	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn",
+	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn; Existing fields are: yesArg, someSuchArg",
 		diagString(diags[1]))
-	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on 'test:resource:type'",
+	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on 'test:resource:type'; Cannot assign '{foo: string, buzz: string}' to 'test:resource:type':\n  Existing properties are: bar, foo",
 		diagString(diags[0]))
 }
 
@@ -1890,6 +1890,65 @@ variables:
 	assert.Len(t, diags, 0)
 }
 
+func TestReadResourceEventualId(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: no-state
+  v2:
+    type: test:read:Resource
+    get:
+      id: eventual-${bucket.tags["isRight"]}
+variables:
+  isRight: ${v2.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	var wasRun bool
+	diags := testInvokeDiags(t, templ, func(r *Runner) {
+		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
+			wasRun = true
+			assert.Equal(t, "definitely", s)
+			return s
+		})
+	})
+	assert.True(t, wasRun)
+	assert.Len(t, diags, 0)
+}
+
+func TestReadResourceIDRuntimeTypeErorr(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: no-state
+  v2:
+    type: test:read:Resource
+    get:
+      id: { a: b }
+variables:
+  isRight: ${v2.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	diags := testInvokeDiags(t, templ, nil)
+	var diagStrings []string
+	for _, v := range diags {
+		diagStrings = append(diagStrings, diagString(v))
+	}
+
+	assert.ElementsMatch(t, diagStrings, []string{
+		"<stdin>:12:11: { a: b } must be a string, instead got type map[string]interface {}; This indicates a bug in the Pulumi YAML type checker. Please open an issue at https://github.com/pulumi/pulumi-yaml/issues/new/choose",
+	})
+}
+
 func TestReadResourceErrorTyping(t *testing.T) {
 	t.Parallel()
 	text := `
@@ -1912,8 +1971,8 @@ resources:
 		diagStrings = append(diagStrings, diagString(v))
 	}
 	assert.ElementsMatch(t, diagStrings, []string{
-		"<stdin>:5:3: Resource fields properties and get are mutually exclusive",
-		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'",
+		"<stdin>:5:3: Resource fields properties and get are mutually exclusive; Properties is used to describe a resource managed by Pulumi.\nGet is used to describe a resource managed outside of the current Pulumi stack.\nSee https://www.pulumi.com/docs/intro/concepts/resources/get for more details on using Get.",
+		"<stdin>:11:9: Property fizz does not exist on 'test:read:Resource'; Cannot assign '{fizz: string}' to 'test:read:Resource':\n  Existing properties are: foo",
 	})
 }
 
