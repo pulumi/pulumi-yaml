@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "pulumi-converter-yaml_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/pulumi/pulumi-yaml/cmd/pulumi-converter-yaml",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/pulumiyaml/codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/pcl",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/encoding",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource/plugin",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/contract",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/rpcutil",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/workspace",
+        "@com_github_pulumi_pulumi_sdk_v3//proto/go",
+        "@com_github_spf13_afero//:afero",
+        "@org_golang_google_grpc//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "pulumi-converter-yaml",
+    embed = [":pulumi-converter-yaml_lib"],
+    visibility = ["//visibility:public"],
+)

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hexops/autogold"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,11 +28,11 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := []Plugin{{
 		Package: "test",
 		Version: "1.23.425-beta.6",
-	}})
-	want.Equal(t, got)
+	}}
+	assert.Equal(t, want, got)
 
 	diags = testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
@@ -58,11 +57,11 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := []Plugin{{
 		Package: "test",
 		Version: "1.7.13",
-	}})
-	want.Equal(t, got)
+	}}
+	assert.Equal(t, want, got)
 
 	diags = testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
@@ -87,11 +86,11 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := []Plugin{{
 		Package: "test",
 		Version: "1.2",
-	}})
-	want.Equal(t, got)
+	}}
+	assert.Equal(t, want, got)
 
 	diags = testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)
@@ -156,13 +155,13 @@ outputs:
 	assert.False(t, diags.HasErrors())
 
 	gotPlugins := plugins
-	wantPlugins := autogold.Want("test-plugins", []Plugin{
+	wantPlugins := []Plugin{
 		{
 			Package: "aws",
 			Version: "4.37.1",
 		},
-	})
-	wantPlugins.Equal(t, gotPlugins)
+	}
+	assert.Equal(t, wantPlugins, gotPlugins)
 
 	confNodes := []configNode{}
 	_, diags = topologicallySortedResources(tmpl, confNodes)
@@ -195,12 +194,12 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := []Plugin{{
 		Package:           "test",
 		Version:           "1.23.425-beta.6",
 		PluginDownloadURL: "https://example.com",
-	}})
-	want.Equal(t, got)
+	}}
+	assert.Equal(t, want, got)
 
 	diags = testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
 	requireNoErrors(t, tmpl, diags)

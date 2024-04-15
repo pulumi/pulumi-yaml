@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tests",
+    srcs = [
+        "stack_name.go",
+        "utils.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/tests",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_pulumi_pulumi_pkg_v3//engine",
+        "@com_github_pulumi_pulumi_pkg_v3//testing/integration",
+        "@com_github_stretchr_testify//assert",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":tests",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "tests_test",
+    srcs = [
+        "example_test.go",
+        "example_transpile_test.go",
+        "integration_test.go",
+    ],
+    data = glob(["testdata/**", "transpiled_examples/**"]) + ["//:examples", "//pkg/pulumiyaml/testing/test:fetch_schemas"],
+    embed = [":tests"],
+    deps = [
+        "//pkg/pulumiyaml",
+        "//pkg/pulumiyaml/ast",
+        "//pkg/pulumiyaml/codegen",
+        "@com_github_blang_semver//:semver",
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/hcl2/syntax",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/pcl",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/testing/utils",
+        "@com_github_pulumi_pulumi_pkg_v3//engine",
+        "@com_github_pulumi_pulumi_pkg_v3//testing/integration",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/cmdutil",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

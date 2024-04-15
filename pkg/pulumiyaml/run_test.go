@@ -3,7 +3,9 @@
 package pulumiyaml
 
 import (
+	"crypto/rand"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,13 +27,32 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
-//go:embed README.md
-var packageReadmeFile string
-
 const (
 	testComponentToken = "test:component:type"
 	testResourceToken  = "test:resource:type"
 )
+
+func createTestFile(t *testing.T) string {
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	require.NoError(t, err)
+	name := "testfile." + hex.EncodeToString(b) + ".tmp"
+	f, err := os.Create(name)
+	require.NoError(t, err)
+	defer f.Close()
+
+	_, err = rand.Read(b)
+	require.NoError(t, err)
+	_, err = f.Write(b)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := os.Remove(name)
+		require.NoError(t, err)
+	})
+	return name
+}
 
 type MockPackageLoader struct {
 	packages map[string]Package
@@ -409,10 +430,12 @@ outputs:
 func TestAssetOrArchive(t *testing.T) {
 	t.Parallel()
 
-	const text = `name: test-yaml
+	file := createTestFile(t)
+
+	text := `name: test-yaml
 variables:
   foo: bar
-  foo2: ./README.md
+  foo2: ./` + file + `
   dir:
     fn::assetArchive:
       str:
@@ -439,7 +462,7 @@ variables:
 		assert.Equal(t, assets["str"].(pulumi.Asset).Text(), "this is home")
 		assert.Equal(t, assets["strIter"].(pulumi.Asset).Text(), "start bar end")
 		assert.Equal(t, assets["away"].(pulumi.Asset).URI(), "example.org/asset")
-		filePath, err := filepath.Abs("./README.md")
+		filePath, err := filepath.Abs(file)
 		assert.NoError(t, err)
 		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), filePath)
 		assert.Equal(t, assets["folder"].(pulumi.Archive).Assets()["docs"].(pulumi.Archive).URI(), "example.org/docs")
@@ -1593,6 +1616,11 @@ variables:
 func TestReadFile(t *testing.T) {
 	t.Parallel()
 
+	testFile := createTestFile(t)
+
+	testfileText, err := os.ReadFile(testFile)
+	require.NoError(t, err)
+
 	repoReadmePath, err := filepath.Abs("../../README.md")
 	assert.NoError(t, err)
 
@@ -1604,12 +1632,12 @@ name: test-readfile
 runtime: yaml
 variables:
   textData:
-    fn::readFile: ./README.md
+    fn::readFile: ./%v
   absInDirData:
-    fn::readFile: ${pulumi.cwd}/README.md
+    fn::readFile: ${pulumi.cwd}/%v
   absOutOfDirData:
     fn::readFile: %v
-`, repoReadmePath)
+`, testFile, testFile, repoReadmePath)
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
@@ -1617,11 +1645,11 @@ variables:
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["textData"].(string)
 		assert.True(t, ok)
-		assert.Equal(t, packageReadmeFile, result)
+		assert.Equal(t, string(testfileText), result)
 
 		result, ok = e.variables["absInDirData"].(string)
 		assert.True(t, ok)
-		assert.Equal(t, packageReadmeFile, result)
+		assert.Equal(t, string(testfileText), result)
 
 		result, ok = e.variables["absOutOfDirData"].(string)
 		assert.True(t, ok)

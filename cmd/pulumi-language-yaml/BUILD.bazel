@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "pulumi-language-yaml_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/pulumi/pulumi-yaml/cmd/pulumi-language-yaml",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/server",
+        "@com_github_pkg_errors//:errors",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/cmdutil",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/logging",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/rpcutil",
+        "@com_github_pulumi_pulumi_sdk_v3//proto/go",
+        "@org_golang_google_grpc//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "pulumi-language-yaml",
+    embed = [":pulumi-language-yaml_lib"],
+    visibility = ["//visibility:public"],
+)

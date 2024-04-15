@@ -1,0 +1,75 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "pulumiyaml",
+    srcs = [
+        "analyser.go",
+        "expr.go",
+        "packages.go",
+        "run.go",
+        "semver.go",
+        "sort.go",
+        "template.go",
+        "yaml.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/pulumiyaml/ast",
+        "//pkg/pulumiyaml/config",
+        "//pkg/pulumiyaml/diags",
+        "//pkg/pulumiyaml/syntax",
+        "//pkg/pulumiyaml/syntax/encoding",
+        "@com_github_blang_semver//:semver",
+        "@com_github_google_shlex//:shlex",
+        "@com_github_hashicorp_go_multierror//:go-multierror",
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@com_github_iancoleman_strcase//:strcase",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/diag",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource/plugin",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/cmdutil",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/contract",
+        "@com_github_pulumi_pulumi_sdk_v3//go/pulumi",
+        "@com_github_pulumi_pulumi_sdk_v3//go/pulumi/config",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":pulumiyaml",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "pulumiyaml_test",
+    srcs = [
+        "analyser_test.go",
+        "run_async_diags_test.go",
+        "run_invoke_test.go",
+        "run_options_test.go",
+        "run_plugin_version_test.go",
+        "run_test.go",
+        "run_token_blocklist_test.go",
+        "run_variable_test.go",
+        "sort_test.go",
+    ],
+    data = [
+        "//:README",
+        "//:go_mod",
+    ],
+    embed = [":pulumiyaml"],
+    deps = [
+        "//pkg/pulumiyaml/ast",
+        "//pkg/pulumiyaml/syntax",
+        "@com_github_blang_semver//:semver",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource",
+        "@com_github_pulumi_pulumi_sdk_v3//go/pulumi",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

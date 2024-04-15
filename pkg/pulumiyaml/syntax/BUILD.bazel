@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "syntax",
+    srcs = [
+        "diags.go",
+        "doc.go",
+        "nodes.go",
+        "syntax.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/contract",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":syntax",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "syntax_test",
+    srcs = ["syntax_test.go"],
+    embed = [":syntax"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)
