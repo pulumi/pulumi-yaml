@@ -1,0 +1,15 @@
+resources:
+  # properties field is bound to union case ServerPropertiesForReplica
+  replica:
+    type: basic-unions:ExampleServer
+    properties:
+      properties:
+        createMode: Replica
+        version: 0.1.0-dev
+  # properties field is bound to union case ServerPropertiesForRestore
+  restore:
+    type: basic-unions:ExampleServer
+    properties:
+      properties:
+        createMode: PointInTimeRestore
+        restorePointInTime: example

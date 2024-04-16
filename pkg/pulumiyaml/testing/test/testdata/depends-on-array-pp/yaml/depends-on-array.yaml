@@ -1,0 +1,33 @@
+resources:
+  myBucket:
+    type: aws:s3:Bucket
+    properties:
+      website:
+        indexDocument: index.html
+  ownershipControls:
+    type: aws:s3:BucketOwnershipControls
+    properties:
+      bucket: ${myBucket.id}
+      rule:
+        objectOwnership: ObjectWriter
+  publicAccessBlock:
+    type: aws:s3:BucketPublicAccessBlock
+    properties:
+      bucket: ${myBucket.id}
+      blockPublicAcls: false
+  indexHtml:
+    type: aws:s3:BucketObject
+    name: index.html
+    properties:
+      bucket: ${myBucket.id}
+      source:
+        fn::FileAsset: ./index.html
+      contentType: text/html
+      acl: public-read
+    options:
+      dependson:
+        - ${publicAccessBlock}
+        - ${ownershipControls}
+outputs:
+  bucketName: ${myBucket.id}
+  bucketEndpoint: http://${myBucket.websiteEndpoint}
