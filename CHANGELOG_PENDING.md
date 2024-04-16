@@ -6,6 +6,8 @@
 - Upgrade pulumi dependency to the latest version.
  [#566](https://github.com/pulumi/pulumi-yaml/pull/566)
 
+- Allow `version` to be set dynamically.
+
 ### Bug Fixes
 
 - Support negative literals [#565](https://github.com/pulumi/pulumi-yaml/pull/565)
