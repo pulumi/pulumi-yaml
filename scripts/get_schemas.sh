@@ -9,6 +9,7 @@ schemas=(
   "aws@4.37.1"
   "aws@5.16.2"
   "aws-native@0.13.0"
+  "aws-native@0.99.0"
   "awsx@1.0.0-beta.5@${awsx_url}"
   "docker@4.0.0-alpha.0"
   "eks@0.40.0"
@@ -34,6 +35,8 @@ schemas=(
   $(pulumi_schema std 1.0.0) # there's no pulumi-std 1.0.0
   $(pulumi_schema snowflake 0.66.1) # not a real pulumi-snowflake schema
   $(pulumi_schema using-dashes 1.0.0)
+  $(pulumi_schema aws-static-website 0.4.0)
+  $(pulumi_schema basic-unions 0.1.0)
 )
 
 for s in "${schemas[@]}"; do

@@ -1,0 +1,10 @@
+resources:
+  namespaceAuthorizationRule:
+    type: azure-native:servicebus:NamespaceAuthorizationRule
+    properties:
+      authorizationRuleName: sdk-AuthRules-1788
+      namespaceName: sdk-Namespace-6914
+      resourceGroupName: ArunMonocle
+      rights:
+        - Listen
+        - Send
