@@ -28,7 +28,13 @@ go_test(
         "example_transpile_test.go",
         "integration_test.go",
     ],
-    data = glob(["testdata/**", "transpiled_examples/**"]) + ["//:examples", "//pkg/pulumiyaml/testing/test:fetch_schemas"],
+    data = glob([
+        "testdata/**",
+        "transpiled_examples/**",
+    ]) + [
+        "//:examples",
+        "//pkg/pulumiyaml/testing/test:fetch_schemas",
+    ],
     embed = [":tests"],
     deps = [
         "//pkg/pulumiyaml",
