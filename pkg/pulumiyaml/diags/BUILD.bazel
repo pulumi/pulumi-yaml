@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "diags",
+    srcs = [
+        "diags.go",
+        "types.go",
+        "utils.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_pulumi_pulumi_pkg_v3//codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":diags",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "diags_test",
+    srcs = [
+        "diags_test.go",
+        "utils_test.go",
+    ],
+    embed = [":diags"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)

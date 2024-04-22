@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "encoding",
+    srcs = [
+        "doc.go",
+        "object.go",
+        "yaml.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/pulumiyaml/syntax",
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":encoding",
+    visibility = ["//visibility:public"],
+)

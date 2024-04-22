@@ -39,6 +39,12 @@ schemas=(
   $(pulumi_schema basic-unions 0.1.0)
 )
 
+dir=
+# Check if we have an argument
+if [ "$#" -gt 0 ]; then
+  dir="$1/"
+fi
+
 for s in "${schemas[@]}"; do
   IFS="@"
   set -- $s
@@ -51,7 +57,7 @@ for s in "${schemas[@]}"; do
   URL="${URL//_VERSION_/${VERSION}}"
 
 
-  FILEPATH="pkg/pulumiyaml/testing/test/testdata/${NAME}-${VERSION}.json"
+  FILEPATH="${dir}pkg/pulumiyaml/testing/test/testdata/${NAME}-${VERSION}.json"
 
   if [ "${LIST_ONLY}" = "true" ]; then
       echo "${FILEPATH}"

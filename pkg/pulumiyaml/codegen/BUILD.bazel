@@ -1,0 +1,73 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "codegen",
+    srcs = [
+        "convert.go",
+        "doc.go",
+        "eject.go",
+        "format.go",
+        "gen_program.go",
+        "load.go",
+        "utils.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/pulumiyaml",
+        "//pkg/pulumiyaml/ast",
+        "//pkg/pulumiyaml/config",
+        "//pkg/pulumiyaml/syntax",
+        "//pkg/pulumiyaml/syntax/encoding",
+        "@com_github_blang_semver//:semver",
+        "@com_github_ettle_strcase//:strcase",
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@com_github_hashicorp_hcl_v2//hclsyntax",
+        "@com_github_iancoleman_strcase//:strcase",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/hcl2/model",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/hcl2/syntax",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/pcl",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/diag",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/encoding",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource/plugin",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/cmdutil",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/contract",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/workspace",
+        "@com_github_zclconf_go_cty//cty",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":codegen",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "codegen_test",
+    srcs = [
+        "doc_test.go",
+        "gen_program_test.go",
+        "load_test.go",
+    ],
+    data = [
+        "//pkg/pulumiyaml/testing/test:codegen_testdata",
+        "//pkg/pulumiyaml/testing/test:fetch_schemas",
+    ],
+    embed = [":codegen"],
+    deps = [
+        "//pkg/pulumiyaml",
+        "@com_github_blang_semver//:semver",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/schema",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/testing/test",
+        "@com_github_pulumi_pulumi_pkg_v3//codegen/testing/utils",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/resource",
+        "@com_github_pulumi_pulumi_sdk_v3//go/pulumi",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

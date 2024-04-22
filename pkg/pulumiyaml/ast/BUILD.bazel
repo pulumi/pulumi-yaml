@@ -1,0 +1,43 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ast",
+    srcs = [
+        "diagWriter.go",
+        "doc.go",
+        "expr.go",
+        "interpolation.go",
+        "property.go",
+        "template.go",
+    ],
+    importpath = "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/pulumiyaml/diags",
+        "//pkg/pulumiyaml/syntax",
+        "@com_github_hashicorp_hcl_v2//:hcl",
+        "@com_github_pulumi_pulumi_sdk_v3//go/common/util/contract",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":ast",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "ast_test",
+    srcs = [
+        "interpolation_test.go",
+        "template_test.go",
+    ],
+    embed = [":ast"],
+    deps = [
+        "//pkg/pulumiyaml/syntax",
+        "//pkg/pulumiyaml/syntax/encoding",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)

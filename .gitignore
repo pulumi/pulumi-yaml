@@ -5,6 +5,7 @@ Pulumi.*.yaml
 stack.json
 goreleaser/
 bin/*
+bazel-*
 
 # Other cannot be downloaded, as it does not correspond to a real package.
 !pkg/pulumiyaml/testing/test/testdata/other.json
