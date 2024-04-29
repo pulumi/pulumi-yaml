@@ -4,7 +4,7 @@
  [#563](https://github.com/pulumi/pulumi-yaml/pull/563)
 
 - Upgrade pulumi dependency to the latest version.
- [#566](https://github.com/pulumi/pulumi-yaml/pull/566)
+ [#566](https://github.com/pulumi/pulumi-yaml/pull/566), [#571](https://github.com/pulumi/pulumi-yaml/pull/571)
 
 ### Bug Fixes
 
