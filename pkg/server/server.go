@@ -21,9 +21,9 @@ import (
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -101,7 +101,7 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	var plugins []*pulumirpc.PluginDependency
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{
-			Kind:    string(workspace.ResourcePlugin),
+			Kind:    string(apitype.ResourcePlugin),
 			Name:    pkg.Package,
 			Version: pkg.Version,
 			Server:  pkg.PluginDownloadURL,
