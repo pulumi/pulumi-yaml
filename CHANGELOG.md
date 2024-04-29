@@ -1,6 +1,20 @@
 CHANGELOG
 =========
 
+## 1.7.0 (2024-04-29)
+
+### Improvements
+
+- Allow the `Resource.get.id` field to be dynamically set.
+ [#563](https://github.com/pulumi/pulumi-yaml/pull/563)
+
+- Upgrade pulumi dependency to the latest version.
+ [#566](https://github.com/pulumi/pulumi-yaml/pull/566), [#571](https://github.com/pulumi/pulumi-yaml/pull/571)
+
+### Bug Fixes
+
+- Support negative literals [#565](https://github.com/pulumi/pulumi-yaml/pull/565)
+
 ## 1.6.0 (2024-03-11)
 
 ### Improvements
