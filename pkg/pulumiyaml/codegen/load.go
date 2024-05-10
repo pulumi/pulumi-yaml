@@ -401,6 +401,12 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "fromBase64",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.RFC3339ToUnixExpr:
+		path, pdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "rfc3339ToUnix",
+			Args: []model.Expression{path},
+		}, pdiags
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil
@@ -937,6 +943,7 @@ func (imp *importer) assignNames() {
 		"split",
 		"toBase64",
 		"toJSON",
+		"rfc3339ToUnix",
 		"sha1",
 		"stack",
 		"project",

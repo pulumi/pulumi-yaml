@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/shlex"
@@ -1498,6 +1499,8 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
 		return e.evaluateBuiltinReadFile(x)
+	case *ast.RFC3339ToUnixExpr:
+		return e.evaluateBuiltinRFC3339ToUnix(x)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
@@ -2254,6 +2257,25 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	})
 
 	return readFileF(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinRFC3339ToUnix(v *ast.RFC3339ToUnixExpr) (interface{}, bool) {
+	str, ok := e.evaluateExpr(v.Value)
+	if !ok {
+		return nil, false
+	}
+	unixTimestamp := e.lift(func(args ...interface{}) (interface{}, bool) {
+		s, ok := args[0].(string)
+		if !ok {
+			return e.error(v.Value, fmt.Sprintf("expected argument to fn::rfc3339ToUnix to be a string, got %v", typeString(args[0])))
+		}
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return e.error(v.Value, fmt.Sprintf("expected argument to is not in RFC3339 time format, got %v", s))
+		}
+		return t.UnixMilli(), true
+	})
+	return unixTimestamp(str)
 }
 
 func hasOutputs(v interface{}) bool {

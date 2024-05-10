@@ -735,6 +735,19 @@ func ReadFileSyntax(node syntax.Node, name *StringExpr, path Expr) *ReadFileExpr
 	}
 }
 
+type RFC3339ToUnixExpr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func RFC3339ToUnixSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *RFC3339ToUnixExpr {
+	return &RFC3339ToUnixExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
 func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, syntax.Diagnostics) {
 	return ReadFileSyntax(node, name, path), nil
 }
@@ -783,6 +796,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::secret", parseSecret)
 	case "fn::readfile":
 		set("fn::readFile", parseReadFile)
+	case "fn::rfc3339ToUnix":
+		set("fn::rfc3339ToUnix", parseRFC3339ToUnix)
 	default:
 		k := kvp.Key.Value()
 		// fn::invoke can be called as fn::${pkg}:${module}(:${name})?
@@ -989,4 +1004,8 @@ func parseAssetArchive(node *syntax.ObjectNode, name *StringExpr, args Expr) (Ex
 		diags.Extend(tdiags...)
 	}
 	return AssetArchiveSyntax(node, name, obj, assetOrArchives), diags
+}
+
+func parseRFC3339ToUnix(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return RFC3339ToUnixSyntax(node, name, args), nil
 }
