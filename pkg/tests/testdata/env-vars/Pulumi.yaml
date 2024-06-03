@@ -1,0 +1,16 @@
+name: project-env-vars
+runtime:
+  name: yaml
+  options:
+    compiler: |
+      sh -c "cat Pulumi.yaml;
+      echo \"\";
+      echo \"outputs:\";
+      echo \"  TEST_ENV_VAR: $TEST_ENV_VAR\";
+      echo \"  PULUMI_STACK: $PULUMI_STACK\";
+      echo \"  PULUMI_PROJECT: $PULUMI_PROJECT\";
+      echo \"  PULUMI_ORGANIZATION: $PULUMI_ORGANIZATION\";
+      echo \"  PULUMI_CONFIG: $PULUMI_CONFIG\";
+      echo \"\";"
+config:
+  foo: "hello world"

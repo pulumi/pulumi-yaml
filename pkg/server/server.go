@@ -18,6 +18,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
@@ -53,8 +55,8 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 	}
 }
 
-func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	if host.template != nil {
+func (host *yamlLanguageHost) loadTemplate(compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	if host.template != nil && host.compiler == "" {
 		return host.template, host.diags, nil
 	}
 
@@ -64,7 +66,7 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 	if host.compiler == "" {
 		template, diags, err = pulumiyaml.Load()
 	} else {
-		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "")
+		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "", compilerEnv)
 	}
 	if err != nil {
 		return nil, diags, err
@@ -82,7 +84,7 @@ func (host *yamlLanguageHost) loadTemplate() (*ast.TemplateDecl, syntax.Diagnost
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest,
 ) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	template, diags, err := host.loadTemplate()
+	template, diags, err := host.loadTemplate(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +123,20 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		}
 	}
 
-	template, diags, err := host.loadTemplate()
+	configValue := req.GetConfig()
+	jsonConfigValue, err := json.Marshal(configValue)
+	if err != nil {
+		return nil, err
+	}
+
+	compilerEnv := []string{
+		fmt.Sprintf(`PULUMI_STACK=%s`, req.GetStack()),
+		fmt.Sprintf(`PULUMI_ORGANIZATION=%s`, req.GetOrganization()),
+		fmt.Sprintf(`PULUMI_PROJECT=%s`, req.GetProject()),
+		fmt.Sprintf(`PULUMI_CONFIG=%s`, jsonConfigValue),
+	}
+
+	template, diags, err := host.loadTemplate(compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}

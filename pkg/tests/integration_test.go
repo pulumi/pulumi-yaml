@@ -79,3 +79,45 @@ func TestProjectConfigWithSecretDecrypted(t *testing.T) {
 	}
 	integration.ProgramTest(t, &testOptions)
 }
+
+//nolint:paralleltest // uses parallel programtest
+func TestEnvVarsPassedToExecCommand(t *testing.T) {
+	testOptions := integration.ProgramTestOptions{
+		Dir:             filepath.Join(getCwd(t), "testdata", "env-vars"),
+		Env:             []string{"TEST_ENV_VAR=foobar"},
+		PrepareProject:  prepareYamlProject,
+		StackName:       "dev",
+		SecretsProvider: "default",
+		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+			assert.Equal(t, "foobar", stack.Outputs["TEST_ENV_VAR"])
+			assert.Equal(t, `dev`, stack.Outputs["PULUMI_STACK"])
+			assert.Equal(t, `project-env-vars`, stack.Outputs["PULUMI_PROJECT"])
+			assert.Equal(t, `organization`, stack.Outputs["PULUMI_ORGANIZATION"])
+			assert.EqualValues(t, map[string]interface{}{"project-env-vars:foo": "hello world"}, stack.Outputs["PULUMI_CONFIG"])
+		},
+	}
+	integration.ProgramTest(t, &testOptions)
+}
+
+//nolint:paralleltest // uses parallel programtest
+func TestEnvVarsKeepConflictingValues(t *testing.T) {
+	testOptions := integration.ProgramTestOptions{
+		Dir: filepath.Join(getCwd(t), "testdata", "env-vars"),
+		Env: []string{
+			"PULUMI_STACK=foo",
+			"PULUMI_PROJECT=bar",
+			"PULUMI_ORGANIZATION=foobar",
+			"PULUMI_CONFIG=bazz",
+		},
+		PrepareProject:  prepareYamlProject,
+		StackName:       "dev",
+		SecretsProvider: "default",
+		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+			assert.Equal(t, `foo`, stack.Outputs["PULUMI_STACK"])
+			assert.Equal(t, `bar`, stack.Outputs["PULUMI_PROJECT"])
+			assert.Equal(t, `foobar`, stack.Outputs["PULUMI_ORGANIZATION"])
+			assert.EqualValues(t, "bazz", stack.Outputs["PULUMI_CONFIG"])
+		},
+	}
+	integration.ProgramTest(t, &testOptions)
+}
