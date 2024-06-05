@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+## 1.8.0 (2024-06-05)
+
+- Pass `PULUMI_STACK`, `PULUMI_ORGANIZATION`, `PULUMI_PROJECT` and `PULUMI_CONFIG` as environment variable to compiler process.
+  [#578](https://github.com/pulumi/pulumi-yaml/pull/578)
+
 ## 1.7.0 (2024-04-29)
 
 ### Improvements
