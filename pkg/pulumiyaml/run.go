@@ -46,7 +46,7 @@ func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	return LoadDir(".")
 }
 
-func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	var diags syntax.Diagnostics
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -60,6 +60,11 @@ func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDe
 	cmd.Dir = workingDirectory
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.Env = append(env, os.Environ()...)
+	for _, duplicate := range conflictingEnvVars(cmd.Env) {
+		diags = append(diags, syntax.Warning(nil, fmt.Sprintf("environment variable %v is already set: compiler %v will not override conflicting environment variables", duplicate, name), ""))
+	}
+
 	err = cmd.Run()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error running compiler %v: %v, stderr follows: %v", name, err, stderr.String())
@@ -72,6 +77,21 @@ func LoadFromCompiler(compiler string, workingDirectory string) (*ast.TemplateDe
 	diags.Extend(tdiags...)
 
 	return template, tdiags, err
+}
+
+func conflictingEnvVars(env []string) []string {
+	envMap := make(map[string]uint)
+	var duplicates []string
+	for _, e := range env {
+		key := strings.Split(e, "=")[0]
+		if cnt, exists := envMap[key]; exists && cnt <= 1 {
+			duplicates = append(duplicates, key)
+		}
+
+		envMap[key]++
+	}
+
+	return duplicates
 }
 
 // Load a template from the current working directory.

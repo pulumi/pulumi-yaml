@@ -2412,3 +2412,50 @@ func TestUnknownsDuringPreviewNotUpdate(t *testing.T) {
 	assert.NoError(t, runProgram(true))
 	assert.Error(t, runProgram(false))
 }
+
+func TestConflictingEnvVarsNoDuplicates(t *testing.T) {
+	t.Parallel()
+
+	env := []string{"FOO=bar", "BAZ=qux"}
+	conflicts := conflictingEnvVars(env)
+	assert.Empty(t, conflicts)
+}
+
+func TestConflictingEnvVarsWithDuplicates(t *testing.T) {
+	t.Parallel()
+
+	env := []string{"FOO=bar", "FOO=baz"}
+	conflicts := conflictingEnvVars(env)
+	assert.Equal(t, []string{"FOO"}, conflicts)
+}
+
+func TestConflictingEnvVarsEmptyEnv(t *testing.T) {
+	t.Parallel()
+
+	env := []string{}
+	conflicts := conflictingEnvVars(env)
+	assert.Empty(t, conflicts)
+}
+
+func TestConflictingEnvVarsNilEnv(t *testing.T) {
+	t.Parallel()
+
+	conflicts := conflictingEnvVars(nil)
+	assert.Empty(t, conflicts)
+}
+
+func TestConflictingEnvVarsInvalidFormat(t *testing.T) {
+	t.Parallel()
+
+	env := []string{"FOO", "BAR=qux"}
+	conflicts := conflictingEnvVars(env)
+	assert.Empty(t, conflicts)
+}
+
+func TestConflictingEnvVarsMultipleDuplicates(t *testing.T) {
+	t.Parallel()
+
+	env := []string{"FOO=bar", "FOO=baz", "BAR=qux", "BAR=quux", "FOO=foobar"}
+	conflicts := conflictingEnvVars(env)
+	assert.ElementsMatch(t, []string{"FOO", "BAR"}, conflicts)
+}
