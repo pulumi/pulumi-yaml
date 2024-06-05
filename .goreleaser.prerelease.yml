@@ -1,7 +1,6 @@
 dist: goreleaser
 project_name: pulumi-yaml
-changelog:
-  skip: true
+version: 2
 release:
   disable: true
 snapshot:
