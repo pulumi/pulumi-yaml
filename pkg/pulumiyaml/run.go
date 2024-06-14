@@ -1351,6 +1351,8 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			return s, true
 		case string:
 			id = pulumi.ID(s)
+		case pulumi.StringOutput:
+			id = s.ApplyT(convertID).(pulumi.IDOutput)
 		case pulumi.AnyOutput:
 			id = s.ApplyT(convertID).(pulumi.IDOutput)
 		default:
