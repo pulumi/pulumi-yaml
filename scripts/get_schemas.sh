@@ -24,6 +24,7 @@ schemas=(
   "azure-native@1.56.0"
   "azure-native@1.29.0"
   "azure-native@1.28.0"
+  "azure-native@2.41.0"
   "aws@5.16.2"
   "aws@5.4.0"
   "aws@4.37.1"
