@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+## Unreleased
+
+- Update pulumi/pulumi to v3.120.0.
+
 ## 1.8.0 (2024-06-05)
 
 - Pass `PULUMI_STACK`, `PULUMI_ORGANIZATION`, `PULUMI_PROJECT` and `PULUMI_CONFIG` as environment variable to compiler process.
