@@ -1,0 +1,9 @@
+resources:
+  example:
+    type: azure-native:eventgrid:EventSubscription
+    properties:
+      destination:
+        endpointType: EventHub
+        resourceId: example
+      expirationTimeUtc: example
+      scope: example
