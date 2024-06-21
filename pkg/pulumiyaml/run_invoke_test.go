@@ -244,13 +244,17 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Ru
 		},
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			if args.ReadRPC != nil {
-				isRight := "yes"
+				isRight := resource.NewProperty("yes")
 				switch args.TypeToken {
 				case "test:read:Resource":
 					switch args.ID {
 					case "no-state":
 					case "eventual-yes":
-						isRight = "definitely"
+						isRight = resource.NewProperty("definitely")
+					case "unknown-state":
+						isRight = resource.MakeComputed(resource.NewStringProperty(""))
+					case "eventual-<nil>": // An unknown ID - not represent-able with mocks
+						return "", resource.PropertyMap{}, nil
 					default:
 						assert.Equal(t, "bucket-123456", args.ID)
 						assert.Equal(t, `string_value:"bar"`, args.ReadRPC.Properties.Fields["foo"].String())
@@ -258,7 +262,7 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Ru
 					}
 					return "arn:aws:s3:::" + args.ID, resource.PropertyMap{
 						"tags": resource.NewObjectProperty(resource.PropertyMap{
-							"isRight": resource.NewStringProperty(isRight),
+							"isRight": isRight,
 						}),
 					}, nil
 				}

@@ -1890,7 +1890,34 @@ variables:
 	assert.Len(t, diags, 0)
 }
 
-func TestReadResourceEventualId(t *testing.T) {
+func TestReadResourceEventualComputedId(t *testing.T) {
+	t.Parallel()
+	text := `
+name: consumer
+runtime: yaml
+resources:
+  bucket:
+    type: test:read:Resource
+    get:
+      id: unknown-state
+  v2:
+    type: test:read:Resource
+    get:
+      id: eventual-${bucket.tags["isRight"]}
+variables:
+  isRight: ${v2.tags["isRight"]}
+`
+	templ := yamlTemplate(t, text)
+	diags := testInvokeDiags(t, templ, func(r *Runner) {
+		r.variables["isRight"].(pulumi.AnyOutput).ApplyT(func(s interface{}) interface{} {
+			t.Fatalf("isRight is unknown and should never be run")
+			return s
+		})
+	})
+	assert.Len(t, diags, 0)
+}
+
+func TestReadResourceEventualKnownId(t *testing.T) {
 	t.Parallel()
 	text := `
 name: consumer
