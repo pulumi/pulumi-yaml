@@ -1,0 +1,13 @@
+name: dev-yaml
+runtime: yaml
+description: |
+  Assert that we can safely use a computed ID to import a resource.
+resources:
+  b1:
+    type: aws:s3:Bucket
+  b2:
+    type: aws:s3:Bucket
+    get:
+      id: ${b1.id}
+    options:
+      retainOnDelete: true
