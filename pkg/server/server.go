@@ -218,6 +218,11 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 	return &pulumirpc.GetProgramDependenciesResponse{}, nil
 }
 
+// RuntimeOptionsPrompts returns a list of additional prompts to ask during `pulumi new`.
+func (host *yamlLanguageHost) RuntimeOptionsPrompts(context.Context, *pulumirpc.RuntimeOptionsRequest) (*pulumirpc.RuntimeOptionsResponse, error) {
+	return &pulumirpc.RuntimeOptionsResponse{}, nil
+}
+
 // About returns information about the runtime for this language.
 func (host *yamlLanguageHost) About(ctx context.Context, req *pulumirpc.AboutRequest) (*pulumirpc.AboutResponse, error) {
 	return &pulumirpc.AboutResponse{}, nil

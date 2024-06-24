@@ -3,7 +3,7 @@ CHANGELOG
 
 ## Unreleased
 
-- Update pulumi/pulumi to v3.120.0.
+- Update pulumi/pulumi to v3.121.0.
 
 ## 1.8.0 (2024-06-05)
 

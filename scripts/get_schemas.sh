@@ -38,6 +38,7 @@ schemas=(
   $(pulumi_schema using-dashes 1.0.0)
   $(pulumi_schema aws-static-website 0.4.0)
   $(pulumi_schema basic-unions 0.1.0)
+  $(pulumi_schema typeddict 1.0.0)
 )
 
 for s in "${schemas[@]}"; do

@@ -1,0 +1,11 @@
+resources:
+  main:
+    type: typeddict:ExampleComponent
+    properties:
+      myType:
+        stringProp: hello
+        nestedProp:
+          nestedStringProp: world
+          nestedNumberProp: 123
+      externalInput:
+        indexDocument: index.html
