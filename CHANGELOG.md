@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.9.1 (2024-07-11)
+
+### Bug Fixes
+
+- Fix Stack Reference output properties to be usable as any type, not only strings inputs.
+  [#600](https://github.com/pulumi/pulumi-yaml/pull/600)
+
 ## 1.9.0 (2024-06-26)
 
 ### Improvements
