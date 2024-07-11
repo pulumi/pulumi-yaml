@@ -109,8 +109,7 @@ func TestTypeError(t *testing.T) {
 			},
 			message: `Cannot assign '{prop1: asset, prop3: any}' to '{prop1: archive, prop2: boolean, prop3: string}':
   prop1: Cannot assign type 'asset' to type 'archive'
-  prop2: Missing required property 'prop2'
-  prop3: Cannot assign type 'any' to type 'string'`,
+  prop2: Missing required property 'prop2'`,
 		},
 
 		// Token Types:
@@ -126,10 +125,9 @@ func TestTypeError(t *testing.T) {
 		},
 		{
 			// Token types are assignable to the 'any' type, and no other type
-			from: &schema.TokenType{Token: "foo"},
-			to:   schema.StringType,
-			message: `Cannot assign 'foo<type = any>' to 'string'. 'foo<type = any>' is a Token Type. Token types act like their underlying type:
-  Cannot assign type 'any' to type 'string'`,
+			from:    &schema.TokenType{Token: "foo"},
+			to:      schema.StringType,
+			message: `Cannot assign 'foo<type = any>' to 'string'`,
 		},
 		{
 			// Token types are assignable to their underlying types
@@ -213,8 +211,10 @@ func TestTypeError(t *testing.T) {
 					t.Logf("err: %s", result.Error())
 				}
 			} else {
-				require.Error(t, result)
-				assert.Equal(t, c.message, result.String())
+				require.Error(t, result, fmt.Sprintf("Expected error %q, no error", c.message))
+				if result != nil {
+					assert.Equal(t, c.message, result.String())
+				}
 			}
 		})
 	}

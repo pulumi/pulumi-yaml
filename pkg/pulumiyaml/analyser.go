@@ -229,6 +229,10 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		return nil
 	}
 
+	if from == schema.AnyType || to == schema.AnyType {
+		return nil
+	}
+
 	dispType := func(t schema.Type) string {
 		var maybeType string
 		if schema.IsPrimitiveType(from) {
@@ -270,9 +274,11 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		return okIf(len(reasons) == 0).Because(reasons...)
 
 	case *schema.TokenType:
-		underlying := schema.AnyType
+		var underlying schema.Type
 		if from.UnderlyingType != nil {
 			underlying = from.UnderlyingType
+		} else {
+			return fail
 		}
 		check := isAssignable(underlying, to)
 		return okIfAssignable(check).WithReason(". '%s' is a Token Type. Token types act like their underlying type", displayType(from))
