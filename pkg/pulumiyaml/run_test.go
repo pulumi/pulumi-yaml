@@ -38,6 +38,10 @@ type MockPackageLoader struct {
 }
 
 func (m MockPackageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
+	if name == "pulumi" {
+		return resourcePackage{schema.DefaultPulumiPackage.Reference()}, nil
+	}
+
 	if version != nil {
 		// See if there is a version specific package
 		if pkg, found := m.packages[name+"@"+version.String()]; found {
@@ -196,7 +200,13 @@ func newMockPackageMap() PackageLoader {
 								},
 							},
 						}
-
+					case "test:resource:with-list-input":
+						return inputProperties("test:resource:not-run", schema.Property{
+							Name: "listInput",
+							Type: &schema.ArrayType{
+								ElementType: schema.StringType,
+							},
+						})
 					default:
 						return inputProperties(typeName)
 					}
@@ -2267,6 +2277,62 @@ func TestHandleUnknownPropertiesDuringPreview(t *testing.T) {
 	}, pulumi.WithMocks(testProject, "unknowns", &testMonitor{}), func(ri *pulumi.RunInfo) {
 		ri.DryRun = true
 	})
+	assert.NoError(t, err)
+}
+
+func TestStackReferenceOutputs(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-alias
+runtime: yaml
+resources:
+  ref:
+    type: pulumi:pulumi:StackReference
+    properties:
+      name: any
+  sec:
+    type: test:resource:with-list-input
+    properties:
+      listInput: ${ref.outputs["listOutput"]}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+
+			if args.TypeToken == "pulumi:pulumi:StackReference" {
+				assert.Equal(t, "ref", args.Name)
+				return "ref", resource.PropertyMap{
+					"outputs": resource.NewObjectProperty(resource.NewPropertyMapFromMap(map[string]any{
+						"listOutput": []string{"foo", "bar"},
+					})),
+				}, nil
+			} else if args.TypeToken == "test:resource:with-list-input" {
+				assert.Equal(t, "sec", args.Name)
+				assert.Equal(t,
+					resource.NewArrayProperty([]resource.PropertyValue{resource.NewStringProperty("foo"), resource.NewStringProperty("bar")}),
+					args.Inputs["listInput"])
+				return "sec", args.Inputs, nil
+			}
+
+			t.Fatalf("unexpected type token: %s", args.TypeToken)
+
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		_, diags := TypeCheck(runner)
+		if diags.HasErrors() {
+			return diags
+		}
+		err := runner.Evaluate(ctx)
+		assert.Len(t, err, 0)
+		assert.Equal(t, err.Error(), "no diagnostics")
+
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
 	assert.NoError(t, err)
 }
 
