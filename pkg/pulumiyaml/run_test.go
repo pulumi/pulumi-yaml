@@ -300,7 +300,8 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 					"foo": "oof",
 				}), args.Inputs, "expected resource test:resource:type to have property foo: oof")
 				assert.Equal(t, "", args.Provider)
-				assert.Equal(t, "", args.ID)
+				// ImportId is the empty string unless the 'import' resource option was given.
+				assert.Equal(t, args.RegisterRPC.ImportId, args.ID)
 
 				return "someID", resource.PropertyMap{
 					"foo":    resource.NewStringProperty("qux"),
@@ -2551,4 +2552,52 @@ func TestConflictingEnvVarsMultipleDuplicates(t *testing.T) {
 	env := []string{"FOO=bar", "FOO=baz", "BAR=qux", "BAR=quux", "FOO=foobar"}
 	conflicts := conflictingEnvVars(env)
 	assert.ElementsMatch(t, []string{"FOO", "BAR"}, conflicts)
+}
+
+func TestRegisterResourceWithImport(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Basic", func(t *testing.T) {
+		t.Parallel()
+		text := `
+name: test-register
+runtime: yaml
+resources:
+  bucket:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      import: "id"
+`
+
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		testTemplate(t, tmpl, func(e *programEvaluator) {
+			diags := e.evalContext.Evaluate(e.pulumiCtx)
+			requireNoErrors(t, tmpl, diags)
+		})
+	})
+
+	t.Run("Output as import id", func(t *testing.T) {
+		t.Parallel()
+		text := `
+name: test-register
+runtime: yaml
+config:
+  importId:
+    default: def
+resources:
+  bucket:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      import: ${importId}
+`
+
+		_, diags, err := LoadYAMLBytes("<stdin>", []byte(text))
+		require.NoError(t, err)
+		require.Len(t, diags, 1)
+		assert.Equal(t, "import must be a string", diags[0].Diagnostic.Summary)
+	})
 }

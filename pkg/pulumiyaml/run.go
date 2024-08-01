@@ -1141,7 +1141,18 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		}
 	}
 	if v.Options.Import != nil {
-		opts = append(opts, pulumi.Import(pulumi.ID(v.Options.Import.Value)))
+		importValue, ok := e.evaluateExpr(v.Options.Import)
+		if ok {
+			if !hasOutputs(importValue) {
+				opts = append(opts, pulumi.Import(pulumi.ID(v.Options.Import.Value)))
+			} else {
+				e.error(v.Options.Import, "import must be not be an output")
+				overallOk = false
+			}
+		} else {
+			e.error(v.Options.Import, "couldn't evaluate the 'import' resource option")
+			overallOk = false
+		}
 	}
 	if v.Options.IgnoreChanges != nil {
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
