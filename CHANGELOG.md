@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+## 1.9.2 (2024-08-09)
+
+### Bug Fixes
+
+- Fix a panic when the compiler doesn't include the name attribute from the Pulumi.yaml.
+  [#610](https://github.com/pulumi/pulumi-yaml/pull/610)
+
 ## 1.9.1 (2024-07-11)
 
 ### Bug Fixes
