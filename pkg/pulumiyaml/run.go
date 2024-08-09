@@ -72,9 +72,18 @@ func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*
 	if stdout.Len() != 0 {
 		diags = append(diags, syntax.Warning(nil, fmt.Sprintf("compiler %v warnings: %v", name, stdout.String()), ""))
 	}
+
 	templateStr := stdout.String()
 	template, tdiags, err := LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 	diags.Extend(tdiags...)
+
+	if template.Name == nil {
+		uncompiledTemplate, _, err := LoadDir(workingDirectory)
+		if err != nil || uncompiledTemplate.Name == nil {
+			return nil, diags, errors.New("compiler did not produce a valid template")
+		}
+		template.Name = uncompiledTemplate.Name
+	}
 
 	return template, tdiags, err
 }
