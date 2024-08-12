@@ -819,15 +819,17 @@ func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 		return
 	}
 
-	var project, stack string
+	var project, stack, organization string
 	if ctx != nil {
 		project = ctx.Project()
 		stack = ctx.Stack()
+		organization = ctx.Organization()
 	}
 	r.variables[PulumiVarName] = map[string]interface{}{
-		"cwd":     cwd,
-		"project": project,
-		"stack":   stack,
+		"cwd":          cwd,
+		"project":      project,
+		"stack":        stack,
+		"organization": organization,
 	}
 	r.cwd = cwd
 }

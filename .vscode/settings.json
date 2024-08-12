@@ -1,0 +1,6 @@
+{
+    "go.toolsEnvVars": {},
+    "go.testEnvVars": {
+        "PATH": "/Users/lukehoban/github/pulumi/pulumi-yaml/bin:${env:PATH}",
+    }
+}

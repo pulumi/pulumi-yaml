@@ -120,6 +120,11 @@ func (imp *importer) pulumiPropertyAccess(node ast.Expr, accessors []ast.Propert
 			Name:      "stack",
 			Signature: simple,
 		}, true, nil
+	case "organization":
+		return &model.FunctionCallExpression{
+			Name:      "organization",
+			Signature: simple,
+		}, true, nil
 	default:
 		return nil, true, wrapDiag("Unknown property of the `pulumi` variable: '%s'", prop.Name)
 	}
@@ -941,6 +946,7 @@ func (imp *importer) assignNames() {
 		"stack",
 		"project",
 		"cwd",
+		"organization",
 	)
 
 	assign := func(name, suffix string) *model.Variable {
