@@ -174,6 +174,10 @@ func TestExamplePulumiVariable(t *testing.T) {
 			projectOutput, isString := stack.Outputs["project"].(string)
 			assert.True(t, isString)
 			assert.Equal(t, "pulumi-reserved-variable", projectOutput)
+
+			organizationOutput, isString := stack.Outputs["organization"].(string)
+			assert.True(t, isString)
+			assert.Equal(t, "organization", organizationOutput)
 		}},
 	)
 }
