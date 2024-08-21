@@ -16,6 +16,23 @@ import (
 const example = `
 name: simple-yaml
 runtime: yaml
+config:
+  some-string-array:
+    type: array
+    value:
+      - subnet1
+      - subnet2
+      - subnet3
+    items:
+      type: string
+  some-nested-array:
+    type: array
+    items:
+      type: array
+      items:
+        type: string
+  some-boolean:
+    type: boolean
 resources:
   my-bucket:
     type: aws:s3/bucket:Bucket

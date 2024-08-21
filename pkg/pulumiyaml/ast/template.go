@@ -276,6 +276,7 @@ type ConfigParamDecl struct {
 	Secret  *BooleanExpr
 	Default Expr
 	Value   Expr
+	Items   *ConfigParamDecl
 }
 
 func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
