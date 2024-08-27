@@ -3,12 +3,15 @@
 package tests
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
+	ptesting "github.com/pulumi/pulumi/sdk/v3/go/common/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func integrationDir(dir string) string {
@@ -128,6 +131,30 @@ func TestEnvVarsKeepConflictingValues(t *testing.T) {
 func TestLocalPlugin(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Dir: filepath.Join("testdata", "local"),
+		LocalProviders: []integration.LocalDependency{
+			{Package: "testprovider", Path: "testprovider"},
+		},
+	})
+}
+
+// Test a paramaterized provider.
+//
+//nolint:paralleltest // ProgramTest calls t.Parallel()
+func TestParameterized(t *testing.T) {
+	e := ptesting.NewEnvironment(t)
+	// We can't use ImportDirectory here because we need to run this in the right directory such that the relative paths
+	// work. This also means we don't delete the directory after the test runs.
+	var err error
+	e.CWD, err = filepath.Abs("testdata/parameterized")
+	require.NoError(t, err)
+
+	err = os.RemoveAll(filepath.Join("testdata", "parameterized", "sdk"))
+	require.NoError(t, err)
+
+	_, _ = e.RunCommand("pulumi", "package", "gen-sdk", "../../testprovider", "pkg", "--language", "yaml", "--local")
+
+	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		Dir: filepath.Join("testdata", "parameterized"),
 		LocalProviders: []integration.LocalDependency{
 			{Package: "testprovider", Path: "testprovider"},
 		},

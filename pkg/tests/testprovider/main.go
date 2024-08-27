@@ -164,7 +164,7 @@ func (p *testproviderProvider) Parameterize(_ context.Context, req *rpc.Paramete
 
 	return &rpc.ParameterizeResponse{
 		Name:    p.parameter,
-		Version: version,
+		Version: "1.0.0",
 	}, nil
 }
 

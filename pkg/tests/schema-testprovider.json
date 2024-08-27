@@ -1,0 +1,109 @@
+{
+    "name": "pkg",
+    "version": "1.0.0",
+    "config": {},
+    "provider": {},
+    "resources": {
+        "pkg:index:Echo": {
+            "description": "A test resource that echoes its input.",
+            "properties": {
+                "echo": {
+                    "$ref": "pulumi.json#/Any",
+                    "description": "Input to echo."
+                }
+            },
+            "type": "object",
+            "inputProperties": {
+                "echo": {
+                    "$ref": "pulumi.json#/Any",
+                    "description": "An echoed input."
+                }
+            },
+            "methods": {
+                "doEchoMethod": "pkg:index:Echo/doEchoMethod"
+            }
+        },
+        "pkg:index:FailsOnCreate": {
+            "description": "A test resource fails on create.",
+            "type": "object"
+        },
+        "pkg:index:FailsOnDelete": {
+            "description": "A test resource fails on delete.",
+            "type": "object"
+        },
+        "pkg:index:Random": {
+            "description": "A test resource that generates a random string of a given length and with an optional prefix.",
+            "properties": {
+                "length": {
+                    "type": "integer",
+                    "description": "The length of the random string (not including the prefix, if any)."
+                },
+                "prefix": {
+                    "type": "string",
+                    "description": "An optional prefix."
+                },
+                "result": {
+                    "type": "string",
+                    "description": "A random string."
+                }
+            },
+            "type": "object",
+            "inputProperties": {
+                "length": {
+                    "type": "integer",
+                    "description": "The length of the random string (not including the prefix, if any)."
+                },
+                "prefix": {
+                    "type": "string",
+                    "description": "An optional prefix."
+                }
+            }
+        }
+    },
+    "functions": {
+        "pkg:index:Echo/doEchoMethod": {
+            "description": "A test call that echoes its input.",
+            "inputs": {
+                "properties": {
+                    "__self__": {
+                        "$ref": "#/types/pkg:index:Echo"
+                    },
+                    "echo": {
+                        "type": "string"
+                    }
+                }
+            },
+            "outputs": {
+                "properties": {
+                    "echo": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "pkg:index:doEcho": {
+            "description": "A test invoke that echoes its input.",
+            "inputs": {
+                "properties": {
+                    "echo": {
+                        "type": "string"
+                    }
+                }
+            },
+            "outputs": {
+                "properties": {
+                    "echo": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    },
+    "parameterization": {
+        "baseProvider": {
+            "name": "testprovider",
+            "version": "0.0.1"
+        },
+        "parameter": "cGtn"
+    }
+}

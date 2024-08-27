@@ -1,0 +1,12 @@
+name: parameterized
+description: An integration test showing the use of a parameterized package
+runtime: yaml
+resources:
+  res1:
+    type: pkg:index:Random
+    properties:
+      length: 10
+  res2:
+    type: pkg:index:Echo
+    properties:
+      echo: "hi"

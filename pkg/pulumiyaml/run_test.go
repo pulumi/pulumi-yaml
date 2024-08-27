@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -37,18 +38,18 @@ type MockPackageLoader struct {
 	packages map[string]Package
 }
 
-func (m MockPackageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
-	if name == "pulumi" {
+func (m MockPackageLoader) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (Package, error) {
+	if descriptor.Name == "pulumi" {
 		return resourcePackage{schema.DefaultPulumiPackage.Reference()}, nil
 	}
 
-	if version != nil {
+	if descriptor.Version != nil {
 		// See if there is a version specific package
-		if pkg, found := m.packages[name+"@"+version.String()]; found {
+		if pkg, found := m.packages[descriptor.Name+"@"+descriptor.Version.String()]; found {
 			return pkg, nil
 		}
 	}
-	if pkg, found := m.packages[name]; found {
+	if pkg, found := m.packages[descriptor.Name]; found {
 		return pkg, nil
 	}
 	return nil, fmt.Errorf("package not found")

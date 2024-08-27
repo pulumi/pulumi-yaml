@@ -19,8 +19,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
@@ -32,10 +34,12 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
@@ -344,6 +348,88 @@ func (host *yamlLanguageHost) GenerateProgram(
 
 	return &pulumirpc.GenerateProgramResponse{
 		Source:      files,
+		Diagnostics: rpcDiagnostics,
+	}, nil
+}
+
+func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirpc.GeneratePackageRequest) (*pulumirpc.GeneratePackageResponse, error) {
+	// YAML doesn't generally have "SDKs" per-se but we can write out a "lock file" for a given package name and
+	// version, and if using a parameterized package this is necessary so that we have somewhere to save the parameter
+	// value.
+
+	if len(req.ExtraFiles) > 0 {
+		return nil, errors.New("overlays are not supported for YAML")
+	}
+
+	loader, err := schema.NewLoaderClient(req.LoaderTarget)
+	if err != nil {
+		return nil, err
+	}
+
+	var spec schema.PackageSpec
+	err = json.Unmarshal([]byte(req.Schema), &spec)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg, diags, err := schema.BindSpec(spec, loader)
+	if err != nil {
+		return nil, err
+	}
+	rpcDiagnostics := plugin.HclDiagnosticsToRPCDiagnostics(diags)
+	if diags.HasErrors() {
+		return &pulumirpc.GeneratePackageResponse{
+			Diagnostics: rpcDiagnostics,
+		}, nil
+	}
+
+	// Generate the a package lock file in the given directory. This is just a simple YAML file that contains the name,
+	// version, and any parameter values.
+	lock := packages.PackageDecl{}
+	// The format of the lock file differs based on if this is a parameterized package or not.
+	if pkg.Parameterization == nil {
+		lock.Name = pkg.Name
+		if pkg.Version != nil {
+			lock.Version = pkg.Version.String()
+		}
+		lock.DownloadURL = pkg.PluginDownloadURL
+	} else {
+		lock.Name = pkg.Parameterization.BaseProvider.Name
+		lock.Version = pkg.Parameterization.BaseProvider.Version.String()
+		lock.DownloadURL = pkg.PluginDownloadURL
+		if pkg.Version == nil {
+			return nil, errors.New("parameterized package must have a version")
+		}
+		lock.Parameterization = &packages.ParameterizationDecl{
+			Name:    pkg.Name,
+			Version: pkg.Version.String(),
+		}
+		lock.Parameterization.SetValue(pkg.Parameterization.Parameter)
+	}
+
+	// Write out a yaml file for this package
+	var version string
+	if pkg.Version != nil {
+		version = fmt.Sprintf("-%s", pkg.Version.String())
+	}
+	dest := filepath.Join(req.Directory, fmt.Sprintf("%s%s.yaml", pkg.Name, version))
+
+	data, err := yaml.Marshal(lock)
+	if err != nil {
+		return nil, err
+	}
+
+	err = os.MkdirAll(req.Directory, 0o700)
+	if err != nil {
+		return nil, fmt.Errorf("could not create output directory %s: %w", req.Directory, err)
+	}
+
+	err = os.WriteFile(dest, data, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("could not write output file %s: %w", dest, err)
+	}
+
+	return &pulumirpc.GeneratePackageResponse{
 		Diagnostics: rpcDiagnostics,
 	}, nil
 }

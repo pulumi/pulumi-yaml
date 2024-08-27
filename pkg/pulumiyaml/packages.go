@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
@@ -63,7 +65,7 @@ type Package interface {
 }
 
 type PackageLoader interface {
-	LoadPackage(name string, version *semver.Version) (Package, error)
+	LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (Package, error)
 	Close()
 }
 
@@ -73,8 +75,8 @@ type packageLoader struct {
 	host plugin.Host
 }
 
-func (l packageLoader) LoadPackage(name string, version *semver.Version) (Package, error) {
-	pkg, err := l.ReferenceLoader.LoadPackageReference(name, version)
+func (l packageLoader) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (Package, error) {
+	pkg, err := l.ReferenceLoader.LoadPackageReferenceV2(ctx, descriptor)
 	if err != nil {
 		return nil, err
 	}
@@ -206,14 +208,30 @@ func ResolvePkgName(typeString string) string {
 	return typeParts[0]
 }
 
-func loadPackage(loader PackageLoader, typeString string, version *semver.Version) (Package, error) {
+func loadPackage(
+	ctx context.Context, loader PackageLoader,
+	descriptors map[tokens.Package]*schema.PackageDescriptor, typeString string, version *semver.Version,
+) (Package, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return nil, fmt.Errorf("invalid type token %q", typeString)
 	}
 
 	packageName := ResolvePkgName(typeString)
-	pkg, err := loader.LoadPackage(packageName, version)
+	descriptor := descriptors[tokens.Package(packageName)]
+	if descriptor == nil {
+		// Fall back to just the package name and passed in version if we don't have a descriptor.
+		descriptor = &schema.PackageDescriptor{
+			Name:    packageName,
+			Version: version,
+		}
+	}
+	if version != nil {
+		// Override the version if one was passed in.
+		descriptor.Version = version
+	}
+
+	pkg, err := loader.LoadPackage(ctx, descriptor)
 	if errors.Is(err, schema.ErrGetSchemaNotImplemented) {
 		return nil, fmt.Errorf("error loading schema for %q: %w", packageName, err)
 	} else if err != nil {
@@ -244,7 +262,9 @@ var helmResourceNames = map[string]struct{}{
 // ResolveResource determines the appropriate package for a resource, loads that package, then calls
 // the package's ResolveResource method to determine the canonical name of the resource, returning
 // both the package and the canonical name.
-func ResolveResource(loader PackageLoader, typeString string, version *semver.Version) (Package, ResourceTypeToken, error) {
+func ResolveResource(ctx context.Context, loader PackageLoader,
+	descriptors map[tokens.Package]*schema.PackageDescriptor,
+	typeString string, version *semver.Version) (Package, ResourceTypeToken, error) {
 	if issue, found := kubernetesResourceNames[typeString]; found {
 		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
 	}
@@ -253,7 +273,7 @@ func ResolveResource(loader PackageLoader, typeString string, version *semver.Ve
 		return nil, "", fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
 	}
 
-	pkg, err := loadPackage(loader, typeString, version)
+	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version)
 	if err != nil {
 		return nil, "", err
 	}
@@ -278,8 +298,10 @@ func ResolveResource(loader PackageLoader, typeString string, version *semver.Ve
 // ResolveFunction determines the appropriate package for a function, loads that package, then calls
 // the package's ResolveFunction method to determine the canonical name of the function, returning
 // both the package and the canonical name.
-func ResolveFunction(loader PackageLoader, typeString string, version *semver.Version) (Package, FunctionTypeToken, error) {
-	pkg, err := loadPackage(loader, typeString, version)
+func ResolveFunction(ctx context.Context, loader PackageLoader,
+	descriptors map[tokens.Package]*schema.PackageDescriptor,
+	typeString string, version *semver.Version) (Package, FunctionTypeToken, error) {
+	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version)
 	if err != nil {
 		return nil, "", err
 	}

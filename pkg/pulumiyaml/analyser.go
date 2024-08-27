@@ -3,6 +3,7 @@
 package pulumiyaml
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -586,7 +587,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		ctx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
 		return true
 	}
-	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value, version)
+	pkg, typ, err := ResolveResource(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, v.Type.Value, version)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
@@ -763,7 +764,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		ctx.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 		return true
 	}
-	pkg, functionName, err := ResolveFunction(ctx.pkgLoader, t.Token.Value, version)
+	pkg, functionName, err := ResolveFunction(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, t.Token.Value, version)
 	if err != nil {
 		_, b := ctx.error(t, err.Error())
 		return b

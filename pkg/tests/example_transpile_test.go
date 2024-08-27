@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
@@ -136,11 +136,11 @@ func newPluginLoader() schema.ReferenceLoader {
 
 type mockPackageLoader struct{ schema.ReferenceLoader }
 
-func (l mockPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
-	pkg, err := schema.LoadPackageReference(l.ReferenceLoader, name, version)
+func (l mockPackageLoader) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (pulumiyaml.Package, error) {
+	pkg, err := schema.LoadPackageReferenceV2(ctx, l.ReferenceLoader, descriptor)
 	if err != nil {
 		m := fmt.Sprintf(`Only plugin versions found under %q can currently be loaded`, schemaLoadPath)
-		return nil, fmt.Errorf("mockPackageLoader(name=%q, version=%v) failed: %w\n%s", name, version, err, m)
+		return nil, fmt.Errorf("mockPackageLoader(name=%q, version=%v) failed: %w\n%s", descriptor.Name, descriptor.Version, err, m)
 	}
 	return pulumiyaml.NewResourcePackage(pkg), nil
 }
