@@ -654,6 +654,7 @@ type Evaluator interface {
 	EvalVariable(r *Runner, node variableNode) bool
 	EvalResource(r *Runner, node resourceNode) bool
 	EvalOutput(r *Runner, node ast.PropertyMapEntry) bool
+	EvalMissing(r *Runner, node missingNode) bool
 }
 
 type programEvaluator struct {
@@ -748,6 +749,11 @@ func (e programEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 		e.resources[node.Key.Value] = res
 	}
 	return true
+}
+
+func (e programEvaluator) EvalMissing(r *Runner, node missingNode) bool {
+	e.error(node.key(), fmt.Sprintf("resource, variable, or config value %q not found", node.key().Value))
+	return false
 }
 
 func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
@@ -883,6 +889,10 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 				}
 			}
 			if !e.EvalResource(r, kvp) {
+				return returnDiags()
+			}
+		case missingNode:
+			if !e.EvalMissing(r, kvp) {
 				return returnDiags()
 			}
 		}

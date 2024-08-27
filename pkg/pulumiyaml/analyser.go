@@ -1114,6 +1114,12 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	return true
 }
 
+func (tc *typeCache) typeMissing(r *Runner, node missingNode) bool {
+	ctx := r.newContext(node)
+	ctx.errorf(node.key(), fmt.Sprintf("resource, variable, or config value %q not found", node.key().Value))
+	return false
+}
+
 // Checks for config type compatibility between types A and B, and if B can be assigned to A.
 // Config types are compatible if
 // - They are the same type.
@@ -1186,6 +1192,7 @@ func TypeCheck(r *Runner) (Typing, syntax.Diagnostics) {
 		VisitExpr:     types.typeExpr,
 		VisitVariable: types.typeVariable,
 		VisitConfig:   types.typeConfig,
+		VisitMissing:  types.typeMissing,
 		VisitOutput:   types.typeOutput,
 	})
 
@@ -1197,6 +1204,7 @@ type walker struct {
 	VisitVariable func(r *Runner, node variableNode) bool
 	VisitOutput   func(r *Runner, node ast.PropertyMapEntry) bool
 	VisitResource func(r *Runner, node resourceNode) bool
+	VisitMissing  func(r *Runner, node missingNode) bool
 	VisitExpr     func(*evalContext, ast.Expr) bool
 }
 
@@ -1318,6 +1326,15 @@ func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 	// We visit the expressions in a resource before we visit the resource itself
 	if e.VisitResource != nil {
 		if !e.VisitResource(r, node) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e walker) EvalMissing(r *Runner, node missingNode) bool {
+	if e.VisitMissing != nil {
+		if !e.VisitMissing(r, node) {
 			return false
 		}
 	}
