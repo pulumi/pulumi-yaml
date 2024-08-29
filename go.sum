@@ -434,12 +434,16 @@ github.com/pulumi/pulumi/pkg/v3 v3.129.1-0.20240819035819-d75251c49f8a h1:0+5Mro
 github.com/pulumi/pulumi/pkg/v3 v3.129.1-0.20240819035819-d75251c49f8a/go.mod h1:W3c7JgO064kUH5IfyQMCgmsAr5iwr3PO6KEeIQiO0dY=
 github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240829091439-153d830947e9 h1:1ogjMiohB3uE08RztKHeO/jn6QVrL0TLHxSZW4VDq1E=
 github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240829091439-153d830947e9/go.mod h1:8Wt6MyH3CO7ssKjYOuhmZHjV/H8oCeSCKe8jjVskuDo=
+github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240829105454-d6f4bf67e0ef h1:3JLywqtr4++8Y37/uHvfr4T/U9Gsw0izaWkKmHFO2JQ=
+github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240829105454-d6f4bf67e0ef/go.mod h1:8Wt6MyH3CO7ssKjYOuhmZHjV/H8oCeSCKe8jjVskuDo=
 github.com/pulumi/pulumi/sdk/v3 v3.129.1-0.20240819035819-d75251c49f8a h1:1k4pn6Ef3Ts5C6UMKpQGcVzs6GmfHOJWW76wVaAUiKE=
 github.com/pulumi/pulumi/sdk/v3 v3.129.1-0.20240819035819-d75251c49f8a/go.mod h1:p1U24en3zt51agx+WlNboSOV8eLlPWYAkxMzVEXKbnY=
 github.com/pulumi/pulumi/sdk/v3 v3.130.0 h1:gGJNd+akPqhZ+vrsZmAjSNJn6kGJkitjjkwrmIQMmn8=
 github.com/pulumi/pulumi/sdk/v3 v3.130.0/go.mod h1:p1U24en3zt51agx+WlNboSOV8eLlPWYAkxMzVEXKbnY=
 github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240829091439-153d830947e9 h1:xu7qiQPLiUHSW1Vh+jHAXggkllNCPPiip/69hf8mWxA=
 github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240829091439-153d830947e9/go.mod h1:p1U24en3zt51agx+WlNboSOV8eLlPWYAkxMzVEXKbnY=
+github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240829105454-d6f4bf67e0ef h1:oH1woWWcpw0V2NlH/sWoNerVuKETx9wIYgHubOC8e68=
+github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240829105454-d6f4bf67e0ef/go.mod h1:p1U24en3zt51agx+WlNboSOV8eLlPWYAkxMzVEXKbnY=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=

@@ -86,14 +86,6 @@ func (l packageLoader) Close() {
 	}
 }
 
-func NewPackageLoader() (PackageLoader, error) {
-	host, err := newResourcePackageHost()
-	if err != nil {
-		return nil, err
-	}
-	return packageLoader{schema.NewPluginLoader(host), host}, nil
-}
-
 // Unsafely create a PackageLoader from a schema.Loader, forfeiting the ability to close the host
 // and clean up plugins when finished. Useful for test cases.
 func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoader {

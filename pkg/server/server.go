@@ -182,8 +182,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		if err != nil {
 			return err
 		}
-		// TODO: loaderClient should be closable
-		//defer loader.Close()
+		defer loaderClient.Close()
 		loader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loaderClient)
 
 		// Now "evaluate" the template.
