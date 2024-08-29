@@ -18,6 +18,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
 type ResourceTypeToken string
@@ -86,8 +87,8 @@ func (l packageLoader) Close() {
 	}
 }
 
-func NewPackageLoader() (PackageLoader, error) {
-	host, err := newResourcePackageHost()
+func NewPackageLoader(plugins *workspace.Plugins) (PackageLoader, error) {
+	host, err := newResourcePackageHost(plugins)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +467,7 @@ func getResourceConstants(props []*schema.Property) map[string]interface{} {
 	return constantProps
 }
 
-func newResourcePackageHost() (plugin.Host, error) {
+func newResourcePackageHost(plugins *workspace.Plugins) (plugin.Host, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -474,7 +475,7 @@ func newResourcePackageHost() (plugin.Host, error) {
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
 		Color: cmdutil.GetGlobalColorization(),
 	})
-	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
+	pluginCtx, err := plugin.NewContextWithRoot(sink, sink, nil, cwd, cwd, nil, true, nil, plugins, nil, nil)
 	if err != nil {
 		return nil, err
 	}

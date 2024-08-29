@@ -1,0 +1,10 @@
+name: local
+scription: An integration test showing the use of a a local plugin
+runtime: yaml
+resources:
+  res1:
+    type: testprovider:index:Random
+    properties:
+      length: 10
+  res2:
+    type: testprovider:index:Echo
