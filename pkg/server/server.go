@@ -166,7 +166,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		ConfigSecretKeys:  req.GetConfigSecretKeys(),
 		ConfigPropertyMap: confPropMap,
 		Organization:      req.Organization,
-		Parallel:          int(req.GetParallel()),
+		Parallel:          req.GetParallel(),
 		DryRun:            req.GetDryRun(),
 		MonitorAddr:       req.GetMonitorAddress(),
 		EngineAddr:        host.engineAddress,
