@@ -23,6 +23,7 @@ import (
 	"os"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
@@ -166,7 +167,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		ConfigSecretKeys:  req.GetConfigSecretKeys(),
 		ConfigPropertyMap: confPropMap,
 		Organization:      req.Organization,
-		Parallel:          int(req.GetParallel()),
+		Parallel:          req.GetParallel(),
 		DryRun:            req.GetDryRun(),
 		MonitorAddr:       req.GetMonitorAddress(),
 		EngineAddr:        host.engineAddress,
@@ -177,11 +178,12 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	defer pctx.Close()
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
-		loader, err := pulumiyaml.NewPackageLoader()
+		loaderClient, err := schema.NewLoaderClient(req.LoaderTarget)
 		if err != nil {
 			return err
 		}
-		defer loader.Close()
+		defer loaderClient.Close()
+		loader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loaderClient)
 
 		// Now "evaluate" the template.
 		return pulumiyaml.RunTemplate(pctx, template, req.GetConfig(), confPropMap, loader)

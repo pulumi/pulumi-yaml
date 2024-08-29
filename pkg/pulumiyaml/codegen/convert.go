@@ -4,16 +4,12 @@ package codegen
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -24,32 +20,11 @@ import (
 // higher-level languages using PCL as an intermediate representation.
 type GenerateFunc func(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error)
 
-func newPluginHost() (plugin.Host, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
-		Color: cmdutil.GetGlobalColorization(),
-	})
-	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
-	if err != nil {
-		return nil, err
-	}
-	return pluginCtx.Host, nil
-}
-
 func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader) (string, hcl.Diagnostics, error) {
-	var diags hcl.Diagnostics
+	contract.Assertf(template != nil, "template must not be nil")
+	contract.Assertf(loader != nil, "loader must not be nil")
 
-	if loader == nil {
-		host, err := newPluginHost()
-		if err != nil {
-			return "", diags, err
-		}
-		loader = schema.NewPluginLoader(host)
-		defer contract.IgnoreClose(host)
-	}
+	var diags hcl.Diagnostics
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)
 	// nil runner passed in since template is not executed and we can use pkgLoader
