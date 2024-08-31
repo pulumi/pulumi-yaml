@@ -251,13 +251,14 @@ func (host *yamlLanguageHost) GenerateProject(
 	if err != nil {
 		return nil, err
 	}
+	defer loader.Close()
 
 	var extraOptions []pcl.BindOption
 	if !req.Strict {
 		extraOptions = append(extraOptions, pcl.NonStrictBindOptions()...)
 	}
 
-	program, diags, err := pcl.BindDirectory(req.SourceDirectory, loader, extraOptions...)
+	program, diags, err := pcl.BindDirectory(req.SourceDirectory, schema.NewCachedLoader(loader), extraOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -293,6 +294,7 @@ func (host *yamlLanguageHost) GenerateProgram(
 	if err != nil {
 		return nil, err
 	}
+	defer loader.Close()
 
 	parser := hclsyntax.NewParser()
 	// Load all .pp files in the directory
@@ -308,7 +310,7 @@ func (host *yamlLanguageHost) GenerateProgram(
 	}
 
 	program, diags, err := pcl.BindProgram(parser.Files,
-		pcl.Loader(loader),
+		pcl.Loader(schema.NewCachedLoader(loader)),
 		pcl.PreferOutputVersionedInvokes)
 	if err != nil {
 		return nil, err
