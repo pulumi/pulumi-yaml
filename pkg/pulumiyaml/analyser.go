@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -568,11 +569,27 @@ func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to sc
 func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
 	ctx := r.newContext(node)
-	version, err := ParseVersion(v.Options.Version)
-	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
-		return true
+
+	var version *semver.Version
+	if v.Options.Version != nil {
+		// compute the type of the version field
+		tc.typeExpr(ctx, v.Options.Version)
+
+		// make sure specified version is typed as a string
+		tc.assertTypeAssignable(ctx, v.Options.Version, schema.StringType)
+
+		// if it happens to be a static string, make sure it parsable as a semver
+		switch versionValue := v.Options.Version.(type) {
+		case *ast.StringExpr:
+			parsedVersion, err := semver.ParseTolerant(versionValue.Value)
+			if err != nil {
+				ctx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
+				return true
+			}
+			version = &parsedVersion
+		}
 	}
+
 	pkg, typ, err := ResolveResource(ctx.pkgLoader, v.Type.Value, version)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
@@ -745,6 +762,11 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourc
 }
 
 func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
+	if t.CallOpts.Version != nil {
+		tc.typeExpr(ctx, t.CallOpts.Version)
+		tc.assertTypeAssignable(ctx, t.CallOpts.Version, schema.StringType)
+	}
+
 	version, err := ParseVersion(t.CallOpts.Version)
 	if err != nil {
 		ctx.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))

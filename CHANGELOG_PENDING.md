@@ -2,6 +2,8 @@
 
 - [features] add "pulumi.organiztion" to the built-in "pulumi" variable to obtain the current organization.
 
+- Allow `version` to be set dynamically.
+
 ### Bug Fixes
 
 - Parse the items property on config type declarations to prevent diagnostic messages about

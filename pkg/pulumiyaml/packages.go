@@ -114,15 +114,23 @@ type pluginEntry struct {
 	pluginDownloadURL string
 }
 
+func getVersionValue(versionExpr ast.Expr) string {
+	switch version := versionExpr.(type) {
+	case *ast.StringExpr:
+		return version.Value
+	}
+
+	return ""
+}
+
 // GetReferencedPlugins returns the packages and (if provided) versions for each referenced provider
 // used in the program.
 func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics) {
 	pluginMap := map[string]*pluginEntry{}
-
-	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
+	acceptType := func(r *Runner, typeName string, version ast.Expr, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
 		if entry, found := pluginMap[pkg]; found {
-			if v := version.GetValue(); v != "" && entry.version != v {
+			if v := getVersionValue(version); v != "" && entry.version != v {
 				if entry.version == "" {
 					entry.version = v
 				} else {
@@ -138,7 +146,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 			}
 		} else {
 			pluginMap[pkg] = &pluginEntry{
-				version:           version.GetValue(),
+				version:           getVersionValue(version),
 				pluginDownloadURL: pluginDownloadURL.GetValue(),
 			}
 		}
