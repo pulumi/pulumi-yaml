@@ -2043,6 +2043,46 @@ resources:
 	assert.NoError(t, err)
 }
 
+func TestEvaluateMissingError(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-missing-config-value
+runtime: yaml
+variables:
+  foo: ${someConfigValue}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Len(t, err, 1)
+		assert.Equal(t, "<stdin>:4,8-8: resource, variable, or config value \"someConfigValue\" not found; ", err.Error())
+		return nil
+	}, pulumi.WithMocks("project", "stack", &testMonitor{}))
+	assert.NoError(t, err)
+}
+
+func TestRunMissingIgnore(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-missing-config-value
+runtime: yaml
+variables:
+  foo: ${someConfigValue}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Run(walker{})
+		assert.Len(t, err, 0)
+		assert.Equal(t, "no diagnostics", err.Error())
+		return nil
+	}, pulumi.WithMocks("project", "stack", &testMonitor{}))
+	assert.NoError(t, err)
+}
+
 func TestResourceWithAlias(t *testing.T) {
 	t.Parallel()
 
