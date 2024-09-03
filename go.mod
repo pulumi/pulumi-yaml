@@ -12,12 +12,13 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.129.1-0.20240819035819-d75251c49f8a
-	github.com/pulumi/pulumi/sdk/v3 v3.129.1-0.20240819035819-d75251c49f8a
+	github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240831132520-d9df47718158
+	github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240831132520-d9df47718158
 	github.com/spf13/afero v1.9.5
 	github.com/stretchr/testify v1.9.0
 	github.com/zclconf/go-cty v1.13.2
 	google.golang.org/grpc v1.63.2
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -186,7 +187,6 @@ require (
 	google.golang.org/genproto v0.0.0-20240311173647-c811ad7063a7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311173647-c811ad7063a7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240311173647-c811ad7063a7 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 	mvdan.cc/gofumpt v0.5.0 // indirect

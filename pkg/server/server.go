@@ -26,6 +26,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/version"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 
@@ -135,6 +136,15 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		fmt.Sprintf(`PULUMI_CONFIG=%s`, jsonConfigValue),
 	}
 
+	projPath, err := workspace.DetectProjectPathFrom(req.Info.RootDirectory)
+	if err != nil {
+		return nil, err
+	}
+	proj, err := workspace.LoadProject(projPath)
+	if err != nil {
+		return nil, err
+	}
+
 	template, diags, err := host.loadTemplate(compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
@@ -166,7 +176,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		ConfigSecretKeys:  req.GetConfigSecretKeys(),
 		ConfigPropertyMap: confPropMap,
 		Organization:      req.Organization,
-		Parallel:          int(req.GetParallel()),
+		Parallel:          req.GetParallel(),
 		DryRun:            req.GetDryRun(),
 		MonitorAddr:       req.GetMonitorAddress(),
 		EngineAddr:        host.engineAddress,
@@ -177,7 +187,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	defer pctx.Close()
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
-		loader, err := pulumiyaml.NewPackageLoader()
+		loader, err := pulumiyaml.NewPackageLoader(proj.Plugins)
 		if err != nil {
 			return err
 		}
