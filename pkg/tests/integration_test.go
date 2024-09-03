@@ -121,3 +121,15 @@ func TestEnvVarsKeepConflictingValues(t *testing.T) {
 	}
 	integration.ProgramTest(t, &testOptions)
 }
+
+// Test a local provider plugin.
+//
+//nolint:paralleltest // ProgramTest calls t.Parallel()
+func TestLocalPlugin(t *testing.T) {
+	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		Dir: filepath.Join("testdata", "local"),
+		LocalProviders: []integration.LocalDependency{
+			{Package: "testprovider", Path: "testprovider"},
+		},
+	})
+}
