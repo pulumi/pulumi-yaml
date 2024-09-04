@@ -5,7 +5,7 @@ CHANGELOG
 
 ### Improvements
 
-- [features] add "pulumi.organiztion" to the built-in "pulumi" variable to obtain the current organization.
+- Add "pulumi.organization" to the built-in "pulumi" variable to obtain the current organization [#613](https://github.com/pulumi/pulumi-yaml/pull/613)
 
 ### Bug Fixes
 
