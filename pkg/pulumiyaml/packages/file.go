@@ -34,6 +34,8 @@ func (p *ParameterizationDecl) SetValue(value []byte) {
 }
 
 type PackageDecl struct {
+	// PackageDeclarationVersion is the version of the package declaration file.
+	PackageDeclarationVersion int `yaml:"packageDeclarationVersion"`
 	// Name is the name of the plugin.
 	Name string `yaml:"name"`
 	// Version is the version of the plugin.
@@ -45,6 +47,11 @@ type PackageDecl struct {
 }
 
 func (p *PackageDecl) Valid() bool {
+	// All packages should define their version as 1
+	if p.PackageDeclarationVersion != 1 {
+		return false
+	}
+
 	// All packages need a name
 	if p.Name == "" {
 		return false

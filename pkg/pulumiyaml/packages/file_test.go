@@ -13,15 +13,18 @@ func TestSearchPackageLocks(t *testing.T) {
 
 	expected := []PackageDecl{
 		{
-			Name: "pkg",
+			PackageDeclarationVersion: 1,
+			Name:                      "pkg",
 		},
 		{
-			Name:        "pkg2",
-			Version:     "1.2",
-			DownloadURL: "github://api.github.com/pulumiverse",
+			PackageDeclarationVersion: 1,
+			Name:                      "pkg2",
+			Version:                   "1.2",
+			DownloadURL:               "github://api.github.com/pulumiverse",
 		},
 		{
-			Name: "base",
+			PackageDeclarationVersion: 1,
+			Name:                      "base",
 			Parameterization: &ParameterizationDecl{
 				Name:    "pkg",
 				Version: "1.0.0",

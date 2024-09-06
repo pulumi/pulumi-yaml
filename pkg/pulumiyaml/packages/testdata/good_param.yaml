@@ -1,3 +1,4 @@
+packageDeclarationVersion: 1
 name: base
 parameterization:
   name: pkg

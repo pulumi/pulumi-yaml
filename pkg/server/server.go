@@ -385,7 +385,9 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 
 	// Generate the a package lock file in the given directory. This is just a simple YAML file that contains the name,
 	// version, and any parameter values.
-	lock := packages.PackageDecl{}
+	lock := packages.PackageDecl{
+		PackageDeclarationVersion: 1,
+	}
 	// The format of the lock file differs based on if this is a parameterized package or not.
 	if pkg.Parameterization == nil {
 		lock.Name = pkg.Name
