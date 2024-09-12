@@ -1,6 +1,8 @@
 module github.com/pulumi/pulumi-yaml
 
-go 1.19
+go 1.21
+
+toolchain go1.22.3
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -12,8 +14,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.130.1-0.20240831132520-d9df47718158
-	github.com/pulumi/pulumi/sdk/v3 v3.130.1-0.20240831132520-d9df47718158
+	github.com/pulumi/pulumi/pkg/v3 v3.132.0
+	github.com/pulumi/pulumi/sdk/v3 v3.132.0
 	github.com/spf13/afero v1.9.5
 	github.com/stretchr/testify v1.9.0
 	github.com/zclconf/go-cty v1.13.2
@@ -139,7 +141,7 @@ require (
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/esc v0.9.1 // indirect
+	github.com/pulumi/esc v0.9.2-0.20240910221656-328d3204100f // indirect
 	github.com/pulumi/inflector v0.1.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
@@ -154,7 +156,6 @@ require (
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/texttheater/golang-levenshtein v1.0.1 // indirect
-	github.com/tweekmonster/luser v0.0.0-20161003172636-3fa38070dbd7 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
