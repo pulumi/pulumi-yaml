@@ -1924,11 +1924,16 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t, err.Error())
 		}
 
-		if err := e.pulumiCtx.Invoke(string(functionName), args[0], &result, opts...); err != nil {
+		pkgRef := ""
+		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, pkgRef, opts...)
+		if err != nil {
 			return e.error(t, err.Error())
 		}
 
 		if t.Return.GetValue() == "" {
+			if secret {
+				return pulumi.ToSecret(pulumi.Any(result)), true
+			}
 			return result, true
 		}
 
@@ -1936,6 +1941,9 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		if !ok {
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
 			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+		}
+		if secret {
+			return pulumi.ToSecret(pulumi.Any(retv)), true
 		}
 		return retv, true
 	})

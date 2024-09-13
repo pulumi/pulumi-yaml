@@ -215,6 +215,36 @@ runtime: yaml
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestInvokeReturningSecrets(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  cipher:
+    fn::invoke:
+      function: test:invoke:secret
+      return: response
+outputs:
+  secret: ${cipher}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	var innerValue string
+	diags := testInvokeDiags(t, tmpl, func(r *Runner) {
+		cipher, ok := r.variables["cipher"].(pulumi.AnyOutput)
+		assert.True(t, ok)
+		assert.NotNil(t, cipher)
+		cipher.ApplyT(func(v interface{}) interface{} {
+			innerValue = v.(string)
+			return v
+		})
+	})
+	requireNoErrors(t, tmpl, diags)
+	assert.Equal(t, "super-secret", innerValue)
+}
+
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
 	mocks := &testMonitor{
 		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
@@ -239,6 +269,10 @@ func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Ru
 				return nil, nil
 			case "test:invoke:poison":
 				return nil, fmt.Errorf("Don't eat the poison")
+			case "test:invoke:secret":
+				return resource.PropertyMap{
+					"response": resource.MakeSecret(resource.NewStringProperty("super-secret")),
+				}, nil
 			}
 			return resource.PropertyMap{}, fmt.Errorf("Unexpected invoke %s", args.Token)
 		},
