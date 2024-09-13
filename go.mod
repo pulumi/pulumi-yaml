@@ -2,8 +2,6 @@ module github.com/pulumi/pulumi-yaml
 
 go 1.21
 
-toolchain go1.22.3
-
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/ettle/strcase v0.1.1
