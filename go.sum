@@ -456,6 +456,8 @@ github.com/pulumi/inflector v0.1.1 h1:dvlxlWtXwOJTUUtcYDvwnl6Mpg33prhK+7mzeF+Sob
 github.com/pulumi/inflector v0.1.1/go.mod h1:HUFCjcPTz96YtTuUlwG3i3EZG4WlniBvR9bd+iJxCUY=
 github.com/pulumi/pulumi/pkg/v3 v3.132.0 h1:FbIvkiFMOYwAixQZ330w42b0khMeAYj+vlH3k4lxwA8=
 github.com/pulumi/pulumi/pkg/v3 v3.132.0/go.mod h1:EnftmBaN59wQI//Q4a6XN3QUlHA4SiGBup8TXC8iT3s=
+github.com/pulumi/pulumi/pkg/v3 v3.132.1-0.20240913143253-a61972e642c1 h1:v07A6+NfGBH/5c8ZI0gGjzny/Xm342hVJP192aulkJo=
+github.com/pulumi/pulumi/pkg/v3 v3.132.1-0.20240913143253-a61972e642c1/go.mod h1:EnftmBaN59wQI//Q4a6XN3QUlHA4SiGBup8TXC8iT3s=
 github.com/pulumi/pulumi/sdk/v3 v3.132.0 h1:UDZHa+WpIEVxWJp+PCbsMxnTUeKMX3xBCcqIHxeAdzI=
 github.com/pulumi/pulumi/sdk/v3 v3.132.0/go.mod h1:J5kQEX8v87aeUhk6NdQXnjCo1DbiOnOiL3Sf2DuDda8=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
