@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
@@ -532,10 +534,15 @@ func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
 	}
 }
 
+var disableTypeChecking = cmdutil.IsTruthy(os.Getenv("PULUMI_YAML_DISABLE_TYPE_CHECKING"))
+
 // Provides an appropriate diagnostic message if it is illegal to assign `from`
 // to `to`.
 func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to schema.Type) {
-	return
+	if disableTypeChecking {
+		return
+	}
+
 	if to == nil {
 		return
 	}
