@@ -2,18 +2,28 @@
 
 ## Changelog
 
-The changelog in this repo is managed through a `CHANGELOG_PENDING.md`
-file.  Please add a new entry for any changes there.
+Changelog management is done via [`changie`](https://changie.dev/).
+See the [installation](https://changie.dev/guide/installation/) guide for `changie`.
 
-## Releasing
+Run `changie new` in the top level directory. Here is an example of what that looks like:
 
-To release a new version of `pulumi-yaml`, create a `CHANGELOG.md`
-entry with the new version number, and copy the contents of
-`CHANGELOG_PENDING.md` there.  Once this is merged, create a new tag
-with the version number and push that.  This will kick off the
-automation to create a new GitHub release.  Finally empty the
-`CHANGELOG_PENDING.md` file, so we're ready for accumulating changelog
-entries for the next version.
+```shell
+$ changie new
+✔ Component … runtime
+✔ Kind … Improvements
+✔ Body … Cool new feature.
+✔ GitHub Pull Request … 123
+```
 
-To release the version to users, `pulumi-yaml` also has to be updated
-in `pulumi/pulumi`.
+## Release
+
+To release a new version use `changie` to update the changelog file, open a PR for that change. Once that PR merges it will trigger a release workflow.
+
+```shell
+$ changie batch auto
+$ changie merge
+$ git add .
+$ git commit -m "Changelog for $(changie latest)"
+```
+
+After the release, also bump the version in `pulumi/pulumi`.  Do this by updating the version of pulumi-yaml in the pkg/go.mod.
