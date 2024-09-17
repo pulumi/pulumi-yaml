@@ -1,6 +1,0 @@
-component: runtime
-kind: Bug Fixes
-body: Fix handling invokes that error out when the response contains secrets
-time: 2024-09-17T10:58:52.46667+01:00
-custom:
-  PR: "619"
