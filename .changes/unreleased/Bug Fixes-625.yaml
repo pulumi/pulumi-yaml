@@ -1,0 +1,6 @@
+component: codegen
+kind: Bug Fixes
+body: Add support for the stack, project, and organization builtins
+time: 2024-09-17T10:58:20.381167+01:00
+custom:
+  PR: "625"

@@ -1,0 +1,28 @@
+name: Verify changelog
+
+on:
+  merge_group:
+  pull_request:
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get the latest version
+        id: latest
+        uses: miniscruff/changie-action@v2
+        with:
+          args: latest
+      - name: Verify
+        run: |
+          if [ ! gh release list | grep "${{ steps.latest.outputs.output }}" ]; then
+            # The changie latest isn't yet published, i.e. we're going to publish it so check ".changes/unreleased" is empty
+            if [ ! -z $(ls -A .changes/unreleased) ]; then
+              echo "Unreleased changes are not empty"
+              exit 1
+            fi
+          fi
