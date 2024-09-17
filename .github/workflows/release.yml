@@ -7,7 +7,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.PULUMI_BOT_TOKEN }}
 
 jobs:
-  release-pulumi-language-dotnet:
+  release-pulumi-language-yaml:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
