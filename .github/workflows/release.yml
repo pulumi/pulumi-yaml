@@ -52,6 +52,7 @@ jobs:
           fi
       - name: Run GoReleaser
         if: steps.check-release.outputs.exists == 'false'
-        uses: ./.github/workflows/stage-publish.yml
+        uses: goreleaser/goreleaser-action@v2
         with:
-          goreleaser-args: -p 10 -f .goreleaser.yml --clean --skip=validate --timeout 60m0s --release-notes=${{ env.RELEASE_NOTES_PATH }}
+          version: latest
+          args: -p 10 -f .goreleaser.yml --clean --skip=validate --timeout 60m0s --release-notes=${{ env.RELEASE_NOTES_PATH }}
