@@ -406,3 +406,4 @@ First preview release of YAML language support for Pulumi. See README for langua
   by discovering the package schema and using the value declared there.
 
 - [features] can use shorter resource types and function names against one of a couple patterns.
+
