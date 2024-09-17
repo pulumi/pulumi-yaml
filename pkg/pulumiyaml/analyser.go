@@ -535,6 +535,7 @@ func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
 // Provides an appropriate diagnostic message if it is illegal to assign `from`
 // to `to`.
 func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to schema.Type) {
+	return
 	if to == nil {
 		return
 	}

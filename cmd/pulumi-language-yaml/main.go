@@ -36,6 +36,7 @@ import (
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the
 // LanguageRuntimeServer RPC endpoint.
 func main() {
+	panic("HERE!")
 	// Parse the flags and initialize some boilerplate.
 	var tracing string
 	var root string
