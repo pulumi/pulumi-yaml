@@ -534,7 +534,7 @@ func hasValidEnumValue(from ast.Expr, to []*schema.Enum) *notAssignable {
 	}
 }
 
-var disableTypeChecking = cmdutil.IsTruthy(os.Getenv("PULUMI_YAML_DISABLE_TYPE_CHECKING"))
+var disableTypeChecking = cmdutil.IsTruthy(os.Getenv("PULUMI_DEBUG_YAML_DISABLE_TYPE_CHECKING"))
 
 // Provides an appropriate diagnostic message if it is illegal to assign `from`
 // to `to`.
