@@ -1,6 +1,0 @@
-component: codegen
-kind: Bug Fixes
-body: Fix GenerateProgram not using the Strict flag
-time: 2024-09-18T14:11:14.985045+02:00
-custom:
-    PR: "635"
