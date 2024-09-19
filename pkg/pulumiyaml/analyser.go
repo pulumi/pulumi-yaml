@@ -540,6 +540,11 @@ var disableTypeChecking = cmdutil.IsTruthy(os.Getenv("PULUMI_DEBUG_YAML_DISABLE_
 // to `to`.
 func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to schema.Type) {
 	if disableTypeChecking {
+		ctx.addWarnDiag(
+			from.Syntax().Syntax().Range(),
+			"Running with type checking disabled. This is not recommended for production use.",
+			"This is a test feature and should not be used in production. Unexpected behavior may occur.",
+		)
 		return
 	}
 
