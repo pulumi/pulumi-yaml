@@ -191,14 +191,17 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
 	defer pctx.Close()
+
+	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
+	// time RunWithContext returns we should be done with all async work.
+	loader, err := pulumiyaml.NewPackageLoader(proj.Plugins)
+	if err != nil {
+		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	}
+	defer loader.Close()
+
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
-		loader, err := pulumiyaml.NewPackageLoader(proj.Plugins)
-		if err != nil {
-			return err
-		}
-		defer loader.Close()
-
 		// Now "evaluate" the template.
 		return pulumiyaml.RunTemplate(pctx, template, req.GetConfig(), confPropMap, loader)
 	}); err != nil {
