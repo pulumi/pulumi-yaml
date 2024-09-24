@@ -1,0 +1,17 @@
+name: aws-yaml
+runtime: yaml
+resources:
+  alb:
+    type: aws:alb:LoadBalancer
+    properties:
+      tags: 
+        Name: test-lb
+      name: testing
+      subnets: 
+        - subnet-eacf3697
+        - subnet-939b18f8
+  provider:
+    defaultProvider: true
+    type: pulumi:providers:aws
+    properties:
+      region: us-west-2
