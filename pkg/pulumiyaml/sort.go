@@ -138,9 +138,16 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 			sorted = append(sorted, node)
 		}
 	}
+
+	var defaultProvider *ast.StringExpr
 	for _, kvp := range t.Resources.Entries {
 		rname, r := kvp.Key.Value, kvp.Value
 		node := resourceNode(kvp)
+
+		// Check if the resource is a default provider
+		if resourceIsDefaultProvider(node) {
+			defaultProvider = node.key()
+		}
 
 		cdiags := checkUniqueNode(intermediates, node)
 		diags = append(diags, cdiags...)
@@ -198,6 +205,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 		}
 		if !visited[name.Value] {
 			visiting[name.Value] = true
+
 			for _, mname := range dependencies[name.Value] {
 				if mname.Value == PulumiVarName {
 					continue
@@ -206,6 +214,20 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 					return false
 				}
 			}
+
+			if resourceNodeHasNoExplicitProvider(e) && defaultProvider != name {
+				if defaultProvider == nil {
+					diags.Extend(ast.ExprError(name, "resource has no explicit provider and no default provider set", ""))
+					return false
+				}
+
+				// If the resource has no explicit provider and the default provider is not set, then the
+				// (implicit) dependency is not yet met.
+				if !visit(defaultProvider) {
+					return false
+				}
+			}
+
 			visited[name.Value] = true
 			visiting[name.Value] = false
 
@@ -232,13 +254,29 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 	return sorted, diags
 }
 
+// resourceIsDefaultProvider returns true if the node is a default provider, otherwise false.
+func resourceIsDefaultProvider(res resourceNode) bool {
+	return res.Value.DefaultProvider != nil && res.Value.DefaultProvider.Value
+}
+
+// resourceNodeHasNoExplicitProvider returns true if the node is a resource
+// node and has no explicit provider set, otherwise false.
+func resourceNodeHasNoExplicitProvider(graphNode graphNode) bool {
+	if res, ok := graphNode.(resourceNode); ok {
+		return res.Value.Options.Provider == nil
+	}
+
+	return false
+}
+
 func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.Diagnostics {
 	var diags syntax.Diagnostics
 
 	key := node.key()
 	name := key.Value
 	if name == PulumiVarName {
-		return syntax.Diagnostics{ast.ExprError(key, fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
+		return syntax.Diagnostics{ast.ExprError(key,
+			fmt.Sprintf("%s %s uses the reserved name pulumi", node.valueKind(), name), "")}
 	}
 
 	if other, found := intermediates[name]; found {
@@ -249,7 +287,8 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))
 		} else {
-			diags.Extend(ast.ExprError(key, fmt.Sprintf("%s %s cannot have the same name as %s %s", node.valueKind(), name, other.valueKind(), name), ""))
+			diags.Extend(ast.ExprError(key, fmt.Sprintf(
+				"%s %s cannot have the same name as %s %s", node.valueKind(), name, other.valueKind(), name), ""))
 		}
 		return diags
 	}

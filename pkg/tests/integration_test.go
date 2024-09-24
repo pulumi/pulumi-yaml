@@ -133,3 +133,13 @@ func TestLocalPlugin(t *testing.T) {
 		},
 	})
 }
+
+//nolint:paralleltest // uses parallel programtest
+func TestResourceOrderingWithDefaultProvider(t *testing.T) {
+	integration.ProgramTest(t,
+		&integration.ProgramTestOptions{
+			Dir:                    filepath.Join("testdata", "resource-ordering"),
+			SkipUpdate:             true,
+			SkipEmptyPreviewUpdate: true,
+		})
+}
