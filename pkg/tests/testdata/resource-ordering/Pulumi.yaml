@@ -1,5 +1,9 @@
 name: aws-yaml
 runtime: yaml
+plugins:
+  providers:
+    - name: testprovider
+      path: ../../testprovider
 resources:
   alb:
     type: aws:alb:LoadBalancer
@@ -10,8 +14,16 @@ resources:
       subnets: 
         - subnet-eacf3697
         - subnet-939b18f8
+  echo:
+    type: testprovider:index:Echo
   provider:
     defaultProvider: true
     type: pulumi:providers:aws
     properties:
       region: us-west-2
+  testProvider:
+    defaultProvider: true
+    type: pulumi:providers:testprovider
+    properties:
+      testInput: ${alb.urn}
+

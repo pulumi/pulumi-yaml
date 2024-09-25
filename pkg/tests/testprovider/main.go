@@ -52,7 +52,12 @@ var providerSchema = pschema.PackageSpec{
 			Description: "The provider type for the testprovider package.",
 			Type:        "object",
 		},
-		InputProperties: map[string]pschema.PropertySpec{},
+		InputProperties: map[string]pschema.PropertySpec{
+			"testInput": {
+				TypeSpec:    pschema.TypeSpec{Type: "string"},
+				Description: "A test input property.",
+			},
+		},
 	},
 
 	Types:     map[string]pschema.ComplexTypeSpec{},

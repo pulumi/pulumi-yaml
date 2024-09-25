@@ -139,14 +139,16 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 		}
 	}
 
-	var defaultProvider *ast.StringExpr
+	// Map of package name to default provider resource and it's key.
+	defaultProviders := map[string]*ast.StringExpr{}
 	for _, kvp := range t.Resources.Entries {
 		rname, r := kvp.Key.Value, kvp.Value
 		node := resourceNode(kvp)
 
 		// Check if the resource is a default provider
 		if resourceIsDefaultProvider(node) {
-			defaultProvider = node.key()
+			pkg := strings.Split(node.Value.Type.Value, ":")[2]
+			defaultProviders[pkg] = node.key()
 		}
 
 		cdiags := checkUniqueNode(intermediates, node)
