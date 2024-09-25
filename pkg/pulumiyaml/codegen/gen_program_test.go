@@ -4,6 +4,7 @@ package codegen
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,8 +66,8 @@ func (m FakePackage) ResolveResource(typeName string) (pulumiyaml.ResourceTypeTo
 		return pulumiyaml.ResourceTypeToken(typeName), nil
 	default:
 		msg := fmt.Sprintf("Unexpected type token in ResolveResource: %q", typeName)
-		m.t.Logf(msg)
-		return "", fmt.Errorf(msg)
+		m.t.Logf("%s", msg)
+		return "", errors.New(msg)
 	}
 }
 
@@ -117,8 +118,8 @@ func (m FakePackage) ResolveFunction(typeName string) (pulumiyaml.FunctionTypeTo
 		return pulumiyaml.FunctionTypeToken(typeName), nil
 	}
 	msg := fmt.Sprintf("Unexpected type token in ResolveFunction: %q", typeName)
-	m.t.Logf(msg)
-	return "", fmt.Errorf(msg)
+	m.t.Logf("%s", msg)
+	return "", errors.New(msg)
 }
 
 func (m FakePackage) FunctionTypeHint(typeName pulumiyaml.FunctionTypeToken) *schema.Function {
@@ -133,8 +134,8 @@ func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, e
 		return false, nil
 	}
 	msg := fmt.Sprintf("Unexpected type token in IsComponent: %q", typeName)
-	m.t.Logf(msg)
-	return false, fmt.Errorf(msg)
+	m.t.Logf("%s", msg)
+	return false, errors.New(msg)
 }
 
 func (m FakePackage) Name() string {
