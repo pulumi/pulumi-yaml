@@ -53,7 +53,7 @@ var providerSchema = pschema.PackageSpec{
 			Type:        "object",
 		},
 		InputProperties: map[string]pschema.PropertySpec{
-			"testInput": pschema.PropertySpec{
+			"testInput": {
 				TypeSpec:    pschema.TypeSpec{Type: "string"},
 				Description: "A test input property.",
 			},
