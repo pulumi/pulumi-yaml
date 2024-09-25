@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: update go version for github workflows
+time: 2024-09-25T14:50:03.581885966+09:00
+custom:
+  PR: "647"
