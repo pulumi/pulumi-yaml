@@ -139,14 +139,16 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 		}
 	}
 
-	var defaultProvider *ast.StringExpr
+	// Map of package name to default provider resource and it's key.
+	defaultProviders := map[string]*ast.StringExpr{}
 	for _, kvp := range t.Resources.Entries {
 		rname, r := kvp.Key.Value, kvp.Value
 		node := resourceNode(kvp)
 
 		// Check if the resource is a default provider
 		if resourceIsDefaultProvider(node) {
-			defaultProvider = node.key()
+			pkg := strings.Split(node.Value.Type.Value, ":")[2]
+			defaultProviders[pkg] = node.key()
 		}
 
 		cdiags := checkUniqueNode(intermediates, node)
@@ -215,14 +217,22 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 				}
 			}
 
-			if resourceNodeHasNoExplicitProvider(e) && defaultProvider != name {
-				// If the resource has no explicit provider and the default provider is not set, then the
-				// (implicit) dependency is not yet met.
-				if defaultProvider != nil && !visit(defaultProvider) {
-					return false
+			if resNode, ok := e.(resourceNode); ok {
+				pkg := ""
+				if resNode.Value.Type != nil {
+					pkg = strings.Split(resNode.Value.Type.Value, ":")[0]
 				}
+				defaultProviderForPackage := defaultProviders[pkg]
+				isDefaultProvider := resNode.Value.DefaultProvider != nil && resNode.Value.DefaultProvider.Value
+				if resourceNodeHasNoExplicitProvider(e) && !isDefaultProvider {
+					// If the resource has no explicit provider and the default provider is not set, then the
+					// (implicit) dependency is not yet met.
+					if defaultProviderForPackage != nil && !visit(defaultProviderForPackage) {
+						return false
+					}
 
-				// if the defaultProviderForPackage is not set, then it may not be needed.
+					// if the defaultProviderForPackage is not set, then it may not be needed.
+				}
 			}
 
 			visited[name.Value] = true
