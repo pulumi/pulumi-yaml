@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
@@ -491,6 +492,7 @@ type TemplateDecl struct {
 	Variables     VariablesMapDecl
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl
+	Packages      []packages.PackageDecl
 }
 
 func (d *TemplateDecl) Syntax() syntax.Node {

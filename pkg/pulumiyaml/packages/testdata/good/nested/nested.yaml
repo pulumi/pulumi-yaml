@@ -1,0 +1,4 @@
+packageDeclarationVersion: 1
+name: pkg2
+version: 1.2
+downloadUrl: github://api.github.com/pulumiverse

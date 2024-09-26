@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Support for parameterized providers
+time: 2024-09-25T11:58:36.07704+01:00
+custom:
+  PR: "616"

@@ -3,6 +3,7 @@
 package codegen
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,12 +24,12 @@ import (
 
 type testPackageLoader struct{ *testing.T }
 
-func (l testPackageLoader) LoadPackage(name string, version *semver.Version) (pulumiyaml.Package, error) {
-	if name == "test" {
+func (l testPackageLoader) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (pulumiyaml.Package, error) {
+	if descriptor.Name == "test" {
 		return FakePackage{l.T}, nil
 	}
 
-	pkg, err := schema.LoadPackageReference(rootPluginLoader, name, version)
+	pkg, err := schema.LoadPackageReferenceV2(ctx, rootPluginLoader, descriptor)
 	if err != nil {
 		return nil, err
 	}

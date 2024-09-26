@@ -1,0 +1,6 @@
+packageDeclarationVersion: 1
+name: pkg
+parameterization:
+  name: pkg
+  # no version so this is invalid
+  value: cGtn

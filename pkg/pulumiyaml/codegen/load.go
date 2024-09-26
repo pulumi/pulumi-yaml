@@ -3,6 +3,7 @@
 package codegen
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -14,12 +15,14 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/zclconf/go-cty/cty"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -32,6 +35,8 @@ type importer struct {
 	stackReferences map[string]*model.Variable
 	resources       map[string]*model.Variable
 	outputs         map[string]*model.Variable
+
+	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
 }
 
 type packageInfo struct {
@@ -302,7 +307,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err), "")}
 		}
-		pkg, functionName, err := pulumiyaml.ResolveFunction(imp.loader, node.Token.Value, version)
+		pkg, functionName, err := pulumiyaml.ResolveFunction(context.TODO(), imp.loader, imp.packageDescriptors, node.Token.Value, version)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -730,7 +735,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		diags.Extend(ast.ExprError(resource.Options.Version, fmt.Sprintf("unable to parse resource %v provider version: %v", name, err), ""))
 		return nil, diags
 	}
-	pkg, token, err := pulumiyaml.ResolveResource(imp.loader, resource.Type.Value, version)
+	pkg, token, err := pulumiyaml.ResolveResource(context.TODO(), imp.loader, imp.packageDescriptors, resource.Type.Value, version)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
@@ -1109,6 +1114,10 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 // ImportTemplate converts a YAML template to a PCL definition.
 func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*model.Body, syntax.Diagnostics) {
+	pacakgeDescriptors, err := packages.ToPackageDescriptors(file.Packages)
+	if err != nil {
+		return nil, syntax.Diagnostics{syntax.Error(nil, fmt.Sprintf("unable to parse package descriptors: %v", err), "")}
+	}
 
 	imp := importer{
 		loader:          loader,
@@ -1117,6 +1126,8 @@ func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*m
 		stackReferences: map[string]*model.Variable{},
 		resources:       map[string]*model.Variable{},
 		outputs:         map[string]*model.Variable{},
+
+		packageDescriptors: pacakgeDescriptors,
 	}
 	return imp.importTemplate(file)
 }

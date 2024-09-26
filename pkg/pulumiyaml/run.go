@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"bytes"
+	"context"
 	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
@@ -24,13 +25,16 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
@@ -76,6 +80,9 @@ func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*
 	templateStr := stdout.String()
 	template, tdiags, err := LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 	diags.Extend(tdiags...)
+	if err != nil {
+		return nil, diags, err
+	}
 
 	if template.Name == nil {
 		uncompiledTemplate, _, err := LoadDir(workingDirectory)
@@ -84,6 +91,12 @@ func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*
 		}
 		template.Name = uncompiledTemplate.Name
 	}
+
+	packages, err := packages.SearchPackageDecls(workingDirectory)
+	if err != nil {
+		diags.Extend(syntax.Error(nil, err.Error(), ""))
+	}
+	template.Packages = packages
 
 	return template, tdiags, err
 }
@@ -120,7 +133,18 @@ func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
 	}
 
-	return LoadYAMLBytes(filename, bs)
+	template, diags, err := LoadYAMLBytes(filename, bs)
+	if err != nil {
+		return nil, diags, err
+	}
+
+	packages, err := packages.SearchPackageDecls(cwd)
+	if err != nil {
+		diags.Extend(syntax.Error(nil, err.Error(), ""))
+	}
+	template.Packages = packages
+
+	return template, diags, nil
 }
 
 // Load a template from the current working directory
@@ -131,7 +155,18 @@ func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	}
 	defer f.Close()
 
-	return LoadYAML(filepath.Base(path), f)
+	template, diags, err := LoadYAML(filepath.Base(path), f)
+	if err != nil {
+		return nil, diags, err
+	}
+
+	packages, err := packages.SearchPackageDecls(filepath.Dir(path))
+	if err != nil {
+		diags.Extend(syntax.Error(nil, err.Error(), ""))
+	}
+	template.Packages = packages
+
+	return template, diags, nil
 }
 
 // LoadYAML decodes a YAML template from an io.Reader.
@@ -343,6 +378,17 @@ func (r *Runner) setDefaultProviders() {
 	contract.IgnoreError(diags)
 }
 
+// Set the runner's package descriptors from the templates package decls.
+func (r *Runner) setPackageDesciptors() error {
+	// Register package refs for all packages we know upfront
+	packageDescriptors, err := packages.ToPackageDescriptors(r.t.Packages)
+	if err != nil {
+		return err
+	}
+	r.packageDescriptors = packageDescriptors
+	return nil
+}
+
 // PrepareTemplate prepares a template for converting or running
 func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
 	// If running a template also, we need to pass a runner through, since setting intermediates
@@ -364,6 +410,12 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 
 	// runner hooks up default providers
 	r.setDefaultProviders()
+
+	// fill in the package descriptors from the templates package decls
+	err := r.setPackageDesciptors()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// runner type checks nodes
 	_, diags := TypeCheck(r)
@@ -427,7 +479,9 @@ type providerInfo struct {
 }
 
 type Runner struct {
-	t         *ast.TemplateDecl
+	t                  *ast.TemplateDecl
+	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
+
 	pkgLoader PackageLoader
 	config    map[string]interface{}
 	variables map[string]interface{}
@@ -659,7 +713,8 @@ type Evaluator interface {
 
 type programEvaluator struct {
 	*evalContext
-	pulumiCtx *pulumi.Context
+	pulumiCtx   *pulumi.Context
+	packageRefs map[tokens.Package]string
 }
 
 func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -773,7 +828,45 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 
 func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	eCtx := r.newContext(nil)
-	return r.Run(programEvaluator{evalContext: eCtx, pulumiCtx: ctx})
+
+	// Register package refs for all packages we know upfront
+	packageRefs := make(map[tokens.Package]string)
+	for _, pkg := range r.packageDescriptors {
+		name := pkg.Name
+		// If parametrized use the parametrized name
+		var parameterization *pulumirpc.Parameterization
+		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+
+			parameterization = &pulumirpc.Parameterization{
+				Name:    pkg.Parameterization.Name,
+				Version: pkg.Parameterization.Version.String(),
+				Value:   pkg.Parameterization.Value,
+			}
+		}
+
+		var version string
+		if pkg.Version != nil {
+			version = pkg.Version.String()
+		}
+
+		resp, err := ctx.RegisterPackage(&pulumirpc.RegisterPackageRequest{
+			Name:             pkg.Name,
+			Version:          version,
+			DownloadUrl:      pkg.DownloadURL,
+			Parameterization: parameterization,
+		})
+		if err != nil {
+			err = fmt.Errorf("registering package %s: %w", name, err)
+			return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+		}
+		packageRefs[tokens.Package(name)] = resp.Ref
+	}
+
+	return r.Run(programEvaluator{
+		evalContext: eCtx,
+		pulumiCtx:   ctx,
+		packageRefs: packageRefs})
 }
 
 func getConfNodesFromMap(project string, configPropertyMap resource.PropertyMap) []configNode {
@@ -1095,7 +1188,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		opts = append(opts, pulumi.Version(version.String()))
 	}
 
-	pkg, typ, err := ResolveResource(e.pkgLoader, v.Type.Value, version)
+	pkg, typ, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version)
 	if err != nil {
 		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		overallOk = false
@@ -1345,7 +1438,9 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 
 	// Now register the resulting resource with the engine.
 	if isComponent {
-		err = e.pulumiCtx.RegisterRemoteComponentResource(string(typ), resourceName, untypedArgs(props), res, opts...)
+		typ := tokens.Type(typ)
+		packageRef := e.packageRefs[typ.Package()]
+		err = e.pulumiCtx.RegisterPackageRemoteComponentResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
 	} else if isRead {
 		s, ok := e.evaluateExpr(v.Get.Id)
 		if !ok {
@@ -1394,7 +1489,9 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			res.(pulumi.CustomResource),
 			opts...)
 	} else {
-		err = e.pulumiCtx.RegisterResource(string(typ), resourceName, untypedArgs(props), res, opts...)
+		typ := tokens.Type(typ)
+		packageRef := e.packageRefs[typ.Package()]
+		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
 	}
 	if err != nil {
 		e.error(kvp.Key, err.Error())
@@ -1919,7 +2016,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 			return nil, true
 		}
-		_, functionName, err := ResolveFunction(e.pkgLoader, t.Token.Value, version)
+		_, functionName, err := ResolveFunction(context.TODO(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
