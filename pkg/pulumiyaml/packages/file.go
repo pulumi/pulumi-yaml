@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ParameterizationDecl defines the structure for the parameterization values of a package.
 type ParameterizationDecl struct {
 	// Name is the name of the parameterized package.
 	Name string `yaml:"name"`
@@ -25,14 +26,17 @@ type ParameterizationDecl struct {
 	Value string `yaml:"value"`
 }
 
+// GetValue returns the value of the parameter as a byte array. This is just a helper around base64.StdEncoding.
 func (p *ParameterizationDecl) GetValue() ([]byte, error) {
 	return base64.StdEncoding.DecodeString(p.Value)
 }
 
+// SetValue sets the value of the parameter as a byte array. This is just a helper around base64.StdEncoding.
 func (p *ParameterizationDecl) SetValue(value []byte) {
 	p.Value = base64.StdEncoding.EncodeToString(value)
 }
 
+// PackageDecl defines the structure of a package declaration file.
 type PackageDecl struct {
 	// PackageDeclarationVersion is the version of the package declaration file.
 	PackageDeclarationVersion int `yaml:"packageDeclarationVersion"`
