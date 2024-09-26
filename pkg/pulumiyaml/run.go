@@ -378,7 +378,7 @@ func (r *Runner) setDefaultProviders() {
 	contract.IgnoreError(diags)
 }
 
-// Set the runners package descriptors from the templates package decls.
+// Set the runner's package descriptors from the templates package decls.
 func (r *Runner) setPackageDesciptors() error {
 	// Register package refs for all packages we know upfront
 	packageDescriptors, err := packages.ToPackageDescriptors(r.t.Packages)
