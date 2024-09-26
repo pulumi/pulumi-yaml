@@ -382,8 +382,11 @@ func (r *Runner) setDefaultProviders() {
 func (r *Runner) setPackageDesciptors() error {
 	// Register package refs for all packages we know upfront
 	packageDescriptors, err := packages.ToPackageDescriptors(r.t.Packages)
+	if err != nil {
+		return err
+	}
 	r.packageDescriptors = packageDescriptors
-	return err
+	return nil
 }
 
 // PrepareTemplate prepares a template for converting or running
