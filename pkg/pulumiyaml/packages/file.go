@@ -116,11 +116,6 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.PackageDescriptor, error) {
 	packageDescriptors := make(map[tokens.Package]*schema.PackageDescriptor)
 	for _, pkg := range packages {
-		name := pkg.Name
-		// If parametrized use the parametrized name
-		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
-		}
 
 		var version *semver.Version
 		if pkg.Version != "" {
@@ -131,8 +126,12 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.Pa
 			version = &v
 		}
 
+		name := pkg.Name
+		// If parametrized use the parametrized name
 		var parameterization *schema.ParameterizationDescriptor
 		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+
 			value, err := pkg.Parameterization.GetValue()
 			if err != nil {
 				return nil, fmt.Errorf("decoding parameterization value for package %s: %w", name, err)

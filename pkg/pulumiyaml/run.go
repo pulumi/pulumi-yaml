@@ -834,12 +834,10 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	for _, pkg := range r.packageDescriptors {
 		name := pkg.Name
 		// If parametrized use the parametrized name
-		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
-		}
-
 		var parameterization *pulumirpc.Parameterization
 		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+
 			parameterization = &pulumirpc.Parameterization{
 				Name:    pkg.Parameterization.Name,
 				Version: pkg.Parameterization.Version.String(),
