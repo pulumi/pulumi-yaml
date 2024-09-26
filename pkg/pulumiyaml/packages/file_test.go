@@ -33,7 +33,21 @@ func TestSearchPackageLocks(t *testing.T) {
 		},
 	}
 
-	actual, err := SearchPackageDecls("testdata")
+	actual, err := SearchPackageDecls("testdata/good")
 	require.NoError(t, err)
 	require.ElementsMatch(t, expected, actual)
+}
+
+func TestSearchPackageLocks_Bad(t *testing.T) {
+	t.Parallel()
+
+	_, err := SearchPackageDecls("testdata/bad")
+	require.ErrorContains(t, err, "validating testdata/bad/bad.yaml: package name is required")
+}
+
+func TestSearchPackageLocks_BadParam(t *testing.T) {
+	t.Parallel()
+
+	_, err := SearchPackageDecls("testdata/bad_param")
+	require.ErrorContains(t, err, "validating testdata/bad_param/bad_param.yaml: parameterization version is required")
 }

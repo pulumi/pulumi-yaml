@@ -50,23 +50,30 @@ type PackageDecl struct {
 	Parameterization *ParameterizationDecl `yaml:"parameterization,omitempty"`
 }
 
-func (p *PackageDecl) Valid() bool {
+// Validate checks if a package declaration is valid. The first return value is a boolean indicating if the package declaration is even a
+// package declaration. The second return value is an error if the package declaration is invalid.
+func (p *PackageDecl) Validate() (bool, error) {
 	// All packages should define their version as 1
 	if p.PackageDeclarationVersion != 1 {
-		return false
+		return false, nil
 	}
 
 	// All packages need a name
 	if p.Name == "" {
-		return false
+		return true, fmt.Errorf("package name is required")
 	}
 
 	// If parameterization is not nil, it must be valid.
 	if p.Parameterization != nil {
-		return p.Parameterization.Name != "" && p.Parameterization.Version != ""
+		if p.Parameterization.Name == "" {
+			return true, fmt.Errorf("parameterization name is required")
+		}
+		if p.Parameterization.Version == "" {
+			return true, fmt.Errorf("parameterization version is required")
+		}
 	}
 
-	return true
+	return true, nil
 }
 
 // SearchPackageDecls searches the given directory down recursively for package lock .yaml files.
@@ -99,8 +106,12 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 		}
 
 		// If the file is not valid skip it
-		if !packageDecl.Valid() {
+		ok, err := packageDecl.Validate()
+		if !ok {
 			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("validating %s: %w", path, err)
 		}
 
 		// Else append it to the list of packages found.
@@ -116,15 +127,6 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.PackageDescriptor, error) {
 	packageDescriptors := make(map[tokens.Package]*schema.PackageDescriptor)
 	for _, pkg := range packages {
-
-		var version *semver.Version
-		if pkg.Version != "" {
-			v, err := semver.Parse(pkg.Version)
-			if err != nil {
-				return nil, fmt.Errorf("parsing version %s for package %s: %w", pkg.Version, name, err)
-			}
-			version = &v
-		}
 
 		name := pkg.Name
 		// If parametrized use the parametrized name
@@ -147,6 +149,15 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.Pa
 				Version: version,
 				Value:   value,
 			}
+		}
+
+		var version *semver.Version
+		if pkg.Version != "" {
+			v, err := semver.Parse(pkg.Version)
+			if err != nil {
+				return nil, fmt.Errorf("parsing version %s for package %s: %w", pkg.Version, name, err)
+			}
+			version = &v
 		}
 
 		packageDescriptors[tokens.Package(name)] = &schema.PackageDescriptor{
