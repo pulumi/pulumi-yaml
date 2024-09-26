@@ -76,7 +76,7 @@ func (host *yamlLanguageHost) loadTemplate(compilerEnv []string) (*ast.TemplateD
 	if host.compiler == "" {
 		template, diags, err = pulumiyaml.Load()
 	} else {
-		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, "", compilerEnv)
+		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, ".", compilerEnv)
 	}
 	if err != nil {
 		return nil, diags, err

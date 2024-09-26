@@ -71,10 +71,6 @@ func (p *PackageDecl) Valid() bool {
 
 // SearchPackageDecls searches the given directory down recursively for package lock .yaml files.
 func SearchPackageDecls(directory string) ([]PackageDecl, error) {
-	if directory == "" {
-		directory = "."
-	}
-
 	var packages []PackageDecl
 	err := filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
