@@ -1130,7 +1130,7 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 
 func (tc *typeCache) typeMissing(r *Runner, node missingNode) bool {
 	ctx := r.newContext(node)
-	ctx.errorf(node.key(), fmt.Sprintf("resource, variable, or config value %q not found", node.key().Value))
+	ctx.errorf(node.key(), "resource, variable, or config value %q not found", node.key().Value)
 	return false
 }
 

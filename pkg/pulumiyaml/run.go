@@ -1157,7 +1157,7 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 	if errors.Is(err, config.ErrMissingVar) && defaultValue != nil {
 		v = defaultValue
 	} else if err != nil {
-		return e.errorf(intmKey, err.Error())
+		return e.errorf(intmKey, "%s", err.Error())
 	}
 
 	contract.Assertf(v != nil, "let an uninitialized var slip through")
