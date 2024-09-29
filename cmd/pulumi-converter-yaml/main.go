@@ -20,17 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
-
 	yamlgen "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/encoding"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"github.com/spf13/afero"
@@ -96,32 +93,20 @@ func (*yamlConverter) ConvertProgram(ctx context.Context,
 
 // Launches the converter RPC endpoint
 func main() {
-	cancelch := make(chan bool)
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	go func() {
-		<-ctx.Done()
-		cancel() // deregister the interrupt handler
-		close(cancelch)
-	}()
 
-	// Fire up a gRPC server, letting the kernel choose a free port for us.
-	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
-		Cancel: cancelch,
-		Init: func(srv *grpc.Server) error {
-			pulumirpc.RegisterConverterServer(srv, plugin.NewConverterServer(&yamlConverter{}))
-			return nil
-		},
-		Options: rpcutil.OpenTracingServerInterceptorOptions(nil),
+	logging.InitLogging(false, 0, false)
+
+	rc, err := rpcCmd.NewRpcCmd(&rpcCmd.RpcCmdConfig{
+		TracingName:  "pulumi-converter-yaml",
+		RootSpanName: "pulumi-converter-yaml",
 	})
 	if err != nil {
-		log.Fatalf("fatal: %v", err)
+		cmdutil.Exit(err)
 	}
 
-	// The converter protocol requires that we now write out the port we have chosen to listen on.
-	fmt.Printf("%d\n", handle.Port)
+	rc.Run(func(srv *grpc.Server) error {
+		pulumirpc.RegisterConverterServer(srv, plugin.NewConverterServer(&yamlConverter{}))
+		return nil
+	}, func() {})
 
-	// Finally, wait for the server to stop serving.
-	if err := <-handle.Done; err != nil {
-		log.Fatalf("fatal: %v", err)
-	}
 }
