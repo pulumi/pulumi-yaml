@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
@@ -232,17 +233,24 @@ outputs:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var innerValue string
+	done := make(chan bool)
 	diags := testInvokeDiags(t, tmpl, func(r *Runner) {
 		cipher, ok := r.variables["cipher"].(pulumi.AnyOutput)
 		assert.True(t, ok)
 		assert.NotNil(t, cipher)
 		cipher.ApplyT(func(v interface{}) interface{} {
 			innerValue = v.(string)
+			done <- true
 			return v
 		})
 	})
-	requireNoErrors(t, tmpl, diags)
-	assert.Equal(t, "super-secret", innerValue)
+	select {
+	case <-done:
+		requireNoErrors(t, tmpl, diags)
+		assert.Equal(t, "super-secret", innerValue)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timed out waiting for the secret to be resolved")
+	}
 }
 
 func testInvokeDiags(t *testing.T, template *ast.TemplateDecl, callback func(*Runner)) syntax.Diagnostics {
