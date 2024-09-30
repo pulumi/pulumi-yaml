@@ -18,13 +18,10 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
@@ -35,51 +32,31 @@ import (
 
 // Launches the language host RPC endpoint, which in turn fires up an RPC server implementing the
 // LanguageRuntimeServer RPC endpoint.
+
 func main() {
-	// Parse the flags and initialize some boilerplate.
-	var tracing string
+
+	logging.InitLogging(false, 0, false)
+
+	rc, err := rpcCmd.NewRpcCmd(&rpcCmd.RpcCmdConfig{
+		TracingName:  "pulumi-language-yaml",
+		RootSpanName: "pulumi-language-yaml",
+	})
+	if err != nil {
+		cmdutil.Exit(err)
+	}
+
 	var root string
 	var compiler string
-	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
-	flag.StringVar(&root, "root", "", "Root of the program execution")
-	flag.StringVar(&compiler, "compiler", "", "Compiler to use to pre-process YAML")
-	flag.Parse()
-	var cancelChannel chan bool
-	args := flag.Args()
-	logging.InitLogging(false, 0, false)
-	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
+	rc.Flag.StringVar(&root, "root", "", "Root of the program execution")
+	rc.Flag.StringVar(&compiler, "compiler", "", "Compiler to use to pre-process YAML")
 
-	// Fetch the engine address if available so we can do logging, etc.
-	var engineAddress string
-	if len(args) > 0 {
-		engineAddress = args[0]
-		var err error
-		cancelChannel, err = setupHealthChecks(engineAddress)
+	rc.Flag.Parse(os.Args[1:])
 
-		if err != nil {
-			cmdutil.Exit(errors.Wrapf(err, "could not start health check host RPC server"))
-		}
-	}
-
-	// Fire up a gRPC server, letting the kernel choose a free port.
-	port, done, err := rpcutil.Serve(0, cancelChannel, []func(*grpc.Server) error{
-		func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, tracing, compiler)
-			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
-			return nil
-		},
-	}, nil)
-	if err != nil {
-		cmdutil.Exit(errors.Wrapf(err, "could not start language host RPC server"))
-	}
-
-	// Otherwise, print out the port so that the spawner knows how to reach us.
-	fmt.Printf("%d\n", port)
-
-	// And finally wait for the server to stop serving.
-	if err := <-done; err != nil {
-		cmdutil.Exit(errors.Wrapf(err, "language host RPC stopped serving"))
-	}
+	rc.Run(func(srv *grpc.Server) error {
+		host := server.NewLanguageHost(rc.EngineAddress, rc.Tracing, compiler)
+		pulumirpc.RegisterLanguageRuntimeServer(srv, host)
+		return nil
+	}, func() {})
 }
 
 func setupHealthChecks(engineAddress string) (chan bool, error) {
