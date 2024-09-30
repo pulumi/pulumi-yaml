@@ -117,6 +117,24 @@ func TestSortUnordered(t *testing.T) {
 	assert.Equal(t, "my-object", names[1])
 }
 
+func TestSortMultipleDefaultProviders(t *testing.T) {
+	t.Parallel()
+
+	tmpl, diags, err := LoadFile("../tests/testdata/resource-ordering/Pulumi.yaml")
+	requireNoErrors(t, tmpl, diags)
+	assert.NoError(t, err)
+
+	confNodes := []configNode{}
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
+	requireNoErrors(t, tmpl, diags)
+	names := sortedNames(resources)
+	assert.Len(t, names, 4)
+	assert.Equal(t, "provider", names[0])
+	assert.Equal(t, "alb", names[1])
+	assert.Equal(t, "testProvider", names[2])
+	assert.Equal(t, "echo", names[3])
+}
+
 func TestSortErrorCycle(t *testing.T) {
 	t.Parallel()
 
