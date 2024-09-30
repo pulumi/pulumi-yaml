@@ -220,7 +220,10 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 			if resNode, ok := e.(resourceNode); ok {
 				pkg := ""
 				if resNode.Value.Type != nil {
-					pkg = strings.Split(resNode.Value.Type.Value, ":")[0]
+					pkg, _, ok = strings.Cut(resNode.Value.Type.Value, ":")
+					if !ok {
+						return false
+					}
 				}
 				defaultProviderForPackage := defaultProviders[pkg]
 				isDefaultProvider := resNode.Value.DefaultProvider != nil && resNode.Value.DefaultProvider.Value
