@@ -2,9 +2,10 @@ on:
   push:
     branches: [ main ]
     paths: [ CHANGELOG.md ]
+  workflow_dispatch: {}
 
-env:
-  GITHUB_TOKEN: ${{ secrets.PULUMI_BOT_TOKEN }}
+permissions:
+  contents: write
 
 jobs:
   release-pulumi-language-yaml:
@@ -56,3 +57,5 @@ jobs:
         with:
           version: latest
           args: -p 10 -f .goreleaser.yml --clean --skip=validate --timeout 60m0s --release-notes=${{ env.RELEASE_NOTES_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
