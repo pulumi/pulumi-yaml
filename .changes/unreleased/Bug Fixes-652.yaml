@@ -1,6 +1,0 @@
-component: runtime
-kind: Bug Fixes
-body: Fix default component detection when declared later in file
-time: 2024-09-24T15:31:34.068526213+09:00
-custom:
-  PR: "652"

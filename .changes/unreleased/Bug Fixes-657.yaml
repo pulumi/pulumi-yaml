@@ -1,6 +1,0 @@
-component: runtime
-kind: Bug Fixes
-body: Build statically linked release binary with CGO disabled
-time: 2024-10-08T16:41:00.728884753+02:00
-custom:
-  PR: "657"
