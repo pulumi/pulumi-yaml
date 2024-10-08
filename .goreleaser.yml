@@ -17,6 +17,8 @@ archives:
 builds:
 - id: pulumi-language-yaml
   binary: pulumi-language-yaml
+  env:
+    - CGO_ENABLED=0
   goarch:
   - amd64
   - arm64
@@ -31,6 +33,8 @@ builds:
   main: ./cmd/pulumi-language-yaml/
 - id: pulumi-converter-yaml
   binary: pulumi-converter-yaml
+  env:
+    - CGO_ENABLED=0
   goarch:
   - amd64
   - arm64
