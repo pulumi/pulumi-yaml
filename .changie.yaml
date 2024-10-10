@@ -16,7 +16,7 @@ components:
  - codegen
  - runtime
  - convert
-changeFormat: '- [{{.Component}}] {{.Body}} [#{{.Custom.PR}}](https://github.com/pulumi/pulumi-dotnet/pull/{{.Custom.PR}})'
+changeFormat: '- [{{.Component}}] {{.Body}} [#{{.Custom.PR}}](https://github.com/pulumi/pulumi-yaml/pull/{{.Custom.PR}})'
 custom:
   - key: PR
     label: GitHub Pull Request
