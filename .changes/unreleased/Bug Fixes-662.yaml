@@ -1,6 +1,0 @@
-component: runtime
-kind: Bug Fixes
-body: Revert go version in go.mod back to 1.21
-time: 2024-10-09T15:05:26.676777-07:00
-custom:
-    PR: "662"
