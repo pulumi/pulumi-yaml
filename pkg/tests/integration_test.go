@@ -170,3 +170,10 @@ func TestResourceOrderingWithDefaultProvider(t *testing.T) {
 			SkipEmptyPreviewUpdate: true,
 		})
 }
+
+//nolint:paralleltest // uses parallel programtest
+func TestResourceSecret(t *testing.T) {
+	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		Dir: filepath.Join("testdata", "resource-secret"),
+	})
+}

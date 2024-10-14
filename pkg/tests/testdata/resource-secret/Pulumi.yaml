@@ -1,0 +1,15 @@
+name: resource-secret
+runtime:
+  name: yaml
+resources:
+  randomPassword:
+    type: random:RandomPassword
+    properties:
+      length: 16
+      lower: true
+      upper: true
+      numeric: true
+      special: true
+outputs:
+  superSecret:
+    fn::secret: ${randomPassword}
