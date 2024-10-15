@@ -582,7 +582,7 @@ func (st *lateboundCustomResourceState) ProviderResource() *pulumi.ProviderResou
 }
 
 func (*lateboundCustomResourceState) ElementType() reflect.Type {
-	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+	return reflect.TypeOf((**lateboundCustomResourceState)(nil)).Elem()
 }
 
 func (st *lateboundCustomResourceState) GetRawOutputs() pulumi.Output {
@@ -625,7 +625,7 @@ func (st *lateboundProviderResourceState) ProviderResource() *pulumi.ProviderRes
 }
 
 func (*lateboundProviderResourceState) ElementType() reflect.Type {
-	return reflect.TypeOf((*lateboundResource)(nil)).Elem()
+	return reflect.TypeOf((**lateboundProviderResourceState)(nil)).Elem()
 }
 
 func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
@@ -866,7 +866,8 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	return r.Run(programEvaluator{
 		evalContext: eCtx,
 		pulumiCtx:   ctx,
-		packageRefs: packageRefs})
+		packageRefs: packageRefs,
+	})
 }
 
 func getConfNodesFromMap(project string, configPropertyMap resource.PropertyMap) []configNode {
