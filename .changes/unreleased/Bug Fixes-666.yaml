@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Invalid YAML files no longer cause package detection to fail.
+time: 2024-10-29T15:26:18.910379-07:00
+custom:
+  PR: "666"
