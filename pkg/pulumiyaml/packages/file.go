@@ -100,12 +100,11 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
 
+		// If the file is not valid skip it
 		var packageDecl PackageDecl
 		if err := yaml.Unmarshal(data, &packageDecl); err != nil {
-			return fmt.Errorf("unmarshalling %s: %w", path, err)
+			return nil
 		}
-
-		// If the file is not valid skip it
 		ok, err := packageDecl.Validate()
 		if !ok {
 			return nil
