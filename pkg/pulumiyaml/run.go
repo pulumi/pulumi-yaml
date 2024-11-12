@@ -45,11 +45,6 @@ import (
 // One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
 const MainTemplate = "Main"
 
-// Load a template from the current working directory
-func Load() (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	return LoadDir(".")
-}
-
 func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	var diags syntax.Diagnostics
 	var stdout bytes.Buffer
@@ -116,18 +111,18 @@ func conflictingEnvVars(env []string) []string {
 	return duplicates
 }
 
-// Load a template from the current working directory.
-func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+// Load a template from the given directory.
+func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
 	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
 	var filename string
 	var bs []byte
-	if b, err := os.ReadFile(filepath.Join(cwd, MainTemplate+".json")); err == nil {
+	if b, err := os.ReadFile(filepath.Join(directory, MainTemplate+".json")); err == nil {
 		filename, bs = MainTemplate+".json", b
-	} else if b, err := os.ReadFile(filepath.Join(cwd, MainTemplate+".yaml")); err == nil {
+	} else if b, err := os.ReadFile(filepath.Join(directory, MainTemplate+".yaml")); err == nil {
 		filename, bs = MainTemplate+".yaml", b
-	} else if b, err := os.ReadFile(filepath.Join(cwd, "Pulumi.yaml")); err == nil {
+	} else if b, err := os.ReadFile(filepath.Join(directory, "Pulumi.yaml")); err == nil {
 		filename, bs = "Pulumi.yaml", b
 	} else {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
@@ -138,7 +133,7 @@ func LoadDir(cwd string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, diags, err
 	}
 
-	packages, err := packages.SearchPackageDecls(cwd)
+	packages, err := packages.SearchPackageDecls(directory)
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
 	}
