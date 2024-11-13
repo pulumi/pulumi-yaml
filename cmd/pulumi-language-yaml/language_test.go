@@ -172,12 +172,8 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
-	"l1-output-array":                       "TODO",
 	"l1-stack-reference":                    "TODO",
 	"l1-output-string":                      "TODO",
-	"l1-output-bool":                        "TODO",
-	"l1-output-number":                      "TODO",
-	"l1-output-map":                         "TODO",
 	"l2-destroy":                            "TODO",
 	"l2-invoke-options":                     "TODO",
 	"l2-map-keys":                           "TODO",
