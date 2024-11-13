@@ -71,13 +71,26 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 	if err != nil {
 		return err
 	}
-	files["Pulumi.yaml"] = projectBytes
+	// Pulumi.yaml always needs to be written to the root directory
+	err = os.WriteFile(path.Join(directory, "Pulumi.yaml"), projectBytes, 0600)
+	if err != nil {
+		return fmt.Errorf("write output project: %w", err)
+	}
+
+	// If main is set the Main.yaml file should be in a subdirectory
+	if project.Main != "" {
+		directory = path.Join(directory, project.Main)
+		err := os.MkdirAll(directory, 0700)
+		if err != nil {
+			return fmt.Errorf("create output directory: %w", err)
+		}
+	}
 
 	for filename, data := range files {
 		outPath := path.Join(directory, filename)
 		err := os.WriteFile(outPath, data, 0600)
 		if err != nil {
-			return fmt.Errorf("could not write output program: %w", err)
+			return fmt.Errorf("write output program: %w", err)
 		}
 	}
 
