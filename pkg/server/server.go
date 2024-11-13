@@ -53,8 +53,6 @@ type yamlLanguageHost struct {
 	engineAddress string
 	tracing       string
 	compiler      string
-	template      *ast.TemplateDecl
-	diags         syntax.Diagnostics
 }
 
 func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.LanguageRuntimeServer {
@@ -66,10 +64,6 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 }
 
 func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	if host.template != nil && host.compiler == "" {
-		return host.template, host.diags, nil
-	}
-
 	var template *ast.TemplateDecl
 	var diags syntax.Diagnostics
 	var err error
@@ -84,10 +78,7 @@ func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []strin
 	if diags.HasErrors() {
 		return nil, diags, nil
 	}
-	host.template = template
-	host.diags = diags
-
-	return host.template, diags, nil
+	return template, diags, nil
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
