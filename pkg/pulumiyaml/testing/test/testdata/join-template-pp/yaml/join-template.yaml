@@ -4,7 +4,7 @@ resources:
     properties:
       name:
         fn::join:
-          -
+          - ""
           - - fn::select:
                 - 0
                 - - foo

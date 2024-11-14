@@ -232,6 +232,10 @@ func MarshalYAML(n syntax.Node) (*yaml.Node, syntax.Diagnostics) {
 		if originalValue != value {
 			yamlNode.Value = value
 		}
+		// if the empty string use double quotes so we get "" instead of nothing
+		if yamlNode.Value == "" {
+			yamlNode.Style = yaml.DoubleQuotedStyle
+		}
 	case *syntax.ListNode:
 		if yamlNode.Kind != yaml.SequenceNode && yamlNode.Kind != yaml.DocumentNode {
 			yamlNode.Kind = yaml.SequenceNode

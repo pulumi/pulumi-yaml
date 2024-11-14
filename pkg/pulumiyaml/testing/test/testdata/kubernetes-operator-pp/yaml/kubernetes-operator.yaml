@@ -48,7 +48,7 @@ resources:
         name: pulumi-kubernetes-operator
       rules:
         - apiGroups:
-            -
+            - ""
           resources:
             - pods
             - services
@@ -97,7 +97,7 @@ resources:
           verbs:
             - update
         - apiGroups:
-            -
+            - ""
           resources:
             - pods
           verbs:
