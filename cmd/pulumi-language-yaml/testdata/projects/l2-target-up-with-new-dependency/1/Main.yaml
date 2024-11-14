@@ -1,0 +1,16 @@
+resources:
+  targetOnly:
+    type: simple:Resource
+    properties:
+      value: true
+  unrelated:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      dependson:
+        - ${dep}
+  dep:
+    type: simple:Resource
+    properties:
+      value: true
