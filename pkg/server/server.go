@@ -45,6 +45,11 @@ import (
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 )
 
+type templateCacheEntry struct {
+	template    *ast.TemplateDecl
+	diagnostics syntax.Diagnostics
+}
+
 // yamlLanguageHost implements the LanguageRuntimeServer interface
 // for use as an API endpoint.
 type yamlLanguageHost struct {
@@ -53,8 +58,8 @@ type yamlLanguageHost struct {
 	engineAddress string
 	tracing       string
 	compiler      string
-	template      *ast.TemplateDecl
-	diags         syntax.Diagnostics
+
+	templateCache map[string]templateCacheEntry
 }
 
 func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.LanguageRuntimeServer {
@@ -62,12 +67,16 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 		engineAddress: engineAddress,
 		tracing:       tracing,
 		compiler:      compiler,
+
+		templateCache: make(map[string]templateCacheEntry),
 	}
 }
 
 func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	if host.template != nil && host.compiler == "" {
-		return host.template, host.diags, nil
+	// We can't cache comppiled templates because at the first point we call loadTemplate (in
+	// GetRequiredPlugins) we don't have the compiler environment (with PULUMI_STACK etc) set.
+	if entry, ok := host.templateCache[directory]; ok && host.compiler == "" {
+		return entry.template, entry.diagnostics, nil
 	}
 
 	var template *ast.TemplateDecl
@@ -84,10 +93,15 @@ func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []strin
 	if diags.HasErrors() {
 		return nil, diags, nil
 	}
-	host.template = template
-	host.diags = diags
 
-	return host.template, diags, nil
+	if host.compiler != "" {
+		host.templateCache[directory] = templateCacheEntry{
+			template:    template,
+			diagnostics: diags,
+		}
+	}
+
+	return template, diags, nil
 }
 
 // GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
