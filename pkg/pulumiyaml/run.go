@@ -133,6 +133,10 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, diags, err
 	}
 
+	if diags.HasErrors() {
+		return nil, diags, diags
+	}
+
 	packages, err := packages.SearchPackageDecls(directory)
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))

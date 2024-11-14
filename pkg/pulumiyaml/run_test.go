@@ -1786,6 +1786,23 @@ resources:
 	requireNoErrors(t, tmpl, diags)
 }
 
+func TestUnknownResource(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+runtime: yaml
+config: {}
+variables:     {}
+resources:     {badResource}
+outputs:       {}`
+
+	pt, diags, _ := LoadYAMLBytes("<stdin>", []byte(text))
+	assert.Nil(t, pt)
+	assert.Len(t, diags, 1)
+	assert.True(t, diags.HasErrors())
+	assert.Contains(t, diags[0].Error(), "resources.badResource must be an object")
+}
+
 func TestPoisonResult(t *testing.T) {
 	t.Parallel()
 
