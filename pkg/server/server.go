@@ -65,7 +65,7 @@ func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.L
 	}
 }
 
-func (host *yamlLanguageHost) loadTemplate(compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	if host.template != nil && host.compiler == "" {
 		return host.template, host.diags, nil
 	}
@@ -74,9 +74,9 @@ func (host *yamlLanguageHost) loadTemplate(compilerEnv []string) (*ast.TemplateD
 	var diags syntax.Diagnostics
 	var err error
 	if host.compiler == "" {
-		template, diags, err = pulumiyaml.LoadDir(".")
+		template, diags, err = pulumiyaml.LoadDir(directory)
 	} else {
-		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, ".", compilerEnv)
+		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, directory, compilerEnv)
 	}
 	if err != nil {
 		return nil, diags, err
@@ -94,7 +94,7 @@ func (host *yamlLanguageHost) loadTemplate(compilerEnv []string) (*ast.TemplateD
 func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	req *pulumirpc.GetRequiredPluginsRequest,
 ) (*pulumirpc.GetRequiredPluginsResponse, error) {
-	template, diags, err := host.loadTemplate(nil)
+	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -126,13 +126,6 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
 func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
-	if pwd := req.GetPwd(); pwd != "" {
-		err := os.Chdir(pwd)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	configValue := req.GetConfig()
 	jsonConfigValue, err := json.Marshal(configValue)
 	if err != nil {
@@ -155,7 +148,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return nil, err
 	}
 
-	template, diags, err := host.loadTemplate(compilerEnv)
+	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -175,6 +168,15 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		plugin.MarshalOptions{KeepUnknowns: true, KeepSecrets: true, SkipInternalKeys: true})
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	}
+
+	// The yaml runtime is stateful and we need to change to the program directory before actually executing
+	// the template.
+	if pwd := req.Info.ProgramDirectory; pwd != "" {
+		err := os.Chdir(pwd)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
