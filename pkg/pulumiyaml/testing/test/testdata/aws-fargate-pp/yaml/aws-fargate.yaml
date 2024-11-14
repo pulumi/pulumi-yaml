@@ -27,7 +27,7 @@ resources:
         fn::toJSON:
           Version: 2008-10-17
           Statement:
-            - Sid:
+            - Sid: ""
               Effect: Allow
               Principal:
                 Service: ecs-tasks.amazonaws.com

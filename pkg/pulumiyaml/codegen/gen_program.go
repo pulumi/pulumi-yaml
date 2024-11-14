@@ -525,6 +525,8 @@ func (g *generator) expr(e model.Expression) syn.Node {
 			return syn.Null()
 		case t.Equals(cty.String):
 			v := e.Value.AsString()
+			// This is a literal string so escape any ${ sequences in it
+			v = strings.ReplaceAll(v, "${", "$${")
 			return syn.String(v)
 		case t.Equals(cty.Number):
 			v := e.Value.AsBigFloat()

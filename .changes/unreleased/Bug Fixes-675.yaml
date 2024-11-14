@@ -1,0 +1,7 @@
+component: codegen
+kind: Bug Fixes
+body: Maintain empty strings in converted programs to still be string literals in
+  YAML
+time: 2024-11-14T15:15:07.587566353Z
+custom:
+  PR: "675"
