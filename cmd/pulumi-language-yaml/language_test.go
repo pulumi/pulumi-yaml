@@ -187,7 +187,6 @@ var expectedFailures = map[string]string{
 	"l2-invoke-simple":                      "TODO",
 	"l2-plain":                              "TODO",
 	"l2-ref-ref":                            "TODO",
-	"l2-resource-simple":                    "TODO",
 	"l2-failed-create-continue-on-error":    "TODO",
 	"l2-invoke-variants":                    "TODO",
 	"l2-primitive-ref":                      "TODO",
@@ -212,7 +211,7 @@ func TestLanguage(t *testing.T) {
 	// Run the language plugin
 	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
 		Init: func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, "", "")
+			host := server.NewLanguageHost(engineAddress, "", "", true /* useRPCLoader */)
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
 			return nil
 		},

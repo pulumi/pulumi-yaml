@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,15 +60,17 @@ type yamlLanguageHost struct {
 	tracing       string
 	compiler      string
 
+	useRPCLoader  bool
 	templateCache map[string]templateCacheEntry
 }
 
-func NewLanguageHost(engineAddress, tracing string, compiler string) pulumirpc.LanguageRuntimeServer {
+func NewLanguageHost(engineAddress, tracing, compiler string, useRPCLoader bool) pulumirpc.LanguageRuntimeServer {
 	return &yamlLanguageHost{
 		engineAddress: engineAddress,
 		tracing:       tracing,
 		compiler:      compiler,
 
+		useRPCLoader:  useRPCLoader,
 		templateCache: make(map[string]templateCacheEntry),
 	}
 }
@@ -214,9 +217,19 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 
 	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
 	// time RunWithContext returns we should be done with all async work.
-	loader, err := pulumiyaml.NewPackageLoader(proj.Plugins)
-	if err != nil {
-		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	var loader pulumiyaml.PackageLoader
+	if host.useRPCLoader {
+		rpcLoader, err := schema.NewLoaderClient(req.LoaderTarget)
+		if err != nil {
+			return &pulumirpc.RunResponse{Error: err.Error()}, nil
+		}
+		loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(
+			schema.NewCachedLoader(rpcLoader))
+	} else {
+		loader, err = pulumiyaml.NewPackageLoader(proj.Plugins)
+		if err != nil {
+			return &pulumirpc.RunResponse{Error: err.Error()}, nil
+		}
 	}
 	defer loader.Close()
 
@@ -254,7 +267,43 @@ func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependen
 
 // GetProgramDependencies returns the set of dependencies required by the program.
 func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *pulumirpc.GetProgramDependenciesRequest) (*pulumirpc.GetProgramDependenciesResponse, error) {
-	return &pulumirpc.GetProgramDependenciesResponse{}, nil
+	// YAML doesn't _really_ have dependencies per-se but we can list all the "packages" that are referenced
+	// in the program here. In the presesnce of parameterization this could differ to the set of plugins
+	// reported by GetRequiredPlugins.
+
+	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
+	if err != nil {
+		return nil, err
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	pkgs, pluginDiags := pulumiyaml.GetReferencedPackages(template)
+	diags.Extend(pluginDiags...)
+	if diags.HasErrors() {
+		// We currently swallow the error to allow project config to evaluate
+		// Specifically, if one sets a config key via the CLI but not within the `config` block
+		// of their YAML program, it would error.
+		return &pulumirpc.GetProgramDependenciesResponse{}, nil
+	}
+	var dependencies []*pulumirpc.DependencyInfo
+	for _, pkg := range pkgs {
+		name := pkg.Name
+		version := pkg.Version
+		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+			version = pkg.Parameterization.Version
+		}
+
+		dependencies = append(dependencies, &pulumirpc.DependencyInfo{
+			Name:    name,
+			Version: version,
+		})
+	}
+	return &pulumirpc.GetProgramDependenciesResponse{
+		Dependencies: dependencies,
+	}, nil
 }
 
 // RuntimeOptionsPrompts returns a list of additional prompts to ask during `pulumi new`.
@@ -298,7 +347,7 @@ func (host *yamlLanguageHost) GenerateProject(
 		return nil, err
 	}
 
-	err = codegen.GenerateProject(req.TargetDirectory, project, program)
+	err = codegen.GenerateProject(req.TargetDirectory, project, program, req.LocalDependencies)
 	if err != nil {
 		return nil, err
 	}
@@ -449,5 +498,53 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 
 	return &pulumirpc.GeneratePackageResponse{
 		Diagnostics: rpcDiagnostics,
+	}, nil
+}
+
+func (host *yamlLanguageHost) Pack(ctx context.Context, req *pulumirpc.PackRequest) (*pulumirpc.PackResponse, error) {
+	// Yaml "SDKs" are just files, we can just copy the file
+	if err := os.MkdirAll(req.DestinationDirectory, 0700); err != nil {
+		return nil, err
+	}
+
+	files, err := os.ReadDir(req.PackageDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("reading package directory: %w", err)
+	}
+
+	copyFile := func(src, dst string) error {
+		srcFile, err := os.Open(src)
+		if err != nil {
+			return fmt.Errorf("opening %s: %w", src, err)
+		}
+		defer srcFile.Close()
+		dstFile, err := os.Create(dst)
+		if err != nil {
+			return fmt.Errorf("creating %s: %w", dst, err)
+		}
+		defer dstFile.Close()
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return fmt.Errorf("copying %s to %s: %w", src, dst, err)
+		}
+		return nil
+	}
+
+	// We only expect one file in the package directory
+	var single string
+	for _, file := range files {
+		if single != "" {
+			return nil, fmt.Errorf("multiple files in package directory %s: %s and %s", req.PackageDirectory, single, file.Name())
+		}
+		single = file.Name()
+	}
+
+	src := filepath.Join(req.PackageDirectory, single)
+	dst := filepath.Join(req.DestinationDirectory, single)
+	if err := copyFile(src, dst); err != nil {
+		return nil, fmt.Errorf("copying %s to %s: %w", src, dst, err)
+	}
+
+	return &pulumirpc.PackResponse{
+		ArtifactPath: dst,
 	}, nil
 }

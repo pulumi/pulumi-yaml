@@ -1,0 +1,5 @@
+resources:
+  res:
+    type: simple:Resource
+    properties:
+      value: true
