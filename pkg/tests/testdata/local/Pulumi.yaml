@@ -1,5 +1,5 @@
 name: local
-scription: An integration test showing the use of a a local plugin
+description: An integration test showing the use of a a local plugin
 runtime: yaml
 resources:
   res1:

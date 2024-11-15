@@ -1,0 +1,9 @@
+resources:
+  prov:
+    type: pulumi:providers:simple
+  res:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      provider: ${prov}

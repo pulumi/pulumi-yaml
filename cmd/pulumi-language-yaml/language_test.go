@@ -172,27 +172,9 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
-	"l1-stack-reference":                    "TODO",
-	"l2-destroy":                            "TODO",
-	"l2-map-keys":                           "TODO",
-	"l2-provider-grpc-config-schema-secret": "TODO",
-	"l2-resource-config":                    "TODO",
-	"l2-engine-update-options":              "TODO",
-	"l2-invoke-secrets":                     "TODO",
-	"l2-parameterized-resource":             "TODO",
-	"l2-provider-grpc-config-secret":        "TODO",
-	"l2-resource-primitives":                "TODO",
-	"l2-explicit-provider":                  "TODO",
-	"l2-plain":                              "TODO",
-	"l2-ref-ref":                            "TODO",
-	"l2-failed-create-continue-on-error":    "TODO",
-	"l2-primitive-ref":                      "TODO",
-	"l2-resource-alpha":                     "TODO",
-	"l2-target-up-with-new-dependency":      "TODO",
-	"l2-invoke-dependencies":                "TODO",
-	"l2-large-string":                       "TODO",
-	"l2-provider-grpc-config":               "TODO",
-	"l2-resource-asset-archive":             "TODO",
+	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
+	"l2-parameterized-resource":             "could not load schema for subpackage, provider not known",
+	"l2-resource-asset-archive":             "Argument must be a constant or contained in the project dir",
 }
 
 func TestLanguage(t *testing.T) {

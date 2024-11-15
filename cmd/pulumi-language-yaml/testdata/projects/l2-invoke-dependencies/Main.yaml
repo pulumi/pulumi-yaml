@@ -1,0 +1,17 @@
+resources:
+  first:
+    type: simple:Resource
+    properties:
+      value: false
+  # assert that resource second depends on resource first
+  # // because it uses .secret from the invoke which depends on first
+  second:
+    type: simple:Resource
+    properties:
+      value:
+        fn::invoke:
+          Function: simple-invoke:secretInvoke
+          Arguments:
+            value: hello
+            secretResponse: ${first.value}
+          Return: secret
