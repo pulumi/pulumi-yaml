@@ -176,7 +176,6 @@ var expectedFailures = map[string]string{
 	"l2-invoke-options":                     "cannot assign expression",
 	"l2-map-keys":                           "missing expected dependency primitive",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
-	"l2-invoke-secrets":                     "YAML does not support fn::secret",
 	"l2-parameterized-resource":             "could not load schema for subpackage, provider not known",
 	"l2-failed-create-continue-on-error":    "missing expected dependency fail_on_create",
 	"l2-invoke-dependencies":                "missing expected dependency simple-invoke",
