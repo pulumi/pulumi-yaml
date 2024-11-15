@@ -10,8 +10,8 @@ resources:
     properties:
       value:
         fn::invoke:
-          Function: simple-invoke:secretInvoke
-          Arguments:
+          function: simple-invoke:secretInvoke
+          arguments:
             value: hello
             secretResponse: ${first.value}
-          Return: secret
+          return: secret
