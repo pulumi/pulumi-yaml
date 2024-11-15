@@ -22,6 +22,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	enc "github.com/pulumi/pulumi/sdk/v3/go/common/encoding"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/fsutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -56,7 +57,7 @@ func GenerateProgram(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, 
 	return map[string][]byte{"Main.yaml": w.Bytes()}, g.diags, err
 }
 
-func GenerateProject(directory string, project workspace.Project, program *pcl.Program) error {
+func GenerateProject(directory string, project workspace.Project, program *pcl.Program, localDependencies map[string]string) error {
 	files, diagnostics, err := GenerateProgram(program)
 	if err != nil {
 		return err
@@ -91,6 +92,14 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 		err := os.WriteFile(outPath, data, 0600)
 		if err != nil {
 			return fmt.Errorf("write output program: %w", err)
+		}
+	}
+
+	for name, content := range localDependencies {
+		outPath := path.Join(directory, "sdks", name+".yaml")
+		err := fsutil.CopyFile(outPath, content, nil)
+		if err != nil {
+			return fmt.Errorf("copy local dependency: %w", err)
 		}
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
@@ -121,6 +122,30 @@ type pluginEntry struct {
 func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics) {
 	pluginMap := map[string]*pluginEntry{}
 
+	// Iterate over the package declarations
+	for _, pkg := range tmpl.Packages {
+		name := pkg.Name
+		version := pkg.Version
+		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+			version = pkg.Parameterization.Version
+		}
+
+		if entry, found := pluginMap[name]; found {
+			if entry.version == "" {
+				entry.version = version
+			}
+			if entry.pluginDownloadURL == "" {
+				entry.pluginDownloadURL = pkg.DownloadURL
+			}
+		} else {
+			pluginMap[name] = &pluginEntry{
+				version:           version,
+				pluginDownloadURL: pkg.DownloadURL,
+			}
+		}
+	}
+
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
 		if entry, found := pluginMap[pkg]; found {
@@ -195,6 +220,118 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 	})
 
 	return plugins, nil
+}
+
+// GetReferencedPlugins returns the packages and (if provided) versions for each referenced package
+// used in the program.
+func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {
+	packageMap := map[string]*packages.PackageDecl{}
+
+	// Iterate over the package declarations
+	for _, pkg := range tmpl.Packages {
+		pkg := pkg
+		name := pkg.Name
+		version := pkg.Version
+		if pkg.Parameterization != nil {
+			name = pkg.Parameterization.Name
+			version = pkg.Parameterization.Version
+		}
+
+		if entry, found := packageMap[name]; found {
+			if entry.Version == "" {
+				entry.Version = version
+			}
+			if entry.DownloadURL == "" {
+				entry.DownloadURL = pkg.DownloadURL
+			}
+		} else {
+			packageMap[name] = &pkg
+		}
+	}
+
+	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
+		pkg := ResolvePkgName(typeName)
+		if entry, found := packageMap[pkg]; found {
+			if v := version.GetValue(); v != "" && entry.Version != v {
+				if entry.Version == "" {
+					entry.Version = v
+				} else {
+					r.sdiags.Extend(ast.ExprError(version, fmt.Sprintf("Package %v already declared with a conflicting version: %v", pkg, entry.Version), ""))
+				}
+			}
+			if url := pluginDownloadURL.GetValue(); url != "" && entry.DownloadURL != url {
+				if entry.DownloadURL == "" {
+					entry.DownloadURL = url
+				} else {
+					r.sdiags.Extend(ast.ExprError(pluginDownloadURL, fmt.Sprintf("Package %v already declared with a conflicting plugin download URL: %v", pkg, entry.DownloadURL), ""))
+				}
+			}
+		} else {
+			packageMap[pkg] = &packages.PackageDecl{
+				Name:        pkg,
+				Version:     version.GetValue(),
+				DownloadURL: pluginDownloadURL.GetValue(),
+			}
+		}
+	}
+
+	diags := newRunner(tmpl, nil).Run(walker{
+		VisitResource: func(r *Runner, node resourceNode) bool {
+			res := node.Value
+
+			if res.Type == nil {
+				r.sdiags.Extend(syntax.NodeError(node.Value.Syntax(), fmt.Sprintf("Resource declared without a 'type': %q", node.Key.Value), ""))
+				return true
+			}
+			acceptType(r, res.Type.Value, res.Options.Version, res.Options.PluginDownloadURL)
+
+			return true
+		},
+		VisitExpr: func(ctx *evalContext, expr ast.Expr) bool {
+			if expr, ok := expr.(*ast.InvokeExpr); ok {
+				if expr.Token == nil {
+					ctx.Runner.sdiags.Extend(syntax.NodeError(expr.Syntax(), "Invoke declared without a 'function' type", ""))
+					return true
+				}
+				acceptType(ctx.Runner, expr.Token.GetValue(), expr.CallOpts.Version, expr.CallOpts.PluginDownloadURL)
+			}
+			return true
+		},
+	})
+
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	var packages []packages.PackageDecl
+	for _, pkg := range packageMap {
+		packages = append(packages, *pkg)
+	}
+
+	sort.Slice(packages, func(i, j int) bool {
+		pI, pJ := packages[i], packages[j]
+		if pI.Name != pJ.Name {
+			return pI.Name < pJ.Name
+		}
+		if pI.Version != pJ.Version {
+			return pI.Version < pJ.Version
+		}
+		if pI.Parameterization == nil && pJ.Parameterization == nil {
+			return pI.DownloadURL < pJ.DownloadURL
+		}
+		if pI.Parameterization == nil {
+			return true
+		}
+		if pJ.Parameterization == nil {
+			return false
+		}
+		if pI.Parameterization.Name != pJ.Parameterization.Name {
+			return pI.Parameterization.Name < pJ.Parameterization.Name
+		}
+		return pI.Parameterization.Version < pJ.Parameterization.Version
+	})
+
+	return packages, nil
 }
 
 func ResolvePkgName(typeString string) string {

@@ -64,7 +64,7 @@ func main() {
 	// Fire up a gRPC server, letting the kernel choose a free port.
 	port, done, err := rpcutil.Serve(0, cancelChannel, []func(*grpc.Server) error{
 		func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, tracing, compiler)
+			host := server.NewLanguageHost(engineAddress, tracing, compiler, false /* useRPCLoader */)
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
 			return nil
 		},
