@@ -1,0 +1,8 @@
+resources:
+  ref:
+    type: pulumi:pulumi:StackReference
+    properties:
+      name: organization/other/dev
+outputs:
+  plain: ${ref.outputs["plain"]}
+  secret: ${ref.outputs["secret"]}

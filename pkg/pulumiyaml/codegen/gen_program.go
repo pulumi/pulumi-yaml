@@ -737,6 +737,20 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("readFile", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
+	case "getOutput":
+		// getOutput(var, key) => ${var.outputs[key]}
+
+		root := g.expr(f.Args[0]).String() // This will be something like ${var}
+		// Strip the ${} from the root as we're going to rewrap it
+		root = root[2 : len(root)-1]
+
+		key := g.expr(f.Args[1])
+		// We need to wrap the key in quotes if its a string, but not if its a number
+		if _, ok := key.(*syn.StringNode); ok {
+			key = syn.String(fmt.Sprintf("%q", key.String()))
+		}
+
+		return syn.String(fmt.Sprintf("${%s.outputs[%s]}", root, key))
 	case pcl.IntrinsicConvert:
 		// We can't perform the convert, but it might happen automatically.
 		// This works for enums, as well as number -> strings.
