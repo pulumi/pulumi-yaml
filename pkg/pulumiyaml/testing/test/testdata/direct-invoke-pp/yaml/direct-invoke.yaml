@@ -8,8 +8,8 @@ resources:
         '3': 4
       policy:
         fn::invoke:
-          Function: aws:iam:getPolicyDocument
-          Arguments:
+          function: aws:iam:getPolicyDocument
+          arguments:
             statements:
               - sid: '1'
                 actions:
@@ -17,4 +17,4 @@ resources:
                   - s3:GetBucketLocation
                 resources:
                   - arn:aws:s3:::*
-          Return: json
+          return: json

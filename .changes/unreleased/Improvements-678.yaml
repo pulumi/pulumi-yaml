@@ -1,0 +1,6 @@
+component: codegen
+kind: Improvements
+body: Generate invoke options from PCL
+time: 2024-11-15T02:25:02.17379+01:00
+custom:
+    PR: "678"

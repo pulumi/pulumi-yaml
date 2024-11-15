@@ -28,8 +28,8 @@ resources:
 variables:
   ami:
     fn::invoke:
-      Function: aws:ec2:getAmi
-      Arguments:
+      function: aws:ec2:getAmi
+      arguments:
         filters:
           - name: name
             values:
@@ -37,7 +37,7 @@ variables:
         owners:
           - '137112412989'
         mostRecent: true
-      Return: id
+      return: id
   userData: |-
     #!/bin/bash
     echo "Hello, World from Pulumi!" > index.html

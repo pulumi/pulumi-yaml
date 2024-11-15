@@ -101,13 +101,13 @@ variables:
   # Read the default VPC and public subnets, which we will use.
   vpc:
     fn::invoke:
-      Function: aws:ec2:getVpc
-      Arguments:
+      function: aws:ec2:getVpc
+      arguments:
         default: true
   subnets:
     fn::invoke:
-      Function: aws:ec2:getSubnetIds
-      Arguments:
+      function: aws:ec2:getSubnetIds
+      arguments:
         vpcId: ${vpc.id}
 outputs:
   # Export the resulting web address.

@@ -1,0 +1,15 @@
+resources:
+  res:
+    type: simple-invoke:StringResource
+outputs:
+  outputInput:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: ${res.text}
+      return: result
+  unit:
+    fn::invoke:
+      function: simple-invoke:unit
+      arguments: {}
+      return: result

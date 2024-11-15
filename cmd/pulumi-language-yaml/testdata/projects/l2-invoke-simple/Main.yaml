@@ -1,0 +1,13 @@
+outputs:
+  hello:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: hello
+      return: result
+  goodbye:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: goodbye
+      return: result
