@@ -148,6 +148,11 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
+		// skip the "pulumi" package
+		if pkg == "pulumi" {
+			return
+		}
+
 		if entry, found := pluginMap[pkg]; found {
 			if v := version.GetValue(); v != "" && entry.version != v {
 				if entry.version == "" {
