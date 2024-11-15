@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Asset and archive paths are passed as is to the engine
+time: 2024-11-15T14:00:42.874578613Z
+custom:
+  PR: "684"
