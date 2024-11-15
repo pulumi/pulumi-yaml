@@ -174,11 +174,8 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l1-stack-reference":                    "YAML does not support fn::getOutput",
 	"l2-invoke-options":                     "cannot assign expression",
-	"l2-map-keys":                           "missing expected dependency primitive",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-parameterized-resource":             "could not load schema for subpackage, provider not known",
-	"l2-failed-create-continue-on-error":    "missing expected dependency fail_on_create",
-	"l2-invoke-dependencies":                "missing expected dependency simple-invoke",
 	"l2-resource-asset-archive":             "Argument must be a constant or contained in the project dir",
 }
 
