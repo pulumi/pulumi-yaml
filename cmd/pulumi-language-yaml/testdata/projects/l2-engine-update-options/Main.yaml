@@ -1,0 +1,9 @@
+resources:
+  target:
+    type: simple:Resource
+    properties:
+      value: true
+  other:
+    type: simple:Resource
+    properties:
+      value: true

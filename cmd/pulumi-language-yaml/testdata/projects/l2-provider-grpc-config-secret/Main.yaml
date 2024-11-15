@@ -1,0 +1,65 @@
+resources:
+  # This provider covers scenarios where user passes secret values to the provider.
+  config_grpc_provider:
+    type: pulumi:providers:config-grpc
+    properties:
+      string1:
+        fn::invoke:
+          Function: config-grpc:toSecret
+          Arguments:
+            string1: SECRET
+          Return: string1
+      int1:
+        fn::invoke:
+          Function: config-grpc:toSecret
+          Arguments:
+            int1: 1.23456789e+09
+          Return: int1
+      num1:
+        fn::invoke:
+          Function: config-grpc:toSecret
+          Arguments:
+            num1: 123456.789
+          Return: num1
+      bool1:
+        fn::invoke:
+          Function: config-grpc:toSecret
+          Arguments:
+            bool1: true
+          Return: bool1
+      listString1:
+        fn::invoke:
+          Function: config-grpc:toSecret
+          Arguments:
+            listString1:
+              - SECRET
+              - SECRET2
+          Return: listString1
+      listString2: # TODO[pulumi/pulumi#17535] this currently breaks Go compilation unfortunately.
+      #     # mapString1 = invoke("config-grpc:index:toSecret", {mapString1 = { key1 = "SECRET", key2 = "SECRET2" }}).mapString1
+        - VALUE
+        - fn::invoke:
+            Function: config-grpc:toSecret
+            Arguments:
+              string1: SECRET
+            Return: string1
+      mapString2: # TODO[pulumi/pulumi#17535] this breaks Go compilation as well.
+      #     # os1 = invoke("config-grpc:index:toSecret", {objString1 = { x = "SECRET" }}).objString1
+        key1: value1
+        key2:
+          fn::invoke:
+            Function: config-grpc:toSecret
+            Arguments:
+              string1: SECRET
+            Return: string1
+      objString2:
+        x:
+          fn::invoke:
+            Function: config-grpc:toSecret
+            Arguments:
+              string1: SECRET
+            Return: string1
+  config:
+    type: config-grpc:ConfigFetcher
+    options:
+      provider: ${config_grpc_provider}
