@@ -1,0 +1,32 @@
+resources:
+  res:
+    type: simple:Resource
+    properties:
+      value: true
+outputs:
+  # inputs are plain and the invoke response is plain
+  nonSecret:
+    fn::invoke:
+      Function: simple-invoke:secretInvoke
+      Arguments:
+        value: hello
+        secretResponse: false
+      Return: response
+  # referencing value from resource
+  # // invoke response is secret => whole output is secret
+  firstSecret:
+    fn::invoke:
+      Function: simple-invoke:secretInvoke
+      Arguments:
+        value: hello
+        secretResponse: ${res.value}
+      Return: response
+  # inputs are secret, invoke response is plain => whole output is secret
+  secondSecret:
+    fn::invoke:
+      Function: simple-invoke:secretInvoke
+      Arguments:
+        value:
+          fn::secret: goodbye
+        secretResponse: false
+      Return: response
