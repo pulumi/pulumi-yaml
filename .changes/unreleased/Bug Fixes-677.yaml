@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Fix panic when resource shape is invalid
+time: 2024-11-15T00:51:03.499599+01:00
+custom:
+    PR: "677"
