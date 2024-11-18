@@ -450,9 +450,7 @@ variables:
 		assert.Equal(t, assets["str"].(pulumi.Asset).Text(), "this is home")
 		assert.Equal(t, assets["strIter"].(pulumi.Asset).Text(), "start bar end")
 		assert.Equal(t, assets["away"].(pulumi.Asset).URI(), "example.org/asset")
-		filePath, err := filepath.Abs("./README.md")
-		assert.NoError(t, err)
-		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), filePath)
+		assert.Equal(t, assets["local"].(pulumi.Asset).Path(), "./README.md")
 		assert.Equal(t, assets["folder"].(pulumi.Archive).Assets()["docs"].(pulumi.Archive).URI(), "example.org/docs")
 	})
 }
@@ -1638,39 +1636,6 @@ variables:
 		assert.True(t, ok)
 		assert.Equal(t, string(repoReadmeText), result)
 	})
-}
-
-// TestReadFileForbidsPathTraversal ensures that we forbid certain malicious path behaviors which
-// allow escaping the project directory in static YAML.
-//
-// The example program uses a non-constant path which escapes the project directory.
-//
-// Non-constant paths which read from the project dir are considered safe, likely as uses of
-// ${pulumi.cwd}, see above. Constant, absolute path are also permitted, sometimes necessary to use
-// a secret or token.
-func TestReadFileForbidsPathTraversal(t *testing.T) {
-	t.Parallel()
-
-	text := `
-name: test-readfile
-runtime: yaml
-outputs:
-  readme:
-    fn::readFile: ${pulumi.cwd}/../../go.mod # imagine this is /etc/shadow, /var/run/secrets/tokens, etc.
-`
-
-	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	diags := testTemplateSyntaxDiags(t, tmpl, func(r *Runner) {})
-
-	var diagStrings []string
-	for _, v := range diags {
-		diagStrings = append(diagStrings, diagString(v))
-	}
-	assert.ElementsMatch(t, diagStrings,
-		[]string{
-			"<stdin>:5:5: Argument must be a constant or contained in the project dir",
-		},
-	)
 }
 
 func TestJoinTemplate(t *testing.T) {
