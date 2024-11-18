@@ -174,7 +174,6 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l2-invoke-options":                     "cannot assign expression",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
-	"l2-parameterized-resource":             "could not load schema for subpackage, provider not known",
 }
 
 func TestLanguage(t *testing.T) {

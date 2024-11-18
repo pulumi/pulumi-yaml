@@ -1,0 +1,6 @@
+resources:
+  # The resource name is based on the parameter value
+  example:
+    type: subpackage:HelloWorld
+outputs:
+  parameterValue: ${example.parameterValue}

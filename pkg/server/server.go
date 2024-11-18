@@ -131,7 +131,7 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 	for _, pkg := range pkgs {
 		plugins = append(plugins, &pulumirpc.PluginDependency{
 			Kind:    string(apitype.ResourcePlugin),
-			Name:    pkg.Package,
+			Name:    pkg.Name,
 			Version: pkg.Version,
 			Server:  pkg.PluginDownloadURL,
 		})

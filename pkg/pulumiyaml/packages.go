@@ -107,12 +107,13 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 // Plugin is metadata containing a package name, possibly empty version and download URL. Used to
 // inform the engine of the required plugins at the beginning of program execution.
 type Plugin struct {
-	Package           string
+	Name              string
 	Version           string
 	PluginDownloadURL string
 }
 
 type pluginEntry struct {
+	name              string
 	version           string
 	pluginDownloadURL string
 }
@@ -120,27 +121,27 @@ type pluginEntry struct {
 // GetReferencedPlugins returns the packages and (if provided) versions for each referenced provider
 // used in the program.
 func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics) {
+	// a map from _package_ name to a plugin entry
 	pluginMap := map[string]*pluginEntry{}
 
 	// Iterate over the package declarations
 	for _, pkg := range tmpl.Packages {
 		name := pkg.Name
-		version := pkg.Version
 		if pkg.Parameterization != nil {
 			name = pkg.Parameterization.Name
-			version = pkg.Parameterization.Version
 		}
 
 		if entry, found := pluginMap[name]; found {
 			if entry.version == "" {
-				entry.version = version
+				entry.version = pkg.Version
 			}
 			if entry.pluginDownloadURL == "" {
 				entry.pluginDownloadURL = pkg.DownloadURL
 			}
 		} else {
 			pluginMap[name] = &pluginEntry{
-				version:           version,
+				name:              pkg.Name,
+				version:           pkg.Version,
 				pluginDownloadURL: pkg.DownloadURL,
 			}
 		}
@@ -170,6 +171,7 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 			}
 		} else {
 			pluginMap[pkg] = &pluginEntry{
+				name:              pkg,
 				version:           version.GetValue(),
 				pluginDownloadURL: pluginDownloadURL.GetValue(),
 			}
@@ -205,9 +207,9 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 	}
 
 	var plugins []Plugin
-	for pkg, meta := range pluginMap {
+	for _, meta := range pluginMap {
 		plugins = append(plugins, Plugin{
-			Package:           pkg,
+			Name:              meta.name,
 			Version:           meta.version,
 			PluginDownloadURL: meta.pluginDownloadURL,
 		})
@@ -215,8 +217,8 @@ func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics)
 
 	sort.Slice(plugins, func(i, j int) bool {
 		pI, pJ := plugins[i], plugins[j]
-		if pI.Package != pJ.Package {
-			return pI.Package < pJ.Package
+		if pI.Name != pJ.Name {
+			return pI.Name < pJ.Name
 		}
 		if pI.Version != pJ.Version {
 			return pI.Version < pJ.Version
