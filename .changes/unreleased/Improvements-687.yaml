@@ -1,0 +1,6 @@
+component: codegen
+kind: Improvements
+body: Support invoke options in program generation
+time: 2024-11-18T16:26:51.64239623Z
+custom:
+  PR: "687"

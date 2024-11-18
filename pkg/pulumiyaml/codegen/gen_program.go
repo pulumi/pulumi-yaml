@@ -796,9 +796,20 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn
 		arguments = g.expr(f.Args[1])
 	}
 
+	var options syn.Node
+	if len(f.Args) > 2 {
+		_, ok := f.Args[2].(*model.ObjectConsExpression)
+		contract.Assertf(ok, "Expected ObjectConsExpression as third argument, got %T", f.Args[2])
+		options = g.expr(f.Args[2])
+	}
+
 	properties := []syn.ObjectPropertyDef{
 		syn.ObjectProperty(syn.String("Function"), syn.String(name)),
 		syn.ObjectProperty(syn.String("Arguments"), arguments),
+	}
+
+	if options != nil {
+		properties = append(properties, syn.ObjectProperty(syn.String("Options"), options))
 	}
 
 	// Calculate the return value
