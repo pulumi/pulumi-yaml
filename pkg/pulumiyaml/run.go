@@ -133,6 +133,10 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, diags, err
 	}
 
+	if diags.HasErrors() {
+		return nil, diags, diags
+	}
+
 	packages, err := packages.SearchPackageDecls(directory)
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
@@ -2275,7 +2279,6 @@ func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}
 }
 
 func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr) (interface{}, bool) {
-	_, isConstant := s.(*ast.StringExpr)
 	v, b := e.evaluateExpr(s)
 	if !b {
 		return nil, false
@@ -2291,26 +2294,12 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 		case *ast.StringAssetExpr:
 			return pulumi.NewStringAsset(value), true
 		case *ast.FileArchiveExpr:
-			path, err := e.sanitizePath(value, isConstant)
-			if err != nil {
-				return e.error(s, err.Error())
-			}
-			return pulumi.NewFileArchive(path), true
+			return pulumi.NewFileArchive(value), true
 		case *ast.FileAssetExpr:
-			path, err := e.sanitizePath(value, isConstant)
-			if err != nil {
-				return e.error(s, err.Error())
-			}
-			return pulumi.NewFileAsset(path), true
+			return pulumi.NewFileAsset(value), true
 		case *ast.RemoteArchiveExpr:
-			if !isConstant {
-				return e.error(s, "Argument to fn::remoteArchiveExpr must be a constantr")
-			}
 			return pulumi.NewRemoteArchive(value), true
 		case *ast.RemoteAssetExpr:
-			if !isConstant {
-				return e.error(s, "Argument to fn::remoteAssetExpr must be a constant")
-			}
 			return pulumi.NewRemoteAsset(value), true
 
 		}
@@ -2320,75 +2309,16 @@ func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr
 	return createAssetArchiveF(v)
 }
 
-func (e *programEvaluator) sanitizePath(path string, isConstant bool) (string, error) {
-	path = filepath.Clean(path)
-	isAbsolute := filepath.IsAbs(path)
-	var err error
-	if !e.pulumiCtx.DryRun() {
-		path, err = filepath.EvalSymlinks(path)
-		if err != nil {
-			return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
-		}
-	}
-
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
-	}
-	isSubdirectory := false
-	relPath, err := filepath.Rel(e.Runner.cwd, path)
-	if err != nil {
-		return "", fmt.Errorf("Error reading file at path %v: %w", path, err)
-	}
-
-	if !strings.HasPrefix(relPath, "../") {
-		isSubdirectory = true
-	}
-
-	isSafe := isSubdirectory || (isConstant && isAbsolute)
-	if !isSafe {
-		return "", fmt.Errorf("Argument must be a constant or contained in the project dir")
-	}
-	// Evaluate symlinks to ensure we don't escape the current project dir
-	// Compute the absolute path to use a prefix to check if we're relative
-	// Security, defense in depth: prevent path traversal exploits from leaking any information
-	// (secrets, tokens, ...) from outside the project directory.
-	//
-	// Allow subdirectory paths, these are valid constructions of the form:
-	//
-	//  * "./README.md"
-	//  * "${pulumi.cwd}/README.md"
-	//  * ... etc
-	//
-	// Allow constant paths that are absolute, therefore reviewable:
-	//
-	//  * /etc/lsb-release
-	//  * /usr/share/nginx/html
-	//  * /var/run/secrets/kubernetes.io/serviceaccount/token
-	//
-	// Forbidding parent directory path traversals (Path Traversal vulnerability):
-	//
-	//  * ../../etc/shadow
-	//  * ../../.ssh/id_rsa.pub
-	return path, nil
-}
-
 func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interface{}, bool) {
 	expr, ok := e.evaluateExpr(s.Path)
 	if !ok {
 		return nil, false
 	}
 
-	_, isConstant := s.Path.(*ast.StringExpr)
-
 	readFileF := e.lift(func(args ...interface{}) (interface{}, bool) {
 		path, ok := args[0].(string)
 		if !ok {
 			return e.error(s.Path, fmt.Sprintf("Argument to fn::readFile must be a string, got %v", reflect.TypeOf(args[0])))
-		}
-		path, err := e.sanitizePath(path, isConstant)
-		if err != nil {
-			return e.error(s, err.Error())
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {

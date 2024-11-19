@@ -213,7 +213,7 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		elems := g.expr(opts.DependsOn)
 		_, ok := elems.(*syn.ListNode)
 		contract.Assertf(ok, "Expected a list node, got %T", elems)
-		rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependson"), elems))
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependsOn"), elems))
 	}
 	if opts.IgnoreChanges != nil {
 		elems := g.expr(opts.IgnoreChanges).(*syn.ListNode)
@@ -222,7 +222,7 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 			ignoreChanges[i] = unquoteInterpolation(elems.Index(i))
 		}
 		list := syn.ListSyntax(elems.Syntax(), ignoreChanges...)
-		rOpts = append(rOpts, syn.ObjectProperty(syn.String("ignorechanges"), list))
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("ignoreChanges"), list))
 	}
 	if opts.Protect != nil {
 		expr := mustCoerceBoolean(g.expr(opts.Protect))

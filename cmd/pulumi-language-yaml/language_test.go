@@ -174,7 +174,6 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-parameterized-resource":             "could not load schema for subpackage, provider not known",
-	"l2-resource-asset-archive":             "Argument must be a constant or contained in the project dir",
 }
 
 func TestLanguage(t *testing.T) {

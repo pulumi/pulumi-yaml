@@ -7,9 +7,9 @@ resources:
     type: aws:s3:Bucket
     options:
       provider: ${provider}
-      dependson:
+      dependsOn:
         - ${provider}
-      ignorechanges:
+      ignoreChanges:
         - bucket
         - lifecycleRules[0]
       protect: true

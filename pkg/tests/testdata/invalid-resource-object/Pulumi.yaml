@@ -1,0 +1,6 @@
+name: myymltest
+description: A minimal Pulumi YAML program
+runtime: yaml
+variables: {}
+resources: {badResource}
+outputs: {}

@@ -8,7 +8,7 @@ resources:
     properties:
       value: true
     options:
-      dependson:
+      dependsOn:
         - ${failing}
   dependent_on_output:
     type: simple:Resource
@@ -23,6 +23,6 @@ resources:
     properties:
       value: true
     options:
-      dependson:
+      dependsOn:
         - ${independent}
         - ${dependent_on_output}
