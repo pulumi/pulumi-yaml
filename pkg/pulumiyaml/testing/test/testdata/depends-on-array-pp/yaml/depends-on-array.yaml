@@ -25,7 +25,7 @@ resources:
       contentType: text/html
       acl: public-read
     options:
-      dependson:
+      dependsOn:
         - ${publicAccessBlock}
         - ${ownershipControls}
 outputs:

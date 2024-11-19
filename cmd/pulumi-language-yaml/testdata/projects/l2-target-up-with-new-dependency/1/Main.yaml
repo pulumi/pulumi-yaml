@@ -8,7 +8,7 @@ resources:
     properties:
       value: true
     options:
-      dependson:
+      dependsOn:
         - ${dep}
   dep:
     type: simple:Resource
