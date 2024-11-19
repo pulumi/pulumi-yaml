@@ -95,7 +95,7 @@ resources:
           containerName: my-app
           containerPort: 80
     options:
-      dependson:
+      dependsOn:
         - ${webListener}
 variables:
   # Read the default VPC and public subnets, which we will use.
