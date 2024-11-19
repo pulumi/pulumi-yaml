@@ -185,6 +185,8 @@ func TestGenerateProgram(t *testing.T) {
 				// secret or unsecret, notImplemented, singleOrNone.
 			case "python-resource-names", "python-reserved", "snowflake-python-12998", "python-regress-14037":
 				// Reason: A python only test.
+			case "csharp-invoke-options":
+				// Reason: C# only test.
 			case "simple-range", "entries-function",
 				"iterating-optional-range-expressions",
 				"invoke-inside-conditional-range":
