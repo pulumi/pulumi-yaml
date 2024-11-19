@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: '`GetProgramDependencies` now returns packages used to show in `pulumi about`'
-time: 2024-11-14T17:39:33.889564362Z
-custom:
-  PR: "676"

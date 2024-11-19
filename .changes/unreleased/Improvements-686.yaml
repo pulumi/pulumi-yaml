@@ -1,6 +1,0 @@
-component: codegen
-kind: Improvements
-body: Support stack references in program generation
-time: 2024-11-15T17:19:10.259289815Z
-custom:
-  PR: "686"
