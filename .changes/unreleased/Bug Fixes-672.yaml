@@ -1,6 +1,0 @@
-component: codegen
-kind: Bug Fixes
-body: Program generation now respects the 'main' option from input Pulumi.yaml
-time: 2024-11-13T19:42:32.376005908Z
-custom:
-  PR: "672"

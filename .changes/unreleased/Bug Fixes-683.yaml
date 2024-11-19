@@ -1,6 +1,0 @@
-component: codegen
-kind: Bug Fixes
-body: Recognize the PCL fn::secret function
-time: 2024-11-15T13:03:54.975607828Z
-custom:
-  PR: "683"
