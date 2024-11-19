@@ -796,16 +796,38 @@ func (g *generator) MustInvoke(f *model.FunctionCallExpression, ret string) *syn
 		arguments = g.expr(f.Args[1])
 	}
 
+	options := []syn.ObjectPropertyDef{}
+	if len(f.Args) > 2 {
+		if invokeOptions, ok := f.Args[2].(*model.ObjectConsExpression); ok {
+			for _, item := range invokeOptions.Items {
+				var key *syn.StringNode
+				switch pcl.LiteralValueString(item.Key) {
+				case "pluginDownloadUrl":
+					key = syn.String("pluginDownloadURL")
+				default:
+					key = g.asKey(item.Key)
+				}
+
+				value := g.expr(item.Value)
+				options = append(options, syn.ObjectProperty(key, value))
+			}
+		}
+	}
+
 	properties := []syn.ObjectPropertyDef{
-		syn.ObjectProperty(syn.String("Function"), syn.String(name)),
-		syn.ObjectProperty(syn.String("Arguments"), arguments),
+		syn.ObjectProperty(syn.String("function"), syn.String(name)),
+		syn.ObjectProperty(syn.String("arguments"), arguments),
+	}
+
+	if len(options) > 0 {
+		properties = append(properties, syn.ObjectProperty(syn.String("options"), syn.Object(options...)))
 	}
 
 	// Calculate the return value
 	if ret != "" {
 		properties = append(properties,
 			syn.ObjectProperty(
-				syn.String("Return"),
+				syn.String("return"),
 				syn.String(ret),
 			))
 	}

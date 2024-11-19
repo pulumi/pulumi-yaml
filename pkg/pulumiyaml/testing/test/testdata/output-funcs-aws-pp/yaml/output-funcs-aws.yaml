@@ -27,16 +27,16 @@ resources:
 variables:
   privateS3PrefixList:
     fn::invoke:
-      Function: aws:ec2:getPrefixList
-      Arguments:
+      function: aws:ec2:getPrefixList
+      arguments:
         prefixListId: ${privateS3VpcEndpoint.prefixListId}
   # A contrived example to test that helper nested records ( `filters`
   # below) generate correctly when using output-versioned function
   # invoke forms.
   amis:
     fn::invoke:
-      Function: aws:ec2:getAmiIds
-      Arguments:
+      function: aws:ec2:getAmiIds
+      arguments:
         owners:
           - ${bar.id}
         filters:

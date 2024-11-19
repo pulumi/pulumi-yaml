@@ -27,8 +27,8 @@ variables:
   # Get the ID for the latest Amazon Linux AMI.
   ami:
     fn::invoke:
-      Function: aws:getAmi
-      Arguments:
+      function: aws:getAmi
+      arguments:
         filters:
           - name: name
             values:

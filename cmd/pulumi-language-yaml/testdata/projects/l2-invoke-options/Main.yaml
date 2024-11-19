@@ -1,0 +1,16 @@
+resources:
+  explicitProvider:
+    type: pulumi:providers:simple-invoke
+variables:
+  data:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: hello
+      options:
+        provider: ${explicitProvider}
+        parent: ${explicitProvider}
+        version: 10.0.0
+        pluginDownloadURL: https://example.com/github/example
+outputs:
+  hello: ${data.result}

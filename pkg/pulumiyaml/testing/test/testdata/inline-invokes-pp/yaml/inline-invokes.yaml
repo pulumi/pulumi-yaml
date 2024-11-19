@@ -4,7 +4,7 @@ resources:
     properties:
       vpcId:
         fn::invoke:
-          Function: aws:ec2:getVpc
-          Arguments:
+          function: aws:ec2:getVpc
+          arguments:
             default: true
-          Return: id
+          return: id

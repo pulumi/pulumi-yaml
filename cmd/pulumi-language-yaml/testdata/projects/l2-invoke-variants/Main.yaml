@@ -4,12 +4,12 @@ resources:
 outputs:
   outputInput:
     fn::invoke:
-      Function: simple-invoke:myInvoke
-      Arguments:
+      function: simple-invoke:myInvoke
+      arguments:
         value: ${res.text}
-      Return: result
+      return: result
   unit:
     fn::invoke:
-      Function: simple-invoke:unit
-      Arguments: {}
-      Return: result
+      function: simple-invoke:unit
+      arguments: {}
+      return: result
