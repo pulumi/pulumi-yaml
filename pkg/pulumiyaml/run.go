@@ -2019,6 +2019,21 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
+	if t.CallOpts.DependsOn != nil {
+		dependsOnOpt, ok := e.evaluateResourceListValuedOption(t.CallOpts.DependsOn, "dependsOn")
+		if ok {
+			var dependsOn []pulumi.Resource
+			for _, r := range dependsOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
+				dependsOn = append(dependsOn, r.CustomResource())
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
+		} else {
+			e.error(t.Return, fmt.Sprintf("Unable to evaluate options DependsOn field: %+v", t.CallOpts.DependsOn))
+		}
+	}
 	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
 		result := map[string]interface{}{}
@@ -2033,16 +2048,17 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		}
 
 		pkgRef := ""
-		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, pkgRef, opts...)
+		secret, deps, err := e.pulumiCtx.InvokePackageRawWithDeps(string(functionName), args[0], &result, pkgRef, opts...)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
 
 		if t.Return.GetValue() == "" {
+			output := pulumi.OutputWithDependencies(context.TODO(), pulumi.Any(result), deps...)
 			if secret {
-				return pulumi.ToSecret(pulumi.Any(result)), true
+				return pulumi.ToSecret(output), true
 			}
-			return result, true
+			return output, true
 		}
 
 		retv, ok := result[t.Return.Value]
@@ -2050,10 +2066,12 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
 			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
 		}
+
+		output := pulumi.OutputWithDependencies(context.TODO(), pulumi.Any(retv), deps...)
 		if secret {
-			return pulumi.ToSecret(pulumi.Any(retv)), true
+			return pulumi.ToSecret(output), true
 		}
-		return retv, true
+		return output, true
 	})
 	return performInvoke(args)
 }

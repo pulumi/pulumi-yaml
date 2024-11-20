@@ -216,7 +216,7 @@ runtime: yaml
 	requireNoErrors(t, tmpl, diags)
 }
 
-func TestInvokeReturningSecrets(t *testing.T) {
+func TestInvokeReturningSecretsWithReturn(t *testing.T) {
 	t.Parallel()
 
 	const text = `
@@ -248,6 +248,42 @@ outputs:
 	case <-done:
 		requireNoErrors(t, tmpl, diags)
 		assert.Equal(t, "super-secret", innerValue)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timed out waiting for the secret to be resolved")
+	}
+}
+
+func TestInvokeReturningSecrets(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+variables:
+  cipher:
+    fn::invoke:
+      function: test:invoke:secret
+outputs:
+  secret: ${cipher}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	var response map[string]any
+	done := make(chan bool)
+	diags := testInvokeDiags(t, tmpl, func(r *Runner) {
+		cipher, ok := r.variables["cipher"].(pulumi.AnyOutput)
+		assert.True(t, ok)
+		assert.NotNil(t, cipher)
+		cipher.ApplyT(func(v interface{}) interface{} {
+			response = v.(map[string]any)
+			done <- true
+			return v
+		})
+	})
+	select {
+	case <-done:
+		requireNoErrors(t, tmpl, diags)
+		assert.Equal(t, map[string]any{"response": "super-secret"}, response)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timed out waiting for the secret to be resolved")
 	}
