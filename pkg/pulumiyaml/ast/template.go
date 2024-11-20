@@ -370,6 +370,7 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 type InvokeOptionsDecl struct {
 	declNode
 
+	DependsOn         Expr
 	Parent            Expr
 	Provider          Expr
 	Version           *StringExpr
