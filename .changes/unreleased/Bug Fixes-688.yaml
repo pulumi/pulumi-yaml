@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Fix a mixup between package names and plugin names when listing required plugins
+time: 2024-11-18T20:11:40.812175763Z
+custom:
+  PR: "688"

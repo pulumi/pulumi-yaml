@@ -30,7 +30,7 @@ resources:
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
-		Package: "test",
+		Name:    "test",
 		Version: "1.23.425-beta.6",
 	}})
 	want.Equal(t, got)
@@ -59,7 +59,7 @@ resources:
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
-		Package: "test",
+		Name:    "test",
 		Version: "1.7.13",
 	}})
 	want.Equal(t, got)
@@ -88,7 +88,7 @@ resources:
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
-		Package: "test",
+		Name:    "test",
 		Version: "1.2",
 	}})
 	want.Equal(t, got)
@@ -158,7 +158,7 @@ outputs:
 	gotPlugins := plugins
 	wantPlugins := autogold.Want("test-plugins", []Plugin{
 		{
-			Package: "aws",
+			Name:    "aws",
 			Version: "4.37.1",
 		},
 	})
@@ -196,7 +196,7 @@ resources:
 
 	got := plugins
 	want := autogold.Want("test-plugins", []Plugin{{
-		Package:           "test",
+		Name:              "test",
 		Version:           "1.23.425-beta.6",
 		PluginDownloadURL: "https://example.com",
 	}})
