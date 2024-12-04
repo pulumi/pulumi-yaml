@@ -2042,7 +2042,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 			return nil, true
 		}
-		_, functionName, err := ResolveFunction(context.TODO(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
+		_, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
@@ -2054,7 +2054,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		}
 
 		if t.Return.GetValue() == "" {
-			output := pulumi.OutputWithDependencies(context.TODO(), pulumi.Any(result), deps...)
+			output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(result), deps...)
 			if secret {
 				return pulumi.ToSecret(output), true
 			}
@@ -2067,7 +2067,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
 		}
 
-		output := pulumi.OutputWithDependencies(context.TODO(), pulumi.Any(retv), deps...)
+		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), deps...)
 		if secret {
 			return pulumi.ToSecret(output), true
 		}
