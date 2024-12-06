@@ -18,6 +18,20 @@ func integrationDir(dir string) string {
 	return filepath.Join("./testdata", dir)
 }
 
+func TestAbout(t *testing.T) {
+	t.Parallel()
+
+	e := ptesting.NewEnvironment(t)
+	defer e.DeleteIfNotFailed()
+
+	e.ImportDirectory(integrationDir("about"))
+
+	stdout, stderr := e.RunCommand("pulumi", "about")
+	// There should be no "unknown" plugin versions.
+	assert.NotContains(t, stdout, "unknown")
+	assert.NotContains(t, stderr, "unknown")
+}
+
 //nolint:paralleltest // uses parallel programtest
 func TestTypeCheckError(t *testing.T) {
 	testWrapper(t, integrationDir("type-fail"), ExpectFailure, StderrValidator{
