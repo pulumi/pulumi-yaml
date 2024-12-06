@@ -229,14 +229,24 @@ func TestTypePropertyAccess(t *testing.T) {
 		errMsg       string
 	}{
 		{
-			root: &schema.MapType{ElementType: &schema.ArrayType{ElementType: schema.AnyType}},
+			root: &schema.MapType{ElementType: &schema.ArrayType{ElementType: schema.IntType}},
 			list: []ast.PropertyAccessor{
 				&ast.PropertySubscript{Index: "foo"},
 				&ast.PropertySubscript{Index: 7},
 				&ast.PropertySubscript{Index: "foo"},
 			},
 			expectedType: "Invalid",
-			errMsg:       `Cannot index into 'start["foo"][7]' (type any):Index property access is only allowed on Maps and Lists`,
+			errMsg:       `Cannot index into 'start["foo"][7]' (type integer):Index property access is only allowed on Maps and Lists`,
+		},
+		{
+			// Once in any Any type, all property access is valid:
+			root: schema.AnyType,
+			list: []ast.PropertyAccessor{
+				&ast.PropertySubscript{Index: "foo"},
+				&ast.PropertySubscript{Index: 7},
+				&ast.PropertySubscript{Index: "foo"},
+			},
+			expectedType: "any",
 		},
 		{
 			root: &schema.ResourceType{
