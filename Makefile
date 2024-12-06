@@ -17,6 +17,10 @@ GO                          := go
 
 BUILD_FLAGS ?=
 
+# Try to get the dev version using changie, otherwise fall back
+FALLBACK_DEV_VERSION := 1.0.0-dev.0
+DEV_VERSION := $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
+
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
 
@@ -60,7 +64,8 @@ lint-copyright:
 
 build:: ensure
 	mkdir -p ./bin
-	${GO} build $(BUILD_FLAGS) -o ./bin -p ${CONCURRENCY} ./cmd/...
+	${GO} build $(BUILD_FLAGS) -o ./bin -p ${CONCURRENCY} \
+		-ldflags "-X github.com/pulumi/pulumi-yaml/pkg/version.Version=$(DEV_VERSION)" ./cmd/...
 
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins get_schemas
