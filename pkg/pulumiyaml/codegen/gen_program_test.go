@@ -205,6 +205,8 @@ func TestGenerateProgram(t *testing.T) {
 				// Needs config set in order to compile/run.
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
+			case "deferred-outputs":
+				// Reason: Pulumi YAML does not support deferred outputs.
 			default:
 				l = append(l, tt)
 			}
