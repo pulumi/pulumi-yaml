@@ -2008,41 +2008,59 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
+	if t.CallOpts.DependsOn != nil {
+		dependsOnOpt, ok := e.evaluateResourceListValuedOption(t.CallOpts.DependsOn, "dependsOn")
+		if ok {
+			var dependsOn []pulumi.Resource
+			for _, r := range dependsOnOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
+				dependsOn = append(dependsOn, r.CustomResource())
+			}
+			opts = append(opts, pulumi.DependsOn(dependsOn))
+		} else {
+			e.error(t.Return, fmt.Sprintf("Unable to evaluate options DependsOn field: %+v", t.CallOpts.DependsOn))
+		}
+	}
 	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
-		result := map[string]interface{}{}
 		version, err := ParseVersion(t.CallOpts.Version)
 		if err != nil {
 			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 			return nil, true
 		}
-		_, functionName, err := ResolveFunction(context.TODO(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
+		_, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
 
-		pkgRef := ""
-		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, pkgRef, opts...)
-		if err != nil {
-			return e.error(t, err.Error())
+		options := pulumi.InvokeOutputOptions{
+			PackageRef:    "",
+			InvokeOptions: opts,
 		}
+		output := e.pulumiCtx.InvokeOutput(string(functionName), args[0], pulumi.AnyOutput{}, options)
 
 		if t.Return.GetValue() == "" {
-			if secret {
-				return pulumi.ToSecret(pulumi.Any(result)), true
-			}
-			return result, true
+			return output, true
 		}
 
-		retv, ok := result[t.Return.Value]
-		if !ok {
-			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
-		}
-		if secret {
-			return pulumi.ToSecret(pulumi.Any(retv)), true
-		}
-		return retv, true
+		return output.ApplyT(func(result any) (any, error) {
+			// We have to manually cast to map[string]any here instead of having
+			// the applier function's argument be of type map[string]any because
+			// we use an AnyOutput type in the InvokeOutput call.
+			r, ok := result.(map[string]any)
+			if !ok {
+				e.error(t.Return, fmt.Sprintf("Expected result of type map[string]interface{}, result is: %+v", result))
+				return nil, fmt.Errorf("result of fn::invoke of %s is not an object, got: %+v", t.Token.Value, result)
+			}
+			retv, ok := r[t.Return.Value]
+			if !ok {
+				e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
+				return nil, fmt.Errorf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value)
+			}
+			return retv, nil
+		}), true
 	})
 	return performInvoke(args)
 }

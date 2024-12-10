@@ -70,6 +70,9 @@ func getExpressionDependencies(deps *[]*ast.StringExpr, x ast.Expr) {
 		if x.CallOpts.Provider != nil {
 			getExpressionDependencies(deps, x.CallOpts.Provider)
 		}
+		if x.CallOpts.DependsOn != nil {
+			getExpressionDependencies(deps, x.CallOpts.DependsOn)
+		}
 	case ast.BuiltinExpr:
 		getExpressionDependencies(deps, x.Args())
 	}
