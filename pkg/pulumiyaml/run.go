@@ -2052,7 +2052,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			r, ok := result.(map[string]any)
 			if !ok {
 				e.error(t.Return, fmt.Sprintf("Expected result of type map[string]interface{}, result is: %+v", result))
-				return nil, fmt.Errorf(fmt.Sprintf("Expected result of type map[string]interface{}, result is: %+v", result))
+				return nil, fmt.Errorf("result of fn::invoke of %s is not an object, got: %+v", t.Token.Value, result)
 			}
 			retv, ok := r[t.Return.Value]
 			if !ok {
