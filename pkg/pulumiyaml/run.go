@@ -2019,10 +2019,11 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Provider field: %+v", t.CallOpts.Provider))
 		}
 	}
+
+	dependsOn := []pulumi.Resource{}
 	if t.CallOpts.DependsOn != nil {
 		dependsOnOpt, ok := e.evaluateResourceListValuedOption(t.CallOpts.DependsOn, "dependsOn")
 		if ok {
-			var dependsOn []pulumi.Resource
 			for _, r := range dependsOnOpt {
 				if p, ok := r.(poisonMarker); ok {
 					return p, true
@@ -2047,18 +2048,19 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t, err.Error())
 		}
 
-		pkgRef := ""
-		secret, deps, err := e.pulumiCtx.InvokePackageRawWithDeps(string(functionName), args[0], &result, pkgRef, opts...)
+		typ := tokens.Type(functionName)
+		packageRef := e.packageRefs[typ.Package()]
+		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, packageRef, opts...)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
 
 		if t.Return.GetValue() == "" {
-			output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(result), deps...)
+			output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(result), dependsOn...)
 			if secret {
 				return pulumi.ToSecret(output), true
 			}
-			return output, true
+			return result, true
 		}
 
 		retv, ok := result[t.Return.Value]
@@ -2067,7 +2069,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
 		}
 
-		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), deps...)
+		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), dependsOn...)
 		if secret {
 			return pulumi.ToSecret(output), true
 		}

@@ -233,7 +233,7 @@ outputs:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var innerValue string
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	diags := testInvokeDiags(t, tmpl, func(r *Runner) {
 		cipher, ok := r.variables["cipher"].(pulumi.AnyOutput)
 		assert.True(t, ok)
@@ -269,7 +269,7 @@ outputs:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	var response map[string]any
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	diags := testInvokeDiags(t, tmpl, func(r *Runner) {
 		cipher, ok := r.variables["cipher"].(pulumi.AnyOutput)
 		assert.True(t, ok)
