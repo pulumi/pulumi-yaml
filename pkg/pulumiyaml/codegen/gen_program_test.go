@@ -218,7 +218,7 @@ func TestGenerateProgram(t *testing.T) {
 				tt.SkipCompile = codegen.NewStringSet("yaml")
 				l = append(l, tt)
 			case "deferred-outputs":
-				// Not yet supported in Pulumi YAML
+				// Reason: Pulumi YAML does not support deferred outputs.
 			default:
 				l = append(l, tt)
 			}
