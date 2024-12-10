@@ -2025,7 +2025,6 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 	}
 	performInvoke := e.lift(func(args ...interface{}) (interface{}, bool) {
 		// At this point, we've got a function to invoke and some parameters! Invoke away.
-		result := map[string]interface{}{}
 		version, err := ParseVersion(t.CallOpts.Version)
 		if err != nil {
 			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
@@ -2036,31 +2035,32 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t, err.Error())
 		}
 
-		pkgRef := ""
-		secret, deps, err := e.pulumiCtx.InvokePackageRawWithDeps(string(functionName), args[0], &result, pkgRef, opts...)
-		if err != nil {
-			return e.error(t, err.Error())
+		options := pulumi.InvokeOutputOptions{
+			PackageRef:    "",
+			InvokeOptions: opts,
 		}
+		output := e.pulumiCtx.InvokeOutput(string(functionName), args[0], pulumi.AnyOutput{}, options)
 
 		if t.Return.GetValue() == "" {
-			output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(result), deps...)
-			if secret {
-				return pulumi.ToSecret(output), true
-			}
 			return output, true
 		}
 
-		retv, ok := result[t.Return.Value]
-		if !ok {
-			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
-		}
-
-		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), deps...)
-		if secret {
-			return pulumi.ToSecret(output), true
-		}
-		return output, true
+		return output.ApplyT(func(result any) (any, error) {
+			// We have to manually cast to map[string]any here instead of having
+			// the applier function's argument be of type map[string]any because
+			// we use an AnyOutput type in the InvokeOutput call.
+			r, ok := result.(map[string]any)
+			if !ok {
+				e.error(t.Return, fmt.Sprintf("Expected result of type map[string]interface{}, result is: %+v", result))
+				return nil, fmt.Errorf(fmt.Sprintf("Expected result of type map[string]interface{}, result is: %+v", result))
+			}
+			retv, ok := r[t.Return.Value]
+			if !ok {
+				e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
+				return nil, fmt.Errorf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value)
+			}
+			return retv, nil
+		}), true
 	})
 	return performInvoke(args)
 }
