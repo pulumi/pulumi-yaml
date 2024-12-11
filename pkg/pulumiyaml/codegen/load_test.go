@@ -141,6 +141,37 @@ variables:
 noRet = invoke("test:mod:fn", {})
 `,
 		},
+		{
+			name: "invoke options",
+			input: `resources:
+  provider:
+    type: pulumi:providers:aws
+    properties:
+      region: us-west-2
+
+variables:
+  cur-region:
+    fn::invoke:
+      arguments: {}
+      function: test:mod:fn
+      options:
+        version: "1.0.0"
+        parent: ${provider}
+        pluginDownloadURL: http://example.com
+        provider: ${provider}`,
+			expected: `curRegion = invoke("test:mod:fn", {}, {
+	parent = provider,
+	provider = provider,
+	version = "1.0.0",
+	pluginDownloadUrl = "http://example.com"
+})
+
+resource provider "pulumi:providers:aws" {
+	__logicalName = "provider"
+	region = "us-west-2"
+}
+`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
