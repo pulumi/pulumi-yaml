@@ -315,13 +315,47 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 
 		invokeArgs := []model.Expression{function}
 		if node.CallArgs != nil {
-			inputs := pkg.FunctionTypeHint(functionName).Inputs
-			args, adiags := imp.importExpr(node.CallArgs, inputs)
+			var functionInputs *schema.ObjectType
+			functionSchema := pkg.FunctionTypeHint(functionName)
+			if functionSchema != nil {
+				functionInputs = functionSchema.Inputs
+			}
+			args, adiags := imp.importExpr(node.CallArgs, functionInputs)
 			diags.Extend(adiags...)
 
 			invokeArgs = append(invokeArgs, args)
 		} else {
 			invokeArgs = append(invokeArgs, &model.ObjectConsExpression{})
+		}
+
+		var invokeOptions []model.ObjectConsItem
+
+		appendOption := func(key string, value ast.Expr) {
+			v, vdiags := imp.importExpr(value, nil)
+			diags.Extend(vdiags...)
+			invokeOptions = append(invokeOptions, model.ObjectConsItem{
+				Key:   plainLit(key),
+				Value: v,
+			})
+		}
+
+		if node.CallOpts.Parent != nil {
+			appendOption("parent", node.CallOpts.Parent)
+		}
+		if node.CallOpts.Provider != nil {
+			appendOption("provider", node.CallOpts.Provider)
+		}
+		if node.CallOpts.Version != nil {
+			appendOption("version", node.CallOpts.Version)
+		}
+		if node.CallOpts.PluginDownloadURL != nil {
+			appendOption("pluginDownloadUrl", node.CallOpts.PluginDownloadURL)
+		}
+
+		if len(invokeOptions) > 0 {
+			invokeArgs = append(invokeArgs, &model.ObjectConsExpression{
+				Items: invokeOptions,
+			})
 		}
 
 		fn := &model.FunctionCallExpression{
