@@ -2060,7 +2060,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			if secret {
 				return pulumi.ToSecret(output), true
 			}
-			return result, true
+			return output, true
 		}
 
 		retv, ok := result[t.Return.Value]
