@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Resource properties marked as secret in schema are now sent as secrets
+time: 2024-12-11T18:20:16.541064Z
+custom:
+  PR: "698"

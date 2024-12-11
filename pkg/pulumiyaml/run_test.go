@@ -58,12 +58,13 @@ func (m MockPackageLoader) LoadPackage(ctx context.Context, descriptor *schema.P
 func (m MockPackageLoader) Close() {}
 
 type MockPackage struct {
-	version          *semver.Version
-	isComponent      func(typeName string) (bool, error)
-	resolveResource  func(typeName string) (ResourceTypeToken, error)
-	resolveFunction  func(typeName string) (FunctionTypeToken, error)
-	resourceTypeHint func(typeName string) *schema.ResourceType
-	functionTypeHint func(typeName string) *schema.Function
+	version                  *semver.Version
+	isComponent              func(typeName string) (bool, error)
+	isResourcePropertySecret func(typeName, propertyName string) (bool, error)
+	resolveResource          func(typeName string) (ResourceTypeToken, error)
+	resolveFunction          func(typeName string) (FunctionTypeToken, error)
+	resourceTypeHint         func(typeName string) *schema.ResourceType
+	functionTypeHint         func(typeName string) *schema.Function
 }
 
 func (m MockPackage) ResolveResource(typeName string) (ResourceTypeToken, error) {
@@ -78,6 +79,10 @@ func (m MockPackage) ResolveFunction(typeName string) (FunctionTypeToken, error)
 		return m.resolveFunction(typeName)
 	}
 	return FunctionTypeToken(typeName), nil
+}
+
+func (m MockPackage) IsResourcePropertySecret(typeName ResourceTypeToken, propertyName string) (bool, error) {
+	return m.isResourcePropertySecret(typeName.String(), propertyName)
 }
 
 func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
