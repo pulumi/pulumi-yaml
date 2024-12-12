@@ -54,7 +54,7 @@ type templateCacheEntry struct {
 // yamlLanguageHost implements the LanguageRuntimeServer interface
 // for use as an API endpoint.
 type yamlLanguageHost struct {
-	pulumirpc.LanguageRuntimeServer
+	pulumirpc.UnimplementedLanguageRuntimeServer
 
 	engineAddress string
 	tracing       string
