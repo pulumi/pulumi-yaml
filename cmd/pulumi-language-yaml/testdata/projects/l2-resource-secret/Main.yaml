@@ -1,0 +1,12 @@
+resources:
+  res:
+    type: secret:Resource
+    properties:
+      private: closed
+      public: open
+      privateData:
+        private: closed
+        public: open
+      publicData:
+        private: closed
+        public: open

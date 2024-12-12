@@ -1203,6 +1203,17 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			if p, ok := vv.(poisonMarker); ok {
 				return p, true
 			}
+			// check if we need to secret-ify the value
+			secret, err := pkg.IsResourcePropertySecret(typ, kvp.Key.Value)
+			if err != nil {
+				e.addWarnDiag(
+					kvp.Key.Syntax().Syntax().Range(),
+					fmt.Sprintf("error checking if property %v is secret: %v", kvp.Key.Value, err), "")
+			}
+
+			if secret {
+				vv = pulumi.ToSecret(vv)
+			}
 			props[kvp.Key.Value] = vv
 		}
 		return poisonMarker{}, false

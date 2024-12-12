@@ -1,6 +1,8 @@
 resources:
   res:
     type: simple-invoke:StringResource
+    properties:
+      text: hello
 outputs:
   outputInput:
     fn::invoke:

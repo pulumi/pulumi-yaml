@@ -139,6 +139,18 @@ func (m FakePackage) IsComponent(typeName pulumiyaml.ResourceTypeToken) (bool, e
 	return false, errors.New(msg)
 }
 
+func (m FakePackage) IsResourcePropertySecret(typeName pulumiyaml.ResourceTypeToken, propertyName string) (bool, error) {
+	// No secret test cases presently.
+	// If the resource resolves, default to false until we add exceptions.
+	if _, err := m.ResolveResource(string(typeName)); err == nil {
+		// note this returns if err *equals* nil.
+		return false, nil
+	}
+	msg := fmt.Sprintf("Unexpected type token in IsComponent: %q", typeName)
+	m.t.Logf("%s", msg)
+	return false, errors.New(msg)
+}
+
 func (m FakePackage) Name() string {
 	return "fake"
 }
