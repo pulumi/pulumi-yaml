@@ -1,0 +1,35 @@
+resources:
+  provider:
+    type: pulumi:providers:simple
+  parent1:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      provider: ${provider}
+  child1:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent1}
+  orphan1:
+    type: simple:Resource
+    properties:
+      value: true
+  parent2:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      protect: true
+  child2:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent2}
+  orphan2:
+    type: simple:Resource
+    properties:
+      value: true
