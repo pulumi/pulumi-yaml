@@ -577,7 +577,7 @@ func (p resourcePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 
 func (p resourcePackage) IsResourcePropertySecret(typeName ResourceTypeToken, propertyName string) (bool, error) {
 	if res, found, err := p.Resources().Get(string(typeName)); found {
-		for _, prop := range res.Properties {
+		for _, prop := range res.InputProperties {
 			if prop.Name == propertyName {
 				return prop.Secret, nil
 			}
