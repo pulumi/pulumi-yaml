@@ -197,6 +197,10 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 
 	var packages []packages.PackageDecl
 	for _, pkg := range packageMap {
+		// Skip the built-in pulumi package
+		if pkg.Name == "pulumi" {
+			continue
+		}
 		packages = append(packages, *pkg)
 	}
 
