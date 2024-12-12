@@ -82,7 +82,10 @@ func (m MockPackage) ResolveFunction(typeName string) (FunctionTypeToken, error)
 }
 
 func (m MockPackage) IsResourcePropertySecret(typeName ResourceTypeToken, propertyName string) (bool, error) {
-	return m.isResourcePropertySecret(typeName.String(), propertyName)
+	if m.isResourcePropertySecret != nil {
+		return m.isResourcePropertySecret(typeName.String(), propertyName)
+	}
+	return false, nil
 }
 
 func (m MockPackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
