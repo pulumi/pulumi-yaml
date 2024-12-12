@@ -77,7 +77,7 @@ func NewLanguageHost(engineAddress, tracing, compiler string, useRPCLoader bool)
 
 func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// We can't cache comppiled templates because at the first point we call loadTemplate (in
-	// GetRequiredPlugins) we don't have the compiler environment (with PULUMI_STACK etc) set.
+	// GetRequiredPackages) we don't have the compiler environment (with PULUMI_STACK etc) set.
 	if entry, ok := host.templateCache[directory]; ok && host.compiler == "" {
 		return entry.template, entry.diagnostics, nil
 	}
@@ -283,8 +283,7 @@ func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependen
 // GetProgramDependencies returns the set of dependencies required by the program.
 func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *pulumirpc.GetProgramDependenciesRequest) (*pulumirpc.GetProgramDependenciesResponse, error) {
 	// YAML doesn't _really_ have dependencies per-se but we can list all the "packages" that are referenced
-	// in the program here. In the presesnce of parameterization this could differ to the set of plugins
-	// reported by GetRequiredPlugins.
+	// in the program here.
 
 	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
 	if err != nil {
