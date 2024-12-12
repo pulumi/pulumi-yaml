@@ -173,7 +173,6 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
-	"l2-invoke-options-depends-on":          "Invoke dependency not propagated",
 	"l2-explicit-parameterized-provider":    "unexpected provider request with no version",
 }
 
