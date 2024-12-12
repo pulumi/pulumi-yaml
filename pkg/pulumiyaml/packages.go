@@ -106,132 +106,7 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 	return packageLoader{loader, nil}
 }
 
-// Plugin is metadata containing a package name, possibly empty version and download URL. Used to
-// inform the engine of the required plugins at the beginning of program execution.
-type Plugin struct {
-	Name              string
-	Version           string
-	PluginDownloadURL string
-}
-
-type pluginEntry struct {
-	name              string
-	version           string
-	pluginDownloadURL string
-}
-
-// GetReferencedPlugins returns the packages and (if provided) versions for each referenced provider
-// used in the program.
-func GetReferencedPlugins(tmpl *ast.TemplateDecl) ([]Plugin, syntax.Diagnostics) {
-	// a map from _package_ name to a plugin entry
-	pluginMap := map[string]*pluginEntry{}
-
-	// Iterate over the package declarations
-	for _, pkg := range tmpl.Packages {
-		name := pkg.Name
-		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
-		}
-
-		if entry, found := pluginMap[name]; found {
-			if entry.version == "" {
-				entry.version = pkg.Version
-			}
-			if entry.pluginDownloadURL == "" {
-				entry.pluginDownloadURL = pkg.DownloadURL
-			}
-		} else {
-			pluginMap[name] = &pluginEntry{
-				name:              pkg.Name,
-				version:           pkg.Version,
-				pluginDownloadURL: pkg.DownloadURL,
-			}
-		}
-	}
-
-	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
-		pkg := ResolvePkgName(typeName)
-		// skip the "pulumi" package
-		if pkg == "pulumi" {
-			return
-		}
-
-		if entry, found := pluginMap[pkg]; found {
-			if v := version.GetValue(); v != "" && entry.version != v {
-				if entry.version == "" {
-					entry.version = v
-				} else {
-					r.sdiags.Extend(ast.ExprError(version, fmt.Sprintf("Provider %v already declared with a conflicting version: %v", pkg, entry.version), ""))
-				}
-			}
-			if url := pluginDownloadURL.GetValue(); url != "" && entry.pluginDownloadURL != url {
-				if entry.pluginDownloadURL == "" {
-					entry.pluginDownloadURL = url
-				} else {
-					r.sdiags.Extend(ast.ExprError(pluginDownloadURL, fmt.Sprintf("Provider %v already declared with a conflicting plugin download URL: %v", pkg, entry.pluginDownloadURL), ""))
-				}
-			}
-		} else {
-			pluginMap[pkg] = &pluginEntry{
-				name:              pkg,
-				version:           version.GetValue(),
-				pluginDownloadURL: pluginDownloadURL.GetValue(),
-			}
-		}
-	}
-
-	diags := newRunner(tmpl, nil).Run(walker{
-		VisitResource: func(r *Runner, node resourceNode) bool {
-			res := node.Value
-
-			if res.Type == nil {
-				r.sdiags.Extend(syntax.NodeError(node.Value.Syntax(), fmt.Sprintf("Resource declared without a 'type': %q", node.Key.Value), ""))
-				return true
-			}
-			acceptType(r, res.Type.Value, res.Options.Version, res.Options.PluginDownloadURL)
-
-			return true
-		},
-		VisitExpr: func(ctx *evalContext, expr ast.Expr) bool {
-			if expr, ok := expr.(*ast.InvokeExpr); ok {
-				if expr.Token == nil {
-					ctx.Runner.sdiags.Extend(syntax.NodeError(expr.Syntax(), "Invoke declared without a 'function' type", ""))
-					return true
-				}
-				acceptType(ctx.Runner, expr.Token.GetValue(), expr.CallOpts.Version, expr.CallOpts.PluginDownloadURL)
-			}
-			return true
-		},
-	})
-
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	var plugins []Plugin
-	for _, meta := range pluginMap {
-		plugins = append(plugins, Plugin{
-			Name:              meta.name,
-			Version:           meta.version,
-			PluginDownloadURL: meta.pluginDownloadURL,
-		})
-	}
-
-	sort.Slice(plugins, func(i, j int) bool {
-		pI, pJ := plugins[i], plugins[j]
-		if pI.Name != pJ.Name {
-			return pI.Name < pJ.Name
-		}
-		if pI.Version != pJ.Version {
-			return pI.Version < pJ.Version
-		}
-		return pI.PluginDownloadURL < pJ.PluginDownloadURL
-	})
-
-	return plugins, nil
-}
-
-// GetReferencedPlugins returns the packages and (if provided) versions for each referenced package
+// GetReferencedPackages returns the packages and (if provided) versions for each referenced package
 // used in the program.
 func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {
 	packageMap := map[string]*packages.PackageDecl{}
@@ -314,6 +189,10 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 
 	var packages []packages.PackageDecl
 	for _, pkg := range packageMap {
+		// Skip the built-in pulumi package
+		if pkg.Name == "pulumi" {
+			continue
+		}
 		packages = append(packages, *pkg)
 	}
 
