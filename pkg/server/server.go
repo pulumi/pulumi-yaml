@@ -107,10 +107,11 @@ func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []strin
 	return template, diags, nil
 }
 
-// GetRequiredPlugins computes the complete set of anticipated plugins required by a program.
-func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
-	req *pulumirpc.GetRequiredPluginsRequest,
-) (*pulumirpc.GetRequiredPluginsResponse, error) {
+// GetRequiredPackages computes the complete set of anticipated packages required by a program.
+func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
+	req *pulumirpc.GetRequiredPackagesRequest,
+) (*pulumirpc.GetRequiredPackagesResponse, error) {
+
 	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
 	if err != nil {
 		return nil, err
@@ -119,25 +120,39 @@ func (host *yamlLanguageHost) GetRequiredPlugins(ctx context.Context,
 		return nil, diags
 	}
 
-	pkgs, pluginDiags := pulumiyaml.GetReferencedPlugins(template)
+	pkgs, pluginDiags := pulumiyaml.GetReferencedPackages(template)
 	diags.Extend(pluginDiags...)
 	if diags.HasErrors() {
 		// We currently swallow the error to allow project config to evaluate
 		// Specifically, if one sets a config key via the CLI but not within the `config` block
 		// of their YAML program, it would error.
-		return &pulumirpc.GetRequiredPluginsResponse{}, nil
+		return &pulumirpc.GetRequiredPackagesResponse{}, nil
 	}
-	var plugins []*pulumirpc.PluginDependency
+	var packages []*pulumirpc.PackageDependency
 	for _, pkg := range pkgs {
-		plugins = append(plugins, &pulumirpc.PluginDependency{
-			Kind:    string(apitype.ResourcePlugin),
-			Name:    pkg.Name,
-			Version: pkg.Version,
-			Server:  pkg.PluginDownloadURL,
+		var parameterization *pulumirpc.PackageParameterization
+		if pkg.Parameterization != nil {
+			value, err := pkg.Parameterization.GetValue()
+			if err != nil {
+				return nil, fmt.Errorf("decoding parameter value for package %s: %w", pkg.Name, err)
+			}
+			parameterization = &pulumirpc.PackageParameterization{
+				Name:    pkg.Parameterization.Name,
+				Version: pkg.Parameterization.Version,
+				Value:   value,
+			}
+		}
+
+		packages = append(packages, &pulumirpc.PackageDependency{
+			Kind:             string(apitype.ResourcePlugin),
+			Name:             pkg.Name,
+			Version:          pkg.Version,
+			Server:           pkg.DownloadURL,
+			Parameterization: parameterization,
 		})
 	}
-	return &pulumirpc.GetRequiredPluginsResponse{
-		Plugins: plugins,
+	return &pulumirpc.GetRequiredPackagesResponse{
+		Packages: packages,
 	}, nil
 }
 

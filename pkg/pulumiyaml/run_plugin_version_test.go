@@ -25,7 +25,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
@@ -54,7 +54,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
@@ -83,7 +83,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
@@ -152,7 +152,7 @@ outputs:
   `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.False(t, diags.HasErrors())
 
 	gotPlugins := plugins
@@ -191,7 +191,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
@@ -228,7 +228,7 @@ resources:
 `
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
-	plugins, diags := GetReferencedPlugins(tmpl)
+	plugins, diags := GetReferencedPackages(tmpl)
 	assert.Contains(t, diagString(diags[0]), "<stdin>:13:16: Provider test already declared with a conflicting version: 1.23.425-beta.6")
 	assert.Contains(t, diagString(diags[1]), "<stdin>:14:26: Provider test already declared with a conflicting plugin download URL: https://example.com")
 	assert.Empty(t, plugins)
