@@ -106,14 +106,6 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 	return packageLoader{loader, nil}
 }
 
-// Plugin is metadata containing a package name, possibly empty version and download URL. Used to
-// inform the engine of the required plugins at the beginning of program execution.
-type Plugin struct {
-	Name              string
-	Version           string
-	PluginDownloadURL string
-}
-
 // GetReferencedPackages returns the packages and (if provided) versions for each referenced package
 // used in the program.
 func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {

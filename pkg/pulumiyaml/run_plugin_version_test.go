@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hexops/autogold"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +30,7 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := autogold.Want("test-plugins", []packages.PackageDecl{{
 		Name:    "test",
 		Version: "1.23.425-beta.6",
 	}})
@@ -58,7 +59,7 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := autogold.Want("test-plugins", []packages.PackageDecl{{
 		Name:    "test",
 		Version: "1.7.13",
 	}})
@@ -87,7 +88,7 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
+	want := autogold.Want("test-plugins", []packages.PackageDecl{{
 		Name:    "test",
 		Version: "1.2",
 	}})
@@ -156,7 +157,7 @@ outputs:
 	assert.False(t, diags.HasErrors())
 
 	gotPlugins := plugins
-	wantPlugins := autogold.Want("test-plugins", []Plugin{
+	wantPlugins := autogold.Want("test-plugins", []packages.PackageDecl{
 		{
 			Name:    "aws",
 			Version: "4.37.1",
@@ -195,10 +196,10 @@ resources:
 	assert.False(t, diags.HasErrors())
 
 	got := plugins
-	want := autogold.Want("test-plugins", []Plugin{{
-		Name:              "test",
-		Version:           "1.23.425-beta.6",
-		PluginDownloadURL: "https://example.com",
+	want := autogold.Want("test-plugins", []packages.PackageDecl{{
+		Name:        "test",
+		Version:     "1.23.425-beta.6",
+		DownloadURL: "https://example.com",
 	}})
 	want.Equal(t, got)
 
@@ -229,7 +230,7 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	plugins, diags := GetReferencedPackages(tmpl)
-	assert.Contains(t, diagString(diags[0]), "<stdin>:13:16: Provider test already declared with a conflicting version: 1.23.425-beta.6")
-	assert.Contains(t, diagString(diags[1]), "<stdin>:14:26: Provider test already declared with a conflicting plugin download URL: https://example.com")
+	assert.Contains(t, diagString(diags[0]), "<stdin>:13:16: Package test already declared with a conflicting version: 1.23.425-beta.6")
+	assert.Contains(t, diagString(diags[1]), "<stdin>:14:26: Package test already declared with a conflicting plugin download URL: https://example.com")
 	assert.Empty(t, plugins)
 }
