@@ -807,6 +807,9 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	if t.CallOpts.PluginDownloadURL != nil {
 		tc.typeExpr(ctx, t.CallOpts.PluginDownloadURL)
 	}
+	if t.CallOpts.DependsOn != nil {
+		tc.typeExpr(ctx, t.CallOpts.DependsOn)
+	}
 	if t.Return != nil {
 		fields := []string{}
 		var (
