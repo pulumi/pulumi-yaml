@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Allow specifying dependencies for output invokes
-time: 2024-11-20T14:58:17.346265+01:00
-custom:
-    PR: "693"

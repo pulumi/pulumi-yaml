@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Update to pulumi v3.143.0
-time: 2024-12-12T16:52:55.333232093Z
-custom:
-  PR: "700"
