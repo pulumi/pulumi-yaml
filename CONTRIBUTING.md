@@ -26,4 +26,4 @@ $ git add .
 $ git commit -m "Changelog for $(changie latest)"
 ```
 
-After the release, also bump the version in `pulumi/pulumi`.  Do this by updating the version of pulumi-yaml in the pkg/go.mod.
+After the release, also bump the version in `pulumi/pulumi`.  Do this by updating the version in the [get-language-providers.sh script](https://github.com/pulumi/pulumi/blob/master/scripts/get-language-providers.sh#L35) in the pulumi/pulumi repository.
