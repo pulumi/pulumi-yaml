@@ -58,37 +58,35 @@ type yamlLanguageHost struct {
 
 	engineAddress string
 	tracing       string
-	compiler      string
 
 	useRPCLoader  bool
 	templateCache map[string]templateCacheEntry
 }
 
-func NewLanguageHost(engineAddress, tracing, compiler string, useRPCLoader bool) pulumirpc.LanguageRuntimeServer {
+func NewLanguageHost(engineAddress, tracing string, useRPCLoader bool) pulumirpc.LanguageRuntimeServer {
 	return &yamlLanguageHost{
 		engineAddress: engineAddress,
 		tracing:       tracing,
-		compiler:      compiler,
 
 		useRPCLoader:  useRPCLoader,
 		templateCache: make(map[string]templateCacheEntry),
 	}
 }
 
-func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// We can't cache comppiled templates because at the first point we call loadTemplate (in
 	// GetRequiredPackages) we don't have the compiler environment (with PULUMI_STACK etc) set.
-	if entry, ok := host.templateCache[directory]; ok && host.compiler == "" {
+	if entry, ok := host.templateCache[directory]; ok && compiler == "" {
 		return entry.template, entry.diagnostics, nil
 	}
 
 	var template *ast.TemplateDecl
 	var diags syntax.Diagnostics
 	var err error
-	if host.compiler == "" {
+	if compiler == "" {
 		template, diags, err = pulumiyaml.LoadDir(directory)
 	} else {
-		template, diags, err = pulumiyaml.LoadFromCompiler(host.compiler, directory, compilerEnv)
+		template, diags, err = pulumiyaml.LoadFromCompiler(compiler, directory, compilerEnv)
 	}
 	if err != nil {
 		return nil, diags, err
@@ -97,7 +95,7 @@ func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []strin
 		return nil, diags, nil
 	}
 
-	if host.compiler != "" {
+	if compiler != "" {
 		host.templateCache[directory] = templateCacheEntry{
 			template:    template,
 			diagnostics: diags,
@@ -107,12 +105,27 @@ func (host *yamlLanguageHost) loadTemplate(directory string, compilerEnv []strin
 	return template, diags, nil
 }
 
+func parseCompiler(options map[string]interface{}) (string, error) {
+	if compiler, ok := options["compiler"]; ok {
+		if compiler, ok := compiler.(string); ok {
+			return compiler, nil
+		}
+		return "", errors.New("binary option must be a string")
+	}
+
+	return "", nil
+}
+
 // GetRequiredPackages computes the complete set of anticipated packages required by a program.
 func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 	req *pulumirpc.GetRequiredPackagesRequest,
 ) (*pulumirpc.GetRequiredPackagesResponse, error) {
+	compiler, err := parseCompiler(req.Info.Options.AsMap())
+	if err != nil {
+		return nil, err
+	}
 
-	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +193,12 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return nil, err
 	}
 
-	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, compilerEnv)
+	compiler, err := parseCompiler(req.Info.Options.AsMap())
+	if err != nil {
+		return nil, err
+	}
+
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -284,8 +302,12 @@ func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependen
 func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *pulumirpc.GetProgramDependenciesRequest) (*pulumirpc.GetProgramDependenciesResponse, error) {
 	// YAML doesn't _really_ have dependencies per-se but we can list all the "packages" that are referenced
 	// in the program here.
+	compiler, err := parseCompiler(req.Info.Options.AsMap())
+	if err != nil {
+		return nil, err
+	}
 
-	template, diags, err := host.loadTemplate(req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
 	if err != nil {
 		return nil, err
 	}
