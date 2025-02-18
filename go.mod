@@ -2,6 +2,10 @@ module github.com/pulumi/pulumi-yaml
 
 go 1.21
 
+replace github.com/pulumi/pulumi/pkg/v3 => ./pulumi/pkg/
+
+replace github.com/pulumi/pulumi/sdk/v3 => ./pulumi/sdk
+
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/ettle/strcase v0.1.1
@@ -12,8 +16,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.143.0
-	github.com/pulumi/pulumi/sdk/v3 v3.143.0
+	github.com/pulumi/pulumi/pkg/v3 v3.150.0
+	github.com/pulumi/pulumi/sdk/v3 v3.150.0
 	github.com/spf13/afero v1.9.5
 	github.com/stretchr/testify v1.9.0
 	github.com/zclconf/go-cty v1.13.2
