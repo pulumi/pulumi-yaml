@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
@@ -121,8 +122,14 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 	dependencies := map[string][]*ast.StringExpr{}
 
 	templateConfig := make([]configNode, len(t.Configuration.Entries))
+	fmt.Fprintln(os.Stderr, "making config", t.Configuration.Entries)
+	fmt.Fprintln(os.Stderr, "config", t.Config.Entries)
 	for i, kvp := range t.Configuration.Entries {
 		templateConfig[i] = configNode(configNodeYaml(kvp))
+	}
+	// TODO: ??????
+	for _, kvp := range t.Config.Entries {
+		templateConfig = append(templateConfig, configNode(configNodeYaml(kvp)))
 	}
 	for _, node := range append(templateConfig, externalConfig...) {
 		cname := node.key().Value

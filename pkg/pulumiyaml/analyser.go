@@ -982,6 +982,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 }
 
 func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
+	fmt.Fprintln(os.Stderr, "typeExpr", t)
 	switch t := t.(type) {
 	case *ast.InvokeExpr:
 		return tc.typeInvoke(ctx, t)
@@ -1091,6 +1092,8 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	k, v := node.key().Value, node.value()
 	var typCurrent schema.Type = &schema.InvalidType{}
 	var optional bool
+
+	fmt.Fprintln(os.Stderr, "config node", node)
 
 	switch n := node.(type) {
 	case configNodeYaml:

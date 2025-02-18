@@ -40,7 +40,7 @@ func main() {
 	var tracing string
 	var root string
 	var compiler string
-	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
+	//	flag.StringVar(&tracing, "tracing", "", "Emit tracing to a Zipkin-compatible tracing endpoint")
 	flag.StringVar(&root, "root", "", "Root of the program execution")
 	flag.StringVar(&compiler, "compiler", "", "[obsolete] Compiler to use to pre-process YAML")
 	flag.Parse()
@@ -55,7 +55,6 @@ func main() {
 		engineAddress = args[0]
 		var err error
 		cancelChannel, err = setupHealthChecks(engineAddress)
-
 		if err != nil {
 			cmdutil.Exit(errors.Wrapf(err, "could not start health check host RPC server"))
 		}
@@ -98,7 +97,6 @@ func setupHealthChecks(engineAddress string) (chan bool, error) {
 		close(cancelChannel)
 	}()
 	err := rpcutil.Healthcheck(ctx, engineAddress, 5*time.Minute, cancel)
-
 	if err != nil {
 		return nil, err
 	}

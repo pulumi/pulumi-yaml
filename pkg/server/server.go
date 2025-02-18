@@ -29,10 +29,14 @@ import (
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"gopkg.in/yaml.v3"
 
@@ -73,7 +77,7 @@ func NewLanguageHost(engineAddress, tracing string, useRPCLoader bool) pulumirpc
 	}
 }
 
-func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func (host *yamlLanguageHost) loadTemplate(compiler, directory, name string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// We can't cache comppiled templates because at the first point we call loadTemplate (in
 	// GetRequiredPackages) we don't have the compiler environment (with PULUMI_STACK etc) set.
 	if entry, ok := host.templateCache[directory]; ok && compiler == "" {
@@ -83,7 +87,9 @@ func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerE
 	var template *ast.TemplateDecl
 	var diags syntax.Diagnostics
 	var err error
-	if compiler == "" {
+	if name != "" {
+		template, diags, err = pulumiyaml.LoadFile(filepath.Join(directory, name))
+	} else if compiler == "" {
 		template, diags, err = pulumiyaml.LoadDir(directory)
 	} else {
 		template, diags, err = pulumiyaml.LoadFromCompiler(compiler, directory, compilerEnv)
@@ -125,7 +131,7 @@ func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 		return nil, err
 	}
 
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, "", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +204,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return nil, err
 	}
 
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, compilerEnv)
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, "", compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -287,6 +293,115 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	return &pulumirpc.RunResponse{}, nil
 }
 
+func (host *yamlLanguageHost) RunPlugin(
+	req *pulumirpc.RunPluginRequest, server pulumirpc.LanguageRuntime_RunPluginServer,
+) error {
+	logging.V(5).Infof("Attempting to run yaml plugin in %s", req.Info.ProgramDirectory)
+	ctx := context.Background()
+
+	closer, stdout, stderr, err := rpcutil.MakeRunPluginStreams(server, false)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	template, diags, err := host.loadTemplate("", req.Info.ProgramDirectory, "PulumiPlugin.yaml", []string{})
+	if err != nil {
+		return err
+	}
+
+	diagWriter := template.NewDiagnosticWriter(stderr, 0, true)
+	if len(diags) != 0 {
+		err := diagWriter.WriteDiagnostics(diags.HCL())
+		if err != nil {
+			return err
+		}
+	}
+	if diags.HasErrors() {
+		return errors.New("failed to load template")
+	}
+
+	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
+	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
+	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
+		EngineAddr: host.engineAddress,
+	})
+	if err != nil {
+		return err
+	}
+	defer pctx.Close()
+
+	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
+	// time RunWithContext returns we should be done with all async work.
+	loader, err := pulumiyaml.NewPackageLoader(nil)
+	// var loader pulumiyaml.PackageLoader
+	// if host.useRPCLoader {
+	// 	rpcLoader, err := schema.NewLoaderClient(req.LoaderTarget)
+	// 	if err != nil {
+	// 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	// 	}
+	// 	loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(
+	// 		schema.NewCachedLoader(rpcLoader))
+	// } else {
+	// 	loader, err = pulumiyaml.NewPackageLoader(proj.Plugins)
+	// 	if err != nil {
+	// 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
+	// 	}
+	// }
+	if err != nil {
+		return err
+	}
+	defer loader.Close()
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// outC := make(chan string)
+	// // copy the output in a separate goroutine so printing can't block indefinitely
+	go func() {
+		io.Copy(stdout, r)
+	}()
+	// 	os.Stdout = stdout
+	jsonSchema, err := template.GenerateSchema()
+	if err != nil {
+		return err
+	}
+	err = provider.ComponentMain(template.Name.Value, "1.0.0", jsonSchema, // TODO: generate schema
+		func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
+			options pulumi.ResourceOption,
+		) (*providersdk.ConstructResult, error) {
+			if typ == template.Name.Value+":index:Component" {
+				m, err := inputs.Map()
+				if err != nil {
+					return nil, err
+				}
+				urn, state, err := pulumiyaml.RunComponentTemplate(ctx, typ, name, options, template, m, loader)
+				if err != nil {
+					return nil, err
+				}
+				return &providersdk.ConstructResult{
+					URN:   urn,
+					State: state,
+				}, nil
+			}
+			return nil, fmt.Errorf("unknown resource type %s", typ)
+		})
+	if err != nil {
+		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
+			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
+			if err != nil {
+				return err
+			}
+			if diags.HasErrors() {
+				return errors.New("has diagnostics errors") // TODO
+			}
+			return err
+		}
+		return err
+	}
+
+	return nil
+}
+
 func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Empty) (*pulumirpc.PluginInfo, error) {
 	return &pulumirpc.PluginInfo{
 		Version: version.Version,
@@ -307,7 +422,7 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 		return nil, err
 	}
 
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, "", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +654,7 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 
 func (host *yamlLanguageHost) Pack(ctx context.Context, req *pulumirpc.PackRequest) (*pulumirpc.PackResponse, error) {
 	// Yaml "SDKs" are just files, we can just copy the file
-	if err := os.MkdirAll(req.DestinationDirectory, 0700); err != nil {
+	if err := os.MkdirAll(req.DestinationDirectory, 0o700); err != nil {
 		return nil, err
 	}
 

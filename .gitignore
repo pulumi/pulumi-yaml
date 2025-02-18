@@ -21,3 +21,4 @@ dist/
 
 .vscode
 pulumi-yaml.sln
+.aider*

@@ -3,6 +3,7 @@
 package ast
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
@@ -285,8 +287,8 @@ func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
 }
 
 func ConfigParamSyntax(node *syntax.ObjectNode, typ *StringExpr, name *StringExpr,
-	secret *BooleanExpr, defaultValue Expr) *ConfigParamDecl {
-
+	secret *BooleanExpr, defaultValue Expr,
+) *ConfigParamDecl {
 	return &ConfigParamDecl{
 		declNode: decl(node),
 		Type:     typ,
@@ -334,8 +336,8 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	deleteBeforeReplace *BooleanExpr, dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr,
 	parent Expr, protect Expr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl,
-	retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
-
+	retainOnDelete *BooleanExpr, deletedWith Expr,
+) ResourceOptionsDecl {
 	return ResourceOptionsDecl{
 		declNode:                decl(node),
 		AdditionalSecretOutputs: additionalSecretOutputs,
@@ -360,8 +362,8 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
 	protect Expr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
-	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
-
+	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, deletedWith Expr,
+) ResourceOptionsDecl {
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
 		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, providers,
 		version, pluginDownloadURL, replaceOnChanges, retainOnDelete, deletedWith)
@@ -433,7 +435,8 @@ func (*ResourceDecl) Fields() []string {
 }
 
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, name *StringExpr, defaultProvider *BooleanExpr,
-	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
+	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl,
+) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:        decl(node),
 		Type:            typ,
@@ -451,7 +454,8 @@ func Resource(
 	defaultProvider *BooleanExpr,
 	properties PropertyMapDecl,
 	options ResourceOptionsDecl,
-	get GetResourceDecl) *ResourceDecl {
+	get GetResourceDecl,
+) *ResourceDecl {
 	return ResourceSyntax(nil, typ, name, defaultProvider, properties, options, get)
 }
 
@@ -519,9 +523,117 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 	return newDiagnosticWriter(w, fileMap, width, color)
 }
 
-func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
-	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl) *TemplateDecl {
+func (d *TemplateDecl) GenerateSchema() ([]byte, error) {
+	schemaDef := schema.PackageSpec{
+		Name:        d.Name.Value,
+		Description: d.Description.Value,
+		Language: map[string]schema.RawMessage{
+			"nodejs": schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"python": schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"cshap":  schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"java":   schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"go":     schema.RawMessage(`{"respectSchemaVersion": true}`),
+		},
+		Version: "0.0.1",
+	}
 
+	// ctx, err := pulumi.NewContext(context.TODO(), pulumi.RunInfo{
+	// 	Project:          d.Name.Value,
+	// 	Stack:            "Component",
+	// 	Config:           map[string]string{},
+	// 	ConfigSecretKeys: []string{},
+	// 	Parallel:         1,
+	// 	DryRun:           true,
+	// })
+	// if err != nil {
+	// 	return []byte{}, fmt.Errorf("could not make context: %w", err)
+	// }
+
+	// typing, err := pulumiyaml.TypeDecl(decl, ctx, loader)
+	// if err != nil {
+	// 	return schema.PackageSpec{}, err
+	// }
+
+	resourceDef := schema.ResourceSpec{
+		ObjectTypeSpec: schema.ObjectTypeSpec{
+			Description: d.Description.Value,
+			Properties:  map[string]schema.PropertySpec{},
+			Type:        d.Name.Value + ":index:Component",
+			Required:    []string{},
+		},
+		InputProperties: map[string]schema.PropertySpec{},
+		IsComponent:     true,
+	}
+	for _, input := range d.Config.Entries {
+		// TODO: we might need to run the program to figure out the correct types here
+		k, v := input.Key.Value, input.Value
+		typeSpec := schema.TypeSpec{
+			//			Plain: true, // Support complex values
+		}
+		if input.Value.Type.Value == "string" {
+			typeSpec.Type = "string"
+		} else {
+			panic("Unknown type")
+		}
+		def := schemaDefaultValue(v.Default)
+
+		resourceDef.InputProperties[k] = schema.PropertySpec{
+			TypeSpec: typeSpec,
+			Default:  def,
+			DefaultInfo: &schema.DefaultSpec{
+				Environment: []string{k},
+			},
+			Secret: v.Secret != nil && v.Secret.Value,
+		}
+		if def == nil {
+			resourceDef.RequiredInputs = append(resourceDef.Required, k)
+		}
+	}
+
+	properties := map[string]schema.PropertySpec{}
+	for _, output := range d.Outputs.Entries {
+		k := output.Key.Value
+
+		typeSpec := schema.TypeSpec{
+			//			Plain: true,     // TODO: support complex stuff
+			Type: "string", // TODO: evaluate actual type
+		}
+
+		properties[k] = schema.PropertySpec{
+			TypeSpec: typeSpec,
+		}
+	}
+	resourceDef.Properties = properties
+
+	resourcesDef := map[string]schema.ResourceSpec{
+		d.Name.Value + ":index:Component": resourceDef,
+	}
+
+	schemaDef.Resources = resourcesDef
+
+	// pkg.Resources = map[string]schema.ResourceSpec{pkg.Name + ":index:Component": r}
+	// return pkg, nil
+	return json.Marshal(schemaDef)
+}
+
+func schemaDefaultValue(e Expr) interface{} {
+	switch e := e.(type) {
+	case *StringExpr:
+		return e.Value
+	case *NumberExpr:
+		return e.Value
+	case *BooleanExpr:
+		return e.Value
+	case nil:
+		return nil
+	default:
+		panic(fmt.Sprintf("Unknown default value: %s", e))
+	}
+}
+
+func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
+	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl,
+) *TemplateDecl {
 	return &TemplateDecl{
 		syntax:        node,
 		Description:   description,
@@ -533,8 +645,8 @@ func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configurat
 }
 
 func Template(description *StringExpr, configuration ConfigMapDecl, variables VariablesMapDecl, resources ResourcesMapDecl,
-	outputs PropertyMapDecl) *TemplateDecl {
-
+	outputs PropertyMapDecl,
+) *TemplateDecl {
 	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
 
@@ -547,10 +659,12 @@ func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagn
 	return &template, diags
 }
 
-var parseDeclType = reflect.TypeOf((*parseDecl)(nil)).Elem()
-var nonNilDeclType = reflect.TypeOf((*nonNilDecl)(nil)).Elem()
-var recordDeclType = reflect.TypeOf((*recordDecl)(nil)).Elem()
-var exprType = reflect.TypeOf((*Expr)(nil)).Elem()
+var (
+	parseDeclType  = reflect.TypeOf((*parseDecl)(nil)).Elem()
+	nonNilDeclType = reflect.TypeOf((*nonNilDecl)(nil)).Elem()
+	recordDeclType = reflect.TypeOf((*recordDecl)(nil)).Elem()
+	exprType       = reflect.TypeOf((*Expr)(nil)).Elem()
+)
 
 func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagnostics {
 	if node == nil {

@@ -448,6 +448,107 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 	return nil
 }
 
+func RunComponentTemplate(ctx *pulumi.Context,
+	tk, name string, options pulumi.ResourceOption,
+	t *ast.TemplateDecl, inputs pulumi.Map, loader PackageLoader,
+) (pulumi.URNOutput, pulumi.Map, error) {
+	runner := newRunner(t, loader)
+
+	_, diags := TypeCheck(runner)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+
+	packageRefs, diags := findPackageRefs(ctx, runner)
+	if diags != nil {
+		return pulumi.URNOutput{}, nil, errors.New(diags.Error())
+	}
+
+	component := &componentEvaluator{
+		inputs:  inputs,
+		outputs: pulumi.Map{},
+		evaluator: &programEvaluator{
+			evalContext: runner.newContext(t),
+			pulumiCtx:   ctx,
+			packageRefs: packageRefs,
+		},
+	}
+
+	if err := ctx.RegisterComponentResource(tk, name, component, options); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+
+	diags.Extend(runner.Run(component)...)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+	if err := ctx.RegisterResourceOutputs(component, component.outputs); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+	return component.URN(), component.outputs, nil
+}
+
+type componentEvaluator struct {
+	pulumi.ResourceState
+
+	inputs  pulumi.Map
+	outputs pulumi.Map
+
+	evaluator *programEvaluator
+}
+
+func (m *componentEvaluator) EvalConfig(r *Runner, node configNode) bool {
+	k := node.key().Value
+	v, ok := m.inputs[k]
+	if ok {
+		r.config[k] = v
+		return true
+	}
+	return m.evaluator.EvalConfig(r, node)
+}
+
+func (m *componentEvaluator) EvalVariable(r *Runner, node variableNode) bool {
+	return m.evaluator.EvalVariable(r, node)
+}
+
+func (m *componentEvaluator) EvalResource(r *Runner, node resourceNode) bool {
+	//	ctx := r.newContext(node)
+	res, ok := m.evaluator.registerResourceWithParent(node, m)
+	if !ok {
+		// TODO
+		// msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		// err := r.ctx.Log.Error(msg, &pulumi.LogArgs{})
+		// if err != nil {
+		// 	return false
+		// }
+		return false
+	} else {
+		r.resources[node.Key.Value] = res
+	}
+	return true
+}
+
+func (m *componentEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
+	//	ctx := r.newContext(node)
+	out, ok := m.evaluator.registerOutput(node)
+	if !ok {
+		// msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		// err := ctx.og.Error(msg, &pulumi.LogArgs{})
+		// if err != nil {
+		// 	return false
+		// }
+	} else {
+		m.outputs[node.Key.Value] = out
+	}
+	return true
+}
+
+func (m *componentEvaluator) EvalMissing(r *Runner, node missingNode) bool {
+	//	ctx := r.newContext(node)
+	// TODO
+	return true
+}
+
 type syncDiags struct {
 	diags syntax.Diagnostics
 	mutex sync.Mutex
@@ -825,9 +926,7 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
-func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
-	eCtx := r.newContext(nil)
-
+func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]string, syntax.Diagnostics) {
 	// Register package refs for all packages we know upfront
 	packageRefs := make(map[tokens.Package]string)
 	for _, pkg := range r.packageDescriptors {
@@ -857,9 +956,19 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 		})
 		if err != nil {
 			err = fmt.Errorf("registering package %s: %w", name, err)
-			return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+			return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 		}
 		packageRefs[tokens.Package(name)] = resp.Ref
+	}
+	return packageRefs, nil
+}
+
+func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+	eCtx := r.newContext(nil)
+
+	packageRefs, diags := findPackageRefs(ctx, r)
+	if diags != nil {
+		return diags
 	}
 
 	return r.Run(programEvaluator{
@@ -1172,6 +1281,11 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 }
 
 func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
+	return e.registerResourceWithParent(kvp, nil)
+}
+
+// TODO: actually register parent
+func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent pulumi.Resource) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
