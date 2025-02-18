@@ -130,6 +130,11 @@ func (imp *importer) pulumiPropertyAccess(node ast.Expr, accessors []ast.Propert
 			Name:      "organization",
 			Signature: simple,
 		}, true, nil
+	case "rootDirectory":
+		return &model.FunctionCallExpression{
+			Name:      "rootDirectory",
+			Signature: simple,
+		}, true, nil
 	default:
 		return nil, true, wrapDiag("Unknown property of the `pulumi` variable: '%s'", prop.Name)
 	}
@@ -963,6 +968,7 @@ func (imp *importer) assignNames() {
 	// PCL has only one namspace with respect to binding, so we can't use any of
 	// these as names.
 	assigned := codegen.NewStringSet(
+		"cwd",
 		"element",
 		"entries",
 		"fileArchive",
@@ -974,18 +980,18 @@ func (imp *importer) assignNames() {
 		"join",
 		"length",
 		"lookup",
+		"organization",
+		"project",
 		"range",
-		"readFile",
 		"readDir",
+		"readFile",
+		"rootDirectory",
 		"secret",
+		"sha1",
 		"split",
+		"stack",
 		"toBase64",
 		"toJSON",
-		"sha1",
-		"stack",
-		"project",
-		"cwd",
-		"organization",
 	)
 
 	assign := func(name, suffix string) *model.Variable {
