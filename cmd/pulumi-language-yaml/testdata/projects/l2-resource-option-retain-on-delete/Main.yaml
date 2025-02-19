@@ -1,0 +1,15 @@
+resources:
+  retainOnDelete:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  notRetainOnDelete:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  defaulted:
+    type: simple:Resource
+    properties:
+      value: true

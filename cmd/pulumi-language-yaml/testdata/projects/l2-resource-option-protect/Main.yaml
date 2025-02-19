@@ -1,0 +1,17 @@
+resources:
+  protected:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      protect: true
+  unprotected:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      protect: false
+  defaulted:
+    type: simple:Resource
+    properties:
+      value: true

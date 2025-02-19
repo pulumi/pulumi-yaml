@@ -1,0 +1,12 @@
+variables:
+  localValue: hello
+outputs:
+  dynamic:
+    fn::invoke:
+      function: any-type-function:dynListToDyn
+      arguments:
+        inputs:
+          - hello
+          - ${localValue}
+          - {}
+      return: result

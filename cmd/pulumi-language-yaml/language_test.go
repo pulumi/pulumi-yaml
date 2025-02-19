@@ -172,6 +172,12 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
+	"l1-builtin-can":                        "#721 generation unimplemented",
+	"l1-builtin-try":                        "#721 generation unimplemented",
+	"l2-component-call-simple":              "#722 generation unimplemented",
+	"l2-resource-option-retain-on-delete":   "#723 generation unimplemented",
+	"l2-resource-option-deleted-with":       "#724 test failing",
+	"l2-failed-create-continue-on-error":    "#725 test failing",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-explicit-parameterized-provider":    "unexpected provider request with no version",
 }
