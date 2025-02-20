@@ -1,3 +1,4 @@
 [submodule "pulumi"]
 	path = pulumi
 	url = git@github.com:pulumi/pulumi.git
+  branch = master
