@@ -1,0 +1,14 @@
+resources:
+  target:
+    type: simple:Resource
+    properties:
+      value: true
+  deletedWith:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  notDeletedWith:
+    type: simple:Resource
+    properties:
+      value: true
