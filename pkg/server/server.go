@@ -182,6 +182,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		fmt.Sprintf(`PULUMI_ORGANIZATION=%s`, req.GetOrganization()),
 		fmt.Sprintf(`PULUMI_PROJECT=%s`, req.GetProject()),
 		fmt.Sprintf(`PULUMI_CONFIG=%s`, jsonConfigValue),
+		fmt.Sprintf(`PULUMI_ROOT_DIRECTORY=%s`, req.Info.RootDirectory),
 	}
 
 	projPath, err := workspace.DetectProjectPathFrom(req.Info.RootDirectory)
@@ -233,6 +234,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
 	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
 		Project:           req.GetProject(),
+		RootDirectory:     req.Info.RootDirectory,
 		Stack:             req.GetStack(),
 		Config:            req.GetConfig(),
 		ConfigSecretKeys:  req.GetConfigSecretKeys(),

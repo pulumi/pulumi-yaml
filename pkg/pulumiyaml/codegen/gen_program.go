@@ -706,7 +706,7 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return rng
 	}
 	switch f.Name {
-	case "stack", "project", "organization":
+	case "stack", "project", "organization", "rootDirectory":
 		return syn.String(fmt.Sprintf("${pulumi.%s}", f.Name))
 	case pcl.Invoke:
 		return g.MustInvoke(f, "")

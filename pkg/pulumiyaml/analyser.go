@@ -1177,6 +1177,7 @@ func newTypeCache() *typeCache {
 		ast.ObjectProperty{Key: ast.String("project")},
 		ast.ObjectProperty{Key: ast.String("stack")},
 		ast.ObjectProperty{Key: ast.String("organization")},
+		ast.ObjectProperty{Key: ast.String("rootDirectory")},
 	)
 	return &typeCache{
 		exprs: map[ast.Expr]schema.Type{
@@ -1187,6 +1188,7 @@ func newTypeCache() *typeCache {
 					{Name: "project", Type: schema.StringType},
 					{Name: "stack", Type: schema.StringType},
 					{Name: "organization", Type: schema.StringType},
+					{Name: "rootDirectory", Type: schema.StringType},
 				},
 			},
 		},

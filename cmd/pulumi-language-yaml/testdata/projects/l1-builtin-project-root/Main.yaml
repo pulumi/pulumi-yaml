@@ -1,0 +1,2 @@
+outputs:
+  rootDirectoryOutput: ${pulumi.rootDirectory}
