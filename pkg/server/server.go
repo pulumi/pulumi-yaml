@@ -182,7 +182,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		fmt.Sprintf(`PULUMI_ORGANIZATION=%s`, req.GetOrganization()),
 		fmt.Sprintf(`PULUMI_PROJECT=%s`, req.GetProject()),
 		fmt.Sprintf(`PULUMI_CONFIG=%s`, jsonConfigValue),
-		fmt.Sprintf(`PULUMI_PROJECT_ROOT=%s`, req.Info.RootDirectory),
+		fmt.Sprintf(`PULUMI_ROOT_DIRECTORY=%s`, req.Info.RootDirectory),
 	}
 
 	projPath, err := workspace.DetectProjectPathFrom(req.Info.RootDirectory)
