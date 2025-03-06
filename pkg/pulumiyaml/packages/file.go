@@ -9,10 +9,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -159,8 +162,17 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.Pa
 			version = &v
 		}
 
+		internalName := pkg.Name
+		if strings.HasPrefix(pkg.DownloadURL, "git://") {
+			spec, err := workspace.NewPluginSpec(strings.TrimPrefix(pkg.DownloadURL, "git://"), apitype.ResourcePlugin, nil, "", nil)
+			if err != nil {
+				return nil, err
+			}
+			internalName = spec.Name
+		}
+
 		packageDescriptors[tokens.Package(name)] = &schema.PackageDescriptor{
-			Name:             pkg.Name,
+			Name:             internalName,
 			Version:          version,
 			DownloadURL:      pkg.DownloadURL,
 			Parameterization: parameterization,

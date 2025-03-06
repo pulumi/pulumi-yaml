@@ -830,12 +830,12 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 
 	// Register package refs for all packages we know upfront
 	packageRefs := make(map[tokens.Package]string)
-	for _, pkg := range r.packageDescriptors {
+	for key, pkg := range r.packageDescriptors {
 		name := pkg.Name
 		// If parametrized use the parametrized name
 		var parameterization *pulumirpc.Parameterization
 		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
+			key = tokens.Package(pkg.Parameterization.Name)
 
 			parameterization = &pulumirpc.Parameterization{
 				Name:    pkg.Parameterization.Name,
@@ -859,7 +859,7 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 			err = fmt.Errorf("registering package %s: %w", name, err)
 			return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 		}
-		packageRefs[tokens.Package(name)] = resp.Ref
+		packageRefs[key] = resp.Ref
 	}
 
 	return r.Run(programEvaluator{
