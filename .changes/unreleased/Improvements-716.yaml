@@ -1,6 +1,0 @@
-component: codegen
-kind: Improvements
-body: Add rootDirectory to codegen, runtime, and convert
-time: 2025-02-18T23:42:18.755925+09:00
-custom:
-    PR: "716"
