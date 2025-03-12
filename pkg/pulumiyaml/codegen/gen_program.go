@@ -73,7 +73,7 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 		return err
 	}
 	// Pulumi.yaml always needs to be written to the root directory
-	err = os.WriteFile(path.Join(directory, "Pulumi.yaml"), projectBytes, 0600)
+	err = os.WriteFile(path.Join(directory, "Pulumi.yaml"), projectBytes, 0o600)
 	if err != nil {
 		return fmt.Errorf("write output project: %w", err)
 	}
@@ -81,7 +81,7 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 	// If main is set the Main.yaml file should be in a subdirectory
 	if project.Main != "" {
 		directory = path.Join(directory, project.Main)
-		err := os.MkdirAll(directory, 0700)
+		err := os.MkdirAll(directory, 0o700)
 		if err != nil {
 			return fmt.Errorf("create output directory: %w", err)
 		}
@@ -89,7 +89,7 @@ func GenerateProject(directory string, project workspace.Project, program *pcl.P
 
 	for filename, data := range files {
 		outPath := path.Join(directory, filename)
-		err := os.WriteFile(outPath, data, 0600)
+		err := os.WriteFile(outPath, data, 0o600)
 		if err != nil {
 			return fmt.Errorf("write output program: %w", err)
 		}
@@ -331,7 +331,6 @@ func AppendTraversal(tl TraversalList, t Traversal) TraversalList {
 // - "foo"bar"
 // - "foo\\"bar"
 func isEscapedString(s string) bool {
-
 	if !strings.HasPrefix(s, `"`) {
 		return false
 	}
@@ -361,7 +360,6 @@ func isEscapedString(s string) bool {
 }
 
 func (g *generator) Traversal(traversal hcl.Traversal) Traversal {
-
 	var segments []TraversalSegment
 	if !traversal.IsRelative() {
 		traversal = traversal.SimpleSplit().Rel

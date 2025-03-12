@@ -996,7 +996,6 @@ func (imp *importer) assignNames() {
 
 	assign := func(name, suffix string) *model.Variable {
 		assignName := func(name, suffix string) string {
-
 			name = camel(makeLegalIdentifier(name))
 			if !assigned.Has(name) {
 				assigned.Add(name)
@@ -1149,7 +1148,6 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	body := &model.Body{Items: items}
 	formatBody(body)
 	return body, diags
-
 }
 
 // ImportTemplate converts a YAML template to a PCL definition.

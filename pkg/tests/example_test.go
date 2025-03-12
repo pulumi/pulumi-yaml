@@ -110,14 +110,13 @@ func TestExampleStackreference(t *testing.T) {
 				template = strings.ReplaceAll(template, "PLACEHOLDER_ORG_NAME", org)
 				template = strings.ReplaceAll(template, "PLACEHOLDER_STACK_NAME", sourceStackName)
 				//nolint:gosec // temporary file, no secrets, non-executable
-				err = os.WriteFile(path, []byte(template), 0644)
+				err = os.WriteFile(path, []byte(template), 0o644)
 				if err != nil {
 					return err
 				}
 
 				return nil
 			})
-
 			if err != nil {
 				return err
 			}

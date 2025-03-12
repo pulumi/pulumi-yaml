@@ -22,7 +22,6 @@ var ProjectKeysToOmit = []string{"configuration", "resources", "outputs", "varia
 // Eject on a YAML program directory returns a Pulumi Project and a YAML program which has been
 // parsed and converted to the intermediate PCL language
 func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.Program, error) {
-
 	// `*pcl.Program`'s maintains an internal reference to the loader that was used during
 	// its creation. This means the lifetime of the returned program is tied to the
 	// lifetime of the loader passed to EjectProgram and ultimately to the host that
@@ -74,7 +73,6 @@ func getProjectPath(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to find current Pulumi project because of "+
 			"an error when searching for the Pulumi.yaml file (searching upwards from %s)"+": %w", dir, err)
-
 	} else if path == "" {
 		return "", fmt.Errorf(
 			"no Pulumi.yaml project file found (searching upwards from %s). If you have not "+

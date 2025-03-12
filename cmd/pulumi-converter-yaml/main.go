@@ -37,8 +37,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type yamlConverter struct {
-}
+type yamlConverter struct{}
 
 func (*yamlConverter) Close() error {
 	return nil
