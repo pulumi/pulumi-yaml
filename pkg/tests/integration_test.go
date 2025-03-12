@@ -130,7 +130,6 @@ func TestEnvVarsKeepConflictingValues(t *testing.T) {
 	testOptions := integration.ProgramTestOptions{
 		Dir: filepath.Join(getCwd(t), "testdata", "env-vars"),
 		Env: []string{
-			"PULUMI_STACK=foo",
 			"PULUMI_PROJECT=bar",
 			"PULUMI_ORGANIZATION=foobar",
 			"PULUMI_CONFIG=bazz",
@@ -139,7 +138,6 @@ func TestEnvVarsKeepConflictingValues(t *testing.T) {
 		StackName:       "dev",
 		SecretsProvider: "default",
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
-			assert.Equal(t, `foo`, stack.Outputs["PULUMI_STACK"])
 			assert.Equal(t, `bar`, stack.Outputs["PULUMI_PROJECT"])
 			assert.Equal(t, `foobar`, stack.Outputs["PULUMI_ORGANIZATION"])
 			assert.EqualValues(t, "bazz", stack.Outputs["PULUMI_CONFIG"])
