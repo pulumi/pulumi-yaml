@@ -232,7 +232,7 @@ func (cmd *mainCmd) run(p *params) (err error) {
 	if !filepath.IsAbs(p.CoverDir) {
 		p.CoverDir = filepath.Join(cwd, p.CoverDir)
 	}
-	if err := os.MkdirAll(p.CoverDir, 0755); err != nil {
+	if err := os.MkdirAll(p.CoverDir, 0o755); err != nil {
 		return fmt.Errorf("set up coverage dir: %w", err)
 	}
 
@@ -343,7 +343,8 @@ func (cmd *mainCmd) buildPackage(r buildPackageRequest) (string, error) {
 		}
 	}
 
-	args := []string{"test", "-c",
+	args := []string{
+		"test", "-c",
 		"-cover",
 		"-coverpkg=" + strings.Join(r.CoverPkgs, ","),
 		"-o", binPath,

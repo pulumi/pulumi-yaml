@@ -28,14 +28,17 @@ func (l *interceptingLog) Debug(msg string, args *pulumi.LogArgs) error {
 	l.debugMessages = append(l.debugMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Info(msg string, args *pulumi.LogArgs) error {
 	l.infoMessages = append(l.infoMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Warn(msg string, args *pulumi.LogArgs) error {
 	l.warnMessages = append(l.warnMessages, msg)
 	return nil
 }
+
 func (l *interceptingLog) Error(msg string, args *pulumi.LogArgs) error {
 	l.errorMessages = append(l.errorMessages, msg)
 	return nil

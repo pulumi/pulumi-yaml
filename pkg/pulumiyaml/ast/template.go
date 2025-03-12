@@ -285,8 +285,8 @@ func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
 }
 
 func ConfigParamSyntax(node *syntax.ObjectNode, typ *StringExpr, name *StringExpr,
-	secret *BooleanExpr, defaultValue Expr) *ConfigParamDecl {
-
+	secret *BooleanExpr, defaultValue Expr,
+) *ConfigParamDecl {
 	return &ConfigParamDecl{
 		declNode: decl(node),
 		Type:     typ,
@@ -334,8 +334,8 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	deleteBeforeReplace *BooleanExpr, dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr,
 	parent Expr, protect Expr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl,
-	retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
-
+	retainOnDelete *BooleanExpr, deletedWith Expr,
+) ResourceOptionsDecl {
 	return ResourceOptionsDecl{
 		declNode:                decl(node),
 		AdditionalSecretOutputs: additionalSecretOutputs,
@@ -360,8 +360,8 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
 	protect Expr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
-	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, deletedWith Expr) ResourceOptionsDecl {
-
+	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, deletedWith Expr,
+) ResourceOptionsDecl {
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
 		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, providers,
 		version, pluginDownloadURL, replaceOnChanges, retainOnDelete, deletedWith)
@@ -433,7 +433,8 @@ func (*ResourceDecl) Fields() []string {
 }
 
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, name *StringExpr, defaultProvider *BooleanExpr,
-	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl) *ResourceDecl {
+	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl,
+) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:        decl(node),
 		Type:            typ,
@@ -451,7 +452,8 @@ func Resource(
 	defaultProvider *BooleanExpr,
 	properties PropertyMapDecl,
 	options ResourceOptionsDecl,
-	get GetResourceDecl) *ResourceDecl {
+	get GetResourceDecl,
+) *ResourceDecl {
 	return ResourceSyntax(nil, typ, name, defaultProvider, properties, options, get)
 }
 
@@ -520,8 +522,8 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 }
 
 func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
-	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl) *TemplateDecl {
-
+	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl,
+) *TemplateDecl {
 	return &TemplateDecl{
 		syntax:        node,
 		Description:   description,
@@ -533,8 +535,8 @@ func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configurat
 }
 
 func Template(description *StringExpr, configuration ConfigMapDecl, variables VariablesMapDecl, resources ResourcesMapDecl,
-	outputs PropertyMapDecl) *TemplateDecl {
-
+	outputs PropertyMapDecl,
+) *TemplateDecl {
 	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
 
@@ -547,10 +549,12 @@ func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagn
 	return &template, diags
 }
 
-var parseDeclType = reflect.TypeOf((*parseDecl)(nil)).Elem()
-var nonNilDeclType = reflect.TypeOf((*nonNilDecl)(nil)).Elem()
-var recordDeclType = reflect.TypeOf((*recordDecl)(nil)).Elem()
-var exprType = reflect.TypeOf((*Expr)(nil)).Elem()
+var (
+	parseDeclType  = reflect.TypeOf((*parseDecl)(nil)).Elem()
+	nonNilDeclType = reflect.TypeOf((*nonNilDecl)(nil)).Elem()
+	recordDeclType = reflect.TypeOf((*recordDecl)(nil)).Elem()
+	exprType       = reflect.TypeOf((*Expr)(nil)).Elem()
+)
 
 func parseField(name string, dest reflect.Value, node syntax.Node) syntax.Diagnostics {
 	if node == nil {

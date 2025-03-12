@@ -98,7 +98,6 @@ func setupHealthChecks(engineAddress string) (chan bool, error) {
 		close(cancelChannel)
 	}()
 	err := rpcutil.Healthcheck(ctx, engineAddress, 5*time.Minute, cancel)
-
 	if err != nil {
 		return nil, err
 	}

@@ -289,7 +289,8 @@ var helmResourceNames = map[string]struct{}{
 // both the package and the canonical name.
 func ResolveResource(ctx context.Context, loader PackageLoader,
 	descriptors map[tokens.Package]*schema.PackageDescriptor,
-	typeString string, version *semver.Version) (Package, ResourceTypeToken, error) {
+	typeString string, version *semver.Version,
+) (Package, ResourceTypeToken, error) {
 	if issue, found := kubernetesResourceNames[typeString]; found {
 		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
 	}
@@ -325,7 +326,8 @@ func ResolveResource(ctx context.Context, loader PackageLoader,
 // both the package and the canonical name.
 func ResolveFunction(ctx context.Context, loader PackageLoader,
 	descriptors map[tokens.Package]*schema.PackageDescriptor,
-	typeString string, version *semver.Version) (Package, FunctionTypeToken, error) {
+	typeString string, version *semver.Version,
+) (Package, FunctionTypeToken, error) {
 	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version)
 	if err != nil {
 		return nil, "", err

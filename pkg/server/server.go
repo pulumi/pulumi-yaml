@@ -541,7 +541,7 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 
 func (host *yamlLanguageHost) Pack(ctx context.Context, req *pulumirpc.PackRequest) (*pulumirpc.PackResponse, error) {
 	// Yaml "SDKs" are just files, we can just copy the file
-	if err := os.MkdirAll(req.DestinationDirectory, 0700); err != nil {
+	if err := os.MkdirAll(req.DestinationDirectory, 0o700); err != nil {
 		return nil, err
 	}
 

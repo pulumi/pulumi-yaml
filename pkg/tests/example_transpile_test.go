@@ -176,20 +176,21 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]b
 		return []byte(program), diags, nil
 	}
 	return []byte(program), diags, nil
-
 }
 
-type ConvertFunc = func(t *testing.T, projectDir string)
-type CheckFunc = func(t *testing.T, projectDir string, deps pcodegen.StringSet)
+type (
+	ConvertFunc = func(t *testing.T, projectDir string)
+	CheckFunc   = func(t *testing.T, projectDir string, deps pcodegen.StringSet)
+)
 
 func writeOrCompare(t *testing.T, dir string, files map[string][]byte) {
 	pulumiAccept := cmdutil.IsTruthy(os.Getenv("PULUMI_ACCEPT"))
 	for path, bytes := range files {
 		path = filepath.Join(dir, filepath.FromSlash(path))
 		if pulumiAccept {
-			err := os.MkdirAll(filepath.Dir(path), 0700)
+			err := os.MkdirAll(filepath.Dir(path), 0o700)
 			require.NoError(t, err)
-			err = os.WriteFile(path, bytes, 0600)
+			err = os.WriteFile(path, bytes, 0o600)
 			require.NoError(t, err)
 		} else {
 			expected, err := os.ReadFile(path)
