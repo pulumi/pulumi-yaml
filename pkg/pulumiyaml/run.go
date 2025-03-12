@@ -423,6 +423,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
+	if len(t.Components.Entries) > 0 {
+		return errors.New("components are only supported in plugins, not in programs")
+	}
 	r := newRunner(t, loader)
 	r.setIntermediates(ctx.Project(), config, configPropertyMap, false)
 	if r.sdiags.HasErrors() {
