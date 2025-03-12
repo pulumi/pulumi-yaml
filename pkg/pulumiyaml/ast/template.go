@@ -482,6 +482,18 @@ func CustomTimeouts(create, update, delete *StringExpr) *CustomTimeoutsDecl {
 	return CustomTimeoutsSyntax(nil, create, update, delete)
 }
 
+type Template interface {
+	GetName() *StringExpr
+	GetDescription() *StringExpr
+	GetConfig() ConfigMapDecl
+	GetVariables() VariablesMapDecl
+	GetResources() ResourcesMapDecl
+	GetOutputs() PropertyMapDecl
+	GetPackages() []packages.PackageDecl
+
+	NewDiagnosticWriter(w io.Writer, width uint, color bool) hcl.DiagnosticWriter
+}
+
 // A TemplateDecl represents a Pulumi YAML template.
 type TemplateDecl struct {
 	source []byte
@@ -496,6 +508,56 @@ type TemplateDecl struct {
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl
 	Packages      []packages.PackageDecl
+}
+
+func (d *TemplateDecl) GetName() *StringExpr {
+	if d == nil {
+		return nil
+	}
+	return d.Name
+}
+
+func (d *TemplateDecl) GetDescription() *StringExpr {
+	if d == nil {
+		return nil
+	}
+	return d.Description
+}
+
+func (d *TemplateDecl) GetConfig() ConfigMapDecl {
+	if d == nil {
+		return ConfigMapDecl{}
+	}
+	// TODO: merge config and configuration (?)
+	return d.Configuration
+}
+
+func (d *TemplateDecl) GetVariables() VariablesMapDecl {
+	if d == nil {
+		return VariablesMapDecl{}
+	}
+	return d.Variables
+}
+
+func (d *TemplateDecl) GetResources() ResourcesMapDecl {
+	if d == nil {
+		return ResourcesMapDecl{}
+	}
+	return d.Resources
+}
+
+func (d *TemplateDecl) GetOutputs() PropertyMapDecl {
+	if d == nil {
+		return PropertyMapDecl{}
+	}
+	return d.Outputs
+}
+
+func (d *TemplateDecl) GetPackages() []packages.PackageDecl {
+	if d == nil {
+		return nil
+	}
+	return d.Packages
 }
 
 func (d *TemplateDecl) Syntax() syntax.Node {
@@ -532,12 +594,6 @@ func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configurat
 		Resources:     resources,
 		Outputs:       outputs,
 	}
-}
-
-func Template(description *StringExpr, configuration ConfigMapDecl, variables VariablesMapDecl, resources ResourcesMapDecl,
-	outputs PropertyMapDecl,
-) *TemplateDecl {
-	return TemplateSyntax(nil, description, configuration, variables, resources, outputs)
 }
 
 // ParseTemplate parses a template from the given syntax node. The source text is optional, and is only used to print

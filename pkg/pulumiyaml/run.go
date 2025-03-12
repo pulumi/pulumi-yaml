@@ -245,7 +245,7 @@ func HasDiagnostics(err error) (syntax.Diagnostics, bool) {
 // validateResources does some basic validation of each resource to provide
 // error messages for any missing required fields.
 func (r *Runner) validateResources() {
-	for _, resource := range r.t.Resources.Entries {
+	for _, resource := range r.t.GetResources().Entries {
 		v := resource.Value
 		if v.Type == nil {
 			r.sdiags.Extend(syntax.NodeError(
@@ -262,7 +262,7 @@ func (r *Runner) validateResources() {
 // that should prevent proceeding.
 func (r *Runner) setDefaultProviders() {
 	defaultProviderInfoMap := make(map[string]*providerInfo)
-	for _, resource := range r.t.Resources.Entries {
+	for _, resource := range r.t.GetResources().Entries {
 		v := resource.Value
 		// check if this is a provider resource
 		if v.Type != nil && strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
@@ -380,7 +380,7 @@ func (r *Runner) setDefaultProviders() {
 // Set the runner's package descriptors from the templates package decls.
 func (r *Runner) setPackageDesciptors() error {
 	// Register package refs for all packages we know upfront
-	packageDescriptors, err := packages.ToPackageDescriptors(r.t.Packages)
+	packageDescriptors, err := packages.ToPackageDescriptors(r.t.GetPackages())
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ type providerInfo struct {
 }
 
 type Runner struct {
-	t                  *ast.TemplateDecl
+	t                  ast.Template
 	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
 
 	pkgLoader PackageLoader
@@ -689,7 +689,7 @@ func isPoisoned(v interface{}) (poisonMarker, bool) {
 	return poisonMarker{}, false
 }
 
-func newRunner(t *ast.TemplateDecl, p PackageLoader) *Runner {
+func newRunner(t ast.Template, p PackageLoader) *Runner {
 	return &Runner{
 		t:         t,
 		pkgLoader: p,
@@ -993,7 +993,7 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 		}
 	}
 
-	for _, kvp := range r.t.Outputs.Entries {
+	for _, kvp := range r.t.GetOutputs().Entries {
 		if !e.EvalOutput(r, kvp) {
 			return returnDiags()
 		}

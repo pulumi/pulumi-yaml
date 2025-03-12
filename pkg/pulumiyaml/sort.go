@@ -87,7 +87,7 @@ func (missingNode) valueKind() string {
 	return "missing node"
 }
 
-func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
+func topologicallySortedResources(t ast.Template, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -120,8 +120,8 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 	dependencies := map[string][]*ast.StringExpr{}
 
-	templateConfig := make([]configNode, len(t.Configuration.Entries))
-	for i, kvp := range t.Configuration.Entries {
+	templateConfig := make([]configNode, len(t.GetConfig().Entries))
+	for i, kvp := range t.GetConfig().Entries {
 		templateConfig[i] = configNode(configNodeYaml(kvp))
 	}
 	for _, node := range append(templateConfig, externalConfig...) {
@@ -141,7 +141,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 	// Map of package name to default provider resource and it's key.
 	defaultProviders := map[string]*ast.StringExpr{}
-	for _, kvp := range t.Resources.Entries {
+	for _, kvp := range t.GetResources().Entries {
 		rname, r := kvp.Key.Value, kvp.Value
 		node := resourceNode(kvp)
 
@@ -159,7 +159,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 			dependencies[rname] = GetResourceDependencies(r)
 		}
 	}
-	for _, kvp := range t.Variables.Entries {
+	for _, kvp := range t.GetVariables().Entries {
 		vname := kvp.Key.Value
 		node := variableNode(kvp)
 
@@ -187,7 +187,7 @@ func topologicallySortedResources(t *ast.TemplateDecl, externalConfig []configNo
 
 		e, ok := intermediates[name.Value]
 		if !ok {
-			s := stripConfigNamespace(t.Name.Value, name.Value)
+			s := stripConfigNamespace(t.GetName().Value, name.Value)
 			if e2, ok := intermediates[s]; ok {
 				e = e2
 			} else {
