@@ -711,20 +711,16 @@ func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configurat
 	}
 }
 
-// fixupTemplateReferencesInComponents ensures that all components have a reference back to the template they belong to.
-func fixupComponentReferences(template TemplateDecl) {
-	for i := range template.Components.Entries {
-		template.Components.Entries[i].Value.Template = &template
-	}
-}
-
 // ParseTemplate parses a template from the given syntax node. The source text is optional, and is only used to print
 // diagnostics.
 func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagnostics) {
 	template := TemplateDecl{source: source}
 
 	diags := parseRecord("template", &template, node, false)
-	fixupComponentReferences(template)
+	// Ensure that all components have a reference back to the template they belong to.
+	for i := range template.Components.Entries {
+		template.Components.Entries[i].Value.Template = &template
+	}
 	return &template, diags
 }
 
