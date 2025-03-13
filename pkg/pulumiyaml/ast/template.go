@@ -494,6 +494,120 @@ type Template interface {
 	NewDiagnosticWriter(w io.Writer, width uint, color bool) hcl.DiagnosticWriter
 }
 
+// ComponentDecl represents a Pulumi YAML component.
+type ComponentDecl struct {
+	syntax syntax.ObjectPropertyDef
+	Key    *StringExpr
+	Value  *ComponentParamDecl
+}
+
+type ComponentParamDecl struct {
+	declNode
+
+	Name        *StringExpr
+	Description *StringExpr
+	Config      ConfigMapDecl
+	Variables   VariablesMapDecl
+	Resources   ResourcesMapDecl
+	Outputs     PropertyMapDecl
+	Template    *TemplateDecl
+}
+
+func (d *ComponentParamDecl) GetName() *StringExpr {
+	if d == nil {
+		return nil
+	}
+	return d.Name
+}
+
+func (d *ComponentParamDecl) GetDescription() *StringExpr {
+	if d == nil {
+		return nil
+	}
+	return d.Description
+}
+
+func (d *ComponentParamDecl) GetConfig() ConfigMapDecl {
+	if d == nil {
+		return ConfigMapDecl{}
+	}
+	return d.Config
+}
+
+func (d *ComponentParamDecl) GetVariables() VariablesMapDecl {
+	if d == nil {
+		return VariablesMapDecl{}
+	}
+	return d.Variables
+}
+
+func (d *ComponentParamDecl) GetResources() ResourcesMapDecl {
+	if d == nil {
+		return ResourcesMapDecl{}
+	}
+	return d.Resources
+}
+
+func (d *ComponentParamDecl) GetOutputs() PropertyMapDecl {
+	if d == nil {
+		return PropertyMapDecl{}
+	}
+	return d.Outputs
+}
+
+func (d *ComponentParamDecl) GetPackages() []packages.PackageDecl {
+	if d == nil {
+		return nil
+	}
+	return d.Template.Packages
+}
+
+func (d *ComponentParamDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) hcl.DiagnosticWriter {
+	return d.Template.NewDiagnosticWriter(w, width, color)
+}
+
+func (d *ComponentParamDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
+type ComponentListDecl struct {
+	declNode
+
+	Entries []ComponentDecl
+}
+
+func (d *ComponentListDecl) defaultValue() interface{} {
+	return &ComponentListDecl{}
+}
+
+func (d *ComponentListDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
+	obj, ok := node.(*syntax.ObjectNode)
+	if !ok {
+		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", name), "")}
+	}
+
+	var diags syntax.Diagnostics
+
+	entries := make([]ComponentDecl, obj.Len())
+	for i := range entries {
+		kvp := obj.Index(i)
+		var v *ComponentParamDecl
+		logname := fmt.Sprintf("%s.%s", name, kvp.Key.Value())
+		vdiags := parseField(logname, reflect.ValueOf(&v).Elem(), kvp.Value)
+		diags.Extend(vdiags...)
+
+		v.Name = String(kvp.Key.Value())
+		entries[i] = ComponentDecl{
+			syntax: kvp,
+			Key:    StringSyntax(kvp.Key),
+			Value:  v,
+		}
+	}
+	d.Entries = entries
+
+	return diags
+}
+
 // A TemplateDecl represents a Pulumi YAML template.
 type TemplateDecl struct {
 	source []byte
@@ -508,6 +622,7 @@ type TemplateDecl struct {
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl
 	Packages      []packages.PackageDecl
+	Components    ComponentListDecl
 }
 
 func (d *TemplateDecl) GetName() *StringExpr {
@@ -602,6 +717,10 @@ func ParseTemplate(source []byte, node syntax.Node) (*TemplateDecl, syntax.Diagn
 	template := TemplateDecl{source: source}
 
 	diags := parseRecord("template", &template, node, false)
+	// Ensure that all components have a reference back to the template they belong to.
+	for i := range template.Components.Entries {
+		template.Components.Entries[i].Value.Template = &template
+	}
 	return &template, diags
 }
 
