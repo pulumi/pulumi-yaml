@@ -118,3 +118,103 @@ func TestComponentParsing(t *testing.T) {
 	require.Len(t, template.Components.Entries[1].Value.Outputs.Entries, 1)
 	require.Equal(t, "bucketEndpoint", template.Components.Entries[1].Value.Outputs.Entries[0].Key.Value)
 }
+
+const componentSchemaExample = `
+name: yaml-plugin
+description: A YAML plugin
+runtime: yaml
+components:
+  aComponent:
+    description: "A component"
+    config:
+      someStringArray:
+        type: array
+        items:
+          type: string
+      aString:
+        type: string
+      aNumber:
+        type: integer
+      aBoolean:
+        type: boolean
+      aStringWithDefault:
+        type: string
+        default: "default"
+      aNumberWithDefault:
+        type: integer
+        default: 42
+      aBooleanWithDefault:
+        type: boolean
+        default: true
+    resources:
+      myBucket:
+        type: aws:s3/bucket:Bucket
+    outputs:
+      someOutput: "abcd"
+`
+
+func TestComponentSchemaGeneration(t *testing.T) {
+	t.Parallel()
+
+	syntax, diags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(componentSchemaExample)), nil)
+	require.Len(t, diags, 0)
+
+	template, diags := ParseTemplate([]byte(componentSchemaExample), syntax)
+	require.Len(t, diags, 0)
+
+	spec, err := template.GenerateSchema()
+	require.NoError(t, err)
+
+	require.Equal(t, "yaml-plugin", spec.Name)
+	require.Equal(t, "A YAML plugin", spec.Description)
+
+	require.Equal(t, 1, len(spec.Resources))
+	res, ok := spec.Resources["yaml-plugin:index:aComponent"]
+	require.True(t, ok, "expected resource yaml-plugin:index:aComponent")
+
+	require.True(t, res.IsComponent, "expected resource to be a component")
+	require.Equal(t, "A component", res.Description)
+
+	inputs := res.InputProperties
+	require.Equal(t, 7, len(inputs))
+
+	stringArray, ok := inputs["someStringArray"]
+	require.True(t, ok, "expected input someStringArray")
+	require.Equal(t, "array", stringArray.Type)
+	require.Equal(t, "string", stringArray.Items.Type)
+
+	aString, ok := inputs["aString"]
+	require.True(t, ok, "expected input aString")
+	require.Equal(t, "string", aString.Type)
+
+	aNumber, ok := inputs["aNumber"]
+	require.True(t, ok, "expected input aNumber")
+	require.Equal(t, "integer", aNumber.Type)
+
+	aBoolean, ok := inputs["aBoolean"]
+	require.True(t, ok, "expected input aBoolean")
+	require.Equal(t, "boolean", aBoolean.Type)
+
+	aStringWithDefault, ok := inputs["aStringWithDefault"]
+	require.True(t, ok, "expected input aStringWithDefault")
+	require.Equal(t, "string", aStringWithDefault.Type)
+
+	aNumberWithDefault, ok := inputs["aNumberWithDefault"]
+	require.True(t, ok, "expected input aNumberWithDefault")
+	require.Equal(t, "integer", aNumberWithDefault.Type)
+
+	aBooleanWithDefault, ok := inputs["aBooleanWithDefault"]
+	require.True(t, ok, "expected input aBooleanWithDefault")
+	require.Equal(t, "boolean", aBooleanWithDefault.Type)
+
+	require.EqualValues(t, []string{"someStringArray", "aString", "aNumber", "aBoolean"}, res.RequiredInputs)
+
+	outputs := res.Properties
+	require.Equal(t, 1, len(outputs))
+
+	someOutput, ok := outputs["someOutput"]
+	require.True(t, ok, "expected output someOutput")
+	require.Equal(t, "pulumi.json#/Any", someOutput.Ref)
+
+	require.EqualValues(t, []string{"someOutput"}, res.Required)
+}
