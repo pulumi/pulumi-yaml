@@ -3,6 +3,7 @@
 package ast
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -117,4 +118,166 @@ func TestComponentParsing(t *testing.T) {
 	require.Equal(t, "differentBucket", template.Components.Entries[1].Value.Resources.Entries[0].Key.Value)
 	require.Len(t, template.Components.Entries[1].Value.Outputs.Entries, 1)
 	require.Equal(t, "bucketEndpoint", template.Components.Entries[1].Value.Outputs.Entries[0].Key.Value)
+}
+
+const componentSchemaExample = `
+name: yaml-plugin
+description: A YAML plugin
+runtime: yaml
+components:
+  aComponent:
+    description: "A component"
+    config:
+      someStringArray:
+        type: array
+        items:
+          type: string
+      aString:
+        type: string
+      aNumber:
+        type: integer
+      aBoolean:
+        type: boolean
+      aStringWithDefault:
+        type: string
+        default: "default"
+      aNumberWithDefault:
+        type: integer
+        default: 42
+      aBooleanWithDefault:
+        type: boolean
+        default: true
+    resources:
+      myBucket:
+        type: aws:s3/bucket:Bucket
+    outputs:
+      someOutput: "abcd"
+`
+
+func TestComponentSchemaGeneration(t *testing.T) {
+	t.Parallel()
+
+	syntax, diags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(componentSchemaExample)), nil)
+	require.Len(t, diags, 0)
+
+	template, diags := ParseTemplate([]byte(componentSchemaExample), syntax)
+	require.Len(t, diags, 0)
+
+	spec, err := template.GenerateSchema()
+	require.NoError(t, err)
+
+	marshalled, err := json.Marshal(spec)
+	require.NoError(t, err)
+
+	expectedSchema := `
+{
+  "name": "yaml-plugin",
+  "description": "A YAML plugin",
+  "language": {
+    "cshap": {
+      "respectSchemaVersion": true
+    },
+    "go": {
+      "respectSchemaVersion": true
+    },
+    "java": {
+      "respectSchemaVersion": true
+    },
+    "nodejs": {
+      "respectSchemaVersion": true
+    },
+    "python": {
+      "respectSchemaVersion": true
+    }
+  },
+  "config": {},
+  "provider": {},
+  "resources": {
+    "yaml-plugin:index:aComponent": {
+      "description": "A component",
+      "properties": {
+        "someOutput": {
+          "$ref": "pulumi.json#/Any"
+        }
+      },
+      "type": "yaml-plugin:index:aComponent",
+      "required": [
+        "someOutput"
+      ],
+      "inputProperties": {
+        "aBoolean": {
+          "type": "boolean",
+          "defaultInfo": {
+            "environment": [
+              "aBoolean"
+            ]
+          }
+        },
+        "aBooleanWithDefault": {
+          "type": "boolean",
+          "default": true,
+          "defaultInfo": {
+            "environment": [
+              "aBooleanWithDefault"
+            ]
+          }
+        },
+        "aNumber": {
+          "type": "integer",
+          "defaultInfo": {
+            "environment": [
+              "aNumber"
+            ]
+          }
+        },
+        "aNumberWithDefault": {
+          "type": "integer",
+          "default": 42,
+          "defaultInfo": {
+            "environment": [
+              "aNumberWithDefault"
+            ]
+          }
+        },
+        "aString": {
+          "type": "string",
+          "defaultInfo": {
+            "environment": [
+              "aString"
+            ]
+          }
+        },
+        "aStringWithDefault": {
+          "type": "string",
+          "default": "default",
+          "defaultInfo": {
+            "environment": [
+              "aStringWithDefault"
+            ]
+          }
+        },
+        "someStringArray": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "defaultInfo": {
+            "environment": [
+              "someStringArray"
+            ]
+          }
+        }
+      },
+      "requiredInputs": [
+        "someStringArray",
+        "aString",
+        "aNumber",
+        "aBoolean"
+      ],
+      "isComponent": true
+    }
+  }
+}
+`
+	require.JSONEq(t, expectedSchema, string(marshalled))
 }

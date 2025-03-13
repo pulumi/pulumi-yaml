@@ -14,6 +14,7 @@ import (
 	yamldiags "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/diags"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 )
 
@@ -696,6 +697,127 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 		}
 	}
 	return newDiagnosticWriter(w, fileMap, width, color)
+}
+
+func parseTypeSpec(configDecl *ConfigParamDecl) (schema.TypeSpec, error) {
+	typeSpec := schema.TypeSpec{}
+	if configDecl.Type == nil {
+		return typeSpec, fmt.Errorf("missing type")
+	}
+	switch configDecl.Type.Value {
+	case "string":
+		typeSpec.Type = "string"
+	case "integer":
+		typeSpec.Type = "integer"
+	case "boolean":
+		typeSpec.Type = "boolean"
+	case "array":
+		if configDecl.Items == nil {
+			return typeSpec, fmt.Errorf("missing items")
+		}
+		itemsTypeSpec, err := parseTypeSpec(configDecl.Items)
+		if err != nil {
+			return typeSpec, err
+		}
+		typeSpec.Type = "array"
+		typeSpec.Items = &itemsTypeSpec
+	default:
+		return typeSpec, fmt.Errorf("unknown type: %s", configDecl.Type.Value)
+	}
+	return typeSpec, nil
+}
+
+func (d *TemplateDecl) GenerateSchema() (schema.PackageSpec, error) {
+	description := ""
+	if d.Description != nil {
+		description = d.Description.Value
+	}
+	schemaDef := schema.PackageSpec{
+		Name:        d.Name.Value,
+		Description: description,
+		Language: map[string]schema.RawMessage{
+			"nodejs": schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"python": schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"cshap":  schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"java":   schema.RawMessage(`{"respectSchemaVersion": true}`),
+			"go":     schema.RawMessage(`{"respectSchemaVersion": true}`),
+		},
+	}
+
+	resourcesDef := make(map[string]schema.ResourceSpec)
+	for _, component := range d.Components.Entries {
+		componentType := d.Name.Value + ":index:" + component.Key.Value
+		resourceDef := schema.ResourceSpec{
+			ObjectTypeSpec: schema.ObjectTypeSpec{
+				Properties: map[string]schema.PropertySpec{},
+				Type:       componentType,
+				Required:   []string{},
+			},
+			InputProperties: map[string]schema.PropertySpec{},
+			IsComponent:     true,
+		}
+		if component.Value.Description != nil {
+			resourceDef.Description = component.Value.Description.Value
+		}
+
+		for _, input := range component.Value.Config.Entries {
+			k, v := input.Key.Value, input.Value
+			typeSpec, err := parseTypeSpec(input.Value)
+			if err != nil {
+				return schema.PackageSpec{}, err
+			}
+			def := schemaDefaultValue(v.Default)
+
+			resourceDef.InputProperties[k] = schema.PropertySpec{
+				TypeSpec: typeSpec,
+				Default:  def,
+				DefaultInfo: &schema.DefaultSpec{
+					Environment: []string{k},
+				},
+				Secret: v.Secret != nil && v.Secret.Value,
+			}
+			if def == nil {
+				resourceDef.RequiredInputs = append(resourceDef.RequiredInputs, k)
+			}
+		}
+
+		properties := map[string]schema.PropertySpec{}
+		for _, output := range component.Value.Outputs.Entries {
+			k := output.Key.Value
+
+			// TODO: evaluate actual type. For the first cut we're just returning `Any` here.
+			typeSpec := schema.TypeSpec{
+				Ref: "pulumi.json#/Any",
+			}
+
+			properties[k] = schema.PropertySpec{
+				TypeSpec: typeSpec,
+			}
+			resourceDef.Required = append(resourceDef.Required, k)
+		}
+		resourceDef.Properties = properties
+
+		resourcesDef[componentType] = resourceDef
+	}
+
+	schemaDef.Resources = resourcesDef
+
+	return schemaDef, nil
+}
+
+func schemaDefaultValue(e Expr) interface{} {
+	switch e := e.(type) {
+	case *StringExpr:
+		return e.Value
+	case *NumberExpr:
+		return e.Value
+	case *BooleanExpr:
+		return e.Value
+	case nil:
+		return nil
+	default:
+		panic(fmt.Sprintf("Unknown default value: %s", e))
+	}
 }
 
 func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
