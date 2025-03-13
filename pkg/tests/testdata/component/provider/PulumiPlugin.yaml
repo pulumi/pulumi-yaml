@@ -1,0 +1,18 @@
+name: random-plugin-component
+description: A random pulumi plugin
+runtime: yaml
+components:
+  randomPetGenerator:
+    inputs:
+      length:
+        type: integer
+      prefix:
+        type: string
+    resources:
+      randomPet:
+        type: random:RandomPet
+        properties:
+          length: ${length}
+          prefix: ${prefix}
+    outputs:
+      pet: ${randomPet.id}

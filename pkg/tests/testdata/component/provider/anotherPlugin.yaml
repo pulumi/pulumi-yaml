@@ -1,0 +1,12 @@
+components:
+  randomStringGenerator:
+    inputs:
+      length:
+        type: integer
+    resources:
+      randomString:
+        type: random:RandomString
+        properties:
+          length: ${length}
+    outputs:
+      string: ${randomString.id}

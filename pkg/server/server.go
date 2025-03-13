@@ -29,10 +29,14 @@ import (
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
 	"gopkg.in/yaml.v3"
 
@@ -71,6 +75,18 @@ func NewLanguageHost(engineAddress, tracing string, useRPCLoader bool) pulumirpc
 		useRPCLoader:  useRPCLoader,
 		templateCache: make(map[string]templateCacheEntry),
 	}
+}
+
+func (host *yamlLanguageHost) loadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	template, diags, err := pulumiyaml.LoadPluginTemplate(directory)
+	if err != nil {
+		return nil, diags, err
+	}
+	if diags.HasErrors() {
+		return nil, diags, nil
+	}
+
+	return template, diags, nil
 }
 
 func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
@@ -287,6 +303,104 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	}
 
 	return &pulumirpc.RunResponse{}, nil
+}
+
+func (host *yamlLanguageHost) RunPlugin(
+	req *pulumirpc.RunPluginRequest, server pulumirpc.LanguageRuntime_RunPluginServer,
+) error {
+	logging.V(5).Infof("Attempting to run yaml plugin in %s", req.Info.ProgramDirectory)
+	ctx := context.Background()
+
+	closer, stdout, stderr, err := rpcutil.MakeRunPluginStreams(server, false)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	template, diags, err := host.loadPluginTemplate(req.Info.ProgramDirectory)
+	if err != nil {
+		return err
+	}
+
+	diagWriter := template.NewDiagnosticWriter(stderr, 0, true)
+	if len(diags) != 0 {
+		err := diagWriter.WriteDiagnostics(diags.HCL())
+		if err != nil {
+			return err
+		}
+	}
+	if diags.HasErrors() {
+		return errors.New("failed to load template")
+	}
+
+	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
+	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
+	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
+		EngineAddr: host.engineAddress,
+	})
+	if err != nil {
+		return err
+	}
+	defer pctx.Close()
+
+	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
+	// time RunWithContext returns we should be done with all async work.
+	loader, err := pulumiyaml.NewPackageLoader(nil)
+	if err != nil {
+		return err
+	}
+	defer loader.Close()
+
+	schema, err := template.GenerateSchema()
+	if err != nil {
+		return err
+	}
+
+	jsonSchema, err := json.Marshal(schema)
+	if err != nil {
+		return err
+	}
+
+	// provider.ComponentMain prints the port it uses to stdout.  We need to copy that to the plugin stream
+	// so the caller knows where to pick it up.
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	go func() {
+		_, _ = io.Copy(stdout, r)
+	}()
+	err = provider.ComponentMain(template.Name.Value, "1.0.0", jsonSchema,
+		func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
+			options pulumi.ResourceOption,
+		) (*providersdk.ConstructResult, error) {
+			m, err := inputs.Map()
+			if err != nil {
+				return nil, err
+			}
+			urn, state, err := pulumiyaml.RunComponentTemplate(ctx, typ, name, options, template, m, loader)
+			if err != nil {
+				return nil, err
+			}
+			return &providersdk.ConstructResult{
+				URN:   urn,
+				State: state,
+			}, nil
+		})
+	if err != nil {
+		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
+			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
+			if err != nil {
+				return err
+			}
+			if diags.HasErrors() {
+				return errors.New("has diagnostics errors") // TODO
+			}
+			return err
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Empty) (*pulumirpc.PluginInfo, error) {
