@@ -566,8 +566,8 @@ func (d *ComponentParamDecl) NewDiagnosticWriter(w io.Writer, width uint, color 
 	return d.Template.NewDiagnosticWriter(w, width, color)
 }
 
-func (c *ComponentParamDecl) recordSyntax() *syntax.Node {
-	return &c.syntax
+func (d *ComponentParamDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
 }
 
 type ComponentListDecl struct {
