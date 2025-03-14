@@ -507,7 +507,7 @@ type ComponentParamDecl struct {
 
 	Name        *StringExpr
 	Description *StringExpr
-	Config      ConfigMapDecl
+	Inputs      ConfigMapDecl
 	Variables   VariablesMapDecl
 	Resources   ResourcesMapDecl
 	Outputs     PropertyMapDecl
@@ -532,7 +532,7 @@ func (d *ComponentParamDecl) GetConfig() ConfigMapDecl {
 	if d == nil {
 		return ConfigMapDecl{}
 	}
-	return d.Config
+	return d.Inputs
 }
 
 func (d *ComponentParamDecl) GetVariables() VariablesMapDecl {
@@ -760,7 +760,7 @@ func (d *TemplateDecl) GenerateSchema() (schema.PackageSpec, error) {
 			resourceDef.Description = component.Value.Description.Value
 		}
 
-		for _, input := range component.Value.Config.Entries {
+		for _, input := range component.Value.Inputs.Entries {
 			k, v := input.Key.Value, input.Value
 			typeSpec, err := parseTypeSpec(input.Value)
 			if err != nil {
