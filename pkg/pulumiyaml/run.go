@@ -178,19 +178,19 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 				continue
 			}
 			if len(t.Configuration.Entries) > 0 {
-				diags.Extend(syntax.Error(nil, "Pulumi.yaml: root-level `configuration` is not supported in plugins", ""))
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `configuration` is not supported in plugins", ""))
 			}
 			if len(t.Config.Entries) > 0 {
-				diags.Extend(syntax.Error(nil, "Pulumi.yaml: root-level `config` is not supported in plugins", ""))
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `config` is not supported in plugins", ""))
 			}
 			if len(t.Variables.Entries) > 0 {
-				diags.Extend(syntax.Error(nil, "Pulumi.yaml: root-level `variables` field is not supported in plugins.", ""))
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `variables` field is not supported in plugins.", ""))
 			}
 			if len(t.Resources.Entries) > 0 {
-				diags.Extend(syntax.Error(nil, "Pulumi.yaml: root-level `resources` field is not supported in plugins.", ""))
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `resources` field is not supported in plugins.", ""))
 			}
 			if len(t.Outputs.Entries) > 0 {
-				diags.Extend(syntax.Error(nil, "Pulumi.yaml: root-level `outputs` field is not supported in plugins.", ""))
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `outputs` field is not supported in plugins.", ""))
 			}
 
 			err = template.Merge(t)
