@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
@@ -38,6 +39,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -361,16 +363,30 @@ func (host *yamlLanguageHost) RunPlugin(
 		return err
 	}
 
-	// provider.ComponentMain prints the port it uses to stdout.  We need to copy that to the plugin stream
-	// so the caller knows where to pick it up.
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var cancelChannel chan bool
+	providerHost, err := provider.NewHostClient(host.engineAddress)
+	if err != nil {
+		return fmt.Errorf("fatal: could not connect to host RPC: %w", err)
+	}
 
+	// If we have a host cancel our cancellation context if it fails the healthcheck
+	ctx, cancel := context.WithCancel(context.Background())
+	// map the context Done channel to the rpcutil boolean cancel channel
+	cancelChannel = make(chan bool)
 	go func() {
-		_, _ = io.Copy(stdout, r)
+		<-ctx.Done()
+		close(cancelChannel)
 	}()
-	err = provider.ComponentMain(template.Name.Value, "1.0.0", jsonSchema,
-		func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
+	err = rpcutil.Healthcheck(ctx, host.engineAddress, 5*time.Minute, cancel)
+	if err != nil {
+		return fmt.Errorf("could not start health check host RPC server: %w", err)
+	}
+
+	prov := &componentProvider{
+		host:   providerHost.EngineConn(),
+		name:   template.Name.Value,
+		schema: jsonSchema,
+		construct: func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
 			options pulumi.ResourceOption,
 		) (*providersdk.ConstructResult, error) {
 			m, err := inputs.Map()
@@ -385,19 +401,28 @@ func (host *yamlLanguageHost) RunPlugin(
 				URN:   urn,
 				State: state,
 			}, nil
-		})
+		},
+	}
+
+	// Fire up a gRPC server, letting the kernel choose a free port for us.
+	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
+		Cancel: cancelChannel,
+		Init: func(srv *grpc.Server) error {
+			pulumirpc.RegisterResourceProviderServer(srv, prov)
+			return nil
+		},
+		Options: rpcutil.OpenTracingServerInterceptorOptions(nil),
+	})
 	if err != nil {
-		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
-			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
-			if err != nil {
-				return err
-			}
-			if diags.HasErrors() {
-				return errors.New("has diagnostics errors") // TODO
-			}
-			return err
-		}
-		return err
+		return fmt.Errorf("fatal: %w", err)
+	}
+
+	// The resource provider protocol requires that we now write out the port we have chosen to listen on.
+	fmt.Fprintf(stdout, "%d\n", handle.Port)
+
+	// Finally, wait for the server to stop serving.
+	if err := <-handle.Done; err != nil {
+		return fmt.Errorf("fatal: %w", err)
 	}
 
 	return nil
