@@ -596,6 +596,9 @@ func (d *ComponentListDecl) parse(name string, node syntax.Node) syntax.Diagnost
 		logname := fmt.Sprintf("%s.%s", name, kvp.Key.Value())
 		vdiags := parseField(logname, reflect.ValueOf(&v).Elem(), kvp.Value)
 		diags.Extend(vdiags...)
+		if diags.HasErrors() {
+			return diags
+		}
 
 		v.Name = String(kvp.Key.Value())
 		entries[i] = ComponentDecl{
@@ -697,6 +700,25 @@ func (d *TemplateDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) 
 		}
 	}
 	return newDiagnosticWriter(w, fileMap, width, color)
+}
+
+func (d *TemplateDecl) Merge(other *TemplateDecl) error {
+	if other == nil {
+		return nil
+	}
+	if d.Name == nil {
+		d.Name = other.Name
+	} else if other.Name != nil {
+		return fmt.Errorf("cannot merge templates with different names")
+	}
+	if d.Description == nil {
+		d.Description = other.Description
+	} else if other.Description != nil {
+		return fmt.Errorf("cannot merge templates with different descriptions")
+	}
+	d.Config.Entries = append(d.Config.Entries, other.Config.Entries...)
+	d.Components.Entries = append(d.Components.Entries, other.Components.Entries...)
+	return nil
 }
 
 func parseTypeSpec(configDecl *ConfigParamDecl) (schema.TypeSpec, error) {
