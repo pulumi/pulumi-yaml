@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,4 +198,28 @@ func TestResourceSecret(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Dir: filepath.Join("testdata", "resource-secret"),
 	})
+}
+
+func TestAuthoredComponent(t *testing.T) {
+	t.Parallel()
+
+	e := ptesting.NewEnvironment(t)
+	defer e.DeleteIfNotFailed()
+
+	e.ImportDirectory(filepath.Join("testdata", "component"))
+
+	e.RunCommand("pulumi", "login", "--cloud-url", e.LocalURL())
+
+	e.CWD = filepath.Join(e.RootPath, "program")
+	e.RunCommand("pulumi", "stack", "init", "organization/component-consumer/test")
+	e.RunCommand("pulumi", "package", "add", "../provider")
+	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
+
+	stdout, _ := e.RunCommand("pulumi", "stack", "output", "randomPet")
+	// We expect 4 words separated by dashes.
+	require.Equal(t, 4, len(strings.Split(stdout, "-")))
+	require.Equal(t, "test-", stdout[:5])
+
+	stdout, _ = e.RunCommand("pulumi", "stack", "output", "randomString")
+	require.Len(t, strings.TrimSuffix(stdout, "\n"), 8, fmt.Sprintf("expected %s to have 8 characters", stdout))
 }

@@ -146,6 +146,76 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	return template, diags, nil
 }
 
+// Load a plugin template from the given directory.
+func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	// Get all yaml files in the directory, load them and merge them into a single template.
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, nil, err
+	}
+	var template *ast.TemplateDecl
+	for _, file := range files {
+		if file.IsDir() || filepath.Ext(file.Name()) != ".yaml" {
+			continue
+		}
+
+		f, err := os.Open(filepath.Join(directory, file.Name()))
+		if err != nil {
+			return nil, nil, err
+		}
+		t, diags, err := LoadYAML(file.Name(), f)
+		if err != nil {
+			return nil, diags, err
+		}
+		if diags.HasErrors() {
+			return nil, diags, diags
+		}
+		if template == nil {
+			template = t
+		} else {
+			if t == nil {
+				diags.Extend(syntax.Error(nil, "failed to load template", ""))
+				continue
+			}
+			if len(t.Configuration.Entries) > 0 {
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `configuration` is not supported in plugins", ""))
+			}
+			if len(t.Config.Entries) > 0 {
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `config` is not supported in plugins", ""))
+			}
+			if len(t.Variables.Entries) > 0 {
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `variables` field is not supported in plugins.", ""))
+			}
+			if len(t.Resources.Entries) > 0 {
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `resources` field is not supported in plugins.", ""))
+			}
+			if len(t.Outputs.Entries) > 0 {
+				diags.Extend(syntax.Error(nil, "PulumiPlugin.yaml: root-level `outputs` field is not supported in plugins.", ""))
+			}
+
+			err = template.Merge(t)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	componentNames := make(map[string]bool)
+	for _, entry := range template.Components.Entries {
+		if _, ok := componentNames[entry.Value.Name.Value]; ok {
+			return nil, nil, fmt.Errorf("duplicate component name %s", entry.Value.Name.Value)
+		}
+		componentNames[entry.Value.Name.Value] = true
+	}
+	packages, err := packages.SearchPackageDecls(directory)
+	if err != nil {
+		return nil, nil, err
+	}
+	template.Packages = packages
+
+	return template, nil, nil
+}
+
 // Load a template from the current working directory
 func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	f, err := os.Open(path)
@@ -449,6 +519,114 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 		return diags
 	}
 	return nil
+}
+
+func RunComponentTemplate(ctx *pulumi.Context,
+	typ, name string, options pulumi.ResourceOption,
+	t *ast.TemplateDecl, inputs pulumi.Map, loader PackageLoader,
+) (pulumi.URNOutput, pulumi.Map, error) {
+	var templ ast.Template
+	typSplit := strings.Split(typ, ":")
+	if len(typSplit) != 3 {
+		return pulumi.URNOutput{}, nil, errors.New("invalid component type")
+	}
+	for _, comp := range t.Components.Entries {
+		if comp.Key.Value == typSplit[2] {
+			templ = comp.Value
+			break
+		}
+	}
+	runner := newRunner(templ, loader)
+
+	_, diags := TypeCheck(runner)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+
+	packageRefs, diags := findPackageRefs(ctx, runner)
+	if diags != nil {
+		return pulumi.URNOutput{}, nil, errors.New(diags.Error())
+	}
+
+	component := &componentEvaluator{
+		inputs:  inputs,
+		outputs: pulumi.Map{},
+		evaluator: &programEvaluator{
+			evalContext: runner.newContext(t),
+			pulumiCtx:   ctx,
+			packageRefs: packageRefs,
+		},
+	}
+
+	if err := ctx.RegisterComponentResource(typ, name, component, options); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+
+	diags.Extend(runner.Run(component)...)
+	if diags.HasErrors() {
+		return pulumi.URNOutput{}, nil, diags
+	}
+	if err := ctx.RegisterResourceOutputs(component, component.outputs); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+	return component.URN(), component.outputs, nil
+}
+
+type componentEvaluator struct {
+	pulumi.ResourceState
+
+	inputs  pulumi.Map
+	outputs pulumi.Map
+
+	evaluator *programEvaluator
+}
+
+func (m *componentEvaluator) EvalConfig(r *Runner, node configNode) bool {
+	k := node.key().Value
+	v, ok := m.inputs[k]
+	if ok {
+		r.config[k] = v
+		return true
+	}
+	return m.evaluator.EvalConfig(r, node)
+}
+
+func (m *componentEvaluator) EvalVariable(r *Runner, node variableNode) bool {
+	return m.evaluator.EvalVariable(r, node)
+}
+
+func (m *componentEvaluator) EvalResource(r *Runner, node resourceNode) bool {
+	ctx := r.newContext(node)
+	res, ok := m.evaluator.registerResourceWithParent(node, m)
+	if !ok {
+		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := m.evaluator.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+		return false
+	}
+	r.resources[node.Key.Value] = res
+	return true
+}
+
+func (m *componentEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool {
+	ctx := r.newContext(node)
+	out, ok := m.evaluator.registerOutput(node)
+	if !ok {
+		msg := fmt.Sprintf("Error registering output [%v]: %v", node.Key.Value, ctx.sdiags.Error())
+		err := m.evaluator.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
+		if err != nil {
+			return false
+		}
+	} else {
+		m.outputs[node.Key.Value] = out
+	}
+	return true
+}
+
+func (m *componentEvaluator) EvalMissing(r *Runner, node missingNode) bool {
+	return m.evaluator.EvalMissing(r, node)
 }
 
 type syncDiags struct {
@@ -828,9 +1006,7 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
-func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
-	eCtx := r.newContext(nil)
-
+func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]string, syntax.Diagnostics) {
 	// Register package refs for all packages we know upfront
 	packageRefs := make(map[tokens.Package]string)
 	for key, pkg := range r.packageDescriptors {
@@ -860,9 +1036,19 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 		})
 		if err != nil {
 			err = fmt.Errorf("registering package %s: %w", name, err)
-			return syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+			return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 		}
 		packageRefs[key] = resp.Ref
+	}
+	return packageRefs, nil
+}
+
+func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
+	eCtx := r.newContext(nil)
+
+	packageRefs, diags := findPackageRefs(ctx, r)
+	if diags != nil {
+		return diags
 	}
 
 	return r.Run(programEvaluator{
@@ -1177,6 +1363,10 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 }
 
 func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
+	return e.registerResourceWithParent(kvp, nil)
+}
+
+func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent pulumi.Resource) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
@@ -1226,6 +1416,10 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 
 	if p, isPoison := readIntoProperties(v.Properties); isPoison {
 		return p, isPoison
+	}
+
+	if v.Options.Parent == nil && parent != nil {
+		opts = append(opts, pulumi.Parent(parent))
 	}
 
 	if v.Options.Aliases != nil {

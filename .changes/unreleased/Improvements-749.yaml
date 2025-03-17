@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Allow authoring components in YAML
+time: 2025-03-14T10:16:05.555834834+01:00
+custom:
+  PR: "749"

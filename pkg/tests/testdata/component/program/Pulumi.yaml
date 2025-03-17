@@ -1,0 +1,19 @@
+name: component-consumer
+runtime: yaml
+plugins:
+  providers:
+    - name: random-plugin-component
+      path: ../provider
+resources:
+  randomPet:
+    type: random-plugin-component:index:randomPetGenerator
+    properties:
+      length: 3
+      prefix: "test"
+  randomString:
+    type: random-plugin-component:index:randomStringGenerator
+    properties:
+      length: 8
+outputs:
+  randomPet: ${randomPet.pet}
+  randomString: ${randomString.string}

@@ -25,15 +25,21 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
@@ -71,6 +77,18 @@ func NewLanguageHost(engineAddress, tracing string, useRPCLoader bool) pulumirpc
 		useRPCLoader:  useRPCLoader,
 		templateCache: make(map[string]templateCacheEntry),
 	}
+}
+
+func (host *yamlLanguageHost) loadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	template, diags, err := pulumiyaml.LoadPluginTemplate(directory)
+	if err != nil {
+		return nil, diags, err
+	}
+	if diags.HasErrors() {
+		return nil, diags, nil
+	}
+
+	return template, diags, nil
 }
 
 func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
@@ -287,6 +305,127 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	}
 
 	return &pulumirpc.RunResponse{}, nil
+}
+
+func (host *yamlLanguageHost) RunPlugin(
+	req *pulumirpc.RunPluginRequest, server pulumirpc.LanguageRuntime_RunPluginServer,
+) error {
+	logging.V(5).Infof("Attempting to run yaml plugin in %s", req.Info.ProgramDirectory)
+	ctx := context.Background()
+
+	closer, stdout, stderr, err := rpcutil.MakeRunPluginStreams(server, false)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	template, diags, err := host.loadPluginTemplate(req.Info.ProgramDirectory)
+	if err != nil {
+		return err
+	}
+
+	diagWriter := template.NewDiagnosticWriter(stderr, 0, true)
+	if len(diags) != 0 {
+		err := diagWriter.WriteDiagnostics(diags.HCL())
+		if err != nil {
+			return err
+		}
+	}
+	if diags.HasErrors() {
+		return errors.New("failed to load template")
+	}
+
+	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
+	// This encapsulates a fair bit of the boilerplate otherwise needed to do RPCs, etc.
+	pctx, err := pulumi.NewContext(ctx, pulumi.RunInfo{
+		EngineAddr: host.engineAddress,
+	})
+	if err != nil {
+		return err
+	}
+	defer pctx.Close()
+
+	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
+	// time RunWithContext returns we should be done with all async work.
+	loader, err := pulumiyaml.NewPackageLoader(nil)
+	if err != nil {
+		return err
+	}
+	defer loader.Close()
+
+	schema, err := template.GenerateSchema()
+	if err != nil {
+		return err
+	}
+
+	jsonSchema, err := json.Marshal(schema)
+	if err != nil {
+		return err
+	}
+
+	var cancelChannel chan bool
+	providerHost, err := provider.NewHostClient(host.engineAddress)
+	if err != nil {
+		return fmt.Errorf("fatal: could not connect to host RPC: %w", err)
+	}
+
+	// If we have a host cancel our cancellation context if it fails the healthcheck
+	ctx, cancel := context.WithCancel(context.Background())
+	// map the context Done channel to the rpcutil boolean cancel channel
+	cancelChannel = make(chan bool)
+	go func() {
+		<-ctx.Done()
+		close(cancelChannel)
+	}()
+	err = rpcutil.Healthcheck(ctx, host.engineAddress, 5*time.Minute, cancel)
+	if err != nil {
+		return fmt.Errorf("could not start health check host RPC server: %w", err)
+	}
+
+	prov := &componentProvider{
+		host:   providerHost.EngineConn(),
+		name:   template.Name.Value,
+		schema: jsonSchema,
+		construct: func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
+			options pulumi.ResourceOption,
+		) (*providersdk.ConstructResult, error) {
+			m, err := inputs.Map()
+			if err != nil {
+				return nil, err
+			}
+			urn, state, err := pulumiyaml.RunComponentTemplate(ctx, typ, name, options, template, m, loader)
+			if err != nil {
+				return nil, err
+			}
+			return &providersdk.ConstructResult{
+				URN:   urn,
+				State: state,
+			}, nil
+		},
+	}
+
+	// Fire up a gRPC server, letting the kernel choose a free port for us.
+	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
+		Cancel: cancelChannel,
+		Init: func(srv *grpc.Server) error {
+			pulumirpc.RegisterResourceProviderServer(srv, prov)
+			return nil
+		},
+		Options: rpcutil.OpenTracingServerInterceptorOptions(nil),
+	})
+	if err != nil {
+		return fmt.Errorf("fatal: %w", err)
+	}
+
+	// The resource provider protocol requires that we now write out the port we have chosen to listen on.
+	fmt.Fprintf(stdout, "%d\n", handle.Port)
+
+	// Finally, wait for the server to stop serving.
+	if err := <-handle.Done; err != nil {
+		return fmt.Errorf("fatal: %w", err)
+	}
+
+	return nil
 }
 
 func (host *yamlLanguageHost) GetPluginInfo(ctx context.Context, req *pbempty.Empty) (*pulumirpc.PluginInfo, error) {
