@@ -1,0 +1,5 @@
+resources:
+  res:
+    type: namespaced:Resource
+    properties:
+      value: true

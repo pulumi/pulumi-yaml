@@ -29,6 +29,13 @@ resources:
       value: true
     options:
       parent: ${parent2}
+  child3:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent2}
+      protect: false
   orphan2:
     type: simple:Resource
     properties:
