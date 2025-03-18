@@ -1,4 +1,4 @@
-// Copyright 2022, Pulumi Corporation.  All rights reserved.
+// Copyright 2022-2025, Pulumi Corporation.  All rights reserved.
 
 package codegen
 
@@ -1152,7 +1152,7 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 // ImportTemplate converts a YAML template to a PCL definition.
 func ImportTemplate(file *ast.TemplateDecl, loader pulumiyaml.PackageLoader) (*model.Body, syntax.Diagnostics) {
-	pacakgeDescriptors, err := packages.ToPackageDescriptors(file.Packages)
+	pacakgeDescriptors, err := packages.ToPackageDescriptors(file.Sdks)
 	if err != nil {
 		return nil, syntax.Diagnostics{syntax.Error(nil, fmt.Sprintf("unable to parse package descriptors: %v", err), "")}
 	}

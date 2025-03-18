@@ -1,4 +1,4 @@
-// Copyright 2022, Pulumi Corporation.  All rights reserved.
+// Copyright 2022-2025, Pulumi Corporation.  All rights reserved.
 
 package ast
 
@@ -490,7 +490,7 @@ type Template interface {
 	GetVariables() VariablesMapDecl
 	GetResources() ResourcesMapDecl
 	GetOutputs() PropertyMapDecl
-	GetPackages() []packages.PackageDecl
+	GetSdks() []packages.PackageDecl
 
 	NewDiagnosticWriter(w io.Writer, width uint, color bool) hcl.DiagnosticWriter
 }
@@ -556,11 +556,11 @@ func (d *ComponentParamDecl) GetOutputs() PropertyMapDecl {
 	return d.Outputs
 }
 
-func (d *ComponentParamDecl) GetPackages() []packages.PackageDecl {
+func (d *ComponentParamDecl) GetSdks() []packages.PackageDecl {
 	if d == nil {
 		return nil
 	}
-	return d.Template.Packages
+	return d.Template.Sdks
 }
 
 func (d *ComponentParamDecl) NewDiagnosticWriter(w io.Writer, width uint, color bool) hcl.DiagnosticWriter {
@@ -625,7 +625,7 @@ type TemplateDecl struct {
 	Variables     VariablesMapDecl
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl
-	Packages      []packages.PackageDecl
+	Sdks          []packages.PackageDecl
 	Components    ComponentListDecl
 }
 
@@ -672,11 +672,11 @@ func (d *TemplateDecl) GetOutputs() PropertyMapDecl {
 	return d.Outputs
 }
 
-func (d *TemplateDecl) GetPackages() []packages.PackageDecl {
+func (d *TemplateDecl) GetSdks() []packages.PackageDecl {
 	if d == nil {
 		return nil
 	}
-	return d.Packages
+	return d.Sdks
 }
 
 func (d *TemplateDecl) Syntax() syntax.Node {
