@@ -2,5 +2,8 @@ resources:
   # The resource name is based on the parameter value
   example:
     type: subpackage:HelloWorld
+  exampleComponent:
+    type: subpackage:HelloWorldComponent
 outputs:
   parameterValue: ${example.parameterValue}
+  parameterValueFromComponent: ${exampleComponent.parameterValue}
