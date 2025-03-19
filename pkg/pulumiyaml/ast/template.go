@@ -619,6 +619,7 @@ type TemplateDecl struct {
 	syntax syntax.Node
 
 	Name          *StringExpr
+	Namespace     *StringExpr
 	Description   *StringExpr
 	Configuration ConfigMapDecl
 	Config        ConfigMapDecl
@@ -716,6 +717,11 @@ func (d *TemplateDecl) Merge(other *TemplateDecl) error {
 	} else if other.Description != nil {
 		return fmt.Errorf("cannot merge templates with different descriptions")
 	}
+	if d.Namespace == nil {
+		d.Namespace = other.Namespace
+	} else if other.Namespace != nil {
+		return fmt.Errorf("cannot merge templates with different namespaces")
+	}
 	d.Config.Entries = append(d.Config.Entries, other.Config.Entries...)
 	d.Components.Entries = append(d.Components.Entries, other.Components.Entries...)
 	return nil
@@ -754,9 +760,14 @@ func (d *TemplateDecl) GenerateSchema() (schema.PackageSpec, error) {
 	if d.Description != nil {
 		description = d.Description.Value
 	}
+	namespace := ""
+	if d.Namespace != nil {
+		namespace = d.Namespace.Value
+	}
 	schemaDef := schema.PackageSpec{
 		Name:        d.Name.Value,
 		Description: description,
+		Namespace:   namespace,
 		Language: map[string]schema.RawMessage{
 			"nodejs": schema.RawMessage(`{"respectSchemaVersion": true}`),
 			"python": schema.RawMessage(`{"respectSchemaVersion": true}`),

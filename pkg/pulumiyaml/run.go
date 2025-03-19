@@ -216,28 +216,6 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 	return template, nil, nil
 }
 
-// Load a template from the current working directory
-func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
-
-	template, diags, err := LoadYAML(filepath.Base(path), f)
-	if err != nil {
-		return nil, diags, err
-	}
-
-	sdks, err := packages.SearchPackageDecls(filepath.Dir(path))
-	if err != nil {
-		diags.Extend(syntax.Error(nil, err.Error(), ""))
-	}
-	template.Sdks = sdks
-
-	return template, diags, nil
-}
-
 // LoadYAML decodes a YAML template from an io.Reader.
 func LoadYAML(filename string, r io.Reader) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	bytes, err := io.ReadAll(r)
@@ -495,6 +473,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
 	if len(t.Components.Entries) > 0 {
 		return errors.New("components are only supported in plugins, not in programs")
+	}
+	if t.Namespace != nil {
+		return errors.New("namespace is only supported in component plugins")
 	}
 	r := newRunner(t, loader)
 	r.setIntermediates(ctx.Project(), config, configPropertyMap, false)

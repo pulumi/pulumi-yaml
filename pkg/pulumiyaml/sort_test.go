@@ -5,6 +5,8 @@ package pulumiyaml
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,7 +122,11 @@ func TestSortUnordered(t *testing.T) {
 func TestSortMultipleDefaultProviders(t *testing.T) {
 	t.Parallel()
 
-	tmpl, diags, err := LoadFile("../tests/testdata/resource-ordering/Pulumi.yaml")
+	path := "../tests/testdata/resource-ordering/Pulumi.yaml"
+	f, err := os.Open(path)
+	require.NoError(t, err)
+	defer f.Close()
+	tmpl, diags, err := LoadYAML(filepath.Base(path), f)
 	requireNoErrors(t, tmpl, diags)
 	assert.NoError(t, err)
 
