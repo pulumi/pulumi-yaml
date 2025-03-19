@@ -92,8 +92,8 @@ func (l packageLoader) Close() {
 	}
 }
 
-func NewPackageLoader(plugins *workspace.Plugins) (PackageLoader, error) {
-	host, err := newResourcePackageHost(plugins)
+func NewPackageLoader(plugins *workspace.Plugins, packages map[string]workspace.PackageSpec) (PackageLoader, error) {
+	host, err := newResourcePackageHost(plugins, packages)
 	if err != nil {
 		return nil, err
 	}
@@ -532,7 +532,7 @@ func getResourceConstants(props []*schema.Property) map[string]interface{} {
 	return constantProps
 }
 
-func newResourcePackageHost(plugins *workspace.Plugins) (plugin.Host, error) {
+func newResourcePackageHost(plugins *workspace.Plugins, packages map[string]workspace.PackageSpec) (plugin.Host, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -540,7 +540,7 @@ func newResourcePackageHost(plugins *workspace.Plugins) (plugin.Host, error) {
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
 		Color: cmdutil.GetGlobalColorization(),
 	})
-	pluginCtx, err := plugin.NewContextWithRoot(sink, sink, nil, cwd, cwd, nil, true, nil, plugins, nil, nil)
+	pluginCtx, err := plugin.NewContextWithRoot(sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -1,9 +1,7 @@
 name: component-consumer
 runtime: yaml
-plugins:
-  providers:
-    - name: random-plugin-component
-      path: ../provider
+packages:
+  random-plugin-component: ../provider
 resources:
   randomPet:
     type: random-plugin-component:index:randomPetGenerator
