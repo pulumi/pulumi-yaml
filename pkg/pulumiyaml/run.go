@@ -73,7 +73,7 @@ func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*
 	}
 
 	templateStr := stdout.String()
-	template, tdiags, err := LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr), false /* isComponent */)
+	template, tdiags, err := LoadYAMLBytes(fmt.Sprintf("<stdout from compiler %v>", name), []byte(templateStr))
 	diags.Extend(tdiags...)
 	if err != nil {
 		return nil, diags, err
@@ -128,7 +128,7 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
 	}
 
-	template, diags, err := LoadYAMLBytes(filename, bs, false /* isComponent */)
+	template, diags, err := LoadYAMLBytes(filename, bs)
 	if err != nil {
 		return nil, diags, err
 	}
@@ -163,7 +163,7 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		if err != nil {
 			return nil, nil, err
 		}
-		t, diags, err := LoadYAML(file.Name(), f, true /* isComponent */)
+		t, diags, err := LoadYAML(file.Name(), f)
 		if err != nil {
 			return nil, diags, err
 		}
@@ -217,16 +217,16 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 }
 
 // LoadYAML decodes a YAML template from an io.Reader.
-func LoadYAML(filename string, r io.Reader, isComponent bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func LoadYAML(filename string, r io.Reader) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	bytes, err := io.ReadAll(r)
 	if err != nil {
 		return nil, nil, err
 	}
-	return LoadYAMLBytes(filename, bytes, isComponent)
+	return LoadYAMLBytes(filename, bytes)
 }
 
 // LoadYAMLBytes decodes a YAML template from a byte array.
-func LoadYAMLBytes(filename string, source []byte, isComponent bool) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func LoadYAMLBytes(filename string, source []byte) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	var diags syntax.Diagnostics
 
 	syn, sdiags := encoding.DecodeYAML(filename, yaml.NewDecoder(bytes.NewReader(source)), TagDecoder)
@@ -242,9 +242,6 @@ func LoadYAMLBytes(filename string, source []byte, isComponent bool) (*ast.Templ
 	}
 	if t.Configuration.Entries != nil {
 		diags = append(diags, syntax.Warning(nil, "Pulumi.yaml: root-level `configuration` field is deprecated; please use `config` instead.", ""))
-	}
-	if !isComponent && t.Namespace != nil {
-		diags = append(diags, syntax.Error(nil, "Pulumi.yaml: root-level `namespace` field is only supported in components.", ""))
 	}
 
 	return t, diags, nil
@@ -476,6 +473,9 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
 	if len(t.Components.Entries) > 0 {
 		return errors.New("components are only supported in plugins, not in programs")
+	}
+	if t.Namespace != nil {
+		return errors.New("namespace is only supported in component plugins")
 	}
 	r := newRunner(t, loader)
 	r.setIntermediates(ctx.Project(), config, configPropertyMap, false)

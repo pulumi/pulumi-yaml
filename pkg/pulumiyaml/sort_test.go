@@ -126,7 +126,7 @@ func TestSortMultipleDefaultProviders(t *testing.T) {
 	f, err := os.Open(path)
 	require.NoError(t, err)
 	defer f.Close()
-	tmpl, diags, err := LoadYAML(filepath.Base(path), f, false)
+	tmpl, diags, err := LoadYAML(filepath.Base(path), f)
 	requireNoErrors(t, tmpl, diags)
 	assert.NoError(t, err)
 
