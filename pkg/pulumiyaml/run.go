@@ -1,4 +1,4 @@
-// Copyright 2022, Pulumi Corporation.  All rights reserved.
+// Copyright 2022-2025, Pulumi Corporation.  All rights reserved.
 
 package pulumiyaml
 
@@ -87,11 +87,11 @@ func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*
 		template.Name = uncompiledTemplate.Name
 	}
 
-	packages, err := packages.SearchPackageDecls(workingDirectory)
+	sdks, err := packages.SearchPackageDecls(workingDirectory)
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
 	}
-	template.Packages = packages
+	template.Sdks = sdks
 
 	return template, tdiags, err
 }
@@ -137,11 +137,11 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, diags, diags
 	}
 
-	packages, err := packages.SearchPackageDecls(directory)
+	sdks, err := packages.SearchPackageDecls(directory)
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
 	}
-	template.Packages = packages
+	template.Sdks = sdks
 
 	return template, diags, nil
 }
@@ -207,11 +207,11 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		}
 		componentNames[entry.Value.Name.Value] = true
 	}
-	packages, err := packages.SearchPackageDecls(directory)
+	sdks, err := packages.SearchPackageDecls(directory)
 	if err != nil {
 		return nil, nil, err
 	}
-	template.Packages = packages
+	template.Sdks = sdks
 
 	return template, nil, nil
 }
@@ -229,11 +229,11 @@ func LoadFile(path string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		return nil, diags, err
 	}
 
-	packages, err := packages.SearchPackageDecls(filepath.Dir(path))
+	sdks, err := packages.SearchPackageDecls(filepath.Dir(path))
 	if err != nil {
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
 	}
-	template.Packages = packages
+	template.Sdks = sdks
 
 	return template, diags, nil
 }
@@ -450,7 +450,7 @@ func (r *Runner) setDefaultProviders() {
 // Set the runner's package descriptors from the templates package decls.
 func (r *Runner) setPackageDesciptors() error {
 	// Register package refs for all packages we know upfront
-	packageDescriptors, err := packages.ToPackageDescriptors(r.t.GetPackages())
+	packageDescriptors, err := packages.ToPackageDescriptors(r.t.GetSdks())
 	if err != nil {
 		return err
 	}

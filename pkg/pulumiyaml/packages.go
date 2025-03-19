@@ -112,7 +112,7 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 	packageMap := map[string]*packages.PackageDecl{}
 
 	// Iterate over the package declarations
-	for _, pkg := range tmpl.Packages {
+	for _, pkg := range tmpl.Sdks {
 		pkg := pkg
 		name := pkg.Name
 		version := pkg.Version
