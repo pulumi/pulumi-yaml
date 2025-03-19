@@ -122,6 +122,7 @@ func TestComponentParsing(t *testing.T) {
 
 const componentSchemaExample = `
 name: yaml-plugin
+namespace: my-company
 description: A YAML plugin
 runtime: yaml
 components:
@@ -173,6 +174,7 @@ func TestComponentSchemaGeneration(t *testing.T) {
 {
   "name": "yaml-plugin",
   "description": "A YAML plugin",
+  "namespace": "my-company",
   "language": {
     "cshap": {
       "respectSchemaVersion": true
