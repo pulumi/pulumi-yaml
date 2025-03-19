@@ -279,7 +279,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(
 			schema.NewCachedLoader(rpcLoader))
 	} else {
-		loader, err = pulumiyaml.NewPackageLoader(proj.Plugins)
+		loader, err = pulumiyaml.NewPackageLoader(proj.Plugins, proj.GetPackageSpecs())
 		if err != nil {
 			return &pulumirpc.RunResponse{Error: err.Error()}, nil
 		}
@@ -347,7 +347,7 @@ func (host *yamlLanguageHost) RunPlugin(
 
 	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
 	// time RunWithContext returns we should be done with all async work.
-	loader, err := pulumiyaml.NewPackageLoader(nil)
+	loader, err := pulumiyaml.NewPackageLoader(nil, nil)
 	if err != nil {
 		return err
 	}

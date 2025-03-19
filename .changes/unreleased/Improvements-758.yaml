@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Support the packages Pulumi.yaml section in YAML runtime
+time: 2025-03-19T10:03:20.695641+01:00
+custom:
+    PR: "758"
