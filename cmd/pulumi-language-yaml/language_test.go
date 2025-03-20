@@ -180,7 +180,6 @@ var expectedFailures = map[string]string{
 	"l2-failed-create-continue-on-error":    "#725 test failing",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-explicit-parameterized-provider":    "unexpected provider request with no version",
-	"l2-resource-parent-inheritance":        "expected child be able to override inherited protect flag",
 	"l2-component-property-deps":            "Traversal not allowed on function result",
 }
 
