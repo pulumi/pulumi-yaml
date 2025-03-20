@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -222,4 +223,51 @@ func TestAuthoredComponent(t *testing.T) {
 
 	stdout, _ = e.RunCommand("pulumi", "stack", "output", "randomString")
 	require.Len(t, strings.TrimSuffix(stdout, "\n"), 8, fmt.Sprintf("expected %s to have 8 characters", stdout))
+}
+
+func TestRemoteComponent(t *testing.T) {
+	t.Parallel()
+
+	e := ptesting.NewEnvironment(t)
+	defer e.DeleteIfNotFailed()
+
+	e.ImportDirectory(filepath.Join("testdata", "component-consumption-test"))
+
+	e.RunCommand("pulumi", "login", "--cloud-url", e.LocalURL())
+	e.RunCommand("pulumi", "stack", "init", "organization/component-consumption-test/test")
+	e.RunCommand(
+		"pulumi", "package", "add",
+		"github.com/pulumi/component-test-providers/test-provider@b39e20e4e33600e33073ccb2df0ddb46388641dc")
+
+	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
+	assert.Contains(t, stdout, "github.com_pulumi_component-test-providers.git")
+	assert.Equal(t, 1, strings.Count(stdout, "component-test-providers"))
+	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
+
+	stdout, _ = e.RunCommand("pulumi", "plugin", "ls")
+	// Make sure we don't have any extra plugins installed. Regression test for
+	// https://github.com/pulumi/pulumi-yaml/pull/734.
+	assert.Equal(t, 1, strings.Count(stdout, "component-test-providers"))
+
+	stdout, _ = e.RunCommand("pulumi", "stack", "export")
+	fmt.Println(stdout)
+
+	unmarshalled := make(map[string]any)
+	err := json.Unmarshal([]byte(stdout), &unmarshalled)
+	require.NoError(t, err)
+	deployment := unmarshalled["deployment"].(map[string]any)
+	require.NotNil(t, deployment)
+
+	// Make sure the type of the provider is correct.  Regression test for https://github.com/pulumi/pulumi/issues/18877
+	resources := deployment["resources"].([]any)
+	found := false
+	for _, res := range resources {
+		r := res.(map[string]any)
+		//nolint:lll
+		if r["urn"] == "urn:pulumi:test::component-consumption-test::pulumi:providers:tls-self-signed-cert::default_0_0_0_xb39e20e4e33600e33073ccb2df0ddb46388641dc_git_/github.com/pulumi/component-test-providers/test-provider" {
+			found = true
+			require.Equal(t, "pulumi:providers:tls-self-signed-cert", r["type"])
+		}
+	}
+	require.True(t, found)
 }
