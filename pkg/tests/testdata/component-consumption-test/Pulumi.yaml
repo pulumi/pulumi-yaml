@@ -1,0 +1,11 @@
+name: component-consumption-test
+runtime: yaml
+resources:
+  selfSignedCert:
+    type: tls-self-signed-cert:index:SelfSignedCertificate
+    properties:
+      localValidityPeriodHours: 5
+      subject:
+        commonName: test
+      validityPeriodHours: 10
+      dnsName: abc.example.com

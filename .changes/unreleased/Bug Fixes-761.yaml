@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Correct provider type for Git plugins in state
+time: 2025-03-20T17:18:22.95283259+01:00
+custom:
+  PR: "761"
