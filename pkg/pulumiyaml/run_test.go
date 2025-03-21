@@ -145,9 +145,6 @@ func function(token string, inputs, outputs []schema.Property) *schema.Function 
 	}
 }
 
-// Returns a pointer to the given value.
-func ptr[T any](v T) *T { return &v }
-
 func newMockPackageMap() PackageLoader {
 	version := func(tag string) *semver.Version {
 		v := semver.MustParse(tag)
@@ -205,7 +202,7 @@ func newMockPackageMap() PackageLoader {
 							Resource: &schema.Resource{
 								Token: typeName,
 								Aliases: []*schema.Alias{
-									{Type: ptr("test:resource:old-with-alias")},
+									{Type: "test:resource:old-with-alias"},
 								},
 							},
 						}
