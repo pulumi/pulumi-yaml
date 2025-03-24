@@ -70,7 +70,7 @@ build:: ensure
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins get_schemas
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	  ${GO} test -v --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./...
+	  ${GO} test --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./...
 
 # Runs tests with code coverage tracking.
 # Generates a coverage report in the coverage directory.
@@ -81,7 +81,7 @@ test_cover: get_plugins get_schemas
 	@rm -rf coverage && mkdir -p coverage
 	$(eval COVERDIR := $(shell mktemp -d))
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	     ${GO} run ./scripts/gocov -coverdir=$(COVERDIR) -coverpkg=./... -v ./... -- -test.timeout=30m
+	     ${GO} run ./scripts/gocov -coverdir=$(COVERDIR) -coverpkg=./... ./... -- -test.timeout=30m
 	@go tool covdata textfmt -i=$(COVERDIR) -o=coverage/cover.out
 	@go tool covdata percent -i=$(COVERDIR) # also print a console report
 
