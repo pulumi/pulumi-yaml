@@ -1575,9 +1575,9 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		}
 	}
 	for _, alias := range resourceSchema.Aliases {
-		if alias.Type != nil {
+		if alias.Type != "" {
 			opts = append(opts, pulumi.Aliases([]pulumi.Alias{
-				{Type: pulumi.String(*alias.Type)},
+				{Type: pulumi.String(alias.Type)},
 			}))
 		}
 	}
