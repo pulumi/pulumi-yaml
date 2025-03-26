@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: Load tagged plugins correctly
+time: 2025-03-26T12:29:56.327905682+01:00
+custom:
+  PR: "768"

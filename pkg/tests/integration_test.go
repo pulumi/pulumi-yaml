@@ -271,3 +271,36 @@ func TestRemoteComponent(t *testing.T) {
 	}
 	require.True(t, found)
 }
+
+func TestRemoteComponentTagged(t *testing.T) {
+	t.Parallel()
+
+	e := ptesting.NewEnvironment(t)
+	defer e.DeleteIfNotFailed()
+
+	e.ImportDirectory(filepath.Join("testdata", "component-consumption-tagged"))
+
+	e.RunCommand("pulumi", "login", "--cloud-url", e.LocalURL())
+
+	e.RunCommand("pulumi", "stack", "init", "organization/component-consumption-tagged/test")
+	e.Env = []string{"PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=false"}
+	e.RunCommand("pulumi", "install")
+	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
+	// Make sure we have exactly the plugin we expect installed
+	assert.Equal(t, 1, strings.Count(stdout, "github.com_pulumi_pulumi-yaml.git"))
+
+	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
+
+	stdout, _ = e.RunCommand("pulumi", "plugin", "ls")
+	// Make sure random-plugin-component hasn't been installed under that name.
+	fmt.Println(stdout)
+	assert.Equal(t, 0, strings.Count(stdout, "random-plugin-component"))
+
+	stdout, _ = e.RunCommand("pulumi", "stack", "output", "randomPet")
+	// We expect 4 words separated by dashes.
+	require.Equal(t, 4, len(strings.Split(stdout, "-")))
+	require.Equal(t, "test-", stdout[:5])
+
+	stdout, _ = e.RunCommand("pulumi", "stack", "output", "randomString")
+	require.Len(t, strings.TrimSuffix(stdout, "\n"), 8, fmt.Sprintf("expected %s to have 8 characters", stdout))
+}
