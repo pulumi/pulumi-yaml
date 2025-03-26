@@ -1,0 +1,17 @@
+name: component-consumption-tagged
+runtime: yaml
+packages:
+  random-plugin-component: github.com/pulumi/pulumi-yaml/pkg/tests/testdata/component/provider@v1.15.0
+resources:
+  randomPet:
+    type: random-plugin-component:index:randomPetGenerator
+    properties:
+      length: 3
+      prefix: "test"
+  randomString:
+    type: random-plugin-component:index:randomStringGenerator
+    properties:
+      length: 8
+outputs:
+  randomPet: ${randomPet.pet}
+  randomString: ${randomString.string}
