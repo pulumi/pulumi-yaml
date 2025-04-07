@@ -542,6 +542,9 @@ configuration:
   defaultInt:
     type: integer
     default: 42
+  defaultFloatTypeInt:
+    type: integer
+    default: 42.2
 `
 	tmpl := yamlTemplate(t, text)
 	mocks := &testMonitor{}
@@ -554,6 +557,14 @@ configuration:
 		ok := programEvaluator.EvalConfig(runner, configNodeYaml(configNode))
 		require.True(t, ok)
 		require.Equal(t, 42, programEvaluator.config["defaultInt"])
+
+		configNode = tmpl.GetConfig().Entries[1]
+		ok = programEvaluator.EvalConfig(runner, configNodeYaml(configNode))
+		require.True(t, ok)
+		require.Equal(t, poisonMarker{}, programEvaluator.config["defaultFloatTypeInt"])
+		require.True(t, runner.sdiags.HasErrors())
+		require.Equal(t, "<stdin>:7,3-22: type mismatch: default value of type number but type integer was specified; ",
+			runner.sdiags.Error())
 		return nil
 	}, pulumi.WithMocks(testProject, "dev", mocks))
 	require.NoError(t, err)

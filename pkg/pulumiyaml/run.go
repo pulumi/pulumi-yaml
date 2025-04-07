@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1211,7 +1212,7 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 					c.Type.Value, ctypes.ConfigTypes)
 			}
 
-			if t == ctypes.Int && expectedType == ctypes.Number {
+			if t == ctypes.Int && expectedType == ctypes.Number && math.Mod(defaultValue.(float64), 1) == 0.0 {
 				expectedType = ctypes.Int
 				defaultValue = int(defaultValue.(float64))
 			}
