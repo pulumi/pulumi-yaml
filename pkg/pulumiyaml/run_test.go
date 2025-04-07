@@ -533,6 +533,32 @@ configuration:
 	require.True(t, diags.HasErrors())
 }
 
+func TestConfigTypeIntDefault(t *testing.T) {
+	t.Parallel()
+
+	const text = `name: test-yaml
+runtime: yaml
+configuration:
+  defaultInt:
+    type: integer
+    default: 42
+`
+	tmpl := yamlTemplate(t, text)
+	mocks := &testMonitor{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		eCtx := runner.newContext(nil)
+		programEvaluator := &programEvaluator{evalContext: eCtx, pulumiCtx: ctx}
+		configNode := tmpl.GetConfig().Entries[0]
+		ok := programEvaluator.EvalConfig(runner, configNodeYaml(configNode))
+		require.True(t, ok)
+		require.Equal(t, 42, programEvaluator.config["defaultInt"])
+		return nil
+	}, pulumi.WithMocks(testProject, "dev", mocks))
+	require.NoError(t, err)
+}
+
 func TestConfigSecrets(t *testing.T) { //nolint:paralleltest
 	const text = `name: test-yaml
 runtime: yaml

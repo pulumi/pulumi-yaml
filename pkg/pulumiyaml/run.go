@@ -1211,6 +1211,11 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 					c.Type.Value, ctypes.ConfigTypes)
 			}
 
+			if t == ctypes.Int && expectedType == ctypes.Number {
+				expectedType = ctypes.Int
+				defaultValue = int(defaultValue.(float64))
+			}
+
 			// We have both a default value and a explicit type. Make sure they
 			// agree.
 			if ctypes.IsValidType(expectedType) && t != expectedType {
