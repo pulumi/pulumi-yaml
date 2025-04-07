@@ -1192,18 +1192,6 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 		if c.Type == nil && c.Default == nil {
 			return e.errorf(intm.Key, "unable to infer type: either 'default' or 'type' is required")
 		}
-		if c.Default != nil {
-			d, ok := e.evaluateExpr(c.Default)
-			if !ok {
-				return nil, false
-			}
-			var err error
-			expectedType, err = ctypes.TypeValue(d)
-			if err != nil {
-				return e.error(c.Default, err.Error())
-			}
-			defaultValue = d
-		}
 		if c.Type != nil {
 			t, ok := ctypes.Parse(c.Type.Value)
 			if !ok {
@@ -1212,8 +1200,24 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 					c.Type.Value, ctypes.ConfigTypes)
 			}
 
-			if t == ctypes.Int && expectedType == ctypes.Number && math.Mod(defaultValue.(float64), 1) == 0.0 {
-				expectedType = ctypes.Int
+			expectedType = t
+
+		}
+
+		if c.Default != nil {
+			var ok bool
+			defaultValue, ok = e.evaluateExpr(c.Default)
+			if !ok {
+				return nil, false
+			}
+			var err error
+			t, err := ctypes.TypeValue(defaultValue)
+			if err != nil {
+				return e.error(c.Default, err.Error())
+			}
+
+			if expectedType == ctypes.Int && t == ctypes.Number && math.Mod(defaultValue.(float64), 1) == 0.0 {
+				t = ctypes.Int
 				defaultValue = int(defaultValue.(float64))
 			}
 
@@ -1222,12 +1226,12 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 			if ctypes.IsValidType(expectedType) && t != expectedType {
 				return e.errorf(intm.Key,
 					"type mismatch: default value of type %s but type %s was specified",
-					expectedType, t)
+					t, expectedType)
 			}
 
 			expectedType = t
-
 		}
+
 		// A value is considered secret if either it is either marked as secret in
 		// the config section or the configuration section.
 		//
