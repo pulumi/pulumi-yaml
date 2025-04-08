@@ -219,6 +219,8 @@ func TestGenerateProgram(t *testing.T) {
 				l = append(l, tt)
 			case "deferred-outputs":
 				// Reason: Pulumi YAML does not support deferred outputs.
+			case "this-keyword-resource-attr":
+				// Reason: Typescript only test
 			default:
 				l = append(l, tt)
 			}
