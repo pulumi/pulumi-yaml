@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Update pulumi/pulumi to 3.160.0
-time: 2025-04-08T11:35:24.710366+02:00
-custom:
-    PR: "773"
