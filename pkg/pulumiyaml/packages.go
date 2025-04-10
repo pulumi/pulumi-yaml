@@ -236,6 +236,7 @@ func ResolvePkgName(typeString string) string {
 func loadPackage(
 	ctx context.Context, loader PackageLoader,
 	descriptors map[tokens.Package]*schema.PackageDescriptor, typeString string, version *semver.Version,
+	pluginDownloadURL string,
 ) (Package, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
@@ -247,8 +248,9 @@ func loadPackage(
 	if descriptor == nil {
 		// Fall back to just the package name and passed in version if we don't have a descriptor.
 		descriptor = &schema.PackageDescriptor{
-			Name:    packageName,
-			Version: version,
+			Name:        packageName,
+			Version:     version,
+			DownloadURL: pluginDownloadURL,
 		}
 	}
 	if version != nil {
@@ -290,6 +292,7 @@ var helmResourceNames = map[string]struct{}{
 func ResolveResource(ctx context.Context, loader PackageLoader,
 	descriptors map[tokens.Package]*schema.PackageDescriptor,
 	typeString string, version *semver.Version,
+	pluginDownloadURL string,
 ) (Package, ResourceTypeToken, error) {
 	if issue, found := kubernetesResourceNames[typeString]; found {
 		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
@@ -299,8 +302,9 @@ func ResolveResource(ctx context.Context, loader PackageLoader,
 		return nil, "", fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
 	}
 
-	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version)
+	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
 	if err != nil {
+		fmt.Println("here")
 		return nil, "", err
 	}
 
@@ -327,8 +331,9 @@ func ResolveResource(ctx context.Context, loader PackageLoader,
 func ResolveFunction(ctx context.Context, loader PackageLoader,
 	descriptors map[tokens.Package]*schema.PackageDescriptor,
 	typeString string, version *semver.Version,
+	pluginDownloadURL string,
 ) (Package, FunctionTypeToken, error) {
-	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version)
+	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
 	if err != nil {
 		return nil, "", err
 	}

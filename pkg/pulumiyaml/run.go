@@ -1374,7 +1374,12 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		opts = append(opts, pulumi.Version(version.String()))
 	}
 
-	pkg, typ, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version)
+	pluginDownloadURL := ""
+	if v.Options.PluginDownloadURL != nil {
+		pluginDownloadURL = v.Options.PluginDownloadURL.Value
+	}
+	pkg, typ, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version,
+		pluginDownloadURL)
 	if err != nil {
 		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
 		overallOk = false
@@ -2233,7 +2238,11 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			e.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 			return nil, true
 		}
-		_, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version)
+		pluginDownloadURL := ""
+		if t.CallOpts.PluginDownloadURL != nil {
+			pluginDownloadURL = t.CallOpts.PluginDownloadURL.Value
+		}
+		_, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
