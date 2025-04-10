@@ -312,7 +312,11 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err), "")}
 		}
-		pkg, functionName, err := pulumiyaml.ResolveFunction(context.TODO(), imp.loader, imp.packageDescriptors, node.Token.Value, version)
+		pluginDownloadURL := ""
+		if node.CallOpts.PluginDownloadURL != nil {
+			pluginDownloadURL = node.CallOpts.PluginDownloadURL.Value
+		}
+		pkg, functionName, err := pulumiyaml.ResolveFunction(context.TODO(), imp.loader, imp.packageDescriptors, node.Token.Value, version, pluginDownloadURL)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -774,7 +778,11 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		diags.Extend(ast.ExprError(resource.Options.Version, fmt.Sprintf("unable to parse resource %v provider version: %v", name, err), ""))
 		return nil, diags
 	}
-	pkg, token, err := pulumiyaml.ResolveResource(context.TODO(), imp.loader, imp.packageDescriptors, resource.Type.Value, version)
+	pluginDownloadURL := ""
+	if resource.Options.PluginDownloadURL != nil {
+		pluginDownloadURL = resource.Options.PluginDownloadURL.Value
+	}
+	pkg, token, err := pulumiyaml.ResolveResource(context.TODO(), imp.loader, imp.packageDescriptors, resource.Type.Value, version, pluginDownloadURL)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
