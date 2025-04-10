@@ -228,6 +228,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		expr := mustCoerceBoolean(g.expr(opts.Protect))
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("protect"), expr))
 	}
+	if opts.ImportID != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("import"),
+			g.expr(opts.ImportID)))
+	}
 
 	return syn.Object(rOpts...)
 }
