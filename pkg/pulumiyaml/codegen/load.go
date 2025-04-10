@@ -839,7 +839,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
-	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, import, version
+	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, version
 
 	resourceOptions := &model.Block{
 		Type: "options",
@@ -884,6 +884,14 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
 			Value: protectExpr,
+		})
+	}
+	if resource.Options.Import != nil {
+		importExpr, vdiags := imp.importExpr(resource.Options.Import, nil)
+		diags.Extend(vdiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "import",
+			Value: importExpr,
 		})
 	}
 	// latest package settings takes precedence over a set provider/ version/ url
