@@ -283,10 +283,14 @@ func TestRemoteComponentTagged(t *testing.T) {
 
 	e.RunCommand("pulumi", "stack", "init", "organization/component-consumption-tagged/test")
 	e.Env = []string{"PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=false"}
+	e.RunCommand("pulumi", "install")
+	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
+	// Make sure we have exactly the plugin we expect installed
+	assert.Equal(t, 1, strings.Count(stdout, "github.com_pulumi_pulumi-yaml.git"))
 
 	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
 
-	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
+	stdout, _ = e.RunCommand("pulumi", "plugin", "ls")
 	// Make sure random-plugin-component hasn't been installed under that name.
 	assert.Equal(t, 0, strings.Count(stdout, "random-plugin-component"))
 
@@ -311,14 +315,10 @@ func TestPluginDownloadURLUsed(t *testing.T) {
 
 	e.RunCommand("pulumi", "stack", "init", "organization/component-consumption-tagged/test")
 	e.Env = []string{"PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=false"}
-	e.RunCommand("pulumi", "install")
-	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
-	// Make sure we have exactly the plugin we expect installed
-	assert.Equal(t, 1, strings.Count(stdout, "github.com_pulumi_pulumi-yaml.git"))
 
 	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
 
-	stdout, _ = e.RunCommand("pulumi", "plugin", "ls")
+	stdout, _ := e.RunCommand("pulumi", "plugin", "ls")
 	// Make sure random-plugin-component hasn't been installed under that name.
 	fmt.Println(stdout)
 	assert.Equal(t, 0, strings.Count(stdout, "random-plugin-component"))
