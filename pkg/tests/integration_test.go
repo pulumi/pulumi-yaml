@@ -331,3 +331,10 @@ func TestPluginDownloadURLUsed(t *testing.T) {
 	stdout, _ = e.RunCommand("pulumi", "stack", "output", "randomString")
 	require.Len(t, strings.TrimSuffix(stdout, "\n"), 8, fmt.Sprintf("expected %s to have 8 characters", stdout))
 }
+
+//nolint:paralleltest // uses parallel programtest
+func TestResourcePropertiesConfig(t *testing.T) {
+	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		Dir: filepath.Join("testdata", "resource-properties-config"),
+	})
+}

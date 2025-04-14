@@ -1,0 +1,12 @@
+name: resource-secret
+runtime:
+  name: yaml
+configuration:
+  props: {}
+resources:
+  randomPassword:
+    type: random:RandomPassword
+    properties: ${props}
+outputs:
+  superSecret:
+    fn::secret: ${randomPassword}
