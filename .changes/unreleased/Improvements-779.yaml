@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Resource properties can be set together with an object variable
+time: 2025-04-14T19:28:12.052193299+01:00
+custom:
+  PR: "779"
