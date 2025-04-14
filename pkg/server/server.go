@@ -289,7 +289,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(pctx, template, req.GetConfig(), confPropMap, loader)
+		return pulumiyaml.RunTemplate(pctx, template, confPropMap, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())

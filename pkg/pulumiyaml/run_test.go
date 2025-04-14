@@ -2459,7 +2459,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, nil, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }
