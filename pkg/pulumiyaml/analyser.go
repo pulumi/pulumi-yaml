@@ -609,7 +609,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	}
 
 	resourceIsGet := v.Get.Id != nil || len(v.Get.State.Entries) > 0
-	resourceHasProperties := len(v.Properties.Entries) > 0
+	resourceHasProperties := (v.Properties.PropertyMap != nil && len(v.Properties.PropertyMap.Entries) > 0) || v.Properties.Symbol != nil
 
 	if resourceIsGet && resourceHasProperties {
 		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
@@ -624,7 +624,15 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	// 1. They exist, or
 	// 2. The resource doesn't have a `Get` field (catching missing properties)
 	if resourceHasProperties || !resourceIsGet {
-		tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.Entries, hint.Resource.InputProperties)
+		if v.Properties.PropertyMap != nil {
+			tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.PropertyMap.Entries, hint.Resource.InputProperties)
+		} else if v.Properties.Symbol != nil {
+			_, ok := tc.exprs[v.Properties.Symbol]
+			if !ok {
+				ctx.addWarnDiag(v.Properties.Syntax().Syntax().Range(),
+					fmt.Sprintf("internal error: unable to discover type of %s", k), "symbol")
+			}
+		}
 	}
 
 	tc.registerResource(k, node.Value, hint)
@@ -1340,8 +1348,12 @@ func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 		if !e.walk(ctx, v.Type) {
 			return false
 		}
-		if !e.walkPropertyMap(ctx, v.Properties) {
-			return false
+		if v.Properties.PropertyMap != nil {
+			if !e.walkPropertyMap(ctx, *v.Properties.PropertyMap) {
+				return false
+			}
+		} else if v.Properties.Symbol != nil {
+			e.walk(ctx, v.Properties.Symbol)
 		}
 		if !e.walkResourceOptions(ctx, v.Options) {
 			return false

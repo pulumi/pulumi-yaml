@@ -335,6 +335,13 @@ func TestPluginDownloadURLUsed(t *testing.T) {
 //nolint:paralleltest // uses parallel programtest
 func TestResourcePropertiesConfig(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		OrderedConfig: []integration.ConfigValue{
+			{
+				Key:   "props.length",
+				Value: "8",
+				Path:  true,
+			},
+		},
 		Dir: filepath.Join("testdata", "resource-properties-config"),
 	})
 }

@@ -1410,8 +1410,42 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		return poisonMarker{}, false
 	}
 
-	if p, isPoison := readIntoProperties(v.Properties); isPoison {
-		return p, isPoison
+	if v.Properties.PropertyMap != nil {
+		if p, isPoison := readIntoProperties(*v.Properties.PropertyMap); isPoison {
+			return p, isPoison
+		}
+	} else {
+		// Evaluate the properties
+		pm, ok := e.evaluateExpr(v.Properties.Symbol)
+		if !ok {
+			overallOk = false
+		}
+		if p, ok := pm.(poisonMarker); ok {
+			return p, true
+		}
+
+		obj, ok := pm.(map[string]interface{})
+		if !ok {
+			overallOk = false
+			e.addWarnDiag(
+				v.Properties.Syntax().Syntax().Range(),
+				fmt.Sprintf("properties must be a plain object value was %T", pm), "")
+		}
+
+		for key, value := range obj {
+			// check if we need to secret-ify the value
+			secret, err := pkg.IsResourcePropertySecret(typ, key)
+			if err != nil {
+				e.addWarnDiag(
+					kvp.Key.Syntax().Syntax().Range(),
+					fmt.Sprintf("error checking if property %v is secret: %v", kvp.Key.Value, err), "")
+			}
+
+			if secret {
+				value = pulumi.ToSecret(value)
+			}
+			props[key] = value
+		}
 	}
 
 	if v.Options.Parent == nil && parent != nil {
