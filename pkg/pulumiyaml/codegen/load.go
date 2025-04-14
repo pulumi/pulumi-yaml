@@ -564,8 +564,6 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		if !ok {
 			return nil, syntax.Diagnostics{ast.ExprError(config.Type, fmt.Sprintf("unrecognized type '%v' for config variable '%s'", config.Type.Value, name), "")}
 		}
-	} else {
-		typeExpr = "string"
 	}
 
 	configName, ok := imp.configuration[name]
@@ -581,10 +579,14 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	}
 
 	// TODO(pdg): secret configuration -- requires changes in PCL
+	labels := []string{configName.Name}
+	if typeExpr != "" {
+		labels = append(labels, typeExpr)
+	}
 
 	configDef := &model.Block{
 		Type:   "config",
-		Labels: []string{configName.Name, typeExpr},
+		Labels: labels,
 		Body: &model.Body{
 			Items: []model.BodyItem{
 				&model.Attribute{

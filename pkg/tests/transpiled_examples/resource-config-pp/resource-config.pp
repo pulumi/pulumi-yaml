@@ -1,4 +1,4 @@
-config inputs string {
+config inputs {
 	__logicalName = "inputs"
 }
 
