@@ -451,7 +451,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	//
 	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
 	// to r.setDefaultProviders.
-	r.setIntermediates("", nil, nil, true /*force*/)
+	r.setIntermediates("", nil, true /*force*/)
 
 	// do some basic validation of each resource
 	r.validateResources()
@@ -471,7 +471,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, configPropertyMap resource.PropertyMap, loader PackageLoader) error {
 	if len(t.Components.Entries) > 0 {
 		return errors.New("components are only supported in plugins, not in programs")
 	}
@@ -479,7 +479,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 		return errors.New("namespace is only supported in component plugins")
 	}
 	r := newRunner(t, loader)
-	r.setIntermediates(ctx.Project(), config, configPropertyMap, false)
+	r.setIntermediates(ctx.Project(), configPropertyMap, false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
 	}
@@ -1059,7 +1059,7 @@ func getConfNodesFromMap(project string, configPropertyMap resource.PropertyMap)
 //
 // If force is true, set intermediates even if errors were encountered
 // Errors will always be reflected in r.sdiags.
-func (r *Runner) setIntermediates(project string, config map[string]string, configPropertyMap resource.PropertyMap, force bool) {
+func (r *Runner) setIntermediates(project string, configPropertyMap resource.PropertyMap, force bool) {
 	if r.intermediates != nil {
 		return
 	}
@@ -1081,7 +1081,7 @@ func (r *Runner) setIntermediates(project string, config map[string]string, conf
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// Our tests need to set intermediates, even though they don't have runtime config
-	r.setIntermediates("", nil, nil, false)
+	r.setIntermediates("", nil, false)
 
 	cwd, err := os.Getwd()
 	if err != nil {
