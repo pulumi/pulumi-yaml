@@ -1425,26 +1425,54 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		}
 
 		obj, ok := pm.(map[string]interface{})
-		if !ok {
+		if ok {
+			// If it's a simple map then just copy the values in it over
+			for key, value := range obj {
+				// check if we need to secret-ify the value
+				secret, err := pkg.IsResourcePropertySecret(typ, key)
+				if err != nil {
+					e.addWarnDiag(
+						kvp.Key.Syntax().Syntax().Range(),
+						fmt.Sprintf("error checking if property %v is secret: %v", kvp.Key.Value, err), "")
+				}
+
+				if secret {
+					value = pulumi.ToSecret(value)
+				}
+				props[key] = value
+			}
+		} else if output, ok := pm.(pulumi.Output); ok {
+			// Else it's an output, so we need to ApplyT it to get the values and we don't staticly know what
+			// they are so we've got to just set every input the resource says it has.
+			hint := pkg.ResourceTypeHint(typ)
+			for _, prop := range hint.Resource.InputProperties {
+				props[prop.Name] = output.ApplyT(func(v interface{}) (interface{}, error) {
+					obj, ok := v.(map[string]interface{})
+					if !ok {
+						return nil, fmt.Errorf("expected a map but got %T", v)
+					}
+					value := obj[prop.Name]
+
+					// check if we need to secret-ify the value
+					secret, err := pkg.IsResourcePropertySecret(typ, prop.Name)
+					if err != nil {
+						e.addWarnDiag(
+							kvp.Key.Syntax().Syntax().Range(),
+							fmt.Sprintf("error checking if property %v is secret: %v", kvp.Key.Value, err), "")
+					}
+
+					if secret {
+						value = pulumi.ToSecret(value)
+					}
+
+					return value, nil
+				})
+			}
+		} else {
 			overallOk = false
 			e.addWarnDiag(
 				v.Properties.Syntax().Syntax().Range(),
 				fmt.Sprintf("properties must be a plain object value was %T", pm), "")
-		}
-
-		for key, value := range obj {
-			// check if we need to secret-ify the value
-			secret, err := pkg.IsResourcePropertySecret(typ, key)
-			if err != nil {
-				e.addWarnDiag(
-					kvp.Key.Syntax().Syntax().Range(),
-					fmt.Sprintf("error checking if property %v is secret: %v", kvp.Key.Value, err), "")
-			}
-
-			if secret {
-				value = pulumi.ToSecret(value)
-			}
-			props[key] = value
 		}
 	}
 

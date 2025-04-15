@@ -2659,3 +2659,49 @@ outputs:
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }
+
+// TestResourceSecretObjectProperties tests we can use a secret object symbol for all the objects properties.
+func TestResourceSecretObjectProperties(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+config:
+  props: {}
+variables:
+  inputs:
+    fn::secret: ${props}
+resources:
+  my-resource:
+    type: test:resource:type
+    properties: ${inputs}
+outputs:
+  result:
+    fn::secret: ${my-resource}
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, "test:resource:type", args.TypeToken)
+			assert.Equal(t, resource.PropertyMap{
+				"foo": resource.MakeSecret(resource.NewStringProperty("bar")),
+				"bar": resource.MakeSecret(resource.NewNullProperty()),
+			}, args.Inputs)
+			return "", resource.PropertyMap{
+				"foo": resource.NewStringProperty("bar"),
+			}, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		configMap := resource.PropertyMap{
+			"props": resource.NewObjectProperty(resource.PropertyMap{
+				"foo": resource.NewStringProperty("bar"),
+			}),
+		}
+
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	assert.NoError(t, err)
+}
