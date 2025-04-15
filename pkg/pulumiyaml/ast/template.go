@@ -275,7 +275,7 @@ func (d *PropertyMapDecl) parse(name string, node syntax.Node) syntax.Diagnostic
 type PropertyMapOrExprDecl struct {
 	declNode
 
-	Symbol      *SymbolExpr
+	Expr        Expr
 	PropertyMap *PropertyMapDecl
 }
 
@@ -311,32 +311,9 @@ func (d *PropertyMapOrExprDecl) parse(name string, node syntax.Node) syntax.Diag
 		return diags
 	}
 
-	str, ok := node.(*syntax.StringNode)
-	if !ok {
-		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be a symbol or an object", name), "")}
-	}
-
-	interpolate, diags := InterpolateSyntax(str)
-
-	if interpolate != nil {
-		switch len(interpolate.Parts) {
-		case 0:
-			return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be a symbol or an object", name), "")}
-		case 1:
-			switch {
-			case interpolate.Parts[0].Value == nil:
-				return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be a symbol or an object", name), "")}
-			case interpolate.Parts[0].Text == "":
-				d.Symbol = &SymbolExpr{
-					exprNode: expr(node),
-					Property: interpolate.Parts[0].Value,
-				}
-				return diags
-			}
-		}
-	}
-
-	return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be a symbol or an object", name), "")}
+	expr, diags := ParseExpr(node)
+	d.Expr = expr
+	return diags
 }
 
 type ConfigParamDecl struct {

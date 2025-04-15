@@ -1414,9 +1414,9 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		if p, isPoison := readIntoProperties(*v.Properties.PropertyMap); isPoison {
 			return p, isPoison
 		}
-	} else if v.Properties.Symbol != nil {
+	} else if v.Properties.Expr != nil {
 		// Evaluate the properties
-		pm, ok := e.evaluateExpr(v.Properties.Symbol)
+		pm, ok := e.evaluateExpr(v.Properties.Expr)
 		if !ok {
 			overallOk = false
 		}

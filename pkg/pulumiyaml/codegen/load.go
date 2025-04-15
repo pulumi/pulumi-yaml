@@ -816,11 +816,11 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 				Value: v,
 			})
 		}
-	} else if resource.Properties.Symbol != nil {
+	} else if resource.Properties.Expr != nil {
 		// Else write out a literal object that refers to each known property in the resource indexed off the referred to symbol
 		for _, prop := range props.Resource.InputProperties {
 
-			receiver, rdiags := imp.importExpr(resource.Properties.Symbol, nil)
+			receiver, rdiags := imp.importExpr(resource.Properties.Expr, nil)
 			diags.Extend(rdiags...)
 
 			traversal := hcl.Traversal{hcl.TraverseAttr{Name: prop.Name}}

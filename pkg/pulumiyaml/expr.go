@@ -15,8 +15,8 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 		for _, kvp := range r.Properties.PropertyMap.Entries {
 			getExpressionDependencies(&deps, kvp.Value)
 		}
-	} else if r.Properties.Symbol != nil {
-		getExpressionDependencies(&deps, r.Properties.Symbol)
+	} else if r.Properties.Expr != nil {
+		getExpressionDependencies(&deps, r.Properties.Expr)
 	}
 	if r.Options.DependsOn != nil {
 		getExpressionDependencies(&deps, r.Options.DependsOn)

@@ -609,7 +609,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	}
 
 	resourceIsGet := v.Get.Id != nil || len(v.Get.State.Entries) > 0
-	resourceHasProperties := (v.Properties.PropertyMap != nil && len(v.Properties.PropertyMap.Entries) > 0) || v.Properties.Symbol != nil
+	resourceHasProperties := (v.Properties.PropertyMap != nil && len(v.Properties.PropertyMap.Entries) > 0) || v.Properties.Expr != nil
 
 	if resourceIsGet && resourceHasProperties {
 		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
@@ -626,12 +626,12 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	if resourceHasProperties || !resourceIsGet {
 		if v.Properties.PropertyMap != nil {
 			tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.PropertyMap.Entries, hint.Resource.InputProperties)
-		} else if v.Properties.Symbol != nil {
-			_, ok := tc.exprs[v.Properties.Symbol]
-			if !ok {
-				ctx.addWarnDiag(v.Properties.Syntax().Syntax().Range(),
-					fmt.Sprintf("internal error: unable to discover type of %s", k), "symbol")
+		} else if v.Properties.Expr != nil {
+			to := &schema.ObjectType{
+				Token:      typ.String(),
+				Properties: hint.Resource.InputProperties,
 			}
+			tc.assertTypeAssignable(ctx, v.Properties.Expr, to)
 		}
 	}
 
@@ -1352,8 +1352,8 @@ func (e walker) EvalResource(r *Runner, node resourceNode) bool {
 			if !e.walkPropertyMap(ctx, *v.Properties.PropertyMap) {
 				return false
 			}
-		} else if v.Properties.Symbol != nil {
-			e.walk(ctx, v.Properties.Symbol)
+		} else if v.Properties.Expr != nil {
+			e.walk(ctx, v.Properties.Expr)
 		}
 		if !e.walkResourceOptions(ctx, v.Options) {
 			return false
