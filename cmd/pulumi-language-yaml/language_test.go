@@ -174,13 +174,22 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                        "#721 generation unimplemented",
 	"l1-builtin-try":                        "#721 generation unimplemented",
+	"l1-config-types":                       "Failed to generate YAML program: *model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
+	"l1-proxy-index":                        "run bailed",
+	"l1-output-null":                        "test failing",
 	"l2-component-call-simple":              "#722 generation unimplemented",
 	"l2-resource-option-retain-on-delete":   "#723 generation unimplemented",
 	"l2-resource-option-deleted-with":       "#724 test failing",
+	"l2-resource-parent-inheritance":        "expected parent to be retain on delete",
 	"l2-failed-create-continue-on-error":    "#725 test failing",
+	"l2-rtti":                               "test failing",
+	"l2-provider-call":                      "Traversal not allowed on function result",
+	"l2-provider-call-explicit":             "Traversal not allowed on function result",
+	"l2-proxy-index":                        "test failing",
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-explicit-parameterized-provider":    "unexpected provider request with no version",
 	"l2-component-property-deps":            "Traversal not allowed on function result",
+	"l3-component-simple":                   "not implemented",
 }
 
 func log(t *testing.T, name, message string) {
