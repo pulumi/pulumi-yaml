@@ -2631,9 +2631,6 @@ resources:
   my-resource:
     type: test:resource:type
     properties: ${props}
-outputs:
-  result:
-    fn::secret: ${my-resource}
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
@@ -2676,9 +2673,6 @@ resources:
   my-resource:
     type: test:resource:type
     properties: ${inputs}
-outputs:
-  result:
-    fn::secret: ${my-resource}
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
