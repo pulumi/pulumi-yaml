@@ -243,6 +243,8 @@ func (d *PropertyMapDecl) defaultValue() interface{} {
 }
 
 func (d *PropertyMapDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
+	d.syntax = node
+
 	obj, ok := node.(*syntax.ObjectNode)
 	if !ok {
 		return syntax.Diagnostics{syntax.NodeError(node, fmt.Sprintf("%v must be an object", name), "")}
@@ -267,6 +269,50 @@ func (d *PropertyMapDecl) parse(name string, node syntax.Node) syntax.Diagnostic
 	}
 	d.Entries = entries
 
+	return diags
+}
+
+type PropertyMapOrExprDecl struct {
+	declNode
+
+	Expr        Expr
+	PropertyMap *PropertyMapDecl
+}
+
+func (d *PropertyMapOrExprDecl) defaultValue() interface{} {
+	return &PropertyMapOrExprDecl{}
+}
+
+func (d *PropertyMapOrExprDecl) parse(name string, node syntax.Node) syntax.Diagnostics {
+	d.syntax = node
+
+	obj, ok := node.(*syntax.ObjectNode)
+	if ok {
+		var diags syntax.Diagnostics
+
+		entries := make([]PropertyMapEntry, obj.Len())
+		for i := range entries {
+			kvp := obj.Index(i)
+
+			var v Expr
+			vname := fmt.Sprintf("%s.%s", name, kvp.Key.Value())
+			vdiags := parseField(vname, reflect.ValueOf(&v).Elem(), kvp.Value)
+			diags.Extend(vdiags...)
+
+			entries[i] = PropertyMapEntry{
+				syntax: kvp,
+				Key:    StringSyntax(kvp.Key),
+				Value:  v,
+			}
+		}
+		d.PropertyMap = &PropertyMapDecl{}
+		d.PropertyMap.Entries = entries
+
+		return diags
+	}
+
+	expr, diags := ParseExpr(node)
+	d.Expr = expr
 	return diags
 }
 
@@ -419,7 +465,7 @@ type ResourceDecl struct {
 	Type            *StringExpr
 	Name            *StringExpr
 	DefaultProvider *BooleanExpr
-	Properties      PropertyMapDecl
+	Properties      PropertyMapOrExprDecl
 	Options         ResourceOptionsDecl
 	Get             GetResourceDecl
 }
@@ -434,7 +480,7 @@ func (*ResourceDecl) Fields() []string {
 }
 
 func ResourceSyntax(node *syntax.ObjectNode, typ *StringExpr, name *StringExpr, defaultProvider *BooleanExpr,
-	properties PropertyMapDecl, options ResourceOptionsDecl, get GetResourceDecl,
+	properties PropertyMapOrExprDecl, options ResourceOptionsDecl, get GetResourceDecl,
 ) *ResourceDecl {
 	return &ResourceDecl{
 		declNode:        decl(node),
@@ -451,7 +497,7 @@ func Resource(
 	typ *StringExpr,
 	name *StringExpr,
 	defaultProvider *BooleanExpr,
-	properties PropertyMapDecl,
+	properties PropertyMapOrExprDecl,
 	options ResourceOptionsDecl,
 	get GetResourceDecl,
 ) *ResourceDecl {

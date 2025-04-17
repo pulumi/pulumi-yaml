@@ -1,0 +1,10 @@
+name: random
+runtime: yaml
+config:
+  inputs: {}
+resources:
+  randomPassword:
+    type: random:RandomPassword
+    properties: ${inputs}
+outputs:
+  password: ${randomPassword.result}

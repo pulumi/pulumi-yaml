@@ -564,8 +564,6 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		if !ok {
 			return nil, syntax.Diagnostics{ast.ExprError(config.Type, fmt.Sprintf("unrecognized type '%v' for config variable '%s'", config.Type.Value, name), "")}
 		}
-	} else {
-		typeExpr = "string"
 	}
 
 	configName, ok := imp.configuration[name]
@@ -581,10 +579,14 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 	}
 
 	// TODO(pdg): secret configuration -- requires changes in PCL
+	labels := []string{configName.Name}
+	if typeExpr != "" {
+		labels = append(labels, typeExpr)
+	}
 
 	configDef := &model.Block{
 		Type:   "config",
-		Labels: []string{configName.Name, typeExpr},
+		Labels: labels,
 		Body: &model.Body{
 			Items: []model.BodyItem{
 				&model.Attribute{
@@ -803,13 +805,38 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 			hints[input.Name] = input.Type
 		}
 	}
-	for _, kvp := range resource.Properties.Entries {
-		v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
-		diags.Extend(vdiags...)
-		items = append(items, &model.Attribute{
-			Name:  kvp.Key.Value,
-			Value: v,
-		})
+
+	// If the properties are an object expression just copy that
+	if pm := resource.Properties.PropertyMap; pm != nil {
+		for _, kvp := range pm.Entries {
+			v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
+			diags.Extend(vdiags...)
+			items = append(items, &model.Attribute{
+				Name:  kvp.Key.Value,
+				Value: v,
+			})
+		}
+	} else if resource.Properties.Expr != nil {
+		// Else write out a literal object that refers to each known property in the resource indexed off the referred to symbol
+		for _, prop := range props.Resource.InputProperties {
+
+			receiver, rdiags := imp.importExpr(resource.Properties.Expr, nil)
+			diags.Extend(rdiags...)
+
+			traversal := hcl.Traversal{hcl.TraverseAttr{Name: prop.Name}}
+			parts := []model.Traversable{model.DynamicType}
+
+			expr := &model.RelativeTraversalExpression{
+				Source:    receiver,
+				Traversal: traversal,
+				Parts:     parts,
+			}
+
+			items = append(items, &model.Attribute{
+				Name:  prop.Name,
+				Value: expr,
+			})
+		}
 	}
 
 	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, import, version
@@ -1073,8 +1100,10 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 		imp.configuration[kvp.Key.Value] = nil
 	}
 	for _, kvp := range file.Resources.Entries {
-		for _, kvp := range kvp.Value.Properties.Entries {
-			imp.findStackReferences(kvp.Value)
+		if kvp.Value.Properties.PropertyMap != nil {
+			for _, kvp := range kvp.Value.Properties.PropertyMap.Entries {
+				imp.findStackReferences(kvp.Value)
+			}
 		}
 		imp.resources[kvp.Key.Value] = nil
 	}
