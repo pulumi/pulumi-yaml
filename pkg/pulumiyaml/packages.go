@@ -304,7 +304,6 @@ func ResolveResource(ctx context.Context, loader PackageLoader,
 
 	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
 	if err != nil {
-		fmt.Println("here")
 		return nil, "", err
 	}
 
