@@ -1,0 +1,11 @@
+resources:
+  import:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      import: fakeID123
+  notImport:
+    type: simple:Resource
+    properties:
+      value: true
