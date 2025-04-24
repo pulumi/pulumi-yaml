@@ -1,6 +1,0 @@
-component: runtime
-kind: Bug Fixes
-body: Use PluginDownloadURL resource option correctly when loading plugins
-time: 2025-04-10T12:05:41.083752708+02:00
-custom:
-    PR: "776"
