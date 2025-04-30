@@ -1,6 +1,0 @@
-component: codegen
-kind: Improvements
-body: Add import support to resource options
-time: 2025-04-10T15:27:48.923898+09:00
-custom:
-    PR: "775"
