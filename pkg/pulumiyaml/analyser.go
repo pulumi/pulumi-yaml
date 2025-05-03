@@ -891,6 +891,9 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 	if len(accessors) == 0 {
 		return root
 	}
+	if root == schema.AnyType {
+		return schema.AnyType
+	}
 	if root, ok := root.(*schema.UnionType); ok {
 		var possibilities OrderedTypeSet
 		errs := []*notAssignable{}
