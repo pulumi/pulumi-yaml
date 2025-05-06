@@ -21,12 +21,6 @@ func editDistance(a, b string) int {
 		d[0][j] = j
 	}
 
-	min := func(i, j int) int {
-		if i < j {
-			return i
-		}
-		return j
-	}
 	for i := 1; i < len(a)+1; i++ {
 		for j := 1; j < len(b)+1; j++ {
 			var subCost int
