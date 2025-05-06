@@ -516,17 +516,17 @@ func (d *CustomTimeoutsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, delete *StringExpr) *CustomTimeoutsDecl {
+func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del *StringExpr) *CustomTimeoutsDecl {
 	return &CustomTimeoutsDecl{
 		declNode: declNode{syntax: node},
 		Create:   create,
 		Update:   update,
-		Delete:   delete,
+		Delete:   del,
 	}
 }
 
-func CustomTimeouts(create, update, delete *StringExpr) *CustomTimeoutsDecl {
-	return CustomTimeoutsSyntax(nil, create, update, delete)
+func CustomTimeouts(create, update, del *StringExpr) *CustomTimeoutsDecl {
+	return CustomTimeoutsSyntax(nil, create, update, del)
 }
 
 type Template interface {
