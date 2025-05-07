@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Use Go 1.24
-time: 2025-05-06T13:16:41.011989+02:00
-custom:
-    PR: "787"

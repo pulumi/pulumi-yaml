@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Update to golangci-lint 1.64.2
-time: 2025-05-06T13:25:35.941768+02:00
-custom:
-    PR: "788"
