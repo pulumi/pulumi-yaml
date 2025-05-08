@@ -104,7 +104,7 @@ jobs:
           role-session-name: pulumi-yaml@githubActions
           role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
       - name: Install Pulumi CLI
-        uses: pulumi/actions@v6
+        uses: pulumi/actions@df5a93ad715135263c732ba288301bd044c383c0 # v6
         with:
           pulumi-version: dev
       - name: Install Cue
