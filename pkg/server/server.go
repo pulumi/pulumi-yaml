@@ -614,7 +614,9 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 		return nil, err
 	}
 
-	pkg, diags, err := schema.BindSpec(spec, loader)
+	pkg, diags, err := schema.BindSpec(spec, loader, schema.ValidationOptions{
+		AllowDanglingReferences: true,
+	})
 	if err != nil {
 		return nil, err
 	}
