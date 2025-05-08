@@ -43,7 +43,7 @@ func TestGetLangauageTypeString(t *testing.T) {
 		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
-			result := helper.GetLanguageTypeString(nil, "no-mode", tt.inputType, true)
+			result := helper.GetTypeName(nil, tt.inputType, true, "no-mode")
 			assert.Equal(t, tt.expected, result)
 		})
 	}

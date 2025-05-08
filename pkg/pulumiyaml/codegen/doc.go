@@ -21,13 +21,13 @@ func (d DocLanguageHelper) GetEnumName(e *schema.Enum, typeName string) (string,
 }
 
 // There is no way to name types besides resources and invokes in Pulumi YAML.
-func (d DocLanguageHelper) GetMethodResultName(pkg *schema.Package, modName string, r *schema.Resource, m *schema.Method) string {
+func (d DocLanguageHelper) GetMethodResultName(schema.PackageReference, string, *schema.Resource, *schema.Method) string {
 	return ""
 }
 
-func (d DocLanguageHelper) GetLanguageTypeString(pkg *schema.Package, moduleName string, t schema.Type, input bool) string {
+func (d DocLanguageHelper) GetTypeName(pkg schema.PackageReference, t schema.Type, input bool, relativeTo string) string {
 	getType := func(t schema.Type) string {
-		return d.GetLanguageTypeString(pkg, moduleName, t, input)
+		return d.GetTypeName(pkg, t, input, relativeTo)
 	}
 	if schema.IsPrimitiveType(t) {
 		switch t {
