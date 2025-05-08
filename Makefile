@@ -17,14 +17,21 @@ GO                          := go
 
 BUILD_FLAGS ?=
 
+define go_build
+	$(GO) build $(BUILD_FLAGS) -o $1 -p $(CONCURRENCY) -ldflags "-X github.com/pulumi/pulumi-yaml/pkg/version.Version=$(DEV_VERSION)" $2
+endef
+
 # Try to get the dev version using changie, otherwise fall back
 FALLBACK_DEV_VERSION := 1.0.0-dev.0
 DEV_VERSION := $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
 
+_ := $(shell mkdir -p bin)
+_ := $(shell go build -o bin/helpmakego github.com/iwahbe/helpmakego)
+
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
 
-default: ensure build
+default: build
 
 get_plugins::
 	pulumi plugin install resource aws ${PLUGIN_VERSION_AWS}
@@ -44,15 +51,18 @@ update_plugin_docs::
 	./scripts/update_plugin_docs.sh azure-native ${PLUGIN_VERSION_AZURE_NATIVE}
 	./scripts/update_plugin_docs.sh awsx ${PLUGIN_VERSION_AWSX}
 
-install::
-	${GO} install ./cmd/...
+.PHONY: install
+install: install_pulumi-language-yaml install_pulumi-converter-yaml
+
+# Install a binary onto GOPATH
+.PHONY: install_%
+install_%: bin/%
+	cp $< $(or $(shell ${GO} env GOBIN),$(shell ${GO} env GOROOT)/bin)/$*
+
 
 clean::
 	rm -f ./bin/*
 	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random,eks,aws-native,docker}.json
-
-ensure::
-	${GO} mod download
 
 .phony: lint
 lint:: lint-copyright lint-golang
@@ -62,10 +72,14 @@ lint-copyright:
     # Generated examples don't have the copyright notice.
 	pulumictl copyright -x 'pkg/tests/transpiled_examples/**'
 
-build:: ensure
-	mkdir -p ./bin
-	${GO} build $(BUILD_FLAGS) -o ./bin -p ${CONCURRENCY} \
-		-ldflags "-X github.com/pulumi/pulumi-yaml/pkg/version.Version=$(DEV_VERSION)" ./cmd/...
+.PHONY: build
+build: bin/pulumi-language-yaml bin/pulumi-converter-yaml
+
+bin/pulumi-language-yaml: $(shell bin/helpmakego cmd/pulumi-language-yaml)
+	$(call go_build,$@,github.com/pulumi/pulumi-yaml/cmd/pulumi-language-yaml)
+
+bin/pulumi-converter-yaml: $(shell bin/helpmakego cmd/pulumi-converter-yaml)
+	$(call go_build,$@,github.com/pulumi/pulumi-yaml/cmd/pulumi-converter-yaml)
 
 # Ensure that in tests, the language server is accessible
 test:: build get_plugins get_schemas
