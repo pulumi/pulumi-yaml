@@ -26,14 +26,17 @@ FALLBACK_DEV_VERSION := 1.0.0-dev.0
 DEV_VERSION := $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
 
 _ := $(shell mkdir -p bin)
-_ := $(shell go build -o bin/helpmakego github.com/iwahbe/helpmakego)
+
+HELPMAKEGO_VERSION := $(shell cat go.mod | grep 'github.com/iwahbe/helpmakego v' | awk '{ print $$2}')
+HELPMAKEGO := bin/$(HELPMAKEGO_VERSION)/helpmakego
+_ := $(shell if ! [ -x $(HELPMAKEGO) ]; then echo Building helpmakego@$(HELPMAKEGO_VERSION); go build -o $(dir $(HELPMAKEGO)) github.com/iwahbe/helpmakego; fi)
 
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
 
 default: build
 
-get_plugins::
+get_plugins:
 	pulumi plugin install resource aws ${PLUGIN_VERSION_AWS}
 	pulumi plugin install resource random ${PLUGIN_VERSION_RANDOM}
 	pulumi plugin install resource aws-native ${PLUGIN_VERSION_AWS_NATIVE}
@@ -75,10 +78,10 @@ lint-copyright:
 .PHONY: build
 build: bin/pulumi-language-yaml bin/pulumi-converter-yaml
 
-bin/pulumi-language-yaml: $(shell bin/helpmakego cmd/pulumi-language-yaml)
+bin/pulumi-language-yaml: $(shell $(HELPMAKEGO) cmd/pulumi-language-yaml)
 	$(call go_build,$@,github.com/pulumi/pulumi-yaml/cmd/pulumi-language-yaml)
 
-bin/pulumi-converter-yaml: $(shell bin/helpmakego cmd/pulumi-converter-yaml)
+bin/pulumi-converter-yaml: $(shell $(HELPMAKEGO) cmd/pulumi-converter-yaml)
 	$(call go_build,$@,github.com/pulumi/pulumi-yaml/cmd/pulumi-converter-yaml)
 
 # Ensure that in tests, the language server is accessible
