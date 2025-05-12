@@ -60,7 +60,7 @@ install: install_pulumi-language-yaml install_pulumi-converter-yaml
 # Install a binary onto GOPATH
 .PHONY: install_%
 install_%: bin/%
-	cp $< $(or $(shell ${GO} env GOBIN),$(shell ${GO} env GOROOT)/bin)/$*
+	cp $< $(or $(shell ${GO} env GOBIN),$(shell ${GO} env GOPATH)/bin)/$*
 
 
 clean::
