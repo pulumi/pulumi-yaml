@@ -3,6 +3,7 @@
 package codegen
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -32,7 +33,8 @@ func newPluginHost() (plugin.Host, error) {
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
 		Color: cmdutil.GetGlobalColorization(),
 	})
-	pluginCtx, err := plugin.NewContext(sink, sink, nil, nil, cwd, nil, true, nil)
+	ctx := context.Background()
+	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil)
 	if err != nil {
 		return nil, err
 	}

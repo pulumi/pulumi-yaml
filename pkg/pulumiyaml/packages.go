@@ -544,7 +544,8 @@ func newResourcePackageHost(plugins *workspace.Plugins, packages map[string]work
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
 		Color: cmdutil.GetGlobalColorization(),
 	})
-	pluginCtx, err := plugin.NewContextWithRoot(sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil)
+	ctx := context.Background()
+	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil)
 	if err != nil {
 		return nil, err
 	}
