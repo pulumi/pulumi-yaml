@@ -106,20 +106,3 @@ func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*p
 
 	return program, append(yamlDiags, diags...), nil
 }
-
-// ConvertTemplate converts a Pulumi YAML template to a target language using PCL as an intermediate representation.
-//
-// loader is the schema.Loader used when binding the the PCL program. If `nil`, a `schema.Loader` will be created from `newPluginHost()`.
-func ConvertTemplate(template *ast.TemplateDecl, generate GenerateFunc, loader schema.ReferenceLoader) (map[string][]byte, hcl.Diagnostics, error) {
-	program, diags, err := EjectProgram(template, loader)
-	if err != nil {
-		return nil, diags, err
-	}
-	if diags.HasErrors() {
-		return nil, diags, fmt.Errorf("internal error: %w", diags)
-	}
-
-	files, gdiags, err := generate(program)
-	diags = diags.Extend(gdiags)
-	return files, diags, err
-}
