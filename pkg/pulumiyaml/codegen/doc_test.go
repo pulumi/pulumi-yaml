@@ -10,6 +10,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetResourceName(t *testing.T) {
+	t.Parallel()
+
+	var helper DocLanguageHelper
+
+	assert.Equal(t, "pkg:Resource", helper.GetResourceName(&schema.Resource{
+		Token: "pkg:index:Resource",
+	}))
+	assert.Equal(t, "pkg:complex:Token", helper.GetResourceName(&schema.Resource{
+		Token: "pkg:complex:Token",
+	}))
+	assert.Equal(t, "pkg:mod:ResToken", helper.GetResourceName(&schema.Resource{
+		Token: "pkg:mod/resToken:ResToken",
+	}))
+}
+
 func TestGetModuleName(t *testing.T) {
 	t.Parallel()
 

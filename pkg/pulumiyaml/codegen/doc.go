@@ -102,6 +102,10 @@ func (d DocLanguageHelper) GetFunctionName(f *schema.Function) string {
 	return collapseToken(f.Token)
 }
 
+func (d DocLanguageHelper) GetResourceName(r *schema.Resource) string {
+	return collapseToken(r.Token)
+}
+
 func (d DocLanguageHelper) GetResourceFunctionResultName(modName string, f *schema.Function) string {
 	return ""
 }
