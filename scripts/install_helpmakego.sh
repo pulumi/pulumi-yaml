@@ -7,7 +7,5 @@ HELPMAKEGO=bin/${HELPMAKEGO_VERSION}/helpmakego
 
 if ! [ -x ${HELPMAKEGO} ]; then
     echo "Installing helpmakego@${HELPMAKEGO_VERSION}"
-    go install -mod readonly "github.com/iwahbe/helpmakego@${HELPMAKEGO_VERSION}"
-    mkdir -p "bin/${HELPMAKEGO_VERSION}"
-    cp $(go env GOPATH)/bin/helpmakego ${HELPMAKEGO}
+    GOBIN=${PWD}/bin/${HELPMAKEGO_VERSION} go install -mod readonly "github.com/iwahbe/helpmakego@${HELPMAKEGO_VERSION}"
 fi
