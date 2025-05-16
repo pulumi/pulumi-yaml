@@ -25,6 +25,13 @@ func (d DocLanguageHelper) GetMethodResultName(schema.PackageReference, string, 
 	return ""
 }
 
+func (d DocLanguageHelper) GetModuleName(_ schema.PackageReference, modName string) string {
+	if modName == "index" {
+		return ""
+	}
+	return modName
+}
+
 func (d DocLanguageHelper) GetTypeName(pkg schema.PackageReference, t schema.Type, input bool, relativeTo string) string {
 	getType := func(t schema.Type) string {
 		return d.GetTypeName(pkg, t, input, relativeTo)
