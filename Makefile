@@ -25,11 +25,11 @@ endef
 FALLBACK_DEV_VERSION := 1.0.0-dev.0
 DEV_VERSION := $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
 
-_ := $(shell mkdir -p bin)
+HELPMAKEGO_VERSION := v0.2.0
+HELPMAKEGO := bin/${HELPMAKEGO_VERSION}/helpmakego
 
-HELPMAKEGO_VERSION := $(shell cat go.mod | grep 'github.com/iwahbe/helpmakego v' | awk '{ print $$2}')
-HELPMAKEGO := bin/$(HELPMAKEGO_VERSION)/helpmakego
-_ := $(shell if ! [ -x $(HELPMAKEGO) ]; then echo Building helpmakego@$(HELPMAKEGO_VERSION); go build -o $(dir $(HELPMAKEGO)) github.com/iwahbe/helpmakego; fi)
+_ := $(shell mkdir -p bin)
+_ := $(shell ./scripts/install_helpmakego.sh ${HELPMAKEGO_VERSION})
 
 .phony: .EXPORT_ALL_VARIABLES
 .EXPORT_ALL_VARIABLES:
