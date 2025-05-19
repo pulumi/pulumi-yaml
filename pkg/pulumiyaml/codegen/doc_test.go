@@ -10,12 +10,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetModuleName(t *testing.T) {
+	t.Parallel()
+
+	var helper DocLanguageHelper
+
+	assert.Equal(t, "", helper.GetModuleName(nil, "index"))
+	assert.Equal(t, "foo", helper.GetModuleName(nil, "foo"))
+}
+
 func TestActuallDocLanguageHelper(t *testing.T) {
 	t.Parallel()
 	func(codegen.DocLanguageHelper) {}(DocLanguageHelper{})
 }
 
-func TestGetLangauageTypeString(t *testing.T) {
+func TestGetTypeName(t *testing.T) {
 	t.Parallel()
 	helper := DocLanguageHelper{}
 
