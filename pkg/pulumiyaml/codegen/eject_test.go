@@ -10,6 +10,7 @@ import (
 )
 
 func Test_loadProjectFromDir(t *testing.T) {
+	t.Parallel()
 	testPath, err := filepath.Abs("./testdata/simple_project")
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
@@ -20,6 +21,7 @@ func Test_loadProjectFromDir(t *testing.T) {
 }
 
 func Test_loadProjectFromDir_fromSubdirectory(t *testing.T) {
+	t.Parallel()
 	testPath, err := filepath.Abs("./testdata/nested_project/starting_point")
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
@@ -32,6 +34,7 @@ func Test_loadProjectFromDir_fromSubdirectory(t *testing.T) {
 }
 
 func Test_loadProjectFromDir_fromSubdirectoryWithMain(t *testing.T) {
+	t.Parallel()
 	testPath, err := filepath.Abs("./testdata/nested_project_with_main/starting_point")
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
