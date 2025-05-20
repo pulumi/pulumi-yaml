@@ -90,7 +90,6 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 		return nil, nil, nil, fmt.Errorf(
 			"no Pulumi.yaml project file found (searching upwards from %s)", dir)
 	}
-	projectDir := path.Dir(projectPath)
 
 	proj, err := workspace.LoadProject(projectPath)
 	if err != nil {
@@ -99,9 +98,9 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 
 	main := proj.Main
 	if main == "" {
-		main = projectDir
+		main = dir
 	} else {
-		main = path.Join(projectDir, main)
+		main = path.Join(dir, main)
 	}
 
 	var t *ast.TemplateDecl
