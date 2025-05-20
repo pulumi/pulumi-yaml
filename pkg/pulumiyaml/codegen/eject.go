@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 
 	"github.com/hashicorp/hcl/v2"
@@ -82,27 +83,39 @@ func getProjectPath(dir string) (string, error) {
 	return path, nil
 }
 
-func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagnostics, error) {
+func loadProjectFromDir(dir string) (*workspace.Project, string, error) {
+	// walk up the directory to find the project file path i.e. path to Pulumi.yaml
 	projectPath, err := getProjectPath(dir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, "", fmt.Errorf("finding project path %w", err)
 	} else if projectPath == "" {
-		return nil, nil, nil, fmt.Errorf(
+		return nil, "", fmt.Errorf(
 			"no Pulumi.yaml project file found (searching upwards from %s)", dir)
 	}
 
+	// parse project info from its path
 	proj, err := workspace.LoadProject(projectPath)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load Pulumi project located at %q: %w", projectPath, err)
+		return nil, "", fmt.Errorf("failed to load Pulumi project located at %q: %w", projectPath, err)
 	}
 
-	main := proj.Main
-	if main == "" {
-		main = dir
-	} else {
-		main = path.Join(dir, main)
+	// find the working directory of the project (parent of the project file)
+	projectDir := filepath.Dir(projectPath)
+
+	if proj.Main == "" {
+		return proj, projectDir, nil
 	}
 
+	// the project specifies a main directory relative to the project directory itself
+	main := path.Join(projectDir, proj.Main)
+	return proj, main, nil
+}
+
+func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagnostics, error) {
+	proj, main, err := loadProjectFromDir(dir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	var t *ast.TemplateDecl
 	var diags syntax.Diagnostics
 	compilerOpt, useCompiler := proj.Runtime.Options()["compiler"]
