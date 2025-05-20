@@ -11,7 +11,7 @@ import (
 
 func Test_loadProjectFromDir(t *testing.T) {
 	t.Parallel()
-	testPath, err := filepath.Abs("./testdata/simple_project")
+	testPath, err := filepath.Abs(filepath.Join("testdata", "simple_project"))
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
 	require.NoError(t, err, "loading project should work")
@@ -22,11 +22,11 @@ func Test_loadProjectFromDir(t *testing.T) {
 
 func Test_loadProjectFromDir_fromSubdirectory(t *testing.T) {
 	t.Parallel()
-	testPath, err := filepath.Abs("./testdata/nested_project/starting_point")
+	testPath, err := filepath.Abs(filepath.Join("testdata", "nested_project/starting_point"))
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
 	require.NoError(t, err, "loading project should work")
-	expectedPath, err := filepath.Abs("./testdata/nested_project")
+	expectedPath, err := filepath.Abs(filepath.Join("testdata", "nested_project"))
 	require.NoError(t, err, "getting absolute path of test data project")
 	require.Equal(t, expectedPath, main, "the test path is where the project lives")
 	require.NotNil(t, proj)
@@ -35,11 +35,13 @@ func Test_loadProjectFromDir_fromSubdirectory(t *testing.T) {
 
 func Test_loadProjectFromDir_fromSubdirectoryWithMain(t *testing.T) {
 	t.Parallel()
-	testPath, err := filepath.Abs("./testdata/nested_project_with_main/starting_point")
+	testPath, err := filepath.Abs(
+		filepath.Join("testdata", "nested_project_with_main", "starting_point"))
 	require.NoError(t, err, "getting absolute path of test data project")
 	proj, main, err := loadProjectFromDir(testPath)
 	require.NoError(t, err, "loading project should work")
-	expectedPath, err := filepath.Abs("./testdata/nested_project_with_main/actual_project")
+	expectedPath, err := filepath.Abs(
+		filepath.Join("testdata", "nested_project_with_main", "actual_project"))
 	require.NoError(t, err, "getting absolute path of test data project")
 	require.Equal(t, expectedPath, main, "the test path is where the project lives")
 	require.NotNil(t, proj)

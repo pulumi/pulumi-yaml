@@ -5,7 +5,6 @@ package codegen
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 
@@ -107,7 +106,7 @@ func loadProjectFromDir(dir string) (*workspace.Project, string, error) {
 	}
 
 	// the project specifies a main directory relative to the project directory itself
-	main := path.Join(projectDir, proj.Main)
+	main := filepath.Join(projectDir, proj.Main)
 	return proj, main, nil
 }
 
