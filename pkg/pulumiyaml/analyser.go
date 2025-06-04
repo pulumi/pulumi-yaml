@@ -990,6 +990,11 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		case *schema.InvalidType:
 			return &schema.InvalidType{}
 		default:
+			if root == schema.AnyType {
+				// We allow indexing into `any` types, since we don't know what they are.
+				return schema.AnyType
+			}
+
 			return err("", "Index property access is only allowed on Maps and Lists")
 		}
 	default:
