@@ -24,6 +24,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
@@ -233,6 +236,37 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		return &pulumirpc.RunResponse{Error: "failed to load template"}, nil
 	}
 
+	// Translate the string based config map into property values for the rest of the system.
+	confPropMap := resource.PropertyMap{}
+	for k, v := range configValue {
+		var value resource.PropertyValue
+		var jsonValue interface{}
+
+		// scalar config values are represented as their go literals, while arrays and objects
+		// are represented as JSON.
+		if len(v) > 1 && strings.HasPrefix(v, "0") && !strings.HasPrefix(v, "0.") {
+			// If the value starts with 0 or symbol we assume it is a string, not a number. This is to avoid cases like
+			// "01234" in config files being turned into numbers. But just "0" or "0.0" are still valid numbers.
+			value = resource.NewStringProperty(v)
+		} else if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			value = resource.NewNumberProperty(float64(i))
+		} else if b, err := strconv.ParseBool(v); err == nil {
+			value = resource.NewBoolProperty(b)
+		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
+			value = resource.NewNumberProperty(float64(f))
+		} else if err := json.Unmarshal([]byte(v), &jsonValue); err == nil {
+			value = resource.NewPropertyValue(jsonValue)
+		} else {
+			value = resource.NewStringProperty(v)
+		}
+
+		if slices.Contains(req.ConfigSecretKeys, k) {
+			value = resource.MakeSecret(value)
+		}
+
+		confPropMap[resource.PropertyKey(k)] = value
+	}
+
 	// The yaml runtime is stateful and we need to change to the program directory before actually executing
 	// the template.
 	if pwd := req.Info.ProgramDirectory; pwd != "" {
@@ -282,7 +316,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(pctx, template, loader)
+		return pulumiyaml.RunTemplate(pctx, template, confPropMap, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())

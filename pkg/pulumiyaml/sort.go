@@ -8,6 +8,7 @@ import (
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 )
 
 //see: https://github.com/BurntSushi/go-sumtype
@@ -57,6 +58,23 @@ func (e configNodeYaml) value() interface{} {
 	return e.Value
 }
 
+type configNodeProp struct {
+	k string
+	v resource.PropertyValue
+}
+
+func (e configNodeProp) valueKind() string {
+	return "configProp"
+}
+
+func (e configNodeProp) key() *ast.StringExpr {
+	return ast.String(e.k)
+}
+
+func (e configNodeProp) value() interface{} {
+	return e.v.V
+}
+
 type missingNode struct {
 	name *ast.StringExpr
 }
@@ -69,7 +87,7 @@ func (missingNode) valueKind() string {
 	return "missing node"
 }
 
-func topologicallySortedResources(t ast.Template) ([]graphNode, syntax.Diagnostics) {
+func topologicallySortedResources(t ast.Template, externalConfig []configNode) ([]graphNode, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
 
 	var sorted []graphNode        // will hold the sorted vertices.
@@ -106,7 +124,7 @@ func topologicallySortedResources(t ast.Template) ([]graphNode, syntax.Diagnosti
 	for i, kvp := range t.GetConfig().Entries {
 		templateConfig[i] = configNode(configNodeYaml(kvp))
 	}
-	for _, node := range templateConfig {
+	for _, node := range append(templateConfig, externalConfig...) {
 		cname := node.key().Value
 		cdiags := checkUniqueNode(intermediates, node)
 		diags = append(diags, cdiags...)
@@ -272,6 +290,10 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 	}
 
 	if other, found := intermediates[name]; found {
+		// if duplicate key from config/ configuration, do not warn about using configuration again
+		if isConfigNodeProp(node) || isConfigNodeProp(other) {
+			return diags
+		}
 		if node.valueKind() == other.valueKind() {
 			diags.Extend(ast.ExprError(key, fmt.Sprintf("found duplicate %s %s", node.valueKind(), name), ""))
 		} else {
@@ -281,6 +303,11 @@ func checkUniqueNode(intermediates map[string]graphNode, node graphNode) syntax.
 		return diags
 	}
 	return diags
+}
+
+func isConfigNodeProp(n graphNode) bool {
+	_, ok := n.(configNodeProp)
+	return ok
 }
 
 func stripConfigNamespace(n, s string) string {

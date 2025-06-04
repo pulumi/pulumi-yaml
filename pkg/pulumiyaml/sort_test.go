@@ -82,7 +82,8 @@ func TestSortOrdered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	confNodes := []configNode{}
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -109,7 +110,8 @@ func TestSortUnordered(t *testing.T) {
 			},
 		},
 	})
-	resources, diags := topologicallySortedResources(tmpl)
+	confNodes := []configNode{}
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 2)
@@ -128,7 +130,8 @@ func TestSortMultipleDefaultProviders(t *testing.T) {
 	requireNoErrors(t, tmpl, diags)
 	assert.NoError(t, err)
 
-	resources, diags := topologicallySortedResources(tmpl)
+	confNodes := []configNode{}
+	resources, diags := topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 	names := sortedNames(resources)
 	assert.Len(t, names, 4)
@@ -159,7 +162,8 @@ func TestSortErrorCycle(t *testing.T) {
 			},
 		},
 	})
-	_, err := topologicallySortedResources(tmpl)
+	confNodes := []configNode{}
+	_, err := topologicallySortedResources(tmpl, confNodes)
 	assert.Error(t, err)
 }
 

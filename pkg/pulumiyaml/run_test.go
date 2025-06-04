@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
-	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 )
 
@@ -2179,71 +2178,118 @@ resources:
 	assert.NoError(t, err)
 }
 
-func TestGetPulumiConfNodes(t *testing.T) {
+func TestGetConfNodesFromMap(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		input string
-		typ   ctypes.Type
-		value interface{}
-		err   error
+		project     string
+		propertymap resource.PropertyMap
+		expected    []configNode
 	}{
 		{
-			input: "foo",
-			typ:   ctypes.String,
-			value: "foo",
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"str": resource.NewStringProperty("bar"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+			},
 		},
 		{
-			input: "2.0",
-			typ:   ctypes.Number,
-			value: 2.0,
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"num": resource.NewNumberProperty(42),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "num",
+					v: resource.NewNumberProperty(42),
+				},
+			},
 		},
 		{
-			input: "0.1",
-			typ:   ctypes.Number,
-			value: 0.1,
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"bool": resource.NewBoolProperty(true),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "bool",
+					v: resource.NewBoolProperty(true),
+				},
+			},
 		},
 		{
-			input: "0",
-			typ:   ctypes.Int,
-			value: int64(0),
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"array": resource.NewArrayProperty([]resource.PropertyValue{
+					resource.NewStringProperty("foo"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "array",
+					v: resource.NewArrayProperty([]resource.PropertyValue{
+						resource.NewStringProperty("foo"),
+					}),
+				},
+			},
 		},
 		{
-			input: "0123",
-			typ:   ctypes.String,
-			value: "0123", // Leading zeros are preserved in string representation
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"map": resource.NewObjectProperty(resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+				}),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "map",
+					v: resource.NewObjectProperty(resource.PropertyMap{
+						"foo": resource.NewStringProperty("bar"),
+					}),
+				},
+			},
 		},
 		{
-			input: "1",
-			typ:   ctypes.Int,
-			value: int64(1),
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"secret": resource.MakeSecret(resource.NewStringProperty("bar")),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "secret",
+					v: resource.MakeSecret(resource.NewStringProperty("bar")),
+				},
+			},
 		},
 		{
-			input: "true",
-			typ:   ctypes.Boolean,
-			value: true,
-		},
-		{
-			input: `["a", "b", "c"]`,
-			typ:   ctypes.StringList,
-			value: []interface{}{"a", "b", "c"},
-		},
-		{
-			input: `["one", 2]`,
-			err:   fmt.Errorf("heterogeneous typed lists are not allowed: found types string and number"),
+			project: "test-project",
+			propertymap: resource.PropertyMap{
+				"test-project:str": resource.NewStringProperty("bar"),
+				"foo":              resource.NewStringProperty("foo"),
+			},
+			expected: []configNode{
+				configNodeProp{
+					k: "str",
+					v: resource.NewStringProperty("bar"),
+				},
+				configNodeProp{
+					k: "foo",
+					v: resource.NewStringProperty("foo"),
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.project, func(t *testing.T) {
 			t.Parallel()
-			value, typ, err := getConfigNode(tt.input)
-			if tt.err != nil {
-				assert.ErrorContains(t, err, tt.err.Error())
-			} else {
-				assert.Equal(t, tt.typ, typ)
-				assert.Equal(t, tt.value, value)
-			}
+			result := getConfNodesFromMap(tt.project, tt.propertymap)
+			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
@@ -2413,7 +2459,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }
@@ -2574,6 +2620,8 @@ func TestConflictingEnvVarsMultipleDuplicates(t *testing.T) {
 
 // TestResourceObjectProperties tests we can use an object symbol for all the objects properties.
 func TestResourceObjectProperties(t *testing.T) {
+	t.Parallel()
+
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -2597,9 +2645,14 @@ resources:
 			}, nil
 		},
 	}
-	t.Setenv("PULUMI_CONFIG", `{"props": "{\"foo\": \"bar\"}"}`)
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, newMockPackageMap())
+		configMap := resource.PropertyMap{
+			"props": resource.NewObjectProperty(resource.PropertyMap{
+				"foo": resource.NewStringProperty("bar"),
+			}),
+		}
+
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }
@@ -2635,9 +2688,14 @@ resources:
 			}, nil
 		},
 	}
-	t.Setenv("PULUMI_CONFIG", `{"props": "{\"foo\": \"bar\"}"}`)
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, newMockPackageMap())
+		configMap := resource.PropertyMap{
+			"props": resource.NewObjectProperty(resource.PropertyMap{
+				"foo": resource.NewStringProperty("bar"),
+			}),
+		}
+
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }

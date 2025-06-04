@@ -1122,6 +1122,11 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 				typCurrent = ctype.Schema()
 			}
 		}
+	case configNodeProp:
+		ctype, ok := ctypes.Parse(n.v.TypeString())
+		if ok {
+			typCurrent = ctype.Schema()
+		}
 	}
 
 	typCurrent = &schema.InputType{ElementType: typCurrent}

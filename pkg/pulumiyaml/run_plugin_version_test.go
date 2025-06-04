@@ -165,7 +165,8 @@ outputs:
 	})
 	wantPlugins.Equal(t, gotPlugins)
 
-	_, diags = topologicallySortedResources(tmpl)
+	confNodes := []configNode{}
+	_, diags = topologicallySortedResources(tmpl, confNodes)
 	requireNoErrors(t, tmpl, diags)
 }
 

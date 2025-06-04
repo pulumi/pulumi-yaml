@@ -135,7 +135,7 @@ func Parse(s string) (Type, bool) {
 	switch s {
 	case "string":
 		return String, true
-	case "boolean":
+	case "bool", "boolean":
 		return Boolean, true
 	case "number":
 		return Number, true
