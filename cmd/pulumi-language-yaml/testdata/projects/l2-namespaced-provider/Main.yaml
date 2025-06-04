@@ -1,10 +1,5 @@
 resources:
-  componentRes:
-    type: component:ComponentCustomRefOutput
-    properties:
-      value: foo-bar-baz
   res:
     type: namespaced:Resource
     properties:
       value: true
-      resourceRef: ${componentRes.ref}
