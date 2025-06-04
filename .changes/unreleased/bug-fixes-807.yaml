@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Use self-driven type casting for config rather than relying on the engine
+time: 2025-06-04T08:16:36.783553+01:00
+custom:
+    PR: "807"
