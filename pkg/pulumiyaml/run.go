@@ -451,7 +451,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	//
 	// r.setDefaultProviders uses r.setIntermediates, so this line need to precede calls
 	// to r.setDefaultProviders.
-	r.setIntermediates(nil, true /*force*/)
+	r.setIntermediates(true /*force*/)
 
 	// do some basic validation of each resource
 	r.validateResources()
@@ -471,7 +471,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 }
 
 // RunTemplate runs the programEvaluator against a template using the given request/settings.
-func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]string, loader PackageLoader) error {
+func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, loader PackageLoader) error {
 	if len(t.Components.Entries) > 0 {
 		return errors.New("components are only supported in plugins, not in programs")
 	}
@@ -479,7 +479,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, config map[string]str
 		return errors.New("namespace is only supported in component plugins")
 	}
 	r := newRunner(t, loader)
-	r.setIntermediates(config, false)
+	r.setIntermediates(false)
 	if r.sdiags.HasErrors() {
 		return &r.sdiags
 	}
@@ -1040,49 +1040,19 @@ func (r *Runner) Evaluate(ctx *pulumi.Context) syntax.Diagnostics {
 	})
 }
 
-func getPulumiConfNodes(config map[string]string) ([]configNode, error) {
-	nodes := make([]configNode, len(config))
-	var errors multierror.Error
-	idx := 0
-	for k, v := range config {
-		// We default types to strings to avoid error cascades on mis-typed values.
-		typ := ctypes.String
-		var value interface{} = v
-		if v, t, err := getConfigNode(v); err == nil {
-			typ = t
-			value = v
-		} else {
-			errors.Errors = append(errors.Errors, err)
-		}
-		n := configNodeEnv{
-			Key:   k,
-			Value: value,
-			Type:  typ,
-		}
-		nodes[idx] = n
-		idx++
-	}
-	return nodes, errors.ErrorOrNil()
-}
-
 // setIntermediates is called for convert and runtime evaluation
 //
 // If force is true, set intermediates even if errors were encountered
 // Errors will always be reflected in r.sdiags.
-func (r *Runner) setIntermediates(config map[string]string, force bool) {
+func (r *Runner) setIntermediates(force bool) {
 	if r.intermediates != nil {
 		return
 	}
 
 	r.intermediates = []graphNode{}
-	confNodes, err := getPulumiConfNodes(config)
-	if err != nil && !force {
-		r.sdiags.Extend(syntax.Error(nil, err.Error(), ""))
-		return
-	}
 
 	// Topologically sort the intermediates based on implicit and explicit dependencies
-	intermediates, rdiags := topologicallySortedResources(r.t, confNodes)
+	intermediates, rdiags := topologicallySortedResources(r.t)
 	r.sdiags.Extend(rdiags...)
 	if rdiags.HasErrors() && !force {
 		return
@@ -1095,7 +1065,7 @@ func (r *Runner) setIntermediates(config map[string]string, force bool) {
 // ensureSetup is called at runtime evaluation
 func (r *Runner) ensureSetup(ctx *pulumi.Context) {
 	// Our tests need to set intermediates, even though they don't have runtime config
-	r.setIntermediates(nil, false)
+	r.setIntermediates(false)
 
 	cwd, err := os.Getwd()
 	if err != nil {

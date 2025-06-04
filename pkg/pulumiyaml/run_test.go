@@ -2413,7 +2413,7 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, newMockPackageMap())
+		return RunTemplate(ctx, template, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.ErrorContains(t, err, `Required field 'type' is missing on resource "my-resource"`)
 }
@@ -2574,8 +2574,6 @@ func TestConflictingEnvVarsMultipleDuplicates(t *testing.T) {
 
 // TestResourceObjectProperties tests we can use an object symbol for all the objects properties.
 func TestResourceObjectProperties(t *testing.T) {
-	t.Parallel()
-
 	const text = `
 name: test-yaml
 runtime: yaml
@@ -2599,12 +2597,9 @@ resources:
 			}, nil
 		},
 	}
+	t.Setenv("PULUMI_CONFIG", `{"props": "{\"foo\": \"bar\"}"}`)
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		config := map[string]string{
-			"props": `{"foo": "bar"}`,
-		}
-
-		return RunTemplate(ctx, template, config, newMockPackageMap())
+		return RunTemplate(ctx, template, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }
@@ -2640,12 +2635,9 @@ resources:
 			}, nil
 		},
 	}
+	t.Setenv("PULUMI_CONFIG", `{"props": "{\"foo\": \"bar\"}"}`)
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		config := map[string]string{
-			"props": `{"foo": "bar"}`,
-		}
-
-		return RunTemplate(ctx, template, config, newMockPackageMap())
+		return RunTemplate(ctx, template, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }

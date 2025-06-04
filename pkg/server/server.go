@@ -279,18 +279,10 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	}
 	defer loader.Close()
 
-	conf := make(map[string]string, len(req.GetConfig()))
-	// Strip the project prefix
-	projPrefix := pctx.Project() + ":"
-	for k, v := range req.GetConfig() {
-		k = strings.TrimPrefix(k, projPrefix)
-		conf[k] = v
-	}
-
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
 	if err := pulumi.RunWithContext(pctx, func(ctx *pulumi.Context) error {
 		// Now "evaluate" the template.
-		return pulumiyaml.RunTemplate(pctx, template, conf, loader)
+		return pulumiyaml.RunTemplate(pctx, template, loader)
 	}); err != nil {
 		if diags, ok := pulumiyaml.HasDiagnostics(err); ok {
 			err := diagWriter.WriteDiagnostics(diags.Unshown().HCL())
