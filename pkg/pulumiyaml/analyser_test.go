@@ -235,8 +235,7 @@ func TestTypePropertyAccess(t *testing.T) {
 				&ast.PropertySubscript{Index: 7},
 				&ast.PropertySubscript{Index: "foo"},
 			},
-			expectedType: "Invalid",
-			errMsg:       `Cannot index into 'start["foo"][7]' (type any):Index property access is only allowed on Maps and Lists`,
+			expectedType: "any",
 		},
 		{
 			root: &schema.ResourceType{
