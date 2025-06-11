@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Allow indexing into `any` types
-time: 2025-06-04T21:49:39.709481+01:00
-custom:
-    PR: "809"
