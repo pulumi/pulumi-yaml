@@ -369,6 +369,8 @@ func TestConfigCompatibility(t *testing.T) {
 }
 
 func TestNonStringKeyInObjectReturnsError(t *testing.T) {
+	t.Parallel()
+
 	tc := typeCache{
 		exprs: make(map[ast.Expr]schema.Type),
 	}
