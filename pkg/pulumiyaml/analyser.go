@@ -1052,7 +1052,16 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		properties := make([]*schema.Property, 0, len(t.Entries))
 		propNames := make([]string, 0, len(t.Entries))
 		for _, entry := range t.Entries {
-			k, v := entry.Key.(*ast.StringExpr), entry.Value
+			k, ok := entry.Key.(*ast.StringExpr)
+			if !ok {
+				tc.exprs[t] = &schema.InvalidType{
+					Diagnostics: []*hcl.Diagnostic{
+						{Summary: fmt.Sprintf("Object key must be a string, got %T", entry.Key)},
+					},
+				}
+				return true
+			}
+			v := entry.Value
 			properties = append(properties, &schema.Property{
 				Name: k.Value,
 				Type: tc.exprs[v],
