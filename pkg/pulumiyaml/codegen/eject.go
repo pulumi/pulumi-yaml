@@ -55,7 +55,7 @@ func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.
 	}
 
 	program, pdiags, err := EjectProgram(template, loader)
-	if len(diags) != 0 {
+	if len(pdiags) != 0 {
 		err := diagWriter.WriteDiagnostics(pdiags)
 		if err != nil {
 			return nil, nil, err
