@@ -367,3 +367,22 @@ func TestConfigCompatibility(t *testing.T) {
 		})
 	}
 }
+
+func TestNonStringKeyInObjectReturnsError(t *testing.T) {
+	t.Parallel()
+
+	tc := typeCache{
+		exprs: make(map[ast.Expr]schema.Type),
+	}
+	expr := &ast.ObjectExpr{
+		Entries: []ast.ObjectProperty{
+			{
+				Key: &ast.BooleanExpr{},
+			},
+		},
+	}
+	_ = tc.typeExpr(nil, expr)
+	require.Equal(t, 1, len(tc.exprs))
+	require.Equal(t, "Object key must be a string, got *ast.BooleanExpr",
+		tc.exprs[expr].(*schema.InvalidType).Diagnostics[0].Summary)
+}
