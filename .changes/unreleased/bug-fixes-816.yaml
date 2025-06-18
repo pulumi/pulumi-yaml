@@ -1,6 +1,0 @@
-component: runtime
-kind: bug-fixes
-body: Give a better error message when an object key is not a string, instead of panic'ing
-time: 2025-06-12T13:47:56.507610885+02:00
-custom:
-    PR: "816"
