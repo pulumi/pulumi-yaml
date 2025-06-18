@@ -1,6 +1,0 @@
-component: convert
-kind: bug-fixes
-body: Show diagnostics properly when generating the program fails
-time: 2025-06-13T15:48:33.376399634+02:00
-custom:
-    PR: "820"
