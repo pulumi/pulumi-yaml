@@ -15,6 +15,7 @@ kinds:
 fragmentFileFormat: '{{.Kind}}-{{.Custom.PR}}'
 components:
  - codegen
+ - docs
  - runtime
  - convert
 changeFormat: '- [{{.Component}}] {{.Body}} [#{{.Custom.PR}}](https://github.com/pulumi/pulumi-yaml/pull/{{.Custom.PR}})'
