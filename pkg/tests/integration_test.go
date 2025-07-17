@@ -62,7 +62,7 @@ func TestInvalidResourceObject(t *testing.T) {
 func TestMismatchedConfigType(t *testing.T) {
 	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
-			assert.Regexp(t, `config key "foo" cannot have conflicting types boolean, number`, stderr)
+			assert.Regexp(t, `found duplicate config foo`, stderr)
 		},
 	})
 }
@@ -77,6 +77,11 @@ func TestProjectConfigRef(t *testing.T) {
 				`resource, variable, or config value "project-config-ref:foo" not found`))
 		},
 	})
+}
+
+//nolint:paralleltest // uses parallel programtest
+func TestConfigSectionIsUsed(t *testing.T) {
+	testWrapper(t, integrationDir("config-section-is-used"))
 }
 
 //nolint:paralleltest // uses parallel programtest
