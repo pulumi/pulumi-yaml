@@ -62,7 +62,7 @@ func TestInvalidResourceObject(t *testing.T) {
 func TestMismatchedConfigType(t *testing.T) {
 	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
-			assert.Regexp(t, `found duplicate config foo`, stderr)
+			assert.Regexp(t, `config key "foo" cannot have conflicting types boolean, number`, stderr)
 		},
 	})
 }
