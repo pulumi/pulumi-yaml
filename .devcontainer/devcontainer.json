@@ -1,0 +1,21 @@
+{
+  "name": "Pulumi YAML",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "golang.go",
+        "ms-vscode.vscode-go"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  },
+  "postCreateCommand": "mise trust && mise install",
+  "remoteUser": "vscode"
+}
