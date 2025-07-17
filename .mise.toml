@@ -10,5 +10,6 @@ changie = "latest"
 go = "latest"
 golangci-lint = "1.64.2"
 jq = "latest"
+"ubi:pulumi/pulumictl" = "latest"
 
 [plugins]
