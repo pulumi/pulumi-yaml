@@ -694,8 +694,11 @@ func (d *TemplateDecl) GetConfig() ConfigMapDecl {
 	if d == nil {
 		return ConfigMapDecl{}
 	}
-	// TODO: merge config and configuration (?)
-	return d.Configuration
+
+	merged := ConfigMapDecl{}
+	merged.Entries = append(merged.Entries, d.Config.Entries...)
+	merged.Entries = append(merged.Entries, d.Configuration.Entries...)
+	return merged
 }
 
 func (d *TemplateDecl) GetVariables() VariablesMapDecl {
