@@ -769,6 +769,7 @@ func (d *TemplateDecl) Merge(other *TemplateDecl) error {
 		return fmt.Errorf("cannot merge templates with different namespaces")
 	}
 	d.Config.Entries = append(d.Config.Entries, other.Config.Entries...)
+	d.Configuration.Entries = append(d.Configuration.Entries, other.Configuration.Entries...)
 	d.Components.Entries = append(d.Components.Entries, other.Components.Entries...)
 	return nil
 }
