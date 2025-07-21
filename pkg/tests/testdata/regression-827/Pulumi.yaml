@@ -1,0 +1,11 @@
+name: yaml-regression-827
+runtime:
+  name: yaml
+config:
+  myValue:
+    type: string
+variables:
+  computedValue: ${myValue}-suffix
+outputs:
+  result:
+    value: ${computedValue}
