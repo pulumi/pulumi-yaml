@@ -1,0 +1,5 @@
+name: yaml-regression-827
+runtime: go
+config:
+  myValue:
+    type: string
