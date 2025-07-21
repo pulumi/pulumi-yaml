@@ -550,12 +550,12 @@ configuration:
 		runner := newRunner(tmpl, newMockPackageMap())
 		eCtx := runner.newContext(nil)
 		programEvaluator := &programEvaluator{evalContext: eCtx, pulumiCtx: ctx}
-		configNode := tmpl.GetConfig().Entries[0]
+		configNode := tmpl.GetConfiguration().Entries[0]
 		ok := programEvaluator.EvalConfig(runner, configNodeYaml(configNode))
 		require.True(t, ok)
 		require.Equal(t, 42, programEvaluator.config["defaultInt"])
 
-		configNode = tmpl.GetConfig().Entries[1]
+		configNode = tmpl.GetConfiguration().Entries[1]
 		ok = programEvaluator.EvalConfig(runner, configNodeYaml(configNode))
 		require.True(t, ok)
 		require.Equal(t, poisonMarker{}, programEvaluator.config["defaultFloatTypeInt"])
