@@ -1,0 +1,13 @@
+resources:
+  prov:
+    type: pulumi:providers:goodbye
+    properties:
+      text: World
+  # The resource name is based on the parameter value
+  res:
+    type: goodbye:Goodbye
+    options:
+      provider: ${prov}
+outputs:
+  # The resource name is based on the parameter value and the provider config
+  parameterValue: ${res.parameterValue}

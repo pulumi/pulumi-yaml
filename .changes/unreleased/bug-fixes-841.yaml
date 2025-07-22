@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Fix registering explicit providers for parameterised packages
+time: 2025-07-22T16:05:13.043858475+01:00
+custom:
+    PR: "841"
