@@ -65,7 +65,6 @@ func TestGetTypeName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
 			result := helper.GetTypeName(nil, tt.inputType, true, "no-mode")

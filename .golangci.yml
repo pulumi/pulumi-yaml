@@ -15,6 +15,7 @@ linters:
     - unconvert
     - unused
     - paralleltest
+    - copyloopvar
 
 linters-settings:
   nakedret:

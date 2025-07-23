@@ -22,7 +22,6 @@ func TestParse(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		c := c
 		t.Run(c.input, func(t *testing.T) {
 			t.Parallel()
 			output, ok := Parse(c.input)
@@ -56,7 +55,6 @@ func TestTypeValue(t *testing.T) {
 	}
 	//nolint:paralleltest // false positive that the "c" var isn't used, it is used via "c.input"
 	for _, c := range cases {
-		c := c
 		t.Run(fmt.Sprintf("%v", c.input), func(t *testing.T) {
 			t.Parallel()
 			typ, err := TypeValue(c.input)

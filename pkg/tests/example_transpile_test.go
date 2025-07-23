@@ -81,7 +81,6 @@ func TestGenerateExamples(t *testing.T) {
 	require.NoError(t, err)
 	//nolint:paralleltest // not directly using the loop variable, but instead using dir.Name() in subtests
 	for _, dir := range examples {
-		dir := dir
 
 		exampleProjectDir := filepath.Join(examplesPath, dir.Name())
 

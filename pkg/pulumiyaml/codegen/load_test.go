@@ -174,7 +174,6 @@ resource provider "pulumi:providers:aws" {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			decl, diags, err := pulumiyaml.LoadYAML(tt.name+".yaml", strings.NewReader(tt.input))
@@ -196,6 +195,5 @@ resource provider "pulumi:providers:aws" {
 				assert.Equal(t, tt.diagErrors, diagErrors)
 			}
 		})
-
 	}
 }
