@@ -39,7 +39,7 @@ type componentProvider struct {
 func (p *componentProvider) GetPluginInfo(context.Context, *emptypb.Empty) (*pulumirpc.PluginInfo, error) {
 	// We fill in the version on the engine side for components.
 	return &pulumirpc.PluginInfo{
-		Version: "",
+		Version: "0.0.0",
 	}, nil
 }
 

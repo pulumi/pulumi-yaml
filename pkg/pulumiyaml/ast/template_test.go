@@ -175,6 +175,7 @@ func TestComponentSchemaGeneration(t *testing.T) {
   "name": "yaml-plugin",
   "description": "A YAML plugin",
   "namespace": "my-company",
+  "version": "0.0.0",
   "language": {
     "cshap": {
       "respectSchemaVersion": true
