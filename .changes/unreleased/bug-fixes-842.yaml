@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Always set a version for component schemas for `package add`
+time: 2025-07-23T10:52:03.349537+01:00
+custom:
+    PR: "842"
