@@ -1758,7 +1758,13 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 			opts...)
 	} else {
 		typ := tokens.Type(typ)
-		packageRef := e.packageRefs[typ.Package()]
+
+		pkg := typ.Package()
+		if typ.Module() == "pulumi:providers" {
+			// This is a provider resource, so the package is actually the name in the token, not the package.
+			pkg = tokens.Package(typ.Name())
+		}
+		packageRef := e.packageRefs[pkg]
 		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
 	}
 	if err != nil {
