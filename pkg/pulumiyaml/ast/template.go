@@ -813,6 +813,7 @@ func (d *TemplateDecl) GenerateSchema() (schema.PackageSpec, error) {
 	schemaDef := schema.PackageSpec{
 		Name:        d.Name.Value,
 		Description: description,
+		Version:     "0.0.0",
 		Namespace:   namespace,
 		Language: map[string]schema.RawMessage{
 			"nodejs": schema.RawMessage(`{"respectSchemaVersion": true}`),
