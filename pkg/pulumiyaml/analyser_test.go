@@ -187,7 +187,6 @@ func TestTypeError(t *testing.T) {
 
 	for i, c := range cases { //nolint:paralleltest
 		// false positive. The parallel call is below
-		c := c
 
 		name := c.message
 		if name == "" {
@@ -293,7 +292,6 @@ func TestTypePropertyAccess(t *testing.T) {
 	for _, c := range cases { //nolint:paralleltest
 		// false positive. The parallel call is below
 
-		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 			var actualMsg string
@@ -359,7 +357,6 @@ func TestConfigCompatibility(t *testing.T) {
 	for _, c := range cases { //nolint:paralleltest
 		// false positive. The parallel call is below
 
-		c := c
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
 			ok := isTypeCompatible(c.typeA, c.typeB, c.valB)

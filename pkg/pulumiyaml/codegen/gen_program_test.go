@@ -367,7 +367,6 @@ func TestEscapedString(t *testing.T) {
 		{`"goo\\"bar"`, false, `"goo\\\"bar"`},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
@@ -395,7 +394,6 @@ func TestCollapseToken(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.expected, collapseToken(tt.input))

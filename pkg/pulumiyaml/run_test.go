@@ -115,7 +115,6 @@ func (m MockPackage) Version() *semver.Version {
 func inputProperties(token string, props ...schema.Property) *schema.ResourceType {
 	p := make([]*schema.Property, 0, len(props))
 	for _, prop := range props {
-		prop := prop
 		p = append(p, &prop)
 	}
 	return &schema.ResourceType{
@@ -131,11 +130,9 @@ func function(token string, inputs, outputs []schema.Property) *schema.Function 
 	pIn := make([]*schema.Property, 0, len(inputs))
 	pOut := make([]*schema.Property, 0, len(outputs))
 	for _, prop := range inputs {
-		prop := prop
 		pIn = append(pIn, &prop)
 	}
 	for _, prop := range outputs {
-		prop := prop
 		pOut = append(pOut, &prop)
 	}
 	return &schema.Function{
@@ -996,7 +993,6 @@ func TestSplit(t *testing.T) {
 	}
 	//nolint:paralleltest // false positive that the "tt" var isn't used, it is via "tt.expected"
 	for _, tt := range tests {
-		tt := tt
 		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
 			t.Parallel()
 
@@ -1097,7 +1093,6 @@ func TestToJSON(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
 
@@ -1217,7 +1212,6 @@ func TestSelect(t *testing.T) {
 	}
 	//nolint:paralleltest // false positive that the "dir" var isn't used, it is via idx
 	for idx, tt := range tests {
-		tt := tt
 		if idx != 4 {
 			continue
 		}
@@ -1368,7 +1362,6 @@ func TestFromBase64ErrorOnInvalidUTF8(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1474,7 +1467,6 @@ func TestFromBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
 
@@ -1549,7 +1541,6 @@ func TestToBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
 
@@ -2285,7 +2276,6 @@ func TestGetConfNodesFromMap(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.project, func(t *testing.T) {
 			t.Parallel()
 			result := getConfNodesFromMap(tt.project, tt.propertymap)
