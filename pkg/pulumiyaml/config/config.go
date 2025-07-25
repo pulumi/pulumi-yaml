@@ -58,14 +58,16 @@ func (t typ) Pcl() model.Type {
 }
 
 var (
-	String      Type = typ{schema.StringType}
-	StringList       = typ{&schema.ArrayType{ElementType: schema.StringType}}
-	Number           = typ{schema.NumberType}
-	NumberList       = typ{&schema.ArrayType{ElementType: schema.NumberType}}
-	Boolean          = typ{schema.BoolType}
-	BooleanList      = typ{&schema.ArrayType{ElementType: schema.NumberType}}
-	Int              = typ{schema.IntType}
-	IntList          = typ{&schema.ArrayType{ElementType: schema.IntType}}
+	String      = typ{schema.StringType}
+	StringList  = typ{&schema.ArrayType{ElementType: schema.StringType}}
+	Number      = typ{schema.NumberType}
+	NumberList  = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	Boolean     = typ{schema.BoolType}
+	BooleanList = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	Int         = typ{schema.IntType}
+	IntList     = typ{&schema.ArrayType{ElementType: schema.IntType}}
+	Object      = typ{&schema.MapType{ElementType: schema.AnyType}}
+	ObjectList  = typ{&schema.ArrayType{ElementType: &schema.MapType{ElementType: schema.AnyType}}}
 )
 
 type Types []Type
@@ -75,6 +77,7 @@ var Primitives = Types{
 	Number,
 	Int,
 	Boolean,
+	Object,
 }
 
 var ConfigTypes = Types{
@@ -86,6 +89,8 @@ var ConfigTypes = Types{
 	IntList,
 	Boolean,
 	BooleanList,
+	Object,
+	ObjectList,
 }
 
 func newList(c Type) typ {
@@ -99,6 +104,8 @@ func newList(c Type) typ {
 		return IntList
 	case Boolean:
 		return BooleanList
+	case Object:
+		return ObjectList
 	default:
 		return typ{&schema.ArrayType{ElementType: c.(typ).inner}}
 	}
@@ -141,6 +148,8 @@ func Parse(s string) (Type, bool) {
 		return Number, true
 	case "int", "integer":
 		return Int, true
+	case "object":
+		return Object, true
 	default:
 		return nil, false
 	}
@@ -203,6 +212,8 @@ func TypeValue(v interface{}) (Type, error) {
 		return Int, nil
 	case bool:
 		return Boolean, nil
+	case map[string]interface{}:
+		return Object, nil
 	case []interface{}:
 		var expected Type
 		if len(v) == 0 {
@@ -236,6 +247,8 @@ func TypeValue(v interface{}) (Type, error) {
 		return NumberList, nil
 	case []int:
 		return IntList, nil
+	case []map[string]interface{}:
+		return ObjectList, nil
 	default:
 		return nil, &UnexpectedTypeErr{v}
 	}
