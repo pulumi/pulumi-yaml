@@ -1294,6 +1294,12 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 		} else {
 			v, err = config.TryBool(e.pulumiCtx, k)
 		}
+	case ctypes.Object:
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &defaultValue)
+		} else {
+			err = config.TryObject(e.pulumiCtx, k, &defaultValue)
+		}
 	case ctypes.NumberList:
 		var arr []float64
 		if isSecretInConfig {
@@ -1326,6 +1332,16 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 		}
 	case ctypes.BooleanList:
 		var arr []bool
+		if isSecretInConfig {
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
+		} else {
+			err = config.TryObject(e.pulumiCtx, k, &arr)
+			if err == nil {
+				v = arr
+			}
+		}
+	case ctypes.ObjectList:
+		var arr []map[string]interface{}
 		if isSecretInConfig {
 			v, err = config.TrySecretObject(e.pulumiCtx, k, &arr)
 		} else {
