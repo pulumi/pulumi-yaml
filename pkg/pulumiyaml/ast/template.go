@@ -533,6 +533,7 @@ type Template interface {
 	GetName() *StringExpr
 	GetDescription() *StringExpr
 	GetConfig() ConfigMapDecl
+	GetConfiguration() ConfigMapDecl
 	GetVariables() VariablesMapDecl
 	GetResources() ResourcesMapDecl
 	GetOutputs() PropertyMapDecl
@@ -579,6 +580,10 @@ func (d *ComponentParamDecl) GetConfig() ConfigMapDecl {
 		return ConfigMapDecl{}
 	}
 	return d.Inputs
+}
+
+func (d *ComponentParamDecl) GetConfiguration() ConfigMapDecl {
+	return ConfigMapDecl{}
 }
 
 func (d *ComponentParamDecl) GetVariables() VariablesMapDecl {
@@ -694,7 +699,15 @@ func (d *TemplateDecl) GetConfig() ConfigMapDecl {
 	if d == nil {
 		return ConfigMapDecl{}
 	}
-	// TODO: merge config and configuration (?)
+
+	return d.Config
+}
+
+func (d *TemplateDecl) GetConfiguration() ConfigMapDecl {
+	if d == nil {
+		return ConfigMapDecl{}
+	}
+
 	return d.Configuration
 }
 
