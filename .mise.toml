@@ -11,6 +11,7 @@ cue = "v0.12.0"
 go = "1.24.5"
 golangci-lint = "1.64.2"
 jq = "latest"
+pulumi = "latest"
 "ubi:pulumi/pulumictl" = "latest"
 
 [plugins]

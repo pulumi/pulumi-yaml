@@ -1,0 +1,6 @@
+name: config-object-type
+runtime: yaml
+configuration:
+  props:
+    type: object
+    default: { "hello": "world" }
