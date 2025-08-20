@@ -63,7 +63,7 @@ var (
 	Number           = typ{schema.NumberType}
 	NumberList       = typ{&schema.ArrayType{ElementType: schema.NumberType}}
 	Boolean          = typ{schema.BoolType}
-	BooleanList      = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	BooleanList      = typ{&schema.ArrayType{ElementType: schema.BoolType}}
 	Int              = typ{schema.IntType}
 	IntList          = typ{&schema.ArrayType{ElementType: schema.IntType}}
 )
