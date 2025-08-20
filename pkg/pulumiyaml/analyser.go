@@ -361,10 +361,23 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 		return okIfAssignable(hasValidEnumValue(fromExpr, to.Elements))
 	case *schema.ObjectType:
 		// We implement structural typing for objects.
-		from, ok := from.(*schema.ObjectType)
-		if !ok {
+		switch f := from.(type) {
+		case *schema.MapType:
+			// Typechecking for maps is simpler: we just check that each value can be unified with the element type.
+			failures := []*notAssignable{}
+			for _, prop := range to.Properties {
+				if notAssignable := isAssignable(f.ElementType, prop.Type); notAssignable != nil {
+					failures = append(failures, notAssignable.Property(prop.Name).WithRange(fromExpr.Syntax().Syntax().Range()))
+				}
+			}
+			return okIf(len(failures) == 0).Because(failures...)
+		case *schema.ObjectType:
+			// We implement structural typing for objects.
+			from = f
+		default:
 			return fail
 		}
+		from := from.(*schema.ObjectType)
 		var objMap map[string]ast.ObjectProperty
 		primeMap := func() {
 			if obj, ok := fromExpr.(*ast.ObjectExpr); ok {
