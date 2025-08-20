@@ -58,16 +58,16 @@ func (t typ) Pcl() model.Type {
 }
 
 var (
-	String      = typ{schema.StringType}
-	StringList  = typ{&schema.ArrayType{ElementType: schema.StringType}}
-	Number      = typ{schema.NumberType}
-	NumberList  = typ{&schema.ArrayType{ElementType: schema.NumberType}}
-	Boolean     = typ{schema.BoolType}
-	BooleanList = typ{&schema.ArrayType{ElementType: schema.NumberType}}
-	Int         = typ{schema.IntType}
-	IntList     = typ{&schema.ArrayType{ElementType: schema.IntType}}
-	Object      = typ{&schema.MapType{ElementType: schema.AnyType}}
-	ObjectList  = typ{&schema.ArrayType{ElementType: &schema.MapType{ElementType: schema.AnyType}}}
+	String      Type = typ{schema.StringType}
+	StringList       = typ{&schema.ArrayType{ElementType: schema.StringType}}
+	Number           = typ{schema.NumberType}
+	NumberList       = typ{&schema.ArrayType{ElementType: schema.NumberType}}
+	Boolean          = typ{schema.BoolType}
+	BooleanList      = typ{&schema.ArrayType{ElementType: schema.BoolType}}
+	Int              = typ{schema.IntType}
+	IntList          = typ{&schema.ArrayType{ElementType: schema.IntType}}
+	Object           = typ{&schema.MapType{ElementType: schema.AnyType}}
+	ObjectList       = typ{&schema.ArrayType{ElementType: &schema.MapType{ElementType: schema.AnyType}}}
 )
 
 type Types []Type
