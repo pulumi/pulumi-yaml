@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Typecheck lists of booleans correctly
+time: 2025-08-20T16:35:51.119911+02:00
+custom:
+    PR: "854"
