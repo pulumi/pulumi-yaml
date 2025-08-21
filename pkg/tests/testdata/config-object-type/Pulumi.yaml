@@ -4,3 +4,6 @@ configuration:
   props:
     type: object
     default: { "hello": "world" }
+outputs:
+  result:
+    value: ${props.hello}
