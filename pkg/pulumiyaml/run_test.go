@@ -2616,7 +2616,8 @@ func TestResourceObjectProperties(t *testing.T) {
 name: test-yaml
 runtime: yaml
 config:
-  props: {}
+  props:
+    type: object
 resources:
   my-resource:
     type: test:resource:type

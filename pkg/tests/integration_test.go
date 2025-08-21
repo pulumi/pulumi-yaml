@@ -50,6 +50,11 @@ func TestTypeCheckError(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
+func TestConfigObjectType(t *testing.T) {
+	testWrapper(t, integrationDir("config-object-type"))
+}
+
+//nolint:paralleltest // uses parallel programtest
 func TestInvalidResourceObject(t *testing.T) {
 	testWrapper(t, integrationDir("invalid-resource-object"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
