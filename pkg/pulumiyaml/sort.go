@@ -120,8 +120,6 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 
 	dependencies := map[string][]*ast.StringExpr{}
 
-	// Process template configuration entries to establish the schema
-	// This is necessary for dependency resolution to work properly
 	for _, entry := range t.GetConfig().Entries {
 		node := configNode(configNodeYaml(entry))
 		cname := node.key().Value
@@ -139,7 +137,6 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 		}
 	}
 
-	// Also process the deprecated configuration field for backward compatibility
 	for _, entry := range t.GetConfiguration().Entries {
 		node := configNode(configNodeYaml(entry))
 		cname := node.key().Value
@@ -157,13 +154,14 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 		}
 	}
 
-	// Process external configuration if provided
 	for _, node := range externalConfig {
 		cname := node.key().Value
 
-		// If an external value overrides a template-defined value, replace it.
+		// Same as the `Config` and `Configuration` cases, except we have to
+		// account for overrides.
 		if _, found := intermediates[cname]; found {
 			intermediates[cname] = node
+
 			// @TODO: this seems suboptimal?
 			for i, sn := range sorted {
 				if sn.key().Value == cname {
