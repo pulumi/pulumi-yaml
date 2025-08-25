@@ -120,12 +120,59 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 
 	dependencies := map[string][]*ast.StringExpr{}
 
-	templateConfig := make([]configNode, len(t.GetConfig().Entries))
-	for i, kvp := range t.GetConfig().Entries {
-		templateConfig[i] = configNode(configNodeYaml(kvp))
-	}
-	for _, node := range append(templateConfig, externalConfig...) {
+	for _, entry := range t.GetConfig().Entries {
+		node := configNode(configNodeYaml(entry))
 		cname := node.key().Value
+
+		cdiags := checkUniqueNode(intermediates, node)
+		diags = append(diags, cdiags...)
+
+		if !cdiags.HasErrors() {
+			addIntermediate(cname, node)
+			dependencies[cname] = nil
+
+			// Special case: configuration goes first
+			visited[cname] = true
+			sorted = append(sorted, node)
+		}
+	}
+
+	for _, entry := range t.GetConfiguration().Entries {
+		node := configNode(configNodeYaml(entry))
+		cname := node.key().Value
+
+		cdiags := checkUniqueNode(intermediates, node)
+		diags = append(diags, cdiags...)
+
+		if !cdiags.HasErrors() {
+			addIntermediate(cname, node)
+			dependencies[cname] = nil
+
+			// Special case: configuration goes first
+			visited[cname] = true
+			sorted = append(sorted, node)
+		}
+	}
+
+	for _, node := range externalConfig {
+		cname := node.key().Value
+
+		// Same as the `Config` and `Configuration` cases, except we have to
+		// account for overrides.
+		if _, found := intermediates[cname]; found {
+			intermediates[cname] = node
+
+			// @TODO: this seems suboptimal?
+			for i, sn := range sorted {
+				if sn.key().Value == cname {
+					sorted[i] = node
+					break
+				}
+			}
+
+			continue
+		}
+
 		cdiags := checkUniqueNode(intermediates, node)
 		diags = append(diags, cdiags...)
 

@@ -1,0 +1,11 @@
+name: yaml-config-section-is-used
+runtime:
+  name: yaml
+config:
+  myValue:
+    type: string
+variables:
+  computedValue: ${myValue}-suffix
+outputs:
+  result:
+    value: ${computedValue}

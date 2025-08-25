@@ -85,6 +85,11 @@ func TestProjectConfigRef(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
+func TestConfigSectionIsUsed(t *testing.T) {
+	testWrapper(t, integrationDir("config-section-is-used"))
+}
+
+//nolint:paralleltest // uses parallel programtest
 func TestProjectConfigWithSecret(t *testing.T) {
 	testOptions := integration.ProgramTestOptions{
 		Dir:             filepath.Join(getCwd(t), "testdata", "project-config-with-secret"),
