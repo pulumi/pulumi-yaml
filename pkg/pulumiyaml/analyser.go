@@ -1152,10 +1152,6 @@ func (tc *typeCache) typeConfig(r *Runner, node configNode) bool {
 	case configNodeProp:
 		typestring := n.v.TypeString()
 
-		if n.v.IsSecret() { // secret<T> -> T
-			typestring = n.v.SecretValue().Element.TypeString()
-		}
-
 		if ctype, ok := ctypes.Parse(typestring); ok {
 			typCurrent = ctype.Schema()
 		}
