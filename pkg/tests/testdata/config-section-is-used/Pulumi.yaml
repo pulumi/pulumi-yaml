@@ -1,4 +1,4 @@
-name: yaml-regression-827
+name: yaml-config-section-is-used
 runtime:
   name: yaml
 config:

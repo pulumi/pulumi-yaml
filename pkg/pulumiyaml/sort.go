@@ -120,6 +120,26 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 
 	dependencies := map[string][]*ast.StringExpr{}
 
+	// Process template configuration entries to establish the schema
+	// This is necessary for dependency resolution to work properly
+	for _, entry := range t.GetConfig().Entries {
+		node := configNode(configNodeYaml(entry))
+		cname := node.key().Value
+
+		cdiags := checkUniqueNode(intermediates, node)
+		diags = append(diags, cdiags...)
+
+		if !cdiags.HasErrors() {
+			addIntermediate(cname, node)
+			dependencies[cname] = nil
+
+			// Special case: configuration goes first
+			visited[cname] = true
+			sorted = append(sorted, node)
+		}
+	}
+
+	// Also process the deprecated configuration field for backward compatibility
 	for _, entry := range t.GetConfiguration().Entries {
 		node := configNode(configNodeYaml(entry))
 		cname := node.key().Value
@@ -137,25 +157,23 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 		}
 	}
 
+	// Process external configuration if provided
 	for _, node := range externalConfig {
 		cname := node.key().Value
 
-		cdiags := checkUniqueNode(intermediates, node)
-		diags = append(diags, cdiags...)
+		// If an external value overrides a template-defined value, replace it.
+		if _, found := intermediates[cname]; found {
+			intermediates[cname] = node
+			// @TODO: this seems suboptimal?
+			for i, sn := range sorted {
+				if sn.key().Value == cname {
+					sorted[i] = node
+					break
+				}
+			}
 
-		if !cdiags.HasErrors() {
-			addIntermediate(cname, node)
-			dependencies[cname] = nil
-
-			// Special case: configuration goes first
-			visited[cname] = true
-			sorted = append(sorted, node)
+			continue
 		}
-	}
-
-	for _, entry := range t.GetConfig().Entries {
-		node := configNode(configNodeYaml(entry))
-		cname := node.key().Value
 
 		cdiags := checkUniqueNode(intermediates, node)
 		diags = append(diags, cdiags...)
