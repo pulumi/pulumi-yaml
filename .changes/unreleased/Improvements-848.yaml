@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Config and configuration values can now be given an opaque `object` type.
-time: 2025-08-20T16:57:56.515296+02:00
-custom:
-    PR: "848"
