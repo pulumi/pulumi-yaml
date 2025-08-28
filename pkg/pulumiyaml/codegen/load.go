@@ -550,7 +550,11 @@ func importParameterType(s string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return t.Pcl().String(), true
+	pcl, err := t.Pcl()
+	if err != nil {
+		return "", false
+	}
+	return pcl.String(), true
 }
 
 // importConfig imports a template config variable. The parameter is imported as a simple config variable definition.
