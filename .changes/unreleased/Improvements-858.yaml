@@ -1,6 +1,6 @@
 component: codegen
 kind: Improvements
-body: Unrecognised model types will now be reported as errors rather than failing silently
+body: Report unrecognised model types as errors rather than failing silently
 time: 2025-08-28T17:15:35.967773+02:00
 custom:
     PR: "858"
