@@ -19,7 +19,7 @@ type Type interface {
 	// Return the schema equivalent of this type
 	Schema() schema.Type
 	// Return the pcl equivalent of this type
-	Pcl() model.Type
+	Pcl() (model.Type, error)
 
 	isType()
 }
@@ -36,25 +36,29 @@ func (t typ) Schema() schema.Type {
 	return t.inner
 }
 
-func (t typ) Pcl() model.Type {
+func (t typ) Pcl() (model.Type, error) {
 	switch t.inner {
 	case schema.StringType:
-		return model.StringType
+		return model.StringType, nil
 	case schema.NumberType:
-		return model.NumberType
+		return model.NumberType, nil
 	case schema.BoolType:
-		return model.BoolType
+		return model.BoolType, nil
 	case schema.IntType:
-		return model.IntType
+		return model.IntType, nil
 	}
 	switch t := t.inner.(type) {
 	case *schema.ArrayType:
-		return model.NewListType(typ{t.ElementType}.Pcl())
+		inner, err := typ{t.ElementType}.Pcl()
+		if err != nil {
+			return nil, fmt.Errorf("unknown array element PCL type")
+		}
+		return model.NewListType(inner), nil
 	}
 
 	// We should never hit this, but if we do an error should be reported instead of
 	// panicking.
-	return model.NewOpaqueType("Invalid type :" + t.String())
+	return nil, fmt.Errorf("unknown PCL type")
 }
 
 var (
