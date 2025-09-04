@@ -2684,6 +2684,44 @@ resources:
 	assert.NoError(t, err)
 }
 
+// TestConfigMapOverride tests that config map values override YAML defaults.
+func TestConfigMapOverride(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+config:
+  myString:
+    type: string
+    default: "default value"
+resources:
+  my-resource:
+    type: test:resource:type
+    properties:
+      foo: ${myString}
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, "test:resource:type", args.TypeToken)
+			// Verify that the config map value overrides the YAML default
+			assert.Equal(t, resource.PropertyMap{
+				"foo": resource.NewStringProperty("override value"),
+			}, args.Inputs)
+			return "", args.Inputs, nil
+		},
+	}
+	configMap := resource.PropertyMap{
+		projectConfigKey("myString"): resource.NewStringProperty("override value"),
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
+	}, pulumi.WithMocks("foo", "stackDev", mocks))
+	assert.NoError(t, err)
+}
+
 // Test that we can index into a list or map returned by a StackReference's outputs.
 func TestStackReferenceNestedOutputs(t *testing.T) {
 	t.Parallel()
