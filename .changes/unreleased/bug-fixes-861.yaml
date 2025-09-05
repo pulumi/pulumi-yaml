@@ -1,0 +1,6 @@
+component: convert
+kind: bug-fixes
+body: Variables defined in `config` will no longer be reported as undefined
+time: 2025-09-05T11:33:52.30466+02:00
+custom:
+    PR: "861"
