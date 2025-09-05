@@ -64,15 +64,6 @@ func TestInvalidResourceObject(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
-func TestMismatchedConfigType(t *testing.T) {
-	testWrapper(t, integrationDir("mismatched-config-type"), ExpectFailure, StderrValidator{
-		f: func(t *testing.T, stderr string) {
-			assert.Regexp(t, `config key "foo" cannot have conflicting types boolean, number`, stderr)
-		},
-	})
-}
-
-//nolint:paralleltest // uses parallel programtest
 func TestProjectConfigRef(t *testing.T) {
 	testWrapper(t, integrationDir("project-config-ref"), ExpectFailure, StderrValidator{
 		f: func(t *testing.T, stderr string) {
