@@ -1,8 +1,0 @@
-name: mismatched-config-type
-runtime: yaml
-config:
-  foo: 3
-configuration:
-  foo:
-    type: bool
-    default: true
