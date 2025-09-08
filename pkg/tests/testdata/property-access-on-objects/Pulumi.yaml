@@ -1,0 +1,4 @@
+name: property-access-on-objects
+runtime: yaml
+outputs:
+  branch: ${deploymentSettings.githubBranch}

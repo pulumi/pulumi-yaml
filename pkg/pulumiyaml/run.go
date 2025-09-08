@@ -1295,10 +1295,14 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 			v, err = config.TryBool(e.pulumiCtx, k)
 		}
 	case ctypes.Object:
+		var obj map[string]interface{}
 		if isSecretInConfig {
-			v, err = config.TrySecretObject(e.pulumiCtx, k, &defaultValue)
+			v, err = config.TrySecretObject(e.pulumiCtx, k, &obj)
 		} else {
-			err = config.TryObject(e.pulumiCtx, k, &defaultValue)
+			err = config.TryObject(e.pulumiCtx, k, &obj)
+			if err == nil {
+				v = obj
+			}
 		}
 	case ctypes.NumberList:
 		var arr []float64
