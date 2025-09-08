@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Decode object values correctly within YAML programs
+time: 2025-09-08T15:03:06.003806+02:00
+custom:
+    PR: "864"

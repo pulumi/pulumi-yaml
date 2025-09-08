@@ -350,3 +350,20 @@ func TestResourcePropertiesConfig(t *testing.T) {
 		Dir: filepath.Join("testdata", "resource-properties-config"),
 	})
 }
+
+//nolint:paralleltest // uses parallel programtest
+func TestPropertyAccessOnObjects(t *testing.T) {
+	integration.ProgramTest(t, &integration.ProgramTestOptions{
+		Dir: filepath.Join("testdata", "property-access-on-objects"),
+		OrderedConfig: []integration.ConfigValue{
+			{
+				Key:   "deploymentSettings.githubBranch",
+				Value: "main",
+				Path:  true,
+			},
+		},
+		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+			assert.Equal(t, "main", stack.Outputs["branch"])
+		},
+	})
+}

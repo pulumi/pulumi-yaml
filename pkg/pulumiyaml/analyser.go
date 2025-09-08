@@ -943,6 +943,8 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 			for _, prop := range root.Properties {
 				properties[prop.Name] = prop.Type
 			}
+		case *schema.MapType:
+			return root.ElementType
 		case *schema.ResourceType:
 			for _, prop := range root.Resource.Properties {
 				properties[prop.Name] = prop.Type
