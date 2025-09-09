@@ -2618,8 +2618,6 @@ runtime: yaml
 config:
   props:
     type: object
-    default:
-      foo: "bar"
 resources:
   my-resource:
     type: test:resource:type
@@ -2639,7 +2637,13 @@ resources:
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		return RunTemplate(ctx, template, nil, newMockPackageMap())
+		configMap := resource.PropertyMap{
+			"props": resource.NewObjectProperty(resource.PropertyMap{
+				"foo": resource.NewStringProperty("bar"),
+			}),
+		}
+
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
 	assert.NoError(t, err)
 }
