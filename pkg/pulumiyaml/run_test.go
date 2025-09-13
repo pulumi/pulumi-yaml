@@ -2656,7 +2656,10 @@ func TestResourceSecretObjectProperties(t *testing.T) {
 name: test-yaml
 runtime: yaml
 config:
-  props: {}
+  props:
+    type: object
+    default:
+      foo: "bar"
 variables:
   inputs:
     fn::secret: ${props}
@@ -2670,24 +2673,56 @@ resources:
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			assert.Equal(t, "test:resource:type", args.TypeToken)
-			assert.Equal(t, resource.PropertyMap{
-				"foo": resource.MakeSecret(resource.NewStringProperty("bar")),
-				"bar": resource.MakeSecret(resource.NewNullProperty()),
-			}, args.Inputs)
-			return "", resource.PropertyMap{
-				"foo": resource.NewStringProperty("bar"),
-			}, nil
+			if v, ok := args.Inputs["foo"]; ok {
+				assert.True(t, v.IsSecret())
+				assert.Equal(t, resource.NewStringProperty("bar"), v.SecretValue().Element)
+			} else {
+				t.Fatalf("expected inputs to contain key 'foo'")
+			}
+			return "", args.Inputs, nil
 		},
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		configMap := resource.PropertyMap{
-			"props": resource.NewObjectProperty(resource.PropertyMap{
-				"foo": resource.NewStringProperty("bar"),
-			}),
-		}
-
-		return RunTemplate(ctx, template, configMap, newMockPackageMap())
+		return RunTemplate(ctx, template, nil, newMockPackageMap())
 	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	assert.NoError(t, err)
+}
+
+// TestConfigMapOverride tests that config map values override YAML defaults.
+func TestConfigMapOverride(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+config:
+  myString:
+    type: string
+    default: "default value"
+resources:
+  my-resource:
+    type: test:resource:type
+    properties:
+      foo: ${myString}
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, "test:resource:type", args.TypeToken)
+			// Verify that the config map value overrides the YAML default
+			assert.Equal(t, resource.PropertyMap{
+				"foo": resource.NewStringProperty("override value"),
+			}, args.Inputs)
+			return "", args.Inputs, nil
+		},
+	}
+	configMap := resource.PropertyMap{
+		projectConfigKey("myString"): resource.NewStringProperty("override value"),
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return RunTemplate(ctx, template, configMap, newMockPackageMap())
+	}, pulumi.WithMocks("foo", "stackDev", mocks))
 	assert.NoError(t, err)
 }
 
