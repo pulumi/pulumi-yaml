@@ -1127,17 +1127,19 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
 		case configNode:
-			key := kvp.key().Value
-			if _, ok := r.config[key]; ok {
-				if ctx != nil {
-					err := ctx.Log.Debug(fmt.Sprintf("config already registered %v\n", key), &pulumi.LogArgs{})
+			if _, ok := kvp.(configNodeYaml); ok {
+				key := kvp.key().Value
+				if _, ok := r.config[key]; ok {
+					if ctx != nil {
+						err := ctx.Log.Debug(fmt.Sprintf("config already registered %v\n", key), &pulumi.LogArgs{})
 
-					if err != nil {
-						return returnDiags()
+						if err != nil {
+							return returnDiags()
+						}
 					}
-				}
 
-				continue
+					continue
+				}
 			}
 
 			if ctx != nil {
