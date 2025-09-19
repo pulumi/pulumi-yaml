@@ -1132,7 +1132,6 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 				if _, ok := r.config[key]; ok {
 					if ctx != nil {
 						err := ctx.Log.Debug(fmt.Sprintf("config already registered %v\n", key), &pulumi.LogArgs{})
-
 						if err != nil {
 							return returnDiags()
 						}
