@@ -1,0 +1,9 @@
+name: config-section-is-used
+runtime: yaml
+config:
+  props:
+    type: object
+    default: { "hello": "world" }
+outputs:
+  result:
+    value: ${props.hello}

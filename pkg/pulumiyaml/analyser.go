@@ -1327,6 +1327,11 @@ func (e walker) EvalConfig(r *Runner, node configNode) bool {
 			return false
 		}
 	}
+
+	if _, ok := node.(configNodeProp); ok {
+		r.config[node.key().Value] = node.value()
+	}
+
 	return true
 }
 

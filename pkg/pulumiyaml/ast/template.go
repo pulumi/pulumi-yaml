@@ -694,8 +694,23 @@ func (d *TemplateDecl) GetConfig() ConfigMapDecl {
 	if d == nil {
 		return ConfigMapDecl{}
 	}
-	// TODO: merge config and configuration (?)
-	return d.Configuration
+
+	// Merge config and configuration entries, prioritizing config over configuration
+	entries := make([]ConfigMapEntry, 0, len(d.Configuration.Entries)+len(d.Config.Entries))
+	entries = append(entries, d.Config.Entries...)
+
+	configKeys := make(map[string]bool)
+	for _, entry := range d.Config.Entries {
+		configKeys[entry.Key.Value] = true
+	}
+
+	for _, entry := range d.Configuration.Entries {
+		if !configKeys[entry.Key.Value] {
+			entries = append(entries, entry)
+		}
+	}
+
+	return ConfigMapDecl{Entries: entries}
 }
 
 func (d *TemplateDecl) GetVariables() VariablesMapDecl {

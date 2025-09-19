@@ -2,7 +2,8 @@ name: resource-secret
 runtime:
   name: yaml
 config:
-  props: {}
+  props:
+    type: object
 resources:
   randomPassword:
     type: random:RandomPassword
