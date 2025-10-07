@@ -1,0 +1,16 @@
+resources:
+  # The resource name is based on the parameter value
+  example1:
+    type: hipackage:HelloWorld
+  exampleComponent1:
+    type: hipackage:HelloWorldComponent
+  # The resource name is based on the parameter value
+  example2:
+    type: byepackage:GoodbyeWorld
+  exampleComponent2:
+    type: byepackage:GoodbyeWorldComponent
+outputs:
+  parameterValue1: ${example1.parameterValue}
+  parameterValueFromComponent1: ${exampleComponent1.parameterValue}
+  parameterValue2: ${example2.parameterValue}
+  parameterValueFromComponent2: ${exampleComponent2.parameterValue}

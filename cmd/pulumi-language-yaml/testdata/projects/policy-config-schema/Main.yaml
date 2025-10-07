@@ -1,0 +1,9 @@
+resources:
+  resY:
+    type: simple:Resource
+    properties:
+      value: true
+  resN:
+    type: simple:Resource
+    properties:
+      value: false

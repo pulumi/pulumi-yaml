@@ -1,0 +1,6 @@
+outputs:
+  scalar:
+    fn::invoke:
+      function: simple-invoke-with-scalar-return:myInvokeScalar
+      arguments:
+        value: goodbye

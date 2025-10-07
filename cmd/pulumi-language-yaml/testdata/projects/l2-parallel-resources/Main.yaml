@@ -1,0 +1,7 @@
+resources:
+  block-1:
+    type: sync:Block
+  block-2:
+    type: sync:Block
+  block-3:
+    type: sync:Block

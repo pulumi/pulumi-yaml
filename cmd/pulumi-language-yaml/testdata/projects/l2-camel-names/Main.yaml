@@ -1,0 +1,9 @@
+resources:
+  firstResource:
+    type: camelNames:CoolModule:SomeResource
+    properties:
+      theInput: true
+  secondResource:
+    type: camelNames:CoolModule:SomeResource
+    properties:
+      theInput: ${firstResource.theOutput}
