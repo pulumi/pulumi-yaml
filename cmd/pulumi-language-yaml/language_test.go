@@ -179,7 +179,6 @@ var expectedFailures = map[string]string{
 	"l1-output-null":                        "test failing",
 	"l2-component-call-simple":              "#722 generation unimplemented",
 	"l2-resource-option-retain-on-delete":   "#723 generation unimplemented",
-	"l2-resource-option-deleted-with":       "#724 test failing",
 	"l2-resource-parent-inheritance":        "expected parent to be retain on delete",
 	"l2-failed-create-continue-on-error":    "#725 test failing",
 	"l2-rtti":                               "test failing",

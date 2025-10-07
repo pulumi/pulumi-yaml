@@ -241,6 +241,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		list := syn.ListSyntax(elems.Syntax(), hideDiffs...)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("hideDiffs"), list))
 	}
+	if opts.DeletedWith != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("deletedWith"),
+			g.expr(opts.DeletedWith)))
+	}
 
 	return syn.Object(rOpts...)
 }
