@@ -232,6 +232,15 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("import"),
 			g.expr(opts.ImportID)))
 	}
+	if opts.HideDiffs != nil {
+		elems := g.expr(opts.HideDiffs).(*syn.ListNode)
+		hideDiffs := make([]syn.Node, elems.Len())
+		for i := range hideDiffs {
+			hideDiffs[i] = unquoteInterpolation(elems.Index(i))
+		}
+		list := syn.ListSyntax(elems.Syntax(), hideDiffs...)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("hideDiffs"), list))
+	}
 
 	return syn.Object(rOpts...)
 }

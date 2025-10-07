@@ -3,7 +3,9 @@ resources:
     type: simple:Resource
     properties:
       value: true
-    options: {}
+    options:
+      hideDiffs:
+        - value
   notHideDiffs:
     type: simple:Resource
     properties:

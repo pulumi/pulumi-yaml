@@ -191,7 +191,6 @@ var expectedFailures = map[string]string{
 	"l3-component-simple":                   "not implemented",
 	"policy-remediate":                      "test failing",
 	"l2-explicit-providers":                 "test failing",
-	"l2-resource-option-hide-diffs":         "test failing",
 	"policy-dryrun":                         "test failing",
 	"policy-enforcement-config":             "test failing",
 	"policy-simple":                         "test failing",
