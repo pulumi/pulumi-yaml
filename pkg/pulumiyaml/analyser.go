@@ -1479,6 +1479,9 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walk(ctx, opts.DeletedWith) {
 		return false
 	}
+	if !e.walkStringList(ctx, opts.HideDiffs) {
+		return false
+	}
 
 	if ct := opts.CustomTimeouts; ct != nil {
 		if !e.walk(ctx, ct.Create) {

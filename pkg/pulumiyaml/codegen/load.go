@@ -963,6 +963,17 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
+	if len(resource.Options.HideDiffs.GetElements()) > 0 {
+		var paths []model.Expression
+		for _, v := range resource.Options.HideDiffs.Elements {
+			paths = append(paths, plainLit(v.Value))
+		}
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "hideDiffs",
+			Value: &model.TupleConsExpression{Expressions: paths},
+		})
+	}
+
 	if len(resourceOptions.Body.Items) > 0 {
 		items = append(items, resourceOptions)
 	}

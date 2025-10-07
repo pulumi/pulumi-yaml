@@ -1652,6 +1652,9 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 			overallOk = false
 		}
 	}
+	if v.Options.HideDiffs != nil {
+		opts = append(opts, pulumi.HideDiffs(listStrings(v.Options.HideDiffs)))
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
