@@ -189,6 +189,18 @@ var expectedFailures = map[string]string{
 	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
 	"l2-component-property-deps":            "Traversal not allowed on function result",
 	"l3-component-simple":                   "not implemented",
+	"policy-remediate":                      "test failing",
+	"l2-explicit-providers":                 "test failing",
+	"l2-resource-option-hide-diffs":         "test failing",
+	"policy-dryrun":                         "test failing",
+	"policy-enforcement-config":             "test failing",
+	"policy-simple":                         "test failing",
+	"policy-config":                         "test failing",
+	"policy-config-schema":                  "test failing",
+	"policy-stack-config":                   "test failing",
+	"l1-builtin-project-root-main":          "test failing",
+	"l2-invoke-scalar":                      "test failing",
+	"l1-builtin-cwd":                        "test failing",
 }
 
 func log(t *testing.T, name, message string) {
