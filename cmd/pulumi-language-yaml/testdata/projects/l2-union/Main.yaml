@@ -1,0 +1,17 @@
+resources:
+  stringOrIntegerExample1:
+    type: union:Example
+    properties:
+      stringOrIntegerProperty: 42
+  stringOrIntegerExample2:
+    type: union:Example
+    properties:
+      stringOrIntegerProperty: forty two
+  mapMapUnionExample:
+    type: union:Example
+    properties:
+      mapMapUnionProperty:
+        key1:
+          key1a: value1a
+outputs:
+  mapMapUnionOutput: ${mapMapUnionExample.mapMapUnionProperty}

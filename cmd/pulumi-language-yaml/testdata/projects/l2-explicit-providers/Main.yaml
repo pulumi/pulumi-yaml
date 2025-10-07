@@ -1,0 +1,13 @@
+resources:
+  explicit:
+    type: pulumi:providers:component
+  list:
+    type: component:ComponentCallable
+    properties:
+      value: value
+    options: {}
+  map:
+    type: component:ComponentCallable
+    properties:
+      value: value
+    options: {}

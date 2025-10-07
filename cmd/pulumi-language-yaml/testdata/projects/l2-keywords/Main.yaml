@@ -1,0 +1,11 @@
+resources:
+  firstResource:
+    type: keywords:SomeResource
+    properties:
+      builtins: builtins
+      property: property
+  secondResource:
+    type: keywords:SomeResource
+    properties:
+      builtins: ${firstResource.builtins}
+      property: ${firstResource.property}
