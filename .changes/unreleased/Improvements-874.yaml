@@ -1,6 +1,0 @@
-component: codegen
-kind: Improvements
-body: Correctly generete the `deletedWith` resource option
-time: 2025-10-07T15:29:32.154101+02:00
-custom:
-    PR: "874"
