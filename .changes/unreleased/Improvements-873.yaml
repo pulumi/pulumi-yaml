@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Add the `hideDiffs` resource option. More details are at https://github.com/pulumi/pulumi/issues/20591
-time: 2025-10-07T15:22:07.042639+02:00
-custom:
-    PR: "873"
