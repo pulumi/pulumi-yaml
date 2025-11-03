@@ -2347,10 +2347,11 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		if t.CallOpts.PluginDownloadURL != nil {
 			pluginDownloadURL = t.CallOpts.PluginDownloadURL.Value
 		}
-		_, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
+		pkg, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
+		hint := pkg.FunctionTypeHint(functionName)
 
 		typ := tokens.Type(functionName)
 		packageRef := e.packageRefs[typ.Package()]
@@ -2359,18 +2360,40 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			return e.error(t, err.Error())
 		}
 
-		if t.Return.GetValue() == "" {
-			output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(result), dependsOn...)
-			if secret {
-				return pulumi.ToSecret(output), true
-			}
-			return output, true
+		// If this is a scalar return extract the single field from the result map.
+
+		singleReturnType := hint.ReturnType
+		if _, ok := hint.ReturnType.(*schema.ObjectType); ok || hint.Outputs != nil {
+			singleReturnType = nil
 		}
 
-		retv, ok := result[t.Return.Value]
-		if !ok {
-			e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-			return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+		var retv any
+		if singleReturnType != nil {
+			if len(result) != 1 {
+				e.addWarnDiag(
+					t.Syntax().Syntax().Range(),
+					fmt.Sprintf("fn::invoke of %s expected a single return value, got: %+v", t.Token.Value, result), "")
+			}
+
+			if t.Return.GetValue() != "" {
+				e.error(t.Return, fmt.Sprintf("fn::invoke of %s has a single return value; cannot specify property '%s'", t.Token.Value, t.Return.Value))
+				return e.error(t.Return, fmt.Sprintf("fn::invoke of %s has a single return value; cannot specify property '%s'", t.Token.Value, t.Return.Value))
+			}
+
+			for _, v := range result {
+				retv = v
+			}
+		} else {
+			if t.Return.GetValue() == "" {
+				retv = result
+			} else {
+				var ok bool
+				retv, ok = result[t.Return.Value]
+				if !ok {
+					e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
+					return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+				}
+			}
 		}
 
 		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), dependsOn...)
