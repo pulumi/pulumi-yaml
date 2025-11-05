@@ -848,7 +848,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	if singleReturnType != nil {
 		if t.Return != nil {
 			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(),
-				"fn::invoke has a single return value",
+				"fn::invoke has a non-object return value",
 				fmt.Sprintf("cannot specify property '%s' for function %s",
 					t.Return.Value, functionName.String()))
 		}

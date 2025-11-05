@@ -2376,8 +2376,11 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			}
 
 			if t.Return.GetValue() != "" {
-				e.error(t.Return, fmt.Sprintf("fn::invoke of %s has a single return value; cannot specify property '%s'", t.Token.Value, t.Return.Value))
-				return e.error(t.Return, fmt.Sprintf("fn::invoke of %s has a single return value; cannot specify property '%s'", t.Token.Value, t.Return.Value))
+				e.addDiag(ast.ExprError(t.Return,
+					fmt.Sprintf("Unable to evaluate result[%v]", t.Return.Value),
+					fmt.Sprintf("fn::invoke of %s has a non-object return value; cannot specify property '%s'", t.Token.Value, t.Return.Value),
+				))
+				return nil, false
 			}
 
 			for _, v := range result {
@@ -2390,8 +2393,21 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 				var ok bool
 				retv, ok = result[t.Return.Value]
 				if !ok {
-					e.error(t.Return, fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return))
-					return e.error(t.Return, fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value))
+					e.addDiag(ast.ExprError(t.Return,
+						fmt.Sprintf("Unable to evaluate result[%v], result is: %+v", t.Return.Value, t.Return),
+						fmt.Sprintf("fn::invoke of %s did not contain a property '%s' in the returned value", t.Token.Value, t.Return.Value),
+					))
+					return nil, false
+				}
+			}
+		}
+
+		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), dependsOn...)
+		if secret {
+			return pulumi.ToSecret(output), true
+		}
+		return output, true
+	})
 				}
 			}
 		}

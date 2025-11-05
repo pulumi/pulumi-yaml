@@ -887,7 +887,7 @@ resources:
 	assert.Len(t, diags, 3)
 	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn; Existing fields are: yesArg, someSuchArg",
 		diagString(diags[2]))
-	assert.Equal(t, "<stdin>:17:15: fn::invoke has a single return value; cannot specify property 'prop' for function test:scalar",
+	assert.Equal(t, "<stdin>:17:15: fn::invoke has a non-object return value; cannot specify property 'prop' for function test:scalar",
 		diagString(diags[1]))
 	assert.Equal(t, "<stdin>:23:7: Property buzz does not exist on 'test:resource:type'; Cannot assign '{foo: string, buzz: string}' to 'test:resource:type':\n  Existing properties are: bar, foo",
 		diagString(diags[0]))
