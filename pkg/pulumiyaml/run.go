@@ -2408,16 +2408,6 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		}
 		return output, true
 	})
-				}
-			}
-		}
-
-		output := pulumi.OutputWithDependencies(e.pulumiCtx.Context(), pulumi.Any(retv), dependsOn...)
-		if secret {
-			return pulumi.ToSecret(output), true
-		}
-		return output, true
-	})
 	return performInvoke(args)
 }
 
