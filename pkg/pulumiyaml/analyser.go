@@ -839,7 +839,21 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	if t.CallOpts.DependsOn != nil {
 		tc.typeExpr(ctx, t.CallOpts.DependsOn)
 	}
-	if t.Return != nil {
+
+	singleReturnType := hint.ReturnType
+	if _, ok := hint.ReturnType.(*schema.ObjectType); ok || hint.Outputs != nil {
+		singleReturnType = nil
+	}
+
+	if singleReturnType != nil {
+		if t.Return != nil {
+			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(),
+				"fn::invoke has a non-object return value",
+				fmt.Sprintf("cannot specify property '%s' for function %s",
+					t.Return.Value, functionName.String()))
+		}
+		tc.exprs[t] = singleReturnType
+	} else if t.Return != nil {
 		fields := []string{}
 		var (
 			returnType  schema.Type

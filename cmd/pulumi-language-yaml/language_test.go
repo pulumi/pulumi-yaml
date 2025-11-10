@@ -190,11 +190,9 @@ var expectedFailures = map[string]string{
 	"l2-component-property-deps":            "Traversal not allowed on function result",
 	"l2-explicit-providers":                 "test failing",
 	"l1-builtin-project-root-main":          "test failing",
-	"l2-invoke-scalar":                      "test failing",
 	"l1-builtin-cwd":                        "test failing",
 
 	"l2-resource-option-hide-diffs": "Currently failing on update to 3.205.0",
-	"l2-invoke-scalars":             "Currently failing on update to 3.205.0",
 }
 
 func log(t *testing.T, name, message string) {

@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add support for scalar return value invokes
+time: 2025-11-03T14:50:48.861169003Z
+custom:
+    PR: "885"

@@ -142,6 +142,18 @@ func function(token string, inputs, outputs []schema.Property) *schema.Function 
 	}
 }
 
+func scalarFunction(token string, inputs []schema.Property, returnType schema.Type) *schema.Function {
+	pIn := make([]*schema.Property, 0, len(inputs))
+	for _, prop := range inputs {
+		pIn = append(pIn, &prop)
+	}
+	return &schema.Function{
+		Token:      testComponentToken,
+		Inputs:     &schema.ObjectType{Properties: pIn},
+		ReturnType: returnType,
+	}
+}
+
 func newMockPackageMap() PackageLoader {
 	version := func(tag string) *semver.Version {
 		v := semver.MustParse(tag)
@@ -229,6 +241,10 @@ func newMockPackageMap() PackageLoader {
 						return function("test:invoke:poison",
 							[]schema.Property{{Name: "foo", Type: schema.StringType}},
 							[]schema.Property{{Name: "value", Type: schema.StringType}})
+					case "test:scalar":
+						return scalarFunction("test:scalar",
+							[]schema.Property{{Name: "foo", Type: schema.StringType}},
+							schema.StringType)
 					default:
 						return function(typeName, nil, nil)
 					}
@@ -852,6 +868,12 @@ variables:
       arguments:
         noArg: false
         yesArg: true
+  scalarReturn:
+    fn::invoke:
+      function: test:scalar
+      arguments:
+        foo: "hello"
+      return: "prop"
 resources:
   r:
     type: test:resource:type
@@ -862,10 +884,12 @@ resources:
 	tmpl := yamlTemplate(t, text)
 	diags := testTemplateDiags(t, tmpl, func(e *programEvaluator) {})
 	require.Truef(t, diags.HasErrors(), diags.Error())
-	assert.Len(t, diags, 2)
+	assert.Len(t, diags, 3)
 	assert.Equal(t, "<stdin>:10:9: noArg does not exist on Invoke test:fn; Existing fields are: yesArg, someSuchArg",
+		diagString(diags[2]))
+	assert.Equal(t, "<stdin>:17:15: fn::invoke has a non-object return value; cannot specify property 'prop' for function test:scalar",
 		diagString(diags[1]))
-	assert.Equal(t, "<stdin>:17:7: Property buzz does not exist on 'test:resource:type'; Cannot assign '{foo: string, buzz: string}' to 'test:resource:type':\n  Existing properties are: bar, foo",
+	assert.Equal(t, "<stdin>:23:7: Property buzz does not exist on 'test:resource:type'; Cannot assign '{foo: string, buzz: string}' to 'test:resource:type':\n  Existing properties are: bar, foo",
 		diagString(diags[0]))
 }
 
