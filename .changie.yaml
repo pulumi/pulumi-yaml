@@ -21,7 +21,7 @@ components:
 changeFormat: '- [{{.Component}}] {{.Body}} [#{{.Custom.PR}}](https://github.com/pulumi/pulumi-yaml/pull/{{.Custom.PR}})'
 custom:
   - key: PR
-    label: GitHub Pull Request
+    label: GitHub Pull Request or Issue Number
     type: int
 newlines:
   afterVersion: 1
