@@ -1641,6 +1641,21 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 	if b := v.Options.RetainOnDelete; b != nil {
 		opts = append(opts, pulumi.RetainOnDelete(b.Value))
 	}
+	if v.Options.ReplaceWith != nil {
+		replaceWithOpt, ok := e.evaluateResourceListValuedOption(v.Options.ReplaceWith, "replaceWith")
+		if ok {
+			var replaceWith []pulumi.Resource
+			for _, r := range replaceWithOpt {
+				if p, ok := r.(poisonMarker); ok {
+					return p, true
+				}
+				replaceWith = append(replaceWith, r.CustomResource())
+			}
+			opts = append(opts, pulumi.ReplaceWith(replaceWith))
+		} else {
+			overallOk = false
+		}
+	}
 	if v.Options.DeletedWith != nil {
 		deletedWithOpt, ok := e.evaluateResourceValuedOption(v.Options.DeletedWith, "deletedWith")
 		if ok {
