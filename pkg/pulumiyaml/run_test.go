@@ -1679,7 +1679,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["textData"].(string)
 		assert.True(t, ok)
@@ -1713,7 +1713,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["foo-bar"].(string)
 		assert.True(t, ok)
@@ -1735,7 +1735,7 @@ variables:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	testTemplate(t, tmpl, func(e *programEvaluator) {
-		diags := e.evalContext.Evaluate(e.pulumiCtx)
+		diags := e.Evaluate(e.pulumiCtx)
 		requireNoErrors(t, tmpl, diags)
 		result, ok := e.variables["interpolated"].(string)
 		assert.True(t, ok)
@@ -2169,14 +2169,15 @@ resources:
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			t.Logf("args: %+v", args)
-			if args.TypeToken == "test:resource:UsingLogicalName" {
+			switch args.TypeToken {
+			case "test:resource:UsingLogicalName":
 				registeredName := "actual-registered-name"
 				assert.Equal(t, registeredName, args.Name)
 				assert.Equal(t, registeredName, args.RegisterRPC.GetName())
-			} else if args.TypeToken == "test:resource:WithoutLogicalName" {
+			case "test:resource:WithoutLogicalName":
 				assert.Equal(t, "sourceNameOnly", args.Name)
 				assert.Equal(t, "sourceNameOnly", args.RegisterRPC.GetName())
-			} else {
+			default:
 				t.Fatalf("unexpected type token: %s", args.TypeToken)
 			}
 
@@ -2380,14 +2381,15 @@ resources:
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			t.Logf("args: %+v", args)
 
-			if args.TypeToken == "pulumi:pulumi:StackReference" {
+			switch args.TypeToken {
+			case "pulumi:pulumi:StackReference":
 				assert.Equal(t, "ref", args.Name)
 				return "ref", resource.PropertyMap{
 					"outputs": resource.NewObjectProperty(resource.NewPropertyMapFromMap(map[string]any{
 						"listOutput": []string{"foo", "bar"},
 					})),
 				}, nil
-			} else if args.TypeToken == "test:resource:with-list-input" {
+			case "test:resource:with-list-input":
 				assert.Equal(t, "sec", args.Name)
 				assert.Equal(t,
 					resource.NewArrayProperty([]resource.PropertyValue{resource.NewStringProperty("foo"), resource.NewStringProperty("bar")}),
@@ -2772,14 +2774,15 @@ resources:
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			t.Logf("args: %+v", args)
 
-			if args.TypeToken == "pulumi:pulumi:StackReference" {
+			switch args.TypeToken {
+			case "pulumi:pulumi:StackReference":
 				assert.Equal(t, "ref", args.Name)
 				return "ref", resource.PropertyMap{
 					"outputs": resource.NewProperty(resource.NewPropertyMapFromMap(map[string]any{
 						"mapOutput": map[string]any{"hi": []string{"foo", "bar"}},
 					})),
 				}, nil
-			} else if args.TypeToken == "test:resource:with-list-input" {
+			case "test:resource:with-list-input":
 				assert.Equal(t, "sec", args.Name)
 				assert.Equal(t,
 					resource.NewProperty([]resource.PropertyValue{resource.NewProperty("foo"), resource.NewProperty("bar")}),

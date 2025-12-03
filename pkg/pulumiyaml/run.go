@@ -748,7 +748,7 @@ func (*lateboundCustomResourceState) ElementType() reflect.Type {
 }
 
 func (st *lateboundCustomResourceState) GetRawOutputs() pulumi.Output {
-	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
+	return pulumi.InternalGetRawOutputs(&st.ResourceState)
 }
 
 func (st *lateboundCustomResourceState) GetResourceSchema() *schema.Resource {
@@ -791,7 +791,7 @@ func (*lateboundProviderResourceState) ElementType() reflect.Type {
 }
 
 func (st *lateboundProviderResourceState) GetRawOutputs() pulumi.Output {
-	return pulumi.InternalGetRawOutputs(&st.CustomResourceState.ResourceState)
+	return pulumi.InternalGetRawOutputs(&st.ResourceState)
 }
 
 func (st *lateboundProviderResourceState) GetResourceSchema() *schema.Resource {
@@ -888,7 +888,7 @@ func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bo
 func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
 	defer func() {
 		e.sdiags.Extend(diag)
-		e.evalContext.Runner.sdiags.Extend(diag)
+		e.Runner.sdiags.Extend(diag)
 	}()
 
 	var buf bytes.Buffer

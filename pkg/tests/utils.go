@@ -14,7 +14,7 @@ import (
 )
 
 func getDryRun() bool {
-	return !(os.Getenv("PULUMI_LIVE_TEST") == "true")
+	return os.Getenv("PULUMI_LIVE_TEST") != "true"
 }
 
 func skipOnDryRun(t *testing.T) {

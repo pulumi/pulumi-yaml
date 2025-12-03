@@ -332,8 +332,8 @@ func (p *testproviderProvider) GetSchema(ctx context.Context,
 			for k, f := range providerSchema.Functions {
 				sch.Functions[strings.Replace(k, "testprovider", p.parameter, 1)] = f
 				for k, prop := range f.Inputs.Properties {
-					if prop.TypeSpec.Ref != "" {
-						prop.TypeSpec.Ref = strings.Replace(prop.TypeSpec.Ref, "testprovider", p.parameter, 1)
+					if prop.Ref != "" {
+						prop.Ref = strings.Replace(prop.Ref, "testprovider", p.parameter, 1)
 						f.Inputs.Properties[k] = prop
 					}
 				}
