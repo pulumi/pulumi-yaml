@@ -28,6 +28,11 @@ linters:
       # pre-emptively.
       # Don't complain about these.
       allow-unused: true
+    staticcheck:
+      checks:
+        - 'all'
+        - '-ST1005' # error strings should not be capitalized
+        - '-ST1003' # struct field Id should be ID
   exclusions:
     generated: lax
     presets:
