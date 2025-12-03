@@ -22,10 +22,10 @@ define go_build
 endef
 
 # Try to get the dev version using changie, otherwise fall back
-FALLBACK_DEV_VERSION := 1.0.0-dev.0
-DEV_VERSION := $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
+FALLBACK_DEV_VERSION = 1.0.0-dev.0
+DEV_VERSION = $(shell if command -v changie > /dev/null; then changie next patch -p dev.0; else echo "$(FALLBACK_DEV_VERSION)"; fi)
 
-HELPMAKEGO_VERSION := v0.2.0
+HELPMAKEGO_VERSION := v0.3.0
 HELPMAKEGO := bin/${HELPMAKEGO_VERSION}/helpmakego
 
 _ := $(shell mkdir -p bin)
