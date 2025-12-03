@@ -7,7 +7,7 @@ permissions: read-all
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  GOLANGCI_LINT_VERSION: v1.64.2
+  GOLANGCI_LINT_VERSION: v2.5.0
   GO_VERSION: v1.24.x
 
 jobs:
@@ -30,12 +30,8 @@ jobs:
             exit 1
           fi
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v9
         with:
-          # Caching was done by actions/setup-go
-          skip-cache: true
-          skip-pkg-cache: true
-          skip-build-cache: true
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
   check-copyright:
