@@ -1,56 +1,71 @@
-run:
-  timeout: 10m
+version: "2"
 linters:
-  enable-all: false
   enable:
-    - errcheck
-    - gofumpt
-    - revive
-    - gosec
-    - govet
-    - ineffassign
-    - misspell
-    - nolintlint
-    - nakedret
-    - unconvert
-    - unused
-    - paralleltest
     - copyloopvar
-
-linters-settings:
-  nakedret:
-    # Make an issue if func has more lines of code than this setting, and it has naked returns.
-    # Default: 30
-    max-func-lines: 60
-  nolintlint:
-    # Some linter exclusions are added to generated or templated files
-    # pre-emptively.
-    # Don't complain about these.
-    allow-unused: true
-  govet:
-    enable:
-      - nilness
-      # Reject comparisons of reflect.Value with DeepEqual or '=='.
-      - reflectvaluecompare
-      # Reject sort.Slice calls with a non-slice argument.
-      - sortslice
-      # Detect write to struct/arrays by-value that aren't read again.
-      - unusedwrite
-
-issues:
-  exclude-rules:
-    # Don't warn on unused parameters.
-    # Parameter names are useful; replacing them with '_' is undesirable.
-    - linters: [revive]
-      text: 'unused-parameter: parameter \S+ seems to be unused, consider removing or renaming it as _'
-
-    # staticcheck already has smarter checks for empty blocks.
-    # revive's empty-block linter has false positives.
-    # For example, as of writing this, the following is not allowed.
-    #   for foo() { }
-    - linters: [revive]
-      text: 'empty-block: this block is empty, you can remove it'
-
-  exclude:
-    # https://github.com/pulumi/pulumi/issues/9469
-    - 'Name is deprecated: Name returns the variable or declaration name of the resource'
+    - gosec
+    - misspell
+    - nakedret
+    - nolintlint
+    - paralleltest
+    - revive
+    - unconvert
+  settings:
+    govet:
+      enable:
+        - nilness
+        # Reject comparisons of reflect.Value with DeepEqual or '=='.
+        - reflectvaluecompare
+        # Reject sort.Slice calls with a non-slice argument.
+        - sortslice
+        # Detect write to struct/arrays by-value that aren't read again.
+        - unusedwrite
+    nakedret:
+      # Make an issue if func has more lines of code than this setting, and it has naked returns.
+      # Default: 30
+      max-func-lines: 60
+    nolintlint:
+      # Some linter exclusions are added to generated or templated files
+      # pre-emptively.
+      # Don't complain about these.
+      allow-unused: true
+    staticcheck:
+      checks:
+        - 'all'
+        - '-ST1005' # error strings should not be capitalized
+        - '-ST1003' # struct field Id should be ID
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Don't warn on unused parameters.
+      # Parameter names are useful; replacing them with '_' is undesirable.
+      - linters:
+          - revive
+        text: 'unused-parameter: parameter \S+ seems to be unused, consider removing or renaming it as _'
+      # staticcheck already has smarter checks for empty blocks.
+      # revive's empty-block linter has false positives.
+      # For example, as of writing this, the following is not allowed.
+      #   for foo() { }
+      - linters:
+          - revive
+        text: 'empty-block: this block is empty, you can remove it'
+      # https://github.com/pulumi/pulumi/issues/9469
+      - path: (.+)\.go$
+        text: 'Name is deprecated: Name returns the variable or declaration name of the resource'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

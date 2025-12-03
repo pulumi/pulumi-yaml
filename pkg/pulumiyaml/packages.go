@@ -79,7 +79,7 @@ type packageLoader struct {
 }
 
 func (l packageLoader) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (Package, error) {
-	pkg, err := l.ReferenceLoader.LoadPackageReferenceV2(ctx, descriptor)
+	pkg, err := l.LoadPackageReferenceV2(ctx, descriptor)
 	if err != nil {
 		return nil, err
 	}
