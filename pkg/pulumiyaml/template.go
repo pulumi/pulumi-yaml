@@ -83,6 +83,8 @@ type ResourceOptions struct {
 	Version string `json:",omitempty" yaml:",omitempty"`
 	// ReplaceOnChanges forces a resource to be replaced when the targeted property is changed.
 	ReplaceOnChanges []string `json:",omitempty" yaml:",omitempty"`
+	// If set, the resource will be replaced if one of the specified resources is replaced.
+	ReplaceWith []string `json:",omitempty" yaml:",omitempty"`
 	// If set, the provider's Delete method will not be called for this resource if the specified resource is being
 	// deleted as well.
 	DeletedWith string `json:",omitempty" yaml:",omitempty"`

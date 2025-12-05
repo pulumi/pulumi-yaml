@@ -215,6 +215,12 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		contract.Assertf(ok, "Expected a list node, got %T", elems)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("dependsOn"), elems))
 	}
+	if opts.ReplaceWith != nil {
+		elems := g.expr(opts.ReplaceWith)
+		_, ok := elems.(*syn.ListNode)
+		contract.Assertf(ok, "Expected a list node, got %T", elems)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("replaceWith"), elems))
+	}
 	if opts.IgnoreChanges != nil {
 		elems := g.expr(opts.IgnoreChanges).(*syn.ListNode)
 		ignoreChanges := make([]syn.Node, elems.Len())

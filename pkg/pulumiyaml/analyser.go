@@ -1490,6 +1490,9 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walk(ctx, opts.RetainOnDelete) {
 		return false
 	}
+	if !e.walk(ctx, opts.ReplaceWith) {
+		return false
+	}
 	if !e.walk(ctx, opts.DeletedWith) {
 		return false
 	}
