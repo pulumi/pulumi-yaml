@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Add the `ReplaceWith` resource option
-time: 2025-12-03T15:59:21.448826+01:00
-custom:
-    PR: "900"
