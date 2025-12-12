@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Fix regression that broke using gcp:projects:IAMMember
+time: 2025-12-12T09:33:16.829798-08:00
+custom:
+    PR: "904"
