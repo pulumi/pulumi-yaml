@@ -65,8 +65,7 @@ func TestResolveToken(t *testing.T) {
 			})
 
 			if tt.expectedError != "" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedError)
+				require.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.found, found)
