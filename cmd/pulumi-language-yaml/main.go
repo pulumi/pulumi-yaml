@@ -64,7 +64,7 @@ func main() {
 	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
 		Cancel: cancelChannel,
 		Init: func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, tracing, false /* useRPCLoader */)
+			host := server.NewLanguageHost(engineAddress, tracing)
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
 			return nil
 		},
