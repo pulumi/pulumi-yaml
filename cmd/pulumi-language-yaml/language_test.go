@@ -195,6 +195,8 @@ var expectedFailures = map[string]string{
 
 	"l2-resource-option-hide-diffs":          "Currently failing on update to 3.205.0",
 	"l2-resource-option-replacement-trigger": "not yet implemented",
+
+	"provider-resource-component": "requires a provider implemented in the language, not applicable for YAML",
 }
 
 func log(t *testing.T, name, message string) {
