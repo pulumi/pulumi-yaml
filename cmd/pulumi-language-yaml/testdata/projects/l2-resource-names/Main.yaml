@@ -1,0 +1,17 @@
+resources:
+  res1:
+    type: names:ResMap
+    properties:
+      value: true
+  res2:
+    type: names:ResArray
+    properties:
+      value: true
+  res3:
+    type: names:ResList
+    properties:
+      value: true
+  res4:
+    type: names:ResResource
+    properties:
+      value: true

@@ -251,6 +251,9 @@ func TestLanguage(t *testing.T) {
 			if strings.HasPrefix(tt, "policy-") {
 				t.Skip("YAML does not support policy tests")
 			}
+			if strings.HasPrefix(tt, "provider-") {
+				t.Skip("YAML does not support provider tests")
+			}
 
 			if expected, ok := expectedFailures[tt]; ok {
 				t.Skipf("Skipping known failure: %s", expected)

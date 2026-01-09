@@ -1,0 +1,8 @@
+outputs:
+  # The invoke name is based on the parameter value
+  parameterValue:
+    fn::invoke:
+      function: subpackage:doHelloWorld
+      arguments:
+        input: goodbye
+      return: output
