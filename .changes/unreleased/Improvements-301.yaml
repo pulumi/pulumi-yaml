@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Use the engine for plugin loading, instead of loading another copy of a plugin for type checking.
+time: 2025-12-03T12:49:52.832569+01:00
+custom:
+    PR: "301"
