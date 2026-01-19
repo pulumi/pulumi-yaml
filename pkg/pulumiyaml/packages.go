@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -16,12 +15,9 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
 type ResourceTypeToken string
@@ -90,14 +86,6 @@ func (l packageLoader) Close() {
 	if l.host != nil {
 		l.host.Close()
 	}
-}
-
-func NewPackageLoader(plugins *workspace.Plugins, packages map[string]workspace.PackageSpec) (PackageLoader, error) {
-	host, err := newResourcePackageHost(plugins, packages)
-	if err != nil {
-		return nil, err
-	}
-	return packageLoader{schema.NewPluginLoader(host), host}, nil
 }
 
 // Unsafely create a PackageLoader from a schema.Loader, forfeiting the ability to close the host
@@ -533,21 +521,4 @@ func getResourceConstants(props []*schema.Property) map[string]interface{} {
 	}
 
 	return constantProps
-}
-
-func newResourcePackageHost(plugins *workspace.Plugins, packages map[string]workspace.PackageSpec) (plugin.Host, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
-		Color: cmdutil.GetGlobalColorization(),
-	})
-	ctx := context.Background()
-	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return pluginCtx.Host, nil
 }
