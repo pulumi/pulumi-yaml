@@ -1,0 +1,7 @@
+configuration:
+  value:
+    type: string
+  tags:
+    type: map(string)
+    default:
+      interpolated/${value}: value

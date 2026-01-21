@@ -190,8 +190,6 @@ func TestGenerateProgram(t *testing.T) {
 				// https://github.com/pulumi/pulumi-yaml/issues/478
 			case "optional-complex-config":
 				// https://github.com/pulumi/pulumi-yaml/issues/479
-			case "interpolated-string-keys":
-				// https://github.com/pulumi/pulumi-yaml/issues/480
 			case "functions", "throw-not-implemented", "single-or-none":
 				// Pulumi YAML does not functions:
 				// secret or unsecret, notImplemented, singleOrNone.
