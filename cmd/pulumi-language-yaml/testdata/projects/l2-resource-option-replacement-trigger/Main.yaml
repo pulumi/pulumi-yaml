@@ -1,0 +1,11 @@
+resources:
+  replacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replacementTrigger: test
+  notReplacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
