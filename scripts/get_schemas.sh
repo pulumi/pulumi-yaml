@@ -17,6 +17,7 @@ schemas=(
   "kubernetes@3.0.0"
   "azure@4.18.0"
   "azure-native@1.56.0"
+  "azure-native@2.41.0"
   "aws@5.4.0"
   "google-native@0.18.2"
   $(pulumi_schema synthetic 1.0.0)
