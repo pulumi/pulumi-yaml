@@ -6,29 +6,18 @@ default_url_template='https://raw.githubusercontent.com/pulumi/pulumi-_NAME_/v_V
 awsx_url='https://raw.githubusercontent.com/pulumi/pulumi-awsx/v_VERSION_/awsx/schema.json'
 function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/tests/testdata/codegen/$1-$2.json"; }
 schemas=(
-  "aws@4.37.1"
+  "aws@4.26.0"
   "aws@5.16.2"
-  "aws-native@0.13.0"
   "aws-native@0.99.0"
   "awsx@1.0.0-beta.5@${awsx_url}"
   "docker@4.0.0-alpha.0"
   "eks@0.40.0"
-  "eks@0.37.1"
   "random@4.11.2"
-  "random@4.3.1"
-  "random@4.2.0"
-  "kubernetes@3.7.2"
   "kubernetes@3.7.0"
   "kubernetes@3.0.0"
   "azure@4.18.0"
   "azure-native@1.56.0"
-  "azure-native@1.29.0"
-  "azure-native@1.28.0"
-  "azure-native@2.41.0"
-  "aws@5.16.2"
   "aws@5.4.0"
-  "aws@4.37.1"
-  "aws@4.36.0"
   "google-native@0.18.2"
   $(pulumi_schema synthetic 1.0.0)
   $(pulumi_schema other 0.1.0)
