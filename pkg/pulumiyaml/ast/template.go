@@ -368,6 +368,7 @@ type ResourceOptionsDecl struct {
 	ReplaceWith             Expr
 	DeletedWith             Expr
 	HideDiffs               *StringListDecl
+	ReplacementTrigger      Expr
 }
 
 func (d *ResourceOptionsDecl) defaultValue() interface{} {
@@ -384,6 +385,7 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	parent Expr, protect Expr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl,
 	retainOnDelete *BooleanExpr, replaceWith, deletedWith Expr, hideDiffs *StringListDecl,
+	replacementTrigger Expr,
 ) ResourceOptionsDecl {
 	return ResourceOptionsDecl{
 		declNode:                decl(node),
@@ -404,6 +406,7 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 		ReplaceWith:             replaceWith,
 		DeletedWith:             deletedWith,
 		HideDiffs:               hideDiffs,
+		ReplacementTrigger:      replacementTrigger,
 	}
 }
 
@@ -412,10 +415,11 @@ func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
 	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
 	protect Expr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,
 	replaceOnChanges *StringListDecl, retainOnDelete *BooleanExpr, replaceWith, deletedWith Expr, hideDiffs *StringListDecl,
+	replacementTrigger Expr,
 ) ResourceOptionsDecl {
 	return ResourceOptionsSyntax(nil, additionalSecretOutputs, aliases, customTimeouts,
 		deleteBeforeReplace, dependsOn, ignoreChanges, importID, parent, protect, provider, providers,
-		version, pluginDownloadURL, replaceOnChanges, retainOnDelete, replaceWith, deletedWith, hideDiffs)
+		version, pluginDownloadURL, replaceOnChanges, retainOnDelete, replaceWith, deletedWith, hideDiffs, replacementTrigger)
 }
 
 type InvokeOptionsDecl struct {

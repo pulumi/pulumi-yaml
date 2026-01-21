@@ -192,9 +192,7 @@ var expectedFailures = map[string]string{
 	"l1-builtin-project-root-main":          "test failing",
 	"l1-builtin-cwd":                        "test failing",
 	"l1-builtin-stash":                      "not yet implemented",
-
-	"l2-resource-option-hide-diffs":          "Currently failing on update to 3.205.0",
-	"l2-resource-option-replacement-trigger": "not yet implemented",
+	"l2-resource-option-hide-diffs":         "Currently failing on update to 3.205.0",
 }
 
 func log(t *testing.T, name, message string) {

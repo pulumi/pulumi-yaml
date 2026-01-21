@@ -1670,6 +1670,15 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 	if v.Options.HideDiffs != nil {
 		opts = append(opts, pulumi.HideDiffs(listStrings(v.Options.HideDiffs)))
 	}
+	if v.Options.ReplacementTrigger != nil {
+		replacementTriggerValue, ok := e.evaluateExpr(v.Options.ReplacementTrigger)
+		if ok {
+			opts = append(opts, pulumi.ReplacementTrigger(pulumi.Any(replacementTriggerValue)))
+		} else {
+			e.error(v.Options.ReplacementTrigger, "couldn't evaluate the 'replacementTrigger' resource option")
+			overallOk = false
+		}
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
