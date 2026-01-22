@@ -2176,6 +2176,13 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				} else if !ok {
 					receiver = nil
 				} else {
+					// Not-known-to-be-unknown properties inside maps containing unknowns
+					// should be treated as unknown during previews to ensure that we
+					// don't end up using old values.
+					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
+						return unknownOutput(), true
+					}
+
 					receiver = prop
 				}
 				accessors = accessors[1:]
