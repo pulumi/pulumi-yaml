@@ -1,0 +1,31 @@
+resources:
+  replacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replacementTrigger: test
+  unknown:
+    type: output:Resource
+    properties:
+      value: 1
+  unknownReplacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replacementTrigger: hellohello
+  notReplacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
+  secretReplacementTrigger:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replacementTrigger:
+        fn::secret:
+          - 1
+          - 2
+          - 3
