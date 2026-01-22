@@ -2188,6 +2188,8 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				accessors = accessors[1:]
 			case resource.PropertyValue:
 				switch {
+				case x.IsNull():
+					receiver = nil
 				case x.IsComputed():
 					return unknownOutput(), true
 				case x.IsOutput():
