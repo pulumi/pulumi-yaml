@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add support for the replacement trigger resource option
+time: 2026-01-21T18:03:13.751853+01:00
+custom:
+    PR: "919"
