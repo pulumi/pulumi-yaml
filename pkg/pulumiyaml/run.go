@@ -1462,6 +1462,11 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		if ok {
 			// If it's a simple map then just copy the values in it over
 			for key, value := range obj {
+				// Convert null PropertyValues to nil to avoid passing them to component providers
+				if pv, ok := value.(resource.PropertyValue); ok && pv.IsNull() {
+					value = nil
+				}
+
 				// check if we need to secret-ify the value
 				secret, err := pkg.IsResourcePropertySecret(typ, key)
 				if err != nil {
@@ -2173,7 +2178,7 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				prop, ok := x[resource.PropertyKey(k)]
 				if x.ContainsUnknowns() && !ok {
 					return unknownOutput(), true
-				} else if !ok {
+				} else if !ok || prop.IsNull() {
 					receiver = nil
 				} else {
 					// Not-known-to-be-unknown properties inside maps containing unknowns
@@ -2189,7 +2194,7 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 			case resource.PropertyValue:
 				switch {
 				case x.IsNull():
-					receiver = nil
+					return nil, true
 				case x.IsComputed():
 					return unknownOutput(), true
 				case x.IsOutput():
