@@ -170,8 +170,10 @@ func (g *generator) genNode(n pcl.Node) {
 		g.genLocalVariable(n)
 	case *pcl.OutputVariable:
 		g.genOutputVariable(n)
+	case *pcl.PulumiBlock:
+		// TODO[github.com/pulumi/pulumi-yaml/issues/924]: Implement Required version
 	default:
-		panic("Not implemented yet")
+		panic(fmt.Sprintf("Not implemented yet: %T", n))
 	}
 }
 
