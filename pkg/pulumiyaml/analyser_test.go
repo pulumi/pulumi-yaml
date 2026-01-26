@@ -382,3 +382,27 @@ func TestNonStringKeyInObjectReturnsError(t *testing.T) {
 	require.Equal(t, "Object key must be a string, got *ast.BooleanExpr",
 		tc.exprs[expr].(*schema.InvalidType).Diagnostics[0].Summary)
 }
+
+func TestInterpolatedKeyInObjectCreatesMap(t *testing.T) {
+	t.Parallel()
+
+	tc := typeCache{
+		exprs: make(map[ast.Expr]schema.Type),
+	}
+	// Create an object with an interpolated key
+	valueExpr := &ast.StringExpr{}
+	tc.exprs[valueExpr] = schema.StringType
+	expr := &ast.ObjectExpr{
+		Entries: []ast.ObjectProperty{
+			{
+				Key:   &ast.InterpolateExpr{},
+				Value: valueExpr,
+			},
+		},
+	}
+	_ = tc.typeExpr(nil, expr)
+	require.Equal(t, 2, len(tc.exprs))
+	mapType, ok := tc.exprs[expr].(*schema.MapType)
+	require.True(t, ok, "Expected MapType, got %T", tc.exprs[expr])
+	require.Equal(t, schema.StringType, mapType.ElementType)
+}

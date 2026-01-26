@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	ctypes "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
@@ -814,13 +815,22 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	}
 	if t.CallArgs != nil {
 		for _, prop := range t.CallArgs.Entries {
-			k := prop.Key.(*ast.StringExpr).Value
-			if typ, ok := inputs[k]; !ok {
-				summary, detail := fmtr.MessageWithDetail(k, k)
-				subject := prop.Key.Syntax().Syntax().Range()
-				ctx.addWarnDiag(subject, summary, detail)
-			} else {
-				tc.exprs[prop.Value] = typ
+			switch keyExpr := prop.Key.(type) {
+			// Invoke arguments are objects (not maps) and so should have statically known keys.
+			case *ast.StringExpr:
+				k := keyExpr.Value
+				if typ, ok := inputs[k]; !ok {
+					summary, detail := fmtr.MessageWithDetail(k, k)
+					subject := prop.Key.Syntax().Syntax().Range()
+					ctx.addWarnDiag(subject, summary, detail)
+				} else {
+					tc.exprs[prop.Value] = typ
+				}
+			default:
+				ctx.addErrDiag(prop.Key.Syntax().Syntax().Range(),
+					"Invoke argument keys must be string literals, not interpolated expressions", "")
+				tc.typeExpr(ctx, prop.Key)
+				tc.typeExpr(ctx, prop.Value)
 			}
 		}
 	}
@@ -919,7 +929,7 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 		return root
 	}
 	if root, ok := root.(*schema.UnionType); ok {
-		var possibilities OrderedTypeSet
+		var possibilities orderedSet[schema.Type]
 		errs := []*notAssignable{}
 		for _, subtypes := range root.ElementTypes {
 			t := typePropertyAccess(ctx, subtypes, runningName, accessors,
@@ -1056,7 +1066,7 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
 		tc.exprs[t] = schema.StringType
 	case *ast.ListExpr:
-		var types OrderedTypeSet
+		var types orderedSet[schema.Type]
 		for _, typ := range t.Elements {
 			types.Add(tc.exprs[typ])
 		}
@@ -1077,12 +1087,14 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 			ElementType: elementType,
 		}
 	case *ast.ObjectExpr:
-		// This is an add hock object
-		properties := make([]*schema.Property, 0, len(t.Entries))
-		propNames := make([]string, 0, len(t.Entries))
+		var hasInterpolatedKey bool
 		for _, entry := range t.Entries {
-			k, ok := entry.Key.(*ast.StringExpr)
-			if !ok {
+			switch entry.Key.(type) {
+			case *ast.StringExpr:
+				continue
+			case *ast.InterpolateExpr:
+				hasInterpolatedKey = true
+			default:
 				tc.exprs[t] = &schema.InvalidType{
 					Diagnostics: []*hcl.Diagnostic{
 						{Summary: fmt.Sprintf("Object key must be a string, got %T", entry.Key)},
@@ -1090,16 +1102,46 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 				}
 				return true
 			}
-			v := entry.Value
-			properties = append(properties, &schema.Property{
-				Name: k.Value,
-				Type: tc.exprs[v],
-			})
-			propNames = append(propNames, k.Value)
 		}
-		tc.exprs[t] = &schema.ObjectType{
-			Token:      adhockObjectToken + strings.Join(propNames, "•"),
-			Properties: properties,
+
+		// If a type has an interpolated key, then we assume it's a map, since an object must have fixed keys.
+		if hasInterpolatedKey {
+			var types orderedSet[schema.Type]
+			for _, entry := range t.Entries {
+				types.Add(tc.exprs[entry.Value])
+			}
+
+			var elementType schema.Type
+			switch types.Len() {
+			case 0:
+				contract.Failf("hasInterpolatedKey implies at least one key (with a type)")
+			case 1:
+				// All values have same type
+				for _, t := range types.Values() {
+					elementType = t
+					break
+				}
+			default:
+				elementType = &schema.UnionType{ElementTypes: types.Values()}
+			}
+
+			tc.exprs[t] = &schema.MapType{ElementType: elementType}
+		} else {
+			properties := make([]*schema.Property, 0, len(t.Entries))
+			propNames := make([]string, 0, len(t.Entries))
+			for _, entry := range t.Entries {
+				k := entry.Key.(*ast.StringExpr).Value
+				v := entry.Value
+				properties = append(properties, &schema.Property{
+					Name: k,
+					Type: tc.exprs[v],
+				})
+				propNames = append(propNames, k)
+			}
+			tc.exprs[t] = &schema.ObjectType{
+				Token:      adhockObjectToken + strings.Join(propNames, "•"),
+				Properties: properties,
+			}
 		}
 	case *ast.NullExpr:
 		tc.exprs[t] = &schema.InvalidType{}
@@ -1543,16 +1585,16 @@ func ResourceOptionsTypeHint() map[string]struct{} {
 	return m
 }
 
-type OrderedTypeSet struct {
+type orderedSet[T comparable] struct {
 	// Provide O(1) existence checking
-	existence map[schema.Type]struct{}
+	existence map[T]struct{}
 	// Provide ordering
-	order []schema.Type
+	order []T
 }
 
-func (o *OrderedTypeSet) Add(t schema.Type) bool {
+func (o *orderedSet[T]) Add(t T) bool {
 	if o.existence == nil {
-		o.existence = map[schema.Type]struct{}{}
+		o.existence = map[T]struct{}{}
 	}
 	_, ok := o.existence[t]
 	if ok {
@@ -1563,17 +1605,17 @@ func (o *OrderedTypeSet) Add(t schema.Type) bool {
 	return true
 }
 
-func (o *OrderedTypeSet) Values() []schema.Type {
-	a := make([]schema.Type, 0, len(o.order))
+func (o *orderedSet[T]) Values() []T {
+	a := make([]T, 0, len(o.order))
 	return append(a, o.order...)
 }
 
-func (o *OrderedTypeSet) Len() int {
+func (o *orderedSet[T]) Len() int {
 	// This will equal len(o.existence) assuming that the internals have not been messed with.
 	return len(o.order)
 }
 
 // First returns the first element added, panicking if no element exists.
-func (o *OrderedTypeSet) First() schema.Type {
+func (o *orderedSet[T]) First() T {
 	return o.order[0]
 }
