@@ -1,0 +1,28 @@
+resources:
+  parent:
+    type: simple:Resource
+    properties:
+      value: true
+  aliasURN:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent}
+  aliasNewName:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  aliasNoParent:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent}
+  aliasParent:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent}

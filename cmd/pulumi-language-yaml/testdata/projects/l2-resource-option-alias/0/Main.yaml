@@ -1,0 +1,24 @@
+resources:
+  # Make a simple resource to use as a parent
+  parent:
+    type: simple:Resource
+    properties:
+      value: true
+  aliasURN:
+    type: simple:Resource
+    properties:
+      value: true
+  aliasName:
+    type: simple:Resource
+    properties:
+      value: true
+  aliasNoParent:
+    type: simple:Resource
+    properties:
+      value: true
+  aliasParent:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${aliasURN}
