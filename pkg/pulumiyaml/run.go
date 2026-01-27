@@ -1462,11 +1462,6 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		if ok {
 			// If it's a simple map then just copy the values in it over
 			for key, value := range obj {
-				// Convert null PropertyValues to nil to avoid passing them to component providers
-				if pv, ok := value.(resource.PropertyValue); ok && pv.IsNull() {
-					value = nil
-				}
-
 				// check if we need to secret-ify the value
 				secret, err := pkg.IsResourcePropertySecret(typ, key)
 				if err != nil {
