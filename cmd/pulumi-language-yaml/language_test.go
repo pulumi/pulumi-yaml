@@ -191,6 +191,7 @@ var expectedFailures = map[string]string{
 	"l2-provider-grpc-config-schema-secret":  "Detected a secret leak in state",
 	"l2-proxy-index":                         "test failing",
 	"l2-resource-option-alias":               "generation unimplemented (https://github.com/pulumi/pulumi-yaml/issues/925)",
+	"l2-resource-option-replace-on-changes":  "not yet implemented",
 	"l2-resource-option-replacement-trigger": "not yet implemented",
 	"l2-resource-option-retain-on-delete":    "#723 generation unimplemented",
 	"l2-resource-parent-inheritance":         "expected parent to be retain on delete",

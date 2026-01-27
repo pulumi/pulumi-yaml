@@ -2173,14 +2173,25 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				prop, ok := x[resource.PropertyKey(k)]
 				if x.ContainsUnknowns() && !ok {
 					return unknownOutput(), true
-				} else if !ok {
+				} else if !ok || prop.IsNull() {
 					receiver = nil
 				} else {
+					// Not-known-to-be-unknown output/computed properties inside maps
+					// containing unknowns should be treated as unknown during previews to
+					// ensure that we don't end up using old values.
+					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
+						if (prop.IsOutput() && !prop.OutputValue().Known) || prop.IsComputed() {
+							return unknownOutput(), true
+						}
+					}
+
 					receiver = prop
 				}
 				accessors = accessors[1:]
 			case resource.PropertyValue:
 				switch {
+				case x.IsNull():
+					return nil, true
 				case x.IsComputed():
 					return unknownOutput(), true
 				case x.IsOutput():
