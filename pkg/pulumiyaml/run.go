@@ -2185,7 +2185,7 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 					// containing unknowns should be treated as unknown during previews to
 					// ensure that we don't end up using old values.
 					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
-						if prop.IsOutput() || prop.IsComputed() {
+						if (prop.IsOutput() && !prop.OutputValue().Known) || prop.IsComputed() {
 							return unknownOutput(), true
 						}
 					}
