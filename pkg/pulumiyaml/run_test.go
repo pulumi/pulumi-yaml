@@ -16,6 +16,7 @@ import (
 	b64 "encoding/base64"
 
 	"github.com/blang/semver"
+	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -2808,4 +2809,25 @@ resources:
 		return nil
 	}, pulumi.WithMocks("project", "stack", mocks))
 	assert.NoError(t, err)
+}
+
+func TestLoadPluginTemplateMissingName(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Main.yaml"), []byte(`
+# name: test-component // <-- name isn't there
+components:
+  testComponent:
+    outputs:
+      output: the-output
+
+`), 0o600))
+
+	_, diags, err := LoadPluginTemplate(dir)
+	require.NoError(t, err)
+	assert.Equal(t, syntax.Diagnostics{{Diagnostic: hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  "missing required `name` field.",
+	}}}, diags)
 }
