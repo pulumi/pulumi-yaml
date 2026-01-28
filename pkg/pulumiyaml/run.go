@@ -155,6 +155,7 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		return nil, nil, err
 	}
 	var template *ast.TemplateDecl
+	var diags syntax.Diagnostics
 	for _, file := range files {
 		if file.IsDir() || filepath.Ext(file.Name()) != ".yaml" {
 			continue
@@ -164,10 +165,11 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		if err != nil {
 			return nil, nil, err
 		}
-		t, diags, err := LoadYAML(file.Name(), f)
+		t, loadDiags, err := LoadYAML(file.Name(), f)
 		if err != nil {
 			return nil, diags, err
 		}
+		diags.Extend(loadDiags...)
 		if diags.HasErrors() {
 			return nil, diags, diags
 		}
@@ -213,8 +215,11 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		return nil, nil, err
 	}
 	template.Sdks = sdks
+	if template.Name == nil {
+		diags.Extend(syntax.Error(nil, "missing required `name` field.", ""))
+	}
 
-	return template, nil, nil
+	return template, diags, nil
 }
 
 // LoadYAML decodes a YAML template from an io.Reader.
