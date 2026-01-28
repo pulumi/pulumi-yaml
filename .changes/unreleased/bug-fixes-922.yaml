@@ -1,6 +1,0 @@
-component: runtime
-kind: bug-fixes
-body: Make the check for unknown values more conservative
-time: 2026-01-22T13:39:46.126307+01:00
-custom:
-    PR: "922"
