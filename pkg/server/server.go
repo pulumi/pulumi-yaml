@@ -754,3 +754,10 @@ func (host *yamlLanguageHost) Pack(ctx context.Context, req *pulumirpc.PackReque
 		ArtifactPath: dst,
 	}, nil
 }
+
+func (host *yamlLanguageHost) Link(context.Context, *pulumirpc.LinkRequest) (*pulumirpc.LinkResponse, error) {
+	// YAML doesn't need to do anything to link in a package.
+	//
+	// We still implement Link so the engine knows that we have done all we need to do.
+	return &pulumirpc.LinkResponse{}, nil
+}
