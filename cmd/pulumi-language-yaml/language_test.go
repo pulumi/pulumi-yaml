@@ -174,8 +174,6 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                               "#721 generation unimplemented",
-	"l1-builtin-cwd":                               "test failing",
-	"l1-builtin-project-root-main":                 "test failing",
 	"l1-builtin-require-pulumi-version":            "not yet implemented (https://github.com/pulumi/pulumi-yaml/issues/924)",
 	"l1-builtin-stash":                             "not yet implemented",
 	"l1-builtin-try":                               "#721 generation unimplemented",
