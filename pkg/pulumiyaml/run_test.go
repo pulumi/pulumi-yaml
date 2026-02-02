@@ -2152,6 +2152,76 @@ resources:
 	assert.NoError(t, err)
 }
 
+func TestResourceWithStringAliases(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-string-aliases
+runtime: yaml
+resources:
+  myResource:
+    type: test:index:Resource
+    properties:
+      value: true
+    options:
+      aliases:
+        - "urn:pulumi:stack::project::test:index:Resource::oldName"
+        - "urn:pulumi:stack::project::test:index:Resource::anotherOldName"
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, 2, len(args.RegisterRPC.GetAliases()))
+			assert.Equal(t, "urn:pulumi:stack::project::test:index:Resource::oldName", args.RegisterRPC.GetAliases()[0].GetUrn())
+			assert.Equal(t, "urn:pulumi:stack::project::test:index:Resource::anotherOldName", args.RegisterRPC.GetAliases()[1].GetUrn())
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithObjectAliases(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-object-aliases
+runtime: yaml
+resources:
+  myResource:
+    type: test:index:Resource
+    properties:
+      value: true
+    options:
+      aliases:
+        - name: oldName
+        - noParent: true
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, 2, len(args.RegisterRPC.GetAliases()))
+			// First alias should have name field
+			assert.Equal(t, "oldName", args.RegisterRPC.GetAliases()[0].GetSpec().Name)
+			// Second alias should have noParent field
+			assert.True(t, args.RegisterRPC.GetAliases()[1].GetSpec().GetNoParent())
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
 func TestResourceWithLogicalName(t *testing.T) {
 	t.Parallel()
 

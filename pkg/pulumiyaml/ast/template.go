@@ -351,7 +351,7 @@ type ResourceOptionsDecl struct {
 	declNode
 
 	AdditionalSecretOutputs *StringListDecl
-	Aliases                 *StringListDecl
+	Aliases                 Expr
 	CustomTimeouts          *CustomTimeoutsDecl
 	DeleteBeforeReplace     *BooleanExpr
 	DependsOn               Expr
@@ -379,7 +379,7 @@ func (d *ResourceOptionsDecl) recordSyntax() *syntax.Node {
 }
 
 func ResourceOptionsSyntax(node *syntax.ObjectNode,
-	additionalSecretOutputs, aliases *StringListDecl, customTimeouts *CustomTimeoutsDecl,
+	additionalSecretOutputs *StringListDecl, aliases Expr, customTimeouts *CustomTimeoutsDecl,
 	deleteBeforeReplace *BooleanExpr, dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr,
 	parent Expr, protect Expr, provider, providers Expr, version *StringExpr,
 	pluginDownloadURL *StringExpr, replaceOnChanges *StringListDecl,
@@ -407,7 +407,7 @@ func ResourceOptionsSyntax(node *syntax.ObjectNode,
 	}
 }
 
-func ResourceOptions(additionalSecretOutputs, aliases *StringListDecl,
+func ResourceOptions(additionalSecretOutputs *StringListDecl, aliases Expr,
 	customTimeouts *CustomTimeoutsDecl, deleteBeforeReplace *BooleanExpr,
 	dependsOn Expr, ignoreChanges *StringListDecl, importID *StringExpr, parent Expr,
 	protect Expr, provider, providers Expr, version *StringExpr, pluginDownloadURL *StringExpr,

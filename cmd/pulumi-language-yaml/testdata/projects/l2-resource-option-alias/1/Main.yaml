@@ -9,20 +9,28 @@ resources:
       value: true
     options:
       parent: ${parent}
+      aliases:
+        - urn:pulumi:test::l2-resource-option-alias::simple:index:Resource::aliasURN
   aliasNewName:
     type: simple:Resource
     properties:
       value: true
-    options: {}
+    options:
+      aliases:
+        - name: aliasName
   aliasNoParent:
     type: simple:Resource
     properties:
       value: true
     options:
       parent: ${parent}
+      aliases:
+        - noParent: true
   aliasParent:
     type: simple:Resource
     properties:
       value: true
     options:
       parent: ${parent}
+      aliases:
+        - parent: ${aliasURN}

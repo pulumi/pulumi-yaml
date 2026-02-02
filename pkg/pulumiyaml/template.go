@@ -54,12 +54,32 @@ type Configuration struct {
 	Secret bool `yaml:",omitempty"`
 }
 
+// AliasSpec describes an alias for a resource. It can be either a string URN or an object with specific fields.
+type AliasSpec struct {
+	// URN is a direct URN alias (mutually exclusive with other fields)
+	URN string `json:",omitempty" yaml:",omitempty"`
+	// Name is the previous name of the resource
+	Name string `json:",omitempty" yaml:",omitempty"`
+	// Type is the previous type of the resource
+	Type string `json:",omitempty" yaml:",omitempty"`
+	// Parent is the previous parent of the resource (mutually exclusive with ParentURN and NoParent)
+	Parent string `json:",omitempty" yaml:",omitempty"`
+	// ParentURN is the previous parent in URN format (mutually exclusive with Parent and NoParent)
+	ParentURN string `json:",omitempty" yaml:",omitempty"`
+	// NoParent indicates the resource previously had no parent (mutually exclusive with Parent and ParentURN)
+	NoParent bool `json:",omitempty" yaml:",omitempty"`
+	// Stack is the previous stack of the resource
+	Stack string `json:",omitempty" yaml:",omitempty"`
+	// Project is the previous project of the resource
+	Project string `json:",omitempty" yaml:",omitempty"`
+}
+
 // ResourceOptions describes additional options common to all Pulumi resources.
 type ResourceOptions struct {
 	// AdditionalSecretOutputs specifies properties that must be encrypted as secrets
 	AdditionalSecretOutputs []string `json:",omitempty" yaml:",omitempty"`
-	// Aliases specifies names that this resource used to be have so that renaming or refactoring doesn’t replace it
-	Aliases []string `json:",omitempty" yaml:"Aliases,omitempty"`
+	// Aliases specifies names that this resource used to be have so that renaming or refactoring doesn't replace it
+	Aliases []interface{} `json:",omitempty" yaml:"Aliases,omitempty"`
 	// CustomTimeouts overrides the default retry/timeout behavior for resource provisioning
 	CustomTimeouts *CustomTimeoutResourceOption `json:",omitempty" yaml:",omitempty"`
 	// DeleteBeforeReplace  overrides the default create-before-delete behavior when replacing

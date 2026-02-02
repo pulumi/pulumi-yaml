@@ -1521,11 +1521,59 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 
 	if v.Options.Aliases != nil {
 		var aliases []pulumi.Alias
-		for _, s := range v.Options.Aliases.Elements {
-			alias := pulumi.Alias{
-				URN: pulumi.URN(s.Value),
+		if listExpr, ok := v.Options.Aliases.(*ast.ListExpr); ok {
+			for _, elem := range listExpr.Elements {
+				if strExpr, ok := elem.(*ast.StringExpr); ok {
+					// String URN alias
+					alias := pulumi.Alias{
+						URN: pulumi.URN(strExpr.Value),
+					}
+					aliases = append(aliases, alias)
+				} else if objExpr, ok := elem.(*ast.ObjectExpr); ok {
+					// Object alias
+					alias := pulumi.Alias{}
+					for _, entry := range objExpr.Entries {
+						key, ok := entry.Key.(*ast.StringExpr)
+						if !ok {
+							continue
+						}
+						switch key.Value {
+						case "urn":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.URN = pulumi.URN(strVal.Value)
+							}
+						case "name":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.Name = pulumi.String(strVal.Value)
+							}
+						case "type":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.Type = pulumi.String(strVal.Value)
+							}
+						case "parent":
+							// TODO: Handle parent resource references
+							// For now, skip parent field in aliases
+						case "parentUrn":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.ParentURN = pulumi.URN(strVal.Value)
+							}
+						case "noParent":
+							if boolVal, ok := entry.Value.(*ast.BooleanExpr); ok {
+								alias.NoParent = pulumi.Bool(boolVal.Value)
+							}
+						case "stack":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.Stack = pulumi.String(strVal.Value)
+							}
+						case "project":
+							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
+								alias.Project = pulumi.String(strVal.Value)
+							}
+						}
+					}
+					aliases = append(aliases, alias)
+				}
 			}
-			aliases = append(aliases, alias)
 		}
 		opts = append(opts, pulumi.Aliases(aliases))
 	}

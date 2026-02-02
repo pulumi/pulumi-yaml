@@ -253,6 +253,12 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("deletedWith"),
 			g.expr(opts.DeletedWith)))
 	}
+	if opts.Aliases != nil {
+		elems := g.expr(opts.Aliases)
+		_, ok := elems.(*syn.ListNode)
+		contract.Assertf(ok, "Expected a list node, got %T", elems)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("aliases"), elems))
+	}
 
 	return syn.Object(rOpts...)
 }

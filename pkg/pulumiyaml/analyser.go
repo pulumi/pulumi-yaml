@@ -1451,7 +1451,7 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walkStringList(ctx, opts.AdditionalSecretOutputs) {
 		return false
 	}
-	if !e.walkStringList(ctx, opts.Aliases) {
+	if !e.walk(ctx, opts.Aliases) {
 		return false
 	}
 	if !e.walk(ctx, opts.DeleteBeforeReplace) {
