@@ -1451,7 +1451,7 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walkStringList(ctx, opts.AdditionalSecretOutputs) {
 		return false
 	}
-	if !e.walk(ctx, opts.Aliases) {
+	if !e.walkAliases(ctx, opts.Aliases) {
 		return false
 	}
 	if !e.walk(ctx, opts.DeleteBeforeReplace) {
@@ -1522,6 +1522,100 @@ func (e walker) walkStringList(ctx *evalContext, l *ast.StringListDecl) bool {
 			}
 		}
 	}
+	return true
+}
+
+// walkAliases validates the aliases option. Aliases must be a list where each element
+// is either a string (URN) or an object with specific fields.
+func (e walker) walkAliases(ctx *evalContext, aliases ast.Expr) bool {
+	if aliases == nil {
+		return true
+	}
+
+	// First walk the expression to type it
+	if !e.walk(ctx, aliases) {
+		return false
+	}
+
+	// Validate that aliases is a list
+	listExpr, ok := aliases.(*ast.ListExpr)
+	if !ok {
+		ctx.addErrDiag(
+			aliases.Syntax().Syntax().Range(),
+			"aliases must be a list",
+			"Expected an array of strings (URNs) or objects with alias properties")
+		return false
+	}
+
+	// Validate each element
+	validAliasFields := map[string]bool{
+		"name":      true,
+		"type":      true,
+		"stack":     true,
+		"project":   true,
+		"parentUrn": true,
+		"noParent":  true,
+	}
+
+	for i, elem := range listExpr.Elements {
+		switch el := elem.(type) {
+		case *ast.StringExpr:
+			// String URN alias - valid
+			continue
+		case *ast.InterpolateExpr:
+			// Interpolated string - valid
+			continue
+		case *ast.ObjectExpr:
+			// Object alias - validate fields
+			for _, entry := range el.Entries {
+				keyExpr, ok := entry.Key.(*ast.StringExpr)
+				if !ok {
+					ctx.addErrDiag(
+						entry.Key.Syntax().Syntax().Range(),
+						"alias object keys must be strings",
+						"")
+					return false
+				}
+
+				if !validAliasFields[keyExpr.Value] {
+					msg, detail := yamldiags.NonExistentFieldFormatter{
+						Fields: []string{"name", "type", "stack", "project", "parentUrn", "noParent"},
+					}.MessageWithDetail(keyExpr.Value, keyExpr.Value)
+					ctx.addErrDiag(entry.Key.Syntax().Syntax().Range(), msg, detail)
+					return false
+				}
+
+				// Validate field types
+				switch keyExpr.Value {
+				case "name", "type", "stack", "project", "parentUrn":
+					switch entry.Value.(type) {
+					case *ast.StringExpr, *ast.InterpolateExpr:
+					default:
+						ctx.addErrDiag(
+							entry.Value.Syntax().Syntax().Range(),
+							fmt.Sprintf("alias field '%s' must be a string", keyExpr.Value),
+							"")
+						return false
+					}
+				case "noParent":
+					if _, ok := entry.Value.(*ast.BooleanExpr); !ok {
+						ctx.addErrDiag(
+							entry.Value.Syntax().Syntax().Range(),
+							"alias field 'noParent' must be a boolean",
+							"")
+						return false
+					}
+				}
+			}
+		default:
+			ctx.addErrDiag(
+				elem.Syntax().Syntax().Range(),
+				fmt.Sprintf("aliases[%d] must be a string or object", i),
+				"Each alias must be either a string URN or an object with alias properties")
+			return false
+		}
+	}
+
 	return true
 }
 
