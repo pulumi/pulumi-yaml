@@ -1551,8 +1551,17 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 								alias.Type = pulumi.String(strVal.Value)
 							}
 						case "parent":
-							// TODO: Handle parent resource references
-							// For now, skip parent field in aliases
+							// Handle parent resource references
+							parentRes, ok := e.evaluateResourceValuedOption(entry.Value, "alias.parent")
+							if ok {
+								if p, ok := parentRes.(poisonMarker); !ok {
+									alias.Parent = parentRes.CustomResource()
+								} else {
+									return p, true
+								}
+							} else {
+								overallOk = false
+							}
 						case "parentUrn":
 							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
 								alias.ParentURN = pulumi.URN(strVal.Value)

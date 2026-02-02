@@ -1553,6 +1553,7 @@ func (e walker) walkAliases(ctx *evalContext, aliases ast.Expr) bool {
 		"type":      true,
 		"stack":     true,
 		"project":   true,
+		"parent":    true,
 		"parentUrn": true,
 		"noParent":  true,
 	}
@@ -1579,7 +1580,7 @@ func (e walker) walkAliases(ctx *evalContext, aliases ast.Expr) bool {
 
 				if !validAliasFields[keyExpr.Value] {
 					msg, detail := yamldiags.NonExistentFieldFormatter{
-						Fields: []string{"name", "type", "stack", "project", "parentUrn", "noParent"},
+						Fields: []string{"name", "type", "stack", "project", "parent", "parentUrn", "noParent"},
 					}.MessageWithDetail(keyExpr.Value, keyExpr.Value)
 					ctx.addErrDiag(entry.Key.Syntax().Syntax().Range(), msg, detail)
 					return false
@@ -1594,6 +1595,17 @@ func (e walker) walkAliases(ctx *evalContext, aliases ast.Expr) bool {
 						ctx.addErrDiag(
 							entry.Value.Syntax().Syntax().Range(),
 							fmt.Sprintf("alias field '%s' must be a string", keyExpr.Value),
+							"")
+						return false
+					}
+				case "parent":
+					// Parent should be a resource reference (symbol or interpolation)
+					switch entry.Value.(type) {
+					case *ast.SymbolExpr, *ast.InterpolateExpr:
+					default:
+						ctx.addErrDiag(
+							entry.Value.Syntax().Syntax().Range(),
+							"alias field 'parent' must be a resource reference",
 							"")
 						return false
 					}

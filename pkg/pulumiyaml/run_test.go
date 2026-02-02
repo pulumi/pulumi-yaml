@@ -2222,6 +2222,52 @@ resources:
 	assert.NoError(t, err)
 }
 
+func TestResourceWithParentAlias(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-parent-alias
+runtime: yaml
+resources:
+  parentResource:
+    type: test:index:Resource
+    properties:
+      value: true
+  childResource:
+    type: test:index:Resource
+    properties:
+      value: false
+    options:
+      aliases:
+        - parent: ${parentResource}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			if args.Name == "childResource" {
+				assert.Equal(t, 1, len(args.RegisterRPC.GetAliases()))
+				// The alias should have a parent URN set (not empty)
+				aliasSpec := args.RegisterRPC.GetAliases()[0].GetSpec()
+				assert.NotNil(t, aliasSpec)
+				// Check that the parent URN is set and not empty
+				parentUrn := aliasSpec.GetParentUrn()
+				assert.NotEmpty(t, parentUrn, "parent URN should be set")
+				// Check that it contains "parentResource" in the URN
+				assert.Contains(t, parentUrn, "parentResource", "parent URN should reference parentResource")
+			}
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
 func TestResourceWithLogicalName(t *testing.T) {
 	t.Parallel()
 

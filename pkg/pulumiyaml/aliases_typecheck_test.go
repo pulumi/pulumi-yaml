@@ -70,6 +70,29 @@ resources:
 		assert.Empty(t, diags, "mixed string and object aliases should not produce errors")
 	})
 
+	// Test parent field with resource reference
+	t.Run("parent field with resource reference", func(t *testing.T) {
+		text := `
+name: test-aliases-parent
+runtime: yaml
+resources:
+  parentRes:
+    type: test:resource:type
+    properties:
+      foo: oof
+  childRes:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - parent: ${parentRes}
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Empty(t, diags, "parent field with resource reference should not produce errors")
+	})
+
 	// Test invalid field in alias object
 	t.Run("invalid field in alias object", func(t *testing.T) {
 		text := `
@@ -166,6 +189,39 @@ resources:
 				}
 			}
 			assert.True(t, foundTypeError, "should report type error for name: %v", diagStrings)
+		}
+	})
+
+	// Test wrong type for parent field
+	t.Run("wrong type for parent", func(t *testing.T) {
+		text := `
+name: test-aliases-wrong-parent-type
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - parent: "someString"
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		if assert.NotEmpty(t, diags, "wrong type for parent should produce error") {
+			var diagStrings []string
+			for _, v := range diags {
+				diagStrings = append(diagStrings, diagString(v))
+			}
+			// Should contain error about parent needing to be a resource reference
+			var foundTypeError bool
+			for _, ds := range diagStrings {
+				if strings.Contains(ds, "parent") && strings.Contains(ds, "resource") {
+					foundTypeError = true
+					break
+				}
+			}
+			assert.True(t, foundTypeError, "should report type error for parent: %v", diagStrings)
 		}
 	})
 
