@@ -1,0 +1,3 @@
+outputs:
+  rootDirectoryOutput: ${pulumi.rootDirectory}
+  workingDirectoryOutput: ${pulumi.cwd}

@@ -760,6 +760,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("readFile", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
+	case "cwd":
+		return syn.String("${pulumi.cwd}")
 	case "getOutput":
 		// getOutput(var, key) => ${var.outputs[key]}
 
