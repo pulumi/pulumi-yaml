@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add pulumi.requiredPulumiVersion
+time: 2026-02-03T17:22:10.560402+01:00
+custom:
+    PR: "939"
