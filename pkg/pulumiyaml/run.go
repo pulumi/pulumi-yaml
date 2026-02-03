@@ -1523,33 +1523,62 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		var aliases []pulumi.Alias
 		if listExpr, ok := v.Options.Aliases.(*ast.ListExpr); ok {
 			for _, elem := range listExpr.Elements {
-				if strExpr, ok := elem.(*ast.StringExpr); ok {
-					// String URN alias
-					alias := pulumi.Alias{
-						URN: pulumi.URN(strExpr.Value),
+				// Evaluate the element to handle interpolations and variables
+				elemValue, ok := e.evaluateExpr(elem)
+				if !ok {
+					overallOk = false
+					continue
+				}
+
+				// Handle string URN aliases
+				if urnStr, ok := elemValue.(string); ok {
+					aliases = append(aliases, pulumi.Alias{
+						URN: pulumi.URN(urnStr),
+					})
+					continue
+				}
+
+				evalString := func(value ast.Expr, assignTo *pulumi.StringInput) {
+					val, ok := e.evaluateExpr(value)
+					if ok {
+						if urnStr, ok := val.(string); ok {
+							*assignTo = pulumi.String(urnStr)
+						} else {
+							e.addErrDiag(value.Syntax().Syntax().Range(), fmt.Sprintf("unable to convert %T into string", val), "")
+						}
+					} else {
+						overallOk = false
 					}
-					aliases = append(aliases, alias)
-				} else if objExpr, ok := elem.(*ast.ObjectExpr); ok {
-					// Object alias
+				}
+				evalURN := func(value ast.Expr, assignTo *pulumi.URNInput) {
+					val, ok := e.evaluateExpr(value)
+					if ok {
+						if urnStr, ok := val.(string); ok {
+							*assignTo = pulumi.URN(urnStr)
+						} else {
+							e.addErrDiag(value.Syntax().Syntax().Range(), fmt.Sprintf("unable to convert %T into string", val), "")
+						}
+					} else {
+						overallOk = false
+					}
+				}
+
+				// Handle object aliases
+				if objExpr, ok := elem.(*ast.ObjectExpr); ok {
 					alias := pulumi.Alias{}
 					for _, entry := range objExpr.Entries {
 						key, ok := entry.Key.(*ast.StringExpr)
 						if !ok {
 							continue
 						}
+
 						switch key.Value {
 						case "urn":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.URN = pulumi.URN(strVal.Value)
-							}
+							evalURN(entry.Value, &alias.URN)
 						case "name":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.Name = pulumi.String(strVal.Value)
-							}
+							evalString(entry.Value, &alias.Name)
 						case "type":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.Type = pulumi.String(strVal.Value)
-							}
+							evalString(entry.Value, &alias.Type)
 						case "parent":
 							// Handle parent resource references
 							parentRes, ok := e.evaluateResourceValuedOption(entry.Value, "alias.parent")
@@ -1563,21 +1592,20 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 								overallOk = false
 							}
 						case "parentUrn":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.ParentURN = pulumi.URN(strVal.Value)
-							}
+							evalURN(entry.Value, &alias.ParentURN)
 						case "noParent":
-							if boolVal, ok := entry.Value.(*ast.BooleanExpr); ok {
-								alias.NoParent = pulumi.Bool(boolVal.Value)
+							val, ok := e.evaluateExpr(entry.Value)
+							if ok {
+								if noParentBool, ok := val.(bool); ok {
+									alias.NoParent = pulumi.Bool(noParentBool)
+								}
+							} else {
+								overallOk = false
 							}
 						case "stack":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.Stack = pulumi.String(strVal.Value)
-							}
+							evalString(entry.Value, &alias.Stack)
 						case "project":
-							if strVal, ok := entry.Value.(*ast.StringExpr); ok {
-								alias.Project = pulumi.String(strVal.Value)
-							}
+							evalString(entry.Value, &alias.Project)
 						}
 					}
 					aliases = append(aliases, alias)

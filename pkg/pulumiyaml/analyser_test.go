@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -381,4 +382,243 @@ func TestNonStringKeyInObjectReturnsError(t *testing.T) {
 	require.Equal(t, 1, len(tc.exprs))
 	require.Equal(t, "Object key must be a string, got *ast.BooleanExpr",
 		tc.exprs[expr].(*schema.InvalidType).Diagnostics[0].Summary)
+}
+
+func TestAliasesTypeChecking(t *testing.T) {
+	t.Parallel()
+
+	// Test valid string aliases
+	t.Run("valid string aliases", func(t *testing.T) {
+		text := `
+name: test-aliases-valid-string
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - "urn:pulumi:stack::project::test:resource:type::oldName"
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Empty(t, diags, "valid string aliases should not produce errors")
+	})
+
+	// Test valid object aliases
+	t.Run("valid object aliases", func(t *testing.T) {
+		text := `
+name: test-aliases-valid-object
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - name: oldName
+        - type: test:resource:OldType
+        - noParent: true
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Empty(t, diags, "valid object aliases should not produce errors")
+	})
+
+	// Test mixed string and object aliases
+	t.Run("mixed string and object aliases", func(t *testing.T) {
+		text := `
+name: test-aliases-mixed
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - "urn:pulumi:stack::project::test:resource:type::oldName"
+        - name: anotherOldName
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Empty(t, diags, "mixed string and object aliases should not produce errors")
+	})
+
+	// Test parent field with resource reference
+	t.Run("parent field with resource reference", func(t *testing.T) {
+		text := `
+name: test-aliases-parent
+runtime: yaml
+resources:
+  parentRes:
+    type: test:resource:type
+    properties:
+      foo: oof
+  childRes:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - parent: ${parentRes}
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Empty(t, diags, "parent field with resource reference should not produce errors")
+	})
+
+	// Test invalid field in alias object
+	t.Run("invalid field in alias object", func(t *testing.T) {
+		text := `
+name: test-aliases-invalid-field
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - invalidField: someValue
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		if assert.NotEmpty(t, diags, "invalid field in alias object should produce error") {
+			var diagStrings []string
+			for _, v := range diags {
+				diagStrings = append(diagStrings, diagString(v))
+			}
+			// Should contain error about invalidField not being a valid property
+			var foundInvalidFieldError bool
+			for _, ds := range diagStrings {
+				if strings.Contains(ds, "invalidField") {
+					foundInvalidFieldError = true
+					break
+				}
+			}
+			assert.True(t, foundInvalidFieldError, "should report error about invalid field: %v", diagStrings)
+		}
+	})
+
+	// Test wrong type for noParent field
+	t.Run("wrong type for noParent", func(t *testing.T) {
+		text := `
+name: test-aliases-wrong-type
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - noParent: "true"
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		if assert.NotEmpty(t, diags, "wrong type for noParent should produce error") {
+			var diagStrings []string
+			for _, v := range diags {
+				diagStrings = append(diagStrings, diagString(v))
+			}
+			// Should contain error about type mismatch
+			var foundTypeError bool
+			for _, ds := range diagStrings {
+				if strings.Contains(ds, "noParent") || strings.Contains(ds, "bool") || strings.Contains(ds, "string") {
+					foundTypeError = true
+					break
+				}
+			}
+			assert.True(t, foundTypeError, "should report type error for noParent: %v", diagStrings)
+		}
+	})
+
+	// Test wrong type for name field
+	t.Run("wrong type for name", func(t *testing.T) {
+		text := `
+name: test-aliases-wrong-name-type
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - name: 123
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		if assert.NotEmpty(t, diags, "wrong type for name should produce error") {
+			var diagStrings []string
+			for _, v := range diags {
+				diagStrings = append(diagStrings, diagString(v))
+			}
+			// Should contain error about type mismatch
+			var foundTypeError bool
+			for _, ds := range diagStrings {
+				if strings.Contains(ds, "name") || strings.Contains(ds, "string") || strings.Contains(ds, "number") {
+					foundTypeError = true
+					break
+				}
+			}
+			assert.True(t, foundTypeError, "should report type error for name: %v", diagStrings)
+		}
+	})
+
+	// Test wrong type for parent field
+	t.Run("wrong type for parent", func(t *testing.T) {
+		text := `
+name: test-aliases-wrong-parent-type
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - parent: "someString"
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		require.Len(t, diags, 1)
+		assert.Contains(t, diags[0].Detail, "Cannot assign type 'string' to type 'pulumi:pulumi:Any'")
+	})
+
+	// Test non-array aliases
+	t.Run("non-array aliases", func(t *testing.T) {
+		text := `
+name: test-aliases-not-array
+runtime: yaml
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases: "urn:pulumi:stack::project::test:resource:type::oldName"
+`
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		diags := testTemplateDiags(t, tmpl, nil)
+		assert.Equal(t, syntax.Diagnostics{{
+			Diagnostic: hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary: "List<Union<string, {name: string, noParent: boolean, parent: " +
+					"pulumi:pulumi:Any, parentUrn: string, project: string, stack: " +
+					"string, type: string, urn: string}>> is not assignable from string",
+				Detail: "Cannot assign type 'string' to type 'List<Union<string, {name: " +
+					"string, noParent: boolean, parent: pulumi:pulumi:Any, parentUrn: " +
+					"string, project: string, stack: string, type: string, urn: string}>>'",
+				Subject: &hcl.Range{
+					Filename: "<stdin>",
+					Start:    hcl.Pos{Line: 9, Column: 16},
+					End:      hcl.Pos{Line: 9, Column: 70},
+				},
+			},
+		}}, diags)
+	})
 }
