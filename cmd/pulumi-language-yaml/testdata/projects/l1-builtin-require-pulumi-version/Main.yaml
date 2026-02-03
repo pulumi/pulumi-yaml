@@ -1,3 +1,5 @@
 configuration:
   version:
     type: string
+pulumi:
+  requiredPulumiVersion: ${version}

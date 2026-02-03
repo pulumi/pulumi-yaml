@@ -568,6 +568,16 @@ type componentEvaluator struct {
 	evaluator *programEvaluator
 }
 
+func (m *componentEvaluator) EvalPulumi(r *Runner, node pulumiNode) bool {
+	k := node.key().Value
+	v, ok := m.inputs[k]
+	if ok {
+		r.config[k] = v
+		return true
+	}
+	return m.evaluator.EvalPulumi(r, node)
+}
+
 func (m *componentEvaluator) EvalConfig(r *Runner, node configNode) bool {
 	k := node.key().Value
 	v, ok := m.inputs[k]
@@ -871,6 +881,7 @@ func newRunner(t ast.Template, p PackageLoader) *Runner {
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
+	EvalPulumi(r *Runner, node pulumiNode) bool
 	EvalConfig(r *Runner, node configNode) bool
 	EvalVariable(r *Runner, node variableNode) bool
 	EvalResource(r *Runner, node resourceNode) bool
@@ -923,6 +934,28 @@ func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
 
 func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
 	return e.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (e programEvaluator) EvalPulumi(r *Runner, node pulumiNode) bool {
+	requiredPulumiVersion := r.t.GetPulumi().RequiredPulumiVersion
+	if requiredPulumiVersion == nil {
+		return true
+	}
+	value, ok := e.evaluateExpr(requiredPulumiVersion)
+	if !ok {
+		e.error(node.RequiredPulumiVersion, "could not evaluate expression for version range")
+		return false
+	}
+	stringValue, ok := value.(string)
+	if !ok {
+		e.error(node.RequiredPulumiVersion, "version range must evaluate to a string")
+		return false
+	}
+	if err := e.pulumiCtx.RequirePulumiVersion(stringValue); err != nil {
+		e.error(node.RequiredPulumiVersion, err.Error())
+		return false
+	}
+	return true
 }
 
 func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
@@ -1131,6 +1164,16 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 
 	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
+		case pulumiNode:
+			if ctx != nil {
+				err := ctx.Log.Debug("Registering pulumi configuration", &pulumi.LogArgs{})
+				if err != nil {
+					return returnDiags()
+				}
+			}
+			if !e.EvalPulumi(r, kvp) {
+				return returnDiags()
+			}
 		case configNode:
 			if _, ok := kvp.(configNodeYaml); ok {
 				key := kvp.key().Value
