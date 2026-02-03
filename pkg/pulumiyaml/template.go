@@ -79,7 +79,7 @@ type ResourceOptions struct {
 	// AdditionalSecretOutputs specifies properties that must be encrypted as secrets
 	AdditionalSecretOutputs []string `json:",omitempty" yaml:",omitempty"`
 	// Aliases specifies names that this resource used to be have so that renaming or refactoring doesn't replace it
-	Aliases []interface{} `json:",omitempty" yaml:"Aliases,omitempty"`
+	Aliases []AliasSpec `json:",omitempty" yaml:"Aliases,omitempty"`
 	// CustomTimeouts overrides the default retry/timeout behavior for resource provisioning
 	CustomTimeouts *CustomTimeoutResourceOption `json:",omitempty" yaml:",omitempty"`
 	// DeleteBeforeReplace  overrides the default create-before-delete behavior when replacing

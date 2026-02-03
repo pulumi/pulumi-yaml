@@ -387,8 +387,8 @@ func TestNonStringKeyInObjectReturnsError(t *testing.T) {
 func TestAliasesTypeChecking(t *testing.T) {
 	t.Parallel()
 
-	// Test valid string aliases
 	t.Run("valid string aliases", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-valid-string
 runtime: yaml
@@ -406,8 +406,8 @@ resources:
 		assert.Empty(t, diags, "valid string aliases should not produce errors")
 	})
 
-	// Test valid object aliases
 	t.Run("valid object aliases", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-valid-object
 runtime: yaml
@@ -427,8 +427,8 @@ resources:
 		assert.Empty(t, diags, "valid object aliases should not produce errors")
 	})
 
-	// Test mixed string and object aliases
 	t.Run("mixed string and object aliases", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-mixed
 runtime: yaml
@@ -447,8 +447,8 @@ resources:
 		assert.Empty(t, diags, "mixed string and object aliases should not produce errors")
 	})
 
-	// Test parent field with resource reference
 	t.Run("parent field with resource reference", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-parent
 runtime: yaml
@@ -470,8 +470,8 @@ resources:
 		assert.Empty(t, diags, "parent field with resource reference should not produce errors")
 	})
 
-	// Test invalid field in alias object
 	t.Run("invalid field in alias object", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-invalid-field
 runtime: yaml
@@ -503,8 +503,8 @@ resources:
 		}
 	})
 
-	// Test wrong type for noParent field
 	t.Run("wrong type for noParent", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-wrong-type
 runtime: yaml
@@ -536,8 +536,8 @@ resources:
 		}
 	})
 
-	// Test wrong type for name field
 	t.Run("wrong type for name", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-wrong-name-type
 runtime: yaml
@@ -569,8 +569,8 @@ resources:
 		}
 	})
 
-	// Test wrong type for parent field
 	t.Run("wrong type for parent", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-wrong-parent-type
 runtime: yaml
@@ -589,8 +589,8 @@ resources:
 		assert.Contains(t, diags[0].Detail, "Cannot assign type 'string' to type 'pulumi:pulumi:Any'")
 	})
 
-	// Test non-array aliases
 	t.Run("non-array aliases", func(t *testing.T) {
+		t.Parallel()
 		text := `
 name: test-aliases-not-array
 runtime: yaml

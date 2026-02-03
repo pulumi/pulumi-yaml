@@ -764,7 +764,9 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 						{Name: "type", Type: &schema.OptionalType{ElementType: schema.StringType}},
 						{Name: "urn", Type: &schema.OptionalType{ElementType: schema.StringType}},
 					},
-				}}}})
+				},
+			},
+		}})
 	}
 
 	return true
