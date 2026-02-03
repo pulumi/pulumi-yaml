@@ -148,12 +148,14 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 			sorted = append(sorted, node)
 		}
 	}
-
-	pulumi := pulumiNode(t.GetPulumi())
-	addIntermediate(pulumi.key().Value, pulumi)
-	var pulumiDeps []*ast.StringExpr
-	getExpressionDependencies(&pulumiDeps, pulumi.RequiredPulumiVersion)
-	dependencies[pulumi.key().Value] = pulumiDeps
+	pulumiDecl := t.GetPulumi()
+	if pulumiDecl.HasSettings() {
+		pulumi := pulumiNode(pulumiDecl)
+		addIntermediate(pulumi.key().Value, pulumi)
+		var pulumiDeps []*ast.StringExpr
+		getExpressionDependencies(&pulumiDeps, pulumi.RequiredPulumiVersion)
+		dependencies[pulumi.key().Value] = pulumiDeps
+	}
 
 	// Map of package name to default provider resource and it's key.
 	defaultProviders := map[string]*ast.StringExpr{}

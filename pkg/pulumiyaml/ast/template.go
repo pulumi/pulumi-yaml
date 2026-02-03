@@ -55,6 +55,10 @@ func (d *PulumiDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
+func (d *PulumiDecl) HasSettings() bool {
+	return d.RequiredPulumiVersion != nil
+}
+
 type StringListDecl struct {
 	declNode
 
