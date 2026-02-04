@@ -257,6 +257,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("deletedWith"),
 			g.expr(opts.DeletedWith)))
 	}
+	if opts.ReplacementTrigger != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("replacementTrigger"),
+			g.expr(opts.ReplacementTrigger)))
+	}
 
 	return syn.Object(rOpts...)
 }

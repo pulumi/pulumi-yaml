@@ -88,6 +88,9 @@ type ResourceOptions struct {
 	// If set, the provider's Delete method will not be called for this resource if the specified resource is being
 	// deleted as well.
 	DeletedWith string `json:",omitempty" yaml:",omitempty"`
+	// ReplacementTrigger specifies a value that, when changed, triggers a replacement of the resource.
+	// The engine will diff this with the last recorded value, and trigger a replace if they are not equal.
+	ReplacementTrigger interface{} `json:",omitempty" yaml:",omitempty"`
 }
 
 // Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,

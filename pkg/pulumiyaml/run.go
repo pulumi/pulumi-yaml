@@ -1718,6 +1718,23 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 	if v.Options.HideDiffs != nil {
 		opts = append(opts, pulumi.HideDiffs(listStrings(v.Options.HideDiffs)))
 	}
+	if v.Options.ReplacementTrigger != nil {
+		replacementTriggerValue, ok := e.evaluateExpr(v.Options.ReplacementTrigger)
+		if ok {
+			// ReplacementTrigger accepts Input. If the value is already an Input (like an Output),
+			// pass it directly to preserve unknown status. Otherwise, wrap it with pulumi.Any().
+			var input pulumi.Input
+			if output, isOutput := replacementTriggerValue.(pulumi.Output); isOutput {
+				input = output
+			} else {
+				input = pulumi.Any(replacementTriggerValue)
+			}
+			opts = append(opts, pulumi.ReplacementTrigger(input))
+		} else {
+			e.error(v.Options.ReplacementTrigger, "couldn't evaluate the 'replacementTrigger' resource option")
+			overallOk = false
+		}
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.
@@ -2170,6 +2187,14 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
 
+					// During preview, treat any resource output property (other than .id and .urn)
+					// as unknown. GetRawOutputs() can return prior state, and it's not obvious to
+					// us what is an old version that will be updated, and what is a new version that
+					// has already been updated (or is new).
+					if ok && e.pulumiCtx.DryRun() {
+						return unknownOutput(), true
+					}
+
 					outputs := x.GetRawOutputs()
 
 					// If we're in a preview, mark missing outputs in the schema as unknown.
@@ -2224,15 +2249,6 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				} else if !ok || prop.IsNull() {
 					receiver = nil
 				} else {
-					// Not-known-to-be-unknown output/computed properties inside maps
-					// containing unknowns should be treated as unknown during previews to
-					// ensure that we don't end up using old values.
-					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
-						if (prop.IsOutput() && !prop.OutputValue().Known) || prop.IsComputed() {
-							return unknownOutput(), true
-						}
-					}
-
 					receiver = prop
 				}
 				accessors = accessors[1:]
