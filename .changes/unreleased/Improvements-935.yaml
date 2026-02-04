@@ -1,6 +1,0 @@
-component: codegen
-kind: Improvements
-body: Add support for fn::cwd -> ${pulumi.cwd}
-time: 2026-02-02T18:56:59.125457+01:00
-custom:
-    PR: "935"
