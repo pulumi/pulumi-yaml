@@ -119,6 +119,7 @@ func inputProperties(token string, props ...schema.Property) *schema.ResourceTyp
 		p = append(p, &prop)
 	}
 	return &schema.ResourceType{
+		Token: token,
 		Resource: &schema.Resource{
 			Token:           token,
 			InputProperties: p,
@@ -2147,6 +2148,211 @@ resources:
 		err := runner.Evaluate(ctx)
 		assert.Len(t, err, 0)
 		assert.Equal(t, err.Error(), "no diagnostics")
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithStringAliases(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-string-aliases
+runtime: yaml
+resources:
+  myResource:
+    type: test:index:Resource
+    properties:
+      value: true
+    options:
+      aliases:
+        - "urn:pulumi:stack::project::test:index:Resource::oldName"
+        - "urn:pulumi:stack::project::test:index:Resource::anotherOldName"
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, 2, len(args.RegisterRPC.GetAliases()))
+			assert.Equal(t, "urn:pulumi:stack::project::test:index:Resource::oldName", args.RegisterRPC.GetAliases()[0].GetUrn())
+			assert.Equal(t, "urn:pulumi:stack::project::test:index:Resource::anotherOldName", args.RegisterRPC.GetAliases()[1].GetUrn())
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithObjectAliases(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-object-aliases
+runtime: yaml
+resources:
+  myResource:
+    type: test:index:Resource
+    properties:
+      value: true
+    options:
+      aliases:
+        - name: oldName
+        - noParent: true
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			assert.Equal(t, 2, len(args.RegisterRPC.GetAliases()))
+			// First alias should have name field
+			assert.Equal(t, "oldName", args.RegisterRPC.GetAliases()[0].GetSpec().Name)
+			// Second alias should have noParent field
+			assert.True(t, args.RegisterRPC.GetAliases()[1].GetSpec().GetNoParent())
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithParentAlias(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-parent-alias
+runtime: yaml
+resources:
+  parentResource:
+    type: test:index:Resource
+    properties:
+      value: true
+  childResource:
+    type: test:index:Resource
+    properties:
+      value: false
+    options:
+      aliases:
+        - parent: ${parentResource}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			if args.Name == "childResource" {
+				assert.Equal(t, 1, len(args.RegisterRPC.GetAliases()))
+				// The alias should have a parent URN set (not empty)
+				aliasSpec := args.RegisterRPC.GetAliases()[0].GetSpec()
+				assert.NotNil(t, aliasSpec)
+				// Check that the parent URN is set and not empty
+				parentUrn := aliasSpec.GetParentUrn()
+				assert.NotEmpty(t, parentUrn, "parent URN should be set")
+				// Check that it contains "parentResource" in the URN
+				assert.Contains(t, parentUrn, "parentResource", "parent URN should reference parentResource")
+			}
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		err := runner.Evaluate(ctx)
+		assert.Empty(t, err)
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithDynamicAliases(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-dynamic-aliases
+runtime: yaml
+variables:
+  oldResourceName: oldName
+  oldStack: previousStack
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - name: ${oldResourceName}
+        - stack: ${oldStack}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			assert.Equal(t, 2, len(args.RegisterRPC.GetAliases()))
+			// First alias should have evaluated name variable
+			assert.Equal(t, "oldName", args.RegisterRPC.GetAliases()[0].GetSpec().Name)
+			// Second alias should have evaluated stack variable
+			assert.Equal(t, "previousStack", args.RegisterRPC.GetAliases()[1].GetSpec().Stack)
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		_, diags := TypeCheck(runner)
+		if diags.HasErrors() {
+			return diags
+		}
+		diags = runner.Evaluate(ctx)
+		if diags.HasErrors() {
+			return diags
+		}
+		return nil
+	}, pulumi.WithMocks("project", "stack", mocks))
+	assert.NoError(t, err)
+}
+
+func TestResourceWithInterpolatedAliasURN(t *testing.T) {
+	t.Parallel()
+
+	text := `
+name: test-interpolated-alias-urn
+runtime: yaml
+variables:
+  resourceName: oldResource
+resources:
+  myResource:
+    type: test:resource:type
+    properties:
+      foo: oof
+    options:
+      aliases:
+        - urn:pulumi:stack::project::test:resource:type::${resourceName}
+`
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			t.Logf("args: %+v", args)
+			assert.Equal(t, 1, len(args.RegisterRPC.GetAliases()))
+			// URN should have the variable interpolated
+			assert.Equal(t, "urn:pulumi:stack::project::test:resource:type::oldResource",
+				args.RegisterRPC.GetAliases()[0].GetUrn())
+			return args.Name, args.Inputs, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		runner := newRunner(tmpl, newMockPackageMap())
+		_, diags := TypeCheck(runner)
+		if diags.HasErrors() {
+			return diags
+		}
+		diags = runner.Evaluate(ctx)
+		if diags.HasErrors() {
+			return diags
+		}
 		return nil
 	}, pulumi.WithMocks("project", "stack", mocks))
 	assert.NoError(t, err)

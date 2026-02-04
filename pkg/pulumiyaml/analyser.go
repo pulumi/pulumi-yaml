@@ -293,6 +293,10 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 			return okIf(true)
 		case schema.NumberType, schema.IntType:
 			return okIf(from == schema.NumberType || from == schema.IntType)
+		case schema.AnyResourceType:
+			// Resources can coerce into strings (by implicitly calling urn)
+			_, isResource := from.(*schema.ResourceType)
+			return okIf(isResource)
 		case schema.StringType:
 			// Resources can coerce into strings (by implicitly calling urn)
 			_, isResource := from.(*schema.ResourceType)
@@ -744,6 +748,30 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 				subject := prop.Key.Syntax().Range()
 				ctx.addErrDiag(subject, summary, detail)
 			}
+		}
+		if v.Options.Aliases != nil {
+			tc.assertTypeAssignable(ctx, v.Options.Aliases, &schema.ArrayType{ElementType: &schema.UnionType{
+				ElementTypes: []schema.Type{
+					schema.StringType,
+					&schema.ObjectType{
+						Token: adhockObjectToken + "ResourceOptionAlias",
+						Properties: []*schema.Property{
+							{Name: "name", Type: &schema.OptionalType{ElementType: schema.StringType}},
+							{Name: "noParent", Type: &schema.OptionalType{ElementType: schema.BoolType}},
+							{Name: "parent", Type: &schema.OptionalType{ElementType: &schema.UnionType{
+								ElementTypes: []schema.Type{
+									schema.AnyResourceType,
+									schema.StringType,
+								},
+							}}},
+							{Name: "project", Type: &schema.OptionalType{ElementType: schema.StringType}},
+							{Name: "stack", Type: &schema.OptionalType{ElementType: schema.StringType}},
+							{Name: "type", Type: &schema.OptionalType{ElementType: schema.StringType}},
+							{Name: "urn", Type: &schema.OptionalType{ElementType: schema.StringType}},
+						},
+					},
+				},
+			}})
 		}
 	}
 
@@ -1461,7 +1489,7 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 	if !e.walkStringList(ctx, opts.AdditionalSecretOutputs) {
 		return false
 	}
-	if !e.walkStringList(ctx, opts.Aliases) {
+	if !e.walk(ctx, opts.Aliases) {
 		return false
 	}
 	if !e.walk(ctx, opts.DeleteBeforeReplace) {

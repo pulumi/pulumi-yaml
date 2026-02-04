@@ -33,6 +33,9 @@ func GetResourceDependencies(r *ast.ResourceDecl) []*ast.StringExpr {
 	if r.Get.Id != nil {
 		getExpressionDependencies(&deps, r.Get.Id)
 	}
+	if r.Options.Aliases != nil {
+		getExpressionDependencies(&deps, r.Options.Aliases)
+	}
 	return deps
 }
 
