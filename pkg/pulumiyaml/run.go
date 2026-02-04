@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/urn"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -1581,18 +1582,36 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 							evalString(entry.Value, &alias.Type)
 						case "parent":
 							// Handle parent resource references
-							parentRes, ok := e.evaluateResourceValuedOption(entry.Value, "alias.parent")
-							if ok {
-								if p, ok := parentRes.(poisonMarker); !ok {
-									alias.Parent = parentRes.CustomResource()
+
+							value, ok := e.evaluateExpr(entry.Value)
+							if !ok {
+								return nil, false
+							}
+							switch value := value.(type) {
+							case string:
+								parsed, err := urn.Parse(value)
+								if err != nil {
+									e.error(entry.Value, err.Error())
+									overallOk = false
 								} else {
-									return p, true
+									alias.ParentURN = pulumi.URN(parsed)
 								}
-							} else {
+							case pulumi.StringOutput:
+								alias.ParentURN = value.ApplyTWithContext(context.TODO(), func(value string) (pulumi.URN, error) {
+									parsed, err := urn.Parse(value)
+									if err != nil {
+										return "", err
+									}
+									return pulumi.URN(parsed), nil
+								}).(pulumi.URNInput)
+							case poisonMarker:
+								return value, true
+							case lateboundResource:
+								alias.Parent = value.CustomResource()
+							default:
+								e.errorf(entry.Value, "expected a resource or string, found %T", value)
 								overallOk = false
 							}
-						case "parentUrn":
-							evalURN(entry.Value, &alias.ParentURN)
 						case "noParent":
 							val, ok := e.evaluateExpr(entry.Value)
 							if ok {
@@ -1653,7 +1672,7 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		opts = append(opts, pulumi.IgnoreChanges(listStrings(v.Options.IgnoreChanges)))
 	}
 	if v.Options.Parent != nil {
-		parentOpt, ok := e.evaluateResourceValuedOption(v.Options.Parent, "parent")
+		parentOpt, ok := e.evaluateResourceValuedOption(v.Options.Parent)
 		if ok {
 			if p, ok := parentOpt.(poisonMarker); ok {
 				return p, true
@@ -1685,7 +1704,7 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 	}
 
 	if v.Options.Provider != nil {
-		providerOpt, ok := e.evaluateResourceValuedOption(v.Options.Provider, "provider")
+		providerOpt, ok := e.evaluateResourceValuedOption(v.Options.Provider)
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true
@@ -1747,7 +1766,7 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		}
 	}
 	if v.Options.DeletedWith != nil {
-		deletedWithOpt, ok := e.evaluateResourceValuedOption(v.Options.DeletedWith, "deletedWith")
+		deletedWithOpt, ok := e.evaluateResourceValuedOption(v.Options.DeletedWith)
 		if ok {
 			if p, ok := deletedWithOpt.(poisonMarker); ok {
 				return p, true
@@ -1943,7 +1962,7 @@ func (e *programEvaluator) evaluateResourceListValuedOption(optionExpr ast.Expr,
 	return resources, true
 }
 
-func (e *programEvaluator) evaluateResourceValuedOption(optionExpr ast.Expr, key string) (lateboundResource, bool) {
+func (e *programEvaluator) evaluateResourceValuedOption(optionExpr ast.Expr) (lateboundResource, bool) {
 	value, ok := e.evaluateExpr(optionExpr)
 	if !ok {
 		return nil, false
@@ -2409,7 +2428,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		opts = append(opts, pulumi.PluginDownloadURL(t.CallOpts.PluginDownloadURL.Value))
 	}
 	if t.CallOpts.Parent != nil {
-		parentOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Parent, "parent")
+		parentOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Parent)
 		if ok {
 			if p, ok := parentOpt.(poisonMarker); ok {
 				return p, true
@@ -2420,7 +2439,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		}
 	}
 	if t.CallOpts.Provider != nil {
-		providerOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Provider, "provider")
+		providerOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Provider)
 		if ok {
 			if p, ok := providerOpt.(poisonMarker); ok {
 				return p, true

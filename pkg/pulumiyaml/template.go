@@ -62,11 +62,9 @@ type AliasSpec struct {
 	Name string `json:",omitempty" yaml:",omitempty"`
 	// Type is the previous type of the resource
 	Type string `json:",omitempty" yaml:",omitempty"`
-	// Parent is the previous parent of the resource (mutually exclusive with ParentURN and NoParent)
+	// Parent is the previous parent of the resource (mutually exclusive with NoParent).
 	Parent string `json:",omitempty" yaml:",omitempty"`
-	// ParentURN is the previous parent in URN format (mutually exclusive with Parent and NoParent)
-	ParentURN string `json:",omitempty" yaml:",omitempty"`
-	// NoParent indicates the resource previously had no parent (mutually exclusive with Parent and ParentURN)
+	// NoParent indicates the resource previously had no parent (mutually exclusive with Parent)
 	NoParent bool `json:",omitempty" yaml:",omitempty"`
 	// Stack is the previous stack of the resource
 	Stack string `json:",omitempty" yaml:",omitempty"`

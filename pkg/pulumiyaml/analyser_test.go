@@ -569,7 +569,7 @@ resources:
 		}
 	})
 
-	t.Run("wrong type for parent", func(t *testing.T) {
+	t.Run("invalid URN for parent", func(t *testing.T) {
 		t.Parallel()
 		text := `
 name: test-aliases-wrong-parent-type
@@ -586,7 +586,7 @@ resources:
 		tmpl := yamlTemplate(t, strings.TrimSpace(text))
 		diags := testTemplateDiags(t, tmpl, nil)
 		require.Len(t, diags, 1)
-		assert.Contains(t, diags[0].Detail, "Cannot assign type 'string' to type 'pulumi:pulumi:Any'")
+		assert.Contains(t, diags[0].Summary, "invalid URN \"someString\"")
 	})
 
 	t.Run("non-array aliases", func(t *testing.T) {
@@ -607,12 +607,12 @@ resources:
 		assert.Equal(t, syntax.Diagnostics{{
 			Diagnostic: hcl.Diagnostic{
 				Severity: hcl.DiagError,
-				Summary: "List<Union<string, {name: string, noParent: boolean, parent: " +
-					"pulumi:pulumi:Any, parentUrn: string, project: string, stack: " +
-					"string, type: string, urn: string}>> is not assignable from string",
-				Detail: "Cannot assign type 'string' to type 'List<Union<string, {name: " +
-					"string, noParent: boolean, parent: pulumi:pulumi:Any, parentUrn: " +
-					"string, project: string, stack: string, type: string, urn: string}>>'",
+				Summary: "List<Union<string, {name: string, noParent: boolean, " +
+					"parent: Union<pulumi:pulumi:Any, string>, project: string, " +
+					"stack: string, type: string, urn: string}>> is not assignable from string",
+				Detail: "Cannot assign type 'string' to type 'List<Union<string, " +
+					"{name: string, noParent: boolean, parent: Union<pulumi:pulumi:Any, " +
+					"string>, project: string, stack: string, type: string, urn: string}>>'",
 				Subject: &hcl.Range{
 					Filename: "<stdin>",
 					Start:    hcl.Pos{Line: 9, Column: 16},

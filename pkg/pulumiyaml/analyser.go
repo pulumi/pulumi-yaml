@@ -758,8 +758,12 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 						Properties: []*schema.Property{
 							{Name: "name", Type: &schema.OptionalType{ElementType: schema.StringType}},
 							{Name: "noParent", Type: &schema.OptionalType{ElementType: schema.BoolType}},
-							{Name: "parent", Type: &schema.OptionalType{ElementType: schema.AnyResourceType}},
-							{Name: "parentUrn", Type: &schema.OptionalType{ElementType: schema.StringType}},
+							{Name: "parent", Type: &schema.OptionalType{ElementType: &schema.UnionType{
+								ElementTypes: []schema.Type{
+									schema.AnyResourceType,
+									schema.StringType,
+								},
+							}}},
 							{Name: "project", Type: &schema.OptionalType{ElementType: schema.StringType}},
 							{Name: "stack", Type: &schema.OptionalType{ElementType: schema.StringType}},
 							{Name: "type", Type: &schema.OptionalType{ElementType: schema.StringType}},
