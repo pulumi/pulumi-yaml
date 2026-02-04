@@ -1542,25 +1542,32 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 				evalString := func(value ast.Expr, assignTo *pulumi.StringInput) {
 					val, ok := e.evaluateExpr(value)
 					if ok {
-						if urnStr, ok := val.(string); ok {
-							*assignTo = pulumi.String(urnStr)
-						} else {
+						switch val := val.(type) {
+						case string:
+							*assignTo = pulumi.String(val)
+						case pulumi.StringInput:
+							*assignTo = val
+						case pulumi.AnyOutput:
+							*assignTo = val.AsStringOutput()
+						default:
 							e.addErrDiag(value.Syntax().Syntax().Range(), fmt.Sprintf("unable to convert %T into string", val), "")
+							overallOk = false
 						}
 					} else {
 						overallOk = false
 					}
 				}
 				evalURN := func(value ast.Expr, assignTo *pulumi.URNInput) {
-					val, ok := e.evaluateExpr(value)
-					if ok {
-						if urnStr, ok := val.(string); ok {
-							*assignTo = pulumi.URN(urnStr)
-						} else {
-							e.addErrDiag(value.Syntax().Syntax().Range(), fmt.Sprintf("unable to convert %T into string", val), "")
-						}
-					} else {
-						overallOk = false
+					var ir pulumi.StringInput
+					evalString(value, &ir)
+					if overallOk {
+						*assignTo = ir.ToStringOutput().ApplyT(func(s string) (pulumi.URN, error) {
+							_, err := resource.ParseURN(s)
+							if err != nil {
+								e.addErrDiag(value.Syntax().Syntax().Range(), "sadness", "")
+							}
+							return pulumi.URN(s), err
+						}).(pulumi.URNOutput)
 					}
 				}
 
@@ -1570,6 +1577,7 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 					for _, entry := range objExpr.Entries {
 						key, ok := entry.Key.(*ast.StringExpr)
 						if !ok {
+							overallOk = false
 							continue
 						}
 
