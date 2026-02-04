@@ -937,22 +937,22 @@ func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}
 }
 
 func (e programEvaluator) EvalPulumi(r *Runner, node pulumiNode) bool {
-	requiredPulumiVersion := r.t.GetPulumi().RequiredPulumiVersion
-	if requiredPulumiVersion == nil {
+	requiredVersion := r.t.GetPulumi().RequiredVersion
+	if requiredVersion == nil {
 		return true
 	}
-	value, ok := e.evaluateExpr(requiredPulumiVersion)
+	value, ok := e.evaluateExpr(requiredVersion)
 	if !ok {
-		e.error(node.RequiredPulumiVersion, "could not evaluate expression for version range")
+		e.error(node.RequiredVersion, "could not evaluate expression for version range")
 		return false
 	}
 	stringValue, ok := value.(string)
 	if !ok {
-		e.error(node.RequiredPulumiVersion, "version range must evaluate to a string")
+		e.error(node.RequiredVersion, "version range must evaluate to a string")
 		return false
 	}
 	if err := e.pulumiCtx.RequirePulumiVersion(stringValue); err != nil {
-		e.error(node.RequiredPulumiVersion, err.Error())
+		e.error(node.RequiredVersion, err.Error())
 		return false
 	}
 	return true

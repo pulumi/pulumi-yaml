@@ -1324,7 +1324,7 @@ func (e walker) walk(ctx *evalContext, x ast.Expr) bool {
 func (e walker) EvalPulumi(r *Runner, node pulumiNode) bool {
 	if e.VisitExpr != nil {
 		ctx := r.newContext(node)
-		if !e.walk(ctx, node.RequiredPulumiVersion) {
+		if !e.walk(ctx, node.RequiredVersion) {
 			return false
 		}
 	}

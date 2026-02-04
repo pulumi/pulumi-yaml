@@ -153,7 +153,7 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 		pulumi := pulumiNode(pulumiDecl)
 		addIntermediate(pulumi.key().Value, pulumi)
 		var pulumiDeps []*ast.StringExpr
-		getExpressionDependencies(&pulumiDeps, pulumi.RequiredPulumiVersion)
+		getExpressionDependencies(&pulumiDeps, pulumi.RequiredVersion)
 		dependencies[pulumi.key().Value] = pulumiDeps
 	}
 

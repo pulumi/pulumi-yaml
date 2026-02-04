@@ -44,7 +44,7 @@ type recordDecl interface {
 type PulumiDecl struct {
 	declNode
 
-	RequiredPulumiVersion Expr
+	RequiredVersion Expr
 }
 
 func (d *PulumiDecl) defaultValue() interface{} {
@@ -56,7 +56,7 @@ func (d *PulumiDecl) recordSyntax() *syntax.Node {
 }
 
 func (d *PulumiDecl) HasSettings() bool {
-	return d.RequiredPulumiVersion != nil
+	return d.RequiredVersion != nil
 }
 
 type StringListDecl struct {

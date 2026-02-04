@@ -2,4 +2,4 @@ configuration:
   version:
     type: string
 pulumi:
-  requiredPulumiVersion: ${version}
+  requiredVersion: ${version}

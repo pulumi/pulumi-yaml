@@ -729,7 +729,7 @@ func (g *generator) genPulumi(n *pcl.PulumiBlock) {
 
 	if n.RequiredVersion != nil {
 		props = append(props, syn.ObjectProperty(
-			syn.String("requiredPulumiVersion"),
+			syn.String("requiredVersion"),
 			g.expr(n.RequiredVersion),
 		))
 	}
