@@ -41,6 +41,24 @@ type recordDecl interface {
 	recordSyntax() *syntax.Node
 }
 
+type PulumiDecl struct {
+	declNode
+
+	RequiredVersion Expr
+}
+
+func (d *PulumiDecl) defaultValue() interface{} {
+	return &PulumiDecl{}
+}
+
+func (d *PulumiDecl) recordSyntax() *syntax.Node {
+	return &d.syntax
+}
+
+func (d *PulumiDecl) HasSettings() bool {
+	return d.RequiredVersion != nil
+}
+
 type StringListDecl struct {
 	declNode
 
@@ -540,6 +558,7 @@ func CustomTimeouts(create, update, del *StringExpr) *CustomTimeoutsDecl {
 type Template interface {
 	GetName() *StringExpr
 	GetDescription() *StringExpr
+	GetPulumi() PulumiDecl
 	GetConfig() ConfigMapDecl
 	GetVariables() VariablesMapDecl
 	GetResources() ResourcesMapDecl
@@ -561,6 +580,7 @@ type ComponentParamDecl struct {
 
 	Name        *StringExpr
 	Description *StringExpr
+	Pulumi      PulumiDecl
 	Inputs      ConfigMapDecl
 	Variables   VariablesMapDecl
 	Resources   ResourcesMapDecl
@@ -580,6 +600,13 @@ func (d *ComponentParamDecl) GetDescription() *StringExpr {
 		return nil
 	}
 	return d.Description
+}
+
+func (d *ComponentParamDecl) GetPulumi() PulumiDecl {
+	if d == nil {
+		return PulumiDecl{}
+	}
+	return d.Pulumi
 }
 
 func (d *ComponentParamDecl) GetConfig() ConfigMapDecl {
@@ -675,6 +702,7 @@ type TemplateDecl struct {
 	Name          *StringExpr
 	Namespace     *StringExpr
 	Description   *StringExpr
+	Pulumi        PulumiDecl
 	Configuration ConfigMapDecl
 	Config        ConfigMapDecl
 	Variables     VariablesMapDecl
@@ -696,6 +724,13 @@ func (d *TemplateDecl) GetDescription() *StringExpr {
 		return nil
 	}
 	return d.Description
+}
+
+func (d *TemplateDecl) GetPulumi() PulumiDecl {
+	if d == nil {
+		return PulumiDecl{}
+	}
+	return d.Pulumi
 }
 
 func (d *TemplateDecl) GetConfig() ConfigMapDecl {
@@ -923,12 +958,13 @@ func schemaDefaultValue(e Expr) interface{} {
 	}
 }
 
-func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, configuration ConfigMapDecl,
-	variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl,
+func TemplateSyntax(node *syntax.ObjectNode, description *StringExpr, pulumi PulumiDecl,
+	configuration ConfigMapDecl, variables VariablesMapDecl, resources ResourcesMapDecl, outputs PropertyMapDecl,
 ) *TemplateDecl {
 	return &TemplateDecl{
 		syntax:        node,
 		Description:   description,
+		Pulumi:        pulumi,
 		Configuration: configuration,
 		Variables:     variables,
 		Resources:     resources,

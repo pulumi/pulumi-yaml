@@ -26,8 +26,6 @@ import (
 	"testing"
 
 	"github.com/pulumi/pulumi-yaml/pkg/server"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
-	pbempty "google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
@@ -38,79 +36,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-type hostEngine struct {
-	pulumirpc.UnimplementedEngineServer
-	t *testing.T
-
-	logLock         sync.Mutex
-	logRepeat       int
-	previousMessage string
-}
-
-func (e *hostEngine) Log(_ context.Context, req *pulumirpc.LogRequest) (*pbempty.Empty, error) {
-	e.logLock.Lock()
-	defer e.logLock.Unlock()
-
-	var sev diag.Severity
-	switch req.Severity {
-	case pulumirpc.LogSeverity_DEBUG:
-		sev = diag.Debug
-	case pulumirpc.LogSeverity_INFO:
-		sev = diag.Info
-	case pulumirpc.LogSeverity_WARNING:
-		sev = diag.Warning
-	case pulumirpc.LogSeverity_ERROR:
-		sev = diag.Error
-	default:
-		return nil, fmt.Errorf("Unrecognized logging severity: %v", req.Severity)
-	}
-
-	message := req.Message
-	if os.Getenv("PULUMI_LANGUAGE_TEST_SHOW_FULL_OUTPUT") != "true" {
-		// Cut down logs so they don't overwhelm the test output
-		if len(message) > 1024 {
-			message = message[:1024] + "... (truncated, run with PULUMI_LANGUAGE_TEST_SHOW_FULL_OUTPUT=true to see full logs))"
-		}
-	}
-
-	if e.previousMessage == message {
-		e.logRepeat++
-		return &pbempty.Empty{}, nil
-	}
-
-	if e.logRepeat > 1 {
-		e.t.Logf("Last message repeated %d times", e.logRepeat)
-	}
-	e.logRepeat = 1
-	e.previousMessage = message
-
-	if req.StreamId != 0 {
-		e.t.Logf("(%d) %s[%s]: %s", req.StreamId, sev, req.Urn, message)
-	} else {
-		e.t.Logf("%s[%s]: %s", sev, req.Urn, message)
-	}
-	return &pbempty.Empty{}, nil
-}
-
-func runEngine(t *testing.T) string {
-	// Run a gRPC server that implements the Pulumi engine RPC interface. But all we do is forward logs on to T.
-	engine := &hostEngine{t: t}
-	stop := make(chan bool)
-	t.Cleanup(func() {
-		close(stop)
-	})
-	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
-		Cancel: stop,
-		Init: func(srv *grpc.Server) error {
-			pulumirpc.RegisterEngineServer(srv, engine)
-			return nil
-		},
-		Options: rpcutil.OpenTracingServerInterceptorOptions(nil),
-	})
-	require.NoError(t, err)
-	return fmt.Sprintf("127.0.0.1:%v", handle.Port)
-}
 
 func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 	// We can't just go run the pulumi-test-language package because of
@@ -167,31 +92,32 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 		contract.IgnoreError(cmd.Wait())
 	})
 
-	engineAddress := runEngine(t)
-	return engineAddress, client
+	return address, client
 }
 
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
-	"l1-builtin-can":                        "#721 generation unimplemented",
-	"l1-builtin-try":                        "#721 generation unimplemented",
-	"l1-config-types":                       "Failed to generate YAML program: *model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
-	"l1-proxy-index":                        "run bailed",
-	"l1-output-null":                        "test failing",
-	"l2-component-call-simple":              "#722 generation unimplemented",
-	"l2-resource-option-retain-on-delete":   "#723 generation unimplemented",
-	"l2-resource-parent-inheritance":        "expected parent to be retain on delete",
-	"l2-failed-create-continue-on-error":    "#725 test failing",
-	"l2-rtti":                               "test failing",
-	"l2-provider-call":                      "Traversal not allowed on function result",
-	"l2-provider-call-explicit":             "Traversal not allowed on function result",
-	"l2-proxy-index":                        "test failing",
-	"l2-provider-grpc-config-schema-secret": "Detected a secret leak in state",
-	"l2-component-property-deps":            "Traversal not allowed on function result",
-	"l2-explicit-providers":                 "test failing",
-	"l1-builtin-project-root-main":          "test failing",
-	"l1-builtin-cwd":                        "test failing",
-	"l1-builtin-stash":                      "not yet implemented",
+	"l1-builtin-can":                               "#721 generation unimplemented",
+	"l1-builtin-stash":                             "not yet implemented",
+	"l1-builtin-try":                               "#721 generation unimplemented",
+	"l1-config-types":                              "Failed to generate YAML program: *model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
+	"l1-output-null":                               "test failing",
+	"l1-proxy-index":                               "run bailed",
+	"l2-component-call-simple":                     "#722 generation unimplemented",
+	"l2-component-property-deps":                   "Traversal not allowed on function result",
+	"l2-explicit-providers":                        "test failing",
+	"l2-failed-create-continue-on-error":           "#725 test failing",
+	"l2-provider-call":                             "Traversal not allowed on function result",
+	"l2-provider-call-explicit":                    "Traversal not allowed on function result",
+	"l2-provider-grpc-config-schema-secret":        "Detected a secret leak in state",
+	"l2-proxy-index":                               "test failing",
+	"l2-resource-option-alias":                     "generation unimplemented (https://github.com/pulumi/pulumi-yaml/issues/925)",
+	"l2-resource-option-replace-on-changes":        "not yet implemented",
+	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
+	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
+	"l2-rtti":                                      "test failing",
+	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
+	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
 }
 
 func log(t *testing.T, name, message string) {

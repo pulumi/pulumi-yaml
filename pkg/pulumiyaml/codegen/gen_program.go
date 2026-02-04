@@ -114,6 +114,7 @@ type generator struct {
 	resources []syn.ObjectPropertyDef
 	variables []syn.ObjectPropertyDef
 	outputs   []syn.ObjectPropertyDef
+	pulumi    []syn.ObjectPropertyDef
 }
 
 func (g *generator) UnifyOutput() syn.Node {
@@ -129,6 +130,9 @@ func (g *generator) UnifyOutput() syn.Node {
 	}
 	if len(g.outputs) > 0 {
 		entries = append(entries, syn.ObjectProperty(syn.String("outputs"), syn.Object(g.outputs...)))
+	}
+	if len(g.pulumi) > 0 {
+		entries = append(entries, syn.ObjectProperty(syn.String("pulumi"), syn.Object(g.pulumi...)))
 	}
 	return syn.Object(entries...)
 }
@@ -170,8 +174,10 @@ func (g *generator) genNode(n pcl.Node) {
 		g.genLocalVariable(n)
 	case *pcl.OutputVariable:
 		g.genOutputVariable(n)
+	case *pcl.PulumiBlock:
+		g.genPulumi(n)
 	default:
-		panic("Not implemented yet")
+		panic(fmt.Sprintf("Not implemented yet: %T", n))
 	}
 }
 
@@ -722,6 +728,21 @@ func (g *generator) genLocalVariable(n *pcl.LocalVariable) {
 	g.variables = append(g.variables, entry)
 }
 
+func (g *generator) genPulumi(n *pcl.PulumiBlock) {
+	props := []syn.ObjectPropertyDef{}
+
+	if n.RequiredVersion != nil {
+		props = append(props, syn.ObjectProperty(
+			syn.String("requiredVersion"),
+			g.expr(n.RequiredVersion),
+		))
+	}
+
+	if len(props) > 0 {
+		g.pulumi = append(g.pulumi, props...)
+	}
+}
+
 func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 	getRange := func() hcl.Range {
 		if s := f.Syntax; s != nil {
@@ -762,6 +783,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("readFile", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
+	case "cwd":
+		return syn.String("${pulumi.cwd}")
 	case "getOutput":
 		// getOutput(var, key) => ${var.outputs[key]}
 

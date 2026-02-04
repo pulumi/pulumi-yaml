@@ -155,6 +155,7 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		return nil, nil, err
 	}
 	var template *ast.TemplateDecl
+	var diags syntax.Diagnostics
 	for _, file := range files {
 		if file.IsDir() || filepath.Ext(file.Name()) != ".yaml" {
 			continue
@@ -164,10 +165,11 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		if err != nil {
 			return nil, nil, err
 		}
-		t, diags, err := LoadYAML(file.Name(), f)
+		t, loadDiags, err := LoadYAML(file.Name(), f)
 		if err != nil {
 			return nil, diags, err
 		}
+		diags.Extend(loadDiags...)
 		if diags.HasErrors() {
 			return nil, diags, diags
 		}
@@ -213,8 +215,11 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 		return nil, nil, err
 	}
 	template.Sdks = sdks
+	if template.Name == nil {
+		diags.Extend(syntax.Error(nil, "missing required `name` field.", ""))
+	}
 
-	return template, nil, nil
+	return template, diags, nil
 }
 
 // LoadYAML decodes a YAML template from an io.Reader.
@@ -563,6 +568,16 @@ type componentEvaluator struct {
 	evaluator *programEvaluator
 }
 
+func (m *componentEvaluator) EvalPulumi(r *Runner, node pulumiNode) bool {
+	k := node.key().Value
+	v, ok := m.inputs[k]
+	if ok {
+		r.config[k] = v
+		return true
+	}
+	return m.evaluator.EvalPulumi(r, node)
+}
+
 func (m *componentEvaluator) EvalConfig(r *Runner, node configNode) bool {
 	k := node.key().Value
 	v, ok := m.inputs[k]
@@ -866,6 +881,7 @@ func newRunner(t ast.Template, p PackageLoader) *Runner {
 const PulumiVarName = "pulumi"
 
 type Evaluator interface {
+	EvalPulumi(r *Runner, node pulumiNode) bool
 	EvalConfig(r *Runner, node configNode) bool
 	EvalVariable(r *Runner, node variableNode) bool
 	EvalResource(r *Runner, node resourceNode) bool
@@ -918,6 +934,28 @@ func (e *programEvaluator) addDiag(diag *syntax.Diagnostic) {
 
 func (e *programEvaluator) errorf(expr ast.Expr, format string, a ...interface{}) (interface{}, bool) {
 	return e.error(expr, fmt.Sprintf(format, a...))
+}
+
+func (e programEvaluator) EvalPulumi(r *Runner, node pulumiNode) bool {
+	requiredVersion := r.t.GetPulumi().RequiredVersion
+	if requiredVersion == nil {
+		return true
+	}
+	value, ok := e.evaluateExpr(requiredVersion)
+	if !ok {
+		e.error(node.RequiredVersion, "could not evaluate expression for version range")
+		return false
+	}
+	stringValue, ok := value.(string)
+	if !ok {
+		e.error(node.RequiredVersion, "version range must evaluate to a string")
+		return false
+	}
+	if err := e.pulumiCtx.RequirePulumiVersion(stringValue); err != nil {
+		e.error(node.RequiredVersion, err.Error())
+		return false
+	}
+	return true
 }
 
 func (e programEvaluator) EvalConfig(r *Runner, node configNode) bool {
@@ -1126,6 +1164,16 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 
 	for _, kvp := range r.intermediates {
 		switch kvp := kvp.(type) {
+		case pulumiNode:
+			if ctx != nil {
+				err := ctx.Log.Debug("Registering pulumi configuration", &pulumi.LogArgs{})
+				if err != nil {
+					return returnDiags()
+				}
+			}
+			if !e.EvalPulumi(r, kvp) {
+				return returnDiags()
+			}
 		case configNode:
 			if _, ok := kvp.(configNodeYaml); ok {
 				key := kvp.key().Value
@@ -2190,14 +2238,25 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				prop, ok := x[resource.PropertyKey(k)]
 				if x.ContainsUnknowns() && !ok {
 					return unknownOutput(), true
-				} else if !ok {
+				} else if !ok || prop.IsNull() {
 					receiver = nil
 				} else {
+					// Not-known-to-be-unknown output/computed properties inside maps
+					// containing unknowns should be treated as unknown during previews to
+					// ensure that we don't end up using old values.
+					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
+						if (prop.IsOutput() && !prop.OutputValue().Known) || prop.IsComputed() {
+							return unknownOutput(), true
+						}
+					}
+
 					receiver = prop
 				}
 				accessors = accessors[1:]
 			case resource.PropertyValue:
 				switch {
+				case x.IsNull():
+					return nil, true
 				case x.IsComputed():
 					return unknownOutput(), true
 				case x.IsOutput():
