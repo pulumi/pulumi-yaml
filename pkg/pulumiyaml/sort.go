@@ -19,6 +19,16 @@ type graphNode interface {
 	key() *ast.StringExpr
 }
 
+type pulumiNode ast.PulumiDecl
+
+func (p pulumiNode) valueKind() string {
+	return "pulumi"
+}
+
+func (p pulumiNode) key() *ast.StringExpr {
+	return ast.String("pulumi")
+}
+
 type resourceNode ast.ResourcesMapEntry
 
 func (e resourceNode) valueKind() string {
@@ -138,6 +148,14 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 			sorted = append(sorted, node)
 		}
 	}
+	pulumiDecl := t.GetPulumi()
+	if pulumiDecl.HasSettings() {
+		pulumi := pulumiNode(pulumiDecl)
+		addIntermediate(pulumi.key().Value, pulumi)
+		var pulumiDeps []*ast.StringExpr
+		getExpressionDependencies(&pulumiDeps, pulumi.RequiredVersion)
+		dependencies[pulumi.key().Value] = pulumiDeps
+	}
 
 	// Map of package name to default provider resource and it's key.
 	defaultProviders := map[string]*ast.StringExpr{}
@@ -179,17 +197,16 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 	// Depth-first visit each node
 	var visit func(name *ast.StringExpr) bool
 	visit = func(name *ast.StringExpr) bool {
-		// Special case: pulumi variable has no dependencies.
-		if name.Value == PulumiVarName {
-			visited[PulumiVarName] = true
-			return true
-		}
-
 		e, ok := intermediates[name.Value]
 		if !ok {
-			s := stripConfigNamespace(t.GetName().Value, name.Value)
-			if e2, ok := intermediates[s]; ok {
-				e = e2
+			if t.GetName() != nil {
+				s := stripConfigNamespace(t.GetName().Value, name.Value)
+				if e2, ok := intermediates[s]; ok {
+					e = e2
+				} else {
+					e = missingNode{name}
+					addIntermediate(name.Value, e)
+				}
 			} else {
 				e = missingNode{name}
 				addIntermediate(name.Value, e)
