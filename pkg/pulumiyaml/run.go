@@ -2187,6 +2187,14 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 						return x.CustomResource().URN().ToStringOutput(), true
 					}
 
+					// During preview, treat any resource output property (other than .id and .urn)
+					// as unknown. GetRawOutputs() can return prior state, and it's not obvious to
+					// us what is an old version that will be updated, and what is a new version that
+					// has already been updated (or is new).
+					if ok && e.pulumiCtx.DryRun() {
+						return unknownOutput(), true
+					}
+
 					outputs := x.GetRawOutputs()
 
 					// If we're in a preview, mark missing outputs in the schema as unknown.
@@ -2241,15 +2249,6 @@ func (e *programEvaluator) evaluatePropertyAccessTail(expr ast.Expr, receiver in
 				} else if !ok || prop.IsNull() {
 					receiver = nil
 				} else {
-					// Not-known-to-be-unknown output/computed properties inside maps
-					// containing unknowns should be treated as unknown during previews to
-					// ensure that we don't end up using old values.
-					if e.pulumiCtx.DryRun() && x.ContainsUnknowns() && !prop.ContainsUnknowns() {
-						if (prop.IsOutput() && !prop.OutputValue().Known) || prop.IsComputed() {
-							return unknownOutput(), true
-						}
-					}
-
 					receiver = prop
 				}
 				accessors = accessors[1:]
