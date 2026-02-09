@@ -1,0 +1,15 @@
+resources:
+  withV2:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  withV26:
+    type: simple:Resource
+    properties:
+      value: false
+    options: {}
+  withDefault:
+    type: simple:Resource
+    properties:
+      value: true

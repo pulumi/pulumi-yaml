@@ -1,0 +1,25 @@
+resources:
+  noTimeouts:
+    type: simple:Resource
+    properties:
+      value: true
+  createOnly:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  updateOnly:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  deleteOnly:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  allTimeouts:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
