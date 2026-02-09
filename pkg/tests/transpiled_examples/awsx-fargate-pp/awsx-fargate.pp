@@ -2,7 +2,7 @@ resource cluster "aws:ecs/cluster:Cluster" {
 	__logicalName = "cluster"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 

@@ -21,7 +21,7 @@ resource indexHtml "aws:s3/bucketObject:BucketObject" {
 	contentType = "text/html"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -33,7 +33,7 @@ resource faviconPng "aws:s3/bucketObject:BucketObject" {
 	contentType = "image/png"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -41,7 +41,7 @@ resource defaultProvider "pulumi:providers:aws" {
 	__logicalName = "defaultProvider"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
