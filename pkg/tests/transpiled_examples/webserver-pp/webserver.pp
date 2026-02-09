@@ -22,7 +22,7 @@ resource webSecGrp "aws:ec2/securityGroup:SecurityGroup" {
 	}]
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -34,7 +34,7 @@ resource webServer "aws:ec2/instance:Instance" {
 	vpcSecurityGroupIds = [webSecGrp.id]
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -42,7 +42,7 @@ resource defaultProvider "pulumi:providers:aws" {
 	__logicalName = "DefaultProvider"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -51,7 +51,7 @@ resource usEast2Provider "pulumi:providers:aws" {
 	region = "us-east-2"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 
@@ -59,7 +59,7 @@ resource myBucket "aws:s3/bucket:Bucket" {
 	__logicalName = "MyBucket"
 
 	options {
-		version = "5.16.2"
+		version = "5.4.0"
 	}
 }
 

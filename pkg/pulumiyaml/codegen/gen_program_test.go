@@ -251,22 +251,20 @@ func TestGenerateProgram(t *testing.T) {
 	assert.NoError(t, err, "Failed to marshal fake config")
 	t.Setenv("PULUMI_CONFIG", string(config))
 
-	test.TestProgramCodegen(t,
-		test.ProgramCodegenOptions{
-			Language:   "yaml",
-			Extension:  "yaml",
-			OutputFile: "Main.yaml",
-			Check:      check,
-			GenProgram: GenerateProgram,
-			TestCases: append(
-				filter(test.PulumiPulumiProgramTests),
-				test.ProgramTest{
-					Directory:   "negative-literals",
-					Description: "Negative literals in Pulumi Programs",
-				},
-			),
-		},
-	)
+	test.TestProgramCodegen(t, test.ProgramCodegenOptions{
+		Language:   "yaml",
+		Extension:  "yaml",
+		OutputFile: "Main.yaml",
+		Check:      check,
+		GenProgram: GenerateProgram,
+		TestCases: append(
+			filter(test.PulumiPulumiProgramTests),
+			test.ProgramTest{
+				Directory:   "negative-literals",
+				Description: "Negative literals in Pulumi Programs",
+			},
+		),
+	})
 }
 
 type testMonitor struct{}

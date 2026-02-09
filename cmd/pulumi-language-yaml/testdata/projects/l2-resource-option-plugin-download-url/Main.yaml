@@ -1,0 +1,20 @@
+resources:
+  withDefaultURL:
+    type: simple:Resource
+    properties:
+      value: true
+  withExplicitDefaultURL:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  withCustomURL1:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
+  withCustomURL2:
+    type: simple:Resource
+    properties:
+      value: false
+    options: {}

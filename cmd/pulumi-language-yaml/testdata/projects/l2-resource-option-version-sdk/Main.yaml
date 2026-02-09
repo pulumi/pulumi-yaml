@@ -1,0 +1,8 @@
+resources:
+  # Check that withV2 is generated against the v2 SDK and not against the V26 SDK,
+  # and that the version resource option is elided.
+  withV2:
+    type: simple:Resource
+    properties:
+      value: true
+    options: {}
