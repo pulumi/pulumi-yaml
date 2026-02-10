@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Add the ability to express complex resource aliases, on par with other languages
-time: 2026-02-03T14:08:13.537448+01:00
-custom:
-    PR: "156"
