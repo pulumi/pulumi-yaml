@@ -99,10 +99,12 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                               "#721 generation unimplemented",
 	"l1-builtin-stash":                             "not yet implemented",
+	"l1-config-types-object":                       "not yet implemented",
+	"l1-config-types-primitive":                    "not yet implemented",
 	"l1-builtin-try":                               "#721 generation unimplemented",
-	"l1-config-types":                              "Failed to generate YAML program: *model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
 	"l1-proxy-index":                               "run bailed",
 	"l2-component-call-simple":                     "#722 generation unimplemented",
+	"l2-resource-option-env-var-mappings":          "not yet implemented",
 	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
