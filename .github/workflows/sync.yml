@@ -1,21 +1,30 @@
+permissions: write-all # Equivalent to default permissions plus id-token: write
+env:
+  ESC_ACTION_OIDC_AUTH: true
+  ESC_ACTION_OIDC_ORGANIZATION: pulumi
+  ESC_ACTION_OIDC_REQUESTED_TOKEN_TYPE: urn:pulumi:token-type:access_token:organization
+  ESC_ACTION_ENVIRONMENT: imports/github-secrets
+  ESC_ACTION_EXPORT_ENVIRONMENT_VARIABLES: false
 name: Sync Files
 
 on:
   release:
     types: [published]
-  workflow_dispatch:
-
+  workflow_dispatch: null
 jobs:
   convert-test-sync:
     name: Sync PCL test files
     runs-on: ubuntu-latest
     steps:
+      - name: Fetch secrets from ESC
+        id: esc-secrets
+        uses: pulumi/esc-action@v1
       - name: Checkout Repo
         uses: actions/checkout@v2
       - name: Run GitHub File Sync
         uses: BetaHuhn/repo-file-sync-action@40da4d517e0a744fce9e8aed03e63d6c8bafbdc0 # v1.17.21
         with:
-          GH_PAT: ${{ secrets.PULUMI_BOT_TOKEN }}
+          GH_PAT: ${{ steps.esc-secrets.outputs.PULUMI_BOT_TOKEN }}
           TEAM_REVIEWERS: Platform
           PR_BODY: "This PR syncs changes to the codegen'd PCL files from the latest `pulumi/yaml` release.\nTo program-gen new/ modified examples, please fork this branch and run `cd pkg/codegen && PULUMI_ACCEPT=true go test -timeout 1h -tags all,smoke -run '^TestGenerateProgram$' ./...`.\nThis is not required if all files in the PR have been deleted (no new examples)."
           COMMIT_PREFIX: "(pulumi-bot)"
