@@ -41,7 +41,7 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 	// We can't just go run the pulumi-test-language package because of
 	// https://github.com/golang/go/issues/39172, so we build it to a temp file then run that.
 	binary := t.TempDir() + "/pulumi-test-language"
-	cmd := exec.Command("go", "build", "-C", "../../pulumi/cmd/pulumi-test-language", "-o", binary) //nolint:gosec
+	cmd := exec.Command("go", "build", "-o", binary, "github.com/pulumi/pulumi/pkg/v3/testing/pulumi-test-language") //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	t.Logf("build output: %s", output)
 	require.NoError(t, err)
@@ -99,29 +99,30 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                               "#721 generation unimplemented",
 	"l1-builtin-stash":                             "not yet implemented",
+	"l1-builtin-try":                               "#721 generation unimplemented",
 	"l1-config-types-object":                       "not yet implemented",
 	"l1-config-types-primitive":                    "not yet implemented",
-	"l1-builtin-try":                               "#721 generation unimplemented",
 	"l1-proxy-index":                               "run bailed",
 	"l2-component-call-simple":                     "#722 generation unimplemented",
-	"l2-resource-option-env-var-mappings":          "not yet implemented",
-	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
-	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
-	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
 	"l2-component-property-deps":                   "Traversal not allowed on function result",
 	"l2-explicit-providers":                        "test failing",
 	"l2-failed-create-continue-on-error":           "#725 test failing",
+	"l2-module-format":                             "https://github.com/pulumi/pulumi-yaml/issues/951",
 	"l2-provider-call":                             "Traversal not allowed on function result",
 	"l2-provider-call-explicit":                    "Traversal not allowed on function result",
 	"l2-provider-grpc-config-schema-secret":        "Detected a secret leak in state",
 	"l2-proxy-index":                               "test failing",
+	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
+	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
+	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
+	"l2-resource-option-env-var-mappings":          "not yet implemented",
+	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
 	"l2-resource-option-replace-on-changes":        "not yet implemented",
 	"l2-resource-option-replacement-trigger":       "not yet implemented",
 	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
+	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
 	"l2-rtti":                                      "test failing",
-	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
-	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
 }
 
 func log(t *testing.T, name, message string) {

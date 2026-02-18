@@ -1,0 +1,16 @@
+resources:
+  sink1:
+    type: enum:Res
+    properties:
+      intEnum: 1
+      stringEnum: two
+  sink2:
+    type: enum:mod:Res
+    properties:
+      intEnum: 1
+      stringEnum: two
+  sink3:
+    type: enum:mod/nested:Res
+    properties:
+      intEnum: 1
+      stringEnum: two

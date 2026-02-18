@@ -8,7 +8,7 @@ _.path = [
 [tools]
 changie = "latest"
 cue = "v0.12.0"
-go = "1.24.5"
+go = "1.25.7"
 golangci-lint = "2.5.0"
 jq = "latest"
 pulumi = "latest"

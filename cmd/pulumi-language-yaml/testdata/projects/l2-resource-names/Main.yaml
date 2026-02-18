@@ -15,3 +15,11 @@ resources:
     type: names:ResResource
     properties:
       value: true
+  res5:
+    type: names:mod:Res
+    properties:
+      value: true
+  res6:
+    type: names:mod/nested:Res
+    properties:
+      value: true
