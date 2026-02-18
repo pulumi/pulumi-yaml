@@ -73,7 +73,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
       - name: Set up Python ${{ inputs.python-version }}
         uses: actions/setup-python@v1
         with:
@@ -145,8 +145,3 @@ jobs:
           fail_ci_if_error: false
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.24.x]

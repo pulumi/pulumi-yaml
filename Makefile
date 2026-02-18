@@ -92,7 +92,6 @@ test:: build get_plugins get_schemas
 # Runs tests with code coverage tracking.
 # Generates a coverage report in the coverage directory.
 .phony: test_cover
-test_cover: export GOEXPERIMENT = coverageredesign
 test_cover: get_plugins get_schemas
 	@make build BUILD_FLAGS="-cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
 	@rm -rf coverage && mkdir -p coverage
