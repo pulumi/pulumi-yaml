@@ -34,7 +34,7 @@ func newPluginHost() (plugin.Host, error) {
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil)
+	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil, nil)
 	if err != nil {
 		return nil, err
 	}

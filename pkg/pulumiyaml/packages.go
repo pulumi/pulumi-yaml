@@ -544,7 +544,7 @@ func newResourcePackageHost(plugins *workspace.Plugins, packages map[string]work
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil)
+	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
