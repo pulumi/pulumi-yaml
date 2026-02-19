@@ -24,3 +24,21 @@ resources:
         stringMap:
           x: '100'
           y: '200'
+  emptyListRes:
+    type: plain:Resource
+    properties:
+      data:
+        innerData:
+          boolean: false
+          float: 0
+          integer: 0
+          string: ""
+          boolArray: []
+          stringMap: {}
+        boolean: false
+        float: 0
+        integer: 0
+        string: ""
+        boolArray: []
+        stringMap: {}
+      dataList: []
