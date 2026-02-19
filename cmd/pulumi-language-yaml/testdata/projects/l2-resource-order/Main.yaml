@@ -1,0 +1,15 @@
+resources:
+  res2:
+    type: simple:Resource
+    properties:
+      value: ${localVar}
+  res1:
+    type: simple:Resource
+    properties:
+      value: true
+variables:
+  localVar: ${res1.value}
+outputs:
+  # This test asserts that PCL declaration order does not need to match usage order. That is a resource can be declared
+  # // lower in the file than it is first referenced.
+  out: ${res2.value}

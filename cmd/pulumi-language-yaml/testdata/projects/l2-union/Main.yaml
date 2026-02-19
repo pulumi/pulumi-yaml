@@ -13,5 +13,27 @@ resources:
       mapMapUnionProperty:
         key1:
           key1a: value1a
+  # List<Union<String, Enum>> pattern
+  stringEnumUnionListExample:
+    type: union:Example
+    properties:
+      stringEnumUnionListProperty:
+        - Listen
+        - Send
+        - NotAnEnumValue
+  # Safe enum: literal string matching an enum value
+  safeEnumExample:
+    type: union:Example
+    properties:
+      typedEnumProperty: Block
+  # Output enum: output from another resource used as enum input
+  enumOutputExample:
+    type: union:EnumOutput
+    properties:
+      name: example
+  outputEnumExample:
+    type: union:Example
+    properties:
+      typedEnumProperty: ${enumOutputExample.type}
 outputs:
   mapMapUnionOutput: ${mapMapUnionExample.mapMapUnionProperty}
