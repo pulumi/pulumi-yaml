@@ -549,6 +549,7 @@ func RunComponentTemplate(ctx *pulumi.Context,
 	if err := ctx.RegisterComponentResource(typ, name, component, options); err != nil {
 		return pulumi.URNOutput{}, nil, err
 	}
+	component.evaluator.parent = component
 
 	diags.Extend(runner.Run(component)...)
 	if diags.HasErrors() {
@@ -595,7 +596,7 @@ func (m *componentEvaluator) EvalVariable(r *Runner, node variableNode) bool {
 
 func (m *componentEvaluator) EvalResource(r *Runner, node resourceNode) bool {
 	ctx := r.newContext(node)
-	res, ok := m.evaluator.registerResourceWithParent(node, m)
+	res, ok := m.evaluator.registerResource(node)
 	if !ok {
 		msg := fmt.Sprintf("Error registering resource [%v]: %v", node.Key.Value, ctx.sdiags.Error())
 		err := m.evaluator.pulumiCtx.Log.Error(msg, &pulumi.LogArgs{})
@@ -894,6 +895,7 @@ type programEvaluator struct {
 	*evalContext
 	pulumiCtx   *pulumi.Context
 	packageRefs map[tokens.Package]string
+	parent      pulumi.Resource // non-nil when evaluating inside a component
 }
 
 func (e *programEvaluator) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -1437,10 +1439,6 @@ func (e *programEvaluator) registerConfig(intm configNode) (interface{}, bool) {
 }
 
 func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource, bool) {
-	return e.registerResourceWithParent(kvp, nil)
-}
-
-func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent pulumi.Resource) (lateboundResource, bool) {
 	k, v := kvp.Key.Value, kvp.Value
 
 	// Read the properties and then evaluate them in case there are expressions contained inside.
@@ -1559,8 +1557,8 @@ func (e *programEvaluator) registerResourceWithParent(kvp resourceNode, parent p
 		}
 	}
 
-	if v.Options.Parent == nil && parent != nil {
-		opts = append(opts, pulumi.Parent(parent))
+	if v.Options.Parent == nil && e.parent != nil {
+		opts = append(opts, pulumi.Parent(e.parent))
 	}
 
 	if v.Options.Aliases != nil {
@@ -2488,6 +2486,8 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		} else {
 			e.error(t.Return, fmt.Sprintf("Unable to evaluate options Parent field: %+v", t.CallOpts.Parent))
 		}
+	} else if e.parent != nil {
+		opts = append(opts, pulumi.Parent(e.parent))
 	}
 	if t.CallOpts.Provider != nil {
 		providerOpt, ok := e.evaluateResourceValuedOption(t.CallOpts.Provider)

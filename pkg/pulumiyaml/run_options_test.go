@@ -11,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const fakeName = "foo"
@@ -182,4 +183,133 @@ variables:
 		requireNoErrors(t, template, diags)
 	}
 	assert.NoError(t, err)
+}
+
+func TestComponentResourceParent(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+components:
+  myComponent:
+    resources:
+      inner:
+        type: ` + testResourceToken + `
+        properties:
+          foo: bar
+    outputs:
+      out: ${inner.bar}
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	resourceCreated := false
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "pulumi:providers:test":
+				return "providerId", resource.PropertyMap{}, nil
+			case "test:index:myComponent":
+				return "", resource.PropertyMap{}, nil
+			case testResourceToken:
+				resourceCreated = true
+				assert.Equal(t,
+					"urn:pulumi:stackDev::projectFoo::pulumi:providers:test::myProvider::providerId",
+					args.Provider,
+				)
+				assert.Equal(t,
+					"urn:pulumi:stackDev::projectFoo::test:index:myComponent::myComp",
+					args.RegisterRPC.Parent,
+				)
+				return "innerID", resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+					"bar": resource.NewStringProperty("baz"),
+				}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("unexpected resource type %s", args.TypeToken)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		var provider pulumi.ProviderResourceState
+		err := ctx.RegisterResource("pulumi:providers:test", "myProvider", nil, &provider)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = RunComponentTemplate(ctx,
+			"test:index:myComponent", "myComp",
+			pulumi.Providers(&provider),
+			template, pulumi.Map{}, newMockPackageMap(),
+		)
+		return err
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	require.NoError(t, err)
+	assert.True(t, resourceCreated, "expected inner resource to be created")
+}
+
+func TestComponentInvokeParent(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+components:
+  myComponent:
+    variables:
+      invokeResult:
+        fn::invoke:
+          function: test:invoke:type
+    outputs:
+      out: ${invokeResult}
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	invokeCalled := false
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "pulumi:providers:test":
+				return "providerId", resource.PropertyMap{}, nil
+			case "test:index:myComponent":
+				return "", resource.PropertyMap{}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("unexpected resource type %s", args.TypeToken)
+		},
+		CallF: func(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+			switch args.Token {
+			case "test:invoke:type":
+				invokeCalled = true
+				assert.Equal(t,
+					"urn:pulumi:stackDev::projectFoo::pulumi:providers:test::myProvider::providerId",
+					args.Provider,
+				)
+				return resource.PropertyMap{
+					"retval": resource.NewStringProperty("oof"),
+				}, nil
+			}
+			return resource.PropertyMap{}, fmt.Errorf("unexpected invoke %s", args.Token)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		var provider pulumi.ProviderResourceState
+		err := ctx.RegisterResource("pulumi:providers:test", "myProvider", nil, &provider)
+		if err != nil {
+			return err
+		}
+
+		_, _, err = RunComponentTemplate(ctx,
+			"test:index:myComponent", "myComp",
+			pulumi.Providers(&provider),
+			template, pulumi.Map{}, newMockPackageMap(),
+		)
+		return err
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	require.NoError(t, err)
+	assert.True(t, invokeCalled, "expected invoke to be called")
 }

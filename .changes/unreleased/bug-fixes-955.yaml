@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Correctly apply parent to invokes running within a component
+time: 2026-02-21T15:07:25.119265+01:00
+custom:
+    PR: "955"
