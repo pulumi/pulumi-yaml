@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add the `envVarMappings` resource option
+time: 2026-02-24T00:00:00.000000Z
+custom:
+    PR: "960"
