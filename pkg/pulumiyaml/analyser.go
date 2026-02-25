@@ -773,6 +773,9 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 				},
 			}})
 		}
+		if v.Options.EnvVarMappings != nil {
+			tc.assertTypeAssignable(ctx, v.Options.EnvVarMappings, &schema.MapType{ElementType: schema.StringType})
+		}
 	}
 
 	return true

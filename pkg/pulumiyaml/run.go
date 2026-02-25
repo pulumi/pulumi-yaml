@@ -1830,7 +1830,9 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 	if v.Options.EnvVarMappings != nil {
 		value, ok := e.evaluateExpr(v.Options.EnvVarMappings)
-		if ok {
+		if !ok {
+			overallOk = false
+		} else {
 			mappingsObj, ok := value.(map[string]interface{})
 			if !ok {
 				e.error(v.Options.EnvVarMappings, "envVarMappings must be an object with string values")
@@ -1846,12 +1848,8 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 					}
 					mappings[key] = s
 				}
-				if overallOk {
-					opts = append(opts, pulumi.EnvVarMappings(mappings))
-				}
+				opts = append(opts, pulumi.EnvVarMappings(mappings))
 			}
-		} else {
-			overallOk = false
 		}
 	}
 
