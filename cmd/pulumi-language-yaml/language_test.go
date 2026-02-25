@@ -115,7 +115,6 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
 	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
 	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
-	"l2-resource-option-env-var-mappings":          "not yet implemented",
 	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
 	"l2-resource-option-replace-on-changes":        "not yet implemented",
 	"l2-resource-option-replacement-trigger":       "not yet implemented",

@@ -1828,6 +1828,32 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.HideDiffs != nil {
 		opts = append(opts, pulumi.HideDiffs(listStrings(v.Options.HideDiffs)))
 	}
+	if v.Options.EnvVarMappings != nil {
+		value, ok := e.evaluateExpr(v.Options.EnvVarMappings)
+		if ok {
+			mappingsObj, ok := value.(map[string]interface{})
+			if !ok {
+				e.error(v.Options.EnvVarMappings, "envVarMappings must be an object with string values")
+				overallOk = false
+			} else {
+				mappings := make(map[string]string, len(mappingsObj))
+				for key, val := range mappingsObj {
+					s, ok := val.(string)
+					if !ok {
+						e.error(v.Options.EnvVarMappings, fmt.Sprintf("envVarMappings value for key %q must be a string", key))
+						overallOk = false
+						break
+					}
+					mappings[key] = s
+				}
+				if overallOk {
+					opts = append(opts, pulumi.EnvVarMappings(mappings))
+				}
+			}
+		} else {
+			overallOk = false
+		}
+	}
 
 	// Create either a latebound custom resource or latebound provider resource depending on
 	// whether the type token indicates a special provider type.

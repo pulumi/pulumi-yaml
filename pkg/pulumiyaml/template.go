@@ -106,6 +106,8 @@ type ResourceOptions struct {
 	// If set, the provider's Delete method will not be called for this resource if the specified resource is being
 	// deleted as well.
 	DeletedWith string `json:",omitempty" yaml:",omitempty"`
+	// EnvVarMappings specifies environment variable remappings for provider resources.
+	EnvVarMappings map[string]string `json:",omitempty" yaml:",omitempty"`
 }
 
 // Resource declares a single infrastructure resource, such as an AWS S3 bucket or EC2 instance,

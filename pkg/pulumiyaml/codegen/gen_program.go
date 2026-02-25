@@ -263,6 +263,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		contract.Assertf(ok, "Expected a list node, got %T", elems)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("aliases"), elems))
 	}
+	if opts.EnvVarMappings != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("envVarMappings"),
+			g.expr(opts.EnvVarMappings)))
+	}
 
 	return syn.Object(rOpts...)
 }
