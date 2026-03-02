@@ -1,0 +1,10 @@
+resources:
+  myRes:
+    type: enum:Res
+    properties:
+      intEnum: 1
+      stringEnum: one
+  mySink:
+    type: extenumref:Sink
+    properties:
+      stringEnum: two
