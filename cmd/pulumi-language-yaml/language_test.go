@@ -98,11 +98,14 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                               "#721 generation unimplemented",
+	"l1-builtin-list":                              "Unknown Function; YAML does not support fn::length",
+	"l1-builtin-object":                            "Unknown Function; YAML does not support fn::entries",
 	"l1-builtin-stash":                             "not yet implemented",
 	"l1-builtin-try":                               "#721 generation unimplemented",
 	"l1-config-types-object":                       "not yet implemented",
 	"l1-config-types-primitive":                    "not yet implemented",
 	"l1-proxy-index":                               "run bailed",
+	"l2-builtin-object":                            "Unknown Function; YAML does not support fn::entries",
 	"l2-component-call-simple":                     "#722 generation unimplemented",
 	"l2-component-property-deps":                   "Traversal not allowed on function result",
 	"l2-explicit-providers":                        "test failing",
@@ -112,6 +115,8 @@ var expectedFailures = map[string]string{
 	"l2-provider-call-explicit":                    "Traversal not allowed on function result",
 	"l2-provider-grpc-config-schema-secret":        "Detected a secret leak in state",
 	"l2-proxy-index":                               "test failing",
+	"l2-resource-elide-unknowns":                   `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
+	"l2-resource-name-type":                        "Unknown Function; YAML does not support fn::pulumiResourceName",
 	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
 	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
 	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",

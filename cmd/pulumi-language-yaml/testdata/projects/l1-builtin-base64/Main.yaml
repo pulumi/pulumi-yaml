@@ -1,0 +1,10 @@
+configuration:
+  input:
+    type: string
+variables:
+  bytes:
+    fn::fromBase64: ${input}
+outputs:
+  data: ${bytes}
+  roundtrip:
+    fn::toBase64: ${bytes}
