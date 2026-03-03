@@ -132,25 +132,25 @@ var expectedFailures = map[string]string{
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
-	// "l1-builtin-project-root-main":        "eject failure",
-	// "l1-builtin-require-pulumi-version":   "eject failure",
-	// "l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
-	// "l1-main":                             "eject failure",
-	// "l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
-	// "l1-stack-reference":                  "eject failure",
-	// "l2-engine-update-options":            "eject failure",
-	// "l2-explicit-parameterized-provider":  "eject failure",
-	// "l2-invoke-options-depends-on":        "eject failure",
-	// "l2-large-string":                     "gRPC message exceeds max size during converter test",
-	// "l2-parallel-resources":               "eject failure",
-	// "l2-parameterized-invoke":             "eject failure",
-	// "l2-parameterized-resource":           "eject failure",
-	// "l2-parameterized-resource-twice":     "eject failure",
-	// "l2-resource-asset-archive":           "eject failure",
-	// "l2-resource-option-alias":            "eject failure",
-	// "l2-resource-option-env-var-mappings": "eject failure",
-	// "l2-resource-option-replace-with":     "eject failure",
-	// "l2-target-up-with-new-dependency":    "eject failure",
+	"l1-builtin-project-root-main":        "eject failure",
+	"l1-builtin-require-pulumi-version":   "eject failure",
+	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
+	"l1-main":                             "eject failure",
+	"l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
+	"l1-stack-reference":                  "eject failure",
+	"l2-engine-update-options":            "eject failure",
+	"l2-explicit-parameterized-provider":  "eject failure",
+	"l2-invoke-options-depends-on":        "eject failure",
+	"l2-large-string":                     "gRPC message exceeds max size during converter test",
+	"l2-parallel-resources":               "eject failure",
+	"l2-parameterized-invoke":             "eject failure",
+	"l2-parameterized-resource":           "eject failure",
+	"l2-parameterized-resource-twice":     "eject failure",
+	"l2-resource-asset-archive":           "eject failure",
+	"l2-resource-option-alias":            "eject failure",
+	"l2-resource-option-env-var-mappings": "eject failure",
+	"l2-resource-option-replace-with":     "eject failure",
+	"l2-target-up-with-new-dependency":    "eject failure",
 }
 
 func log(t *testing.T, name, message string) {
@@ -219,10 +219,10 @@ func TestLanguage(t *testing.T) {
 				t.Skipf("Skipping known failure: %s", expected)
 			}
 
-			result, err := engine.RunLanguageTest(context.Background(), &testingrpc.RunLanguageTestRequest{
+			result, err := engine.RunLanguageTest(t.Context(), &testingrpc.RunLanguageTestRequest{
 				Token:            prepare.Token,
 				Test:             tt,
-				SkipConvertTests: tt != "l2-resource-names",
+				SkipConvertTests: has(expectedEjectFailures, tt),
 			})
 
 			require.NoError(t, err)
@@ -235,3 +235,5 @@ func TestLanguage(t *testing.T) {
 		})
 	}
 }
+
+func has[K comparable, V any, M ~map[K]V](m M, k K) bool { _, ok := m[k]; return ok }
