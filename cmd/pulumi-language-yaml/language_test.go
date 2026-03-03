@@ -25,8 +25,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pulumi/pulumi-yaml/pkg/converter"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
@@ -126,7 +128,29 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
-	"l2-rtti":                                      "test failing",
+}
+
+// Add test names here that are expected to fail the converter (eject) round-trip test.
+var expectedEjectFailures = map[string]string{
+	// "l1-builtin-project-root-main":        "eject failure",
+	// "l1-builtin-require-pulumi-version":   "eject failure",
+	// "l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
+	// "l1-main":                             "eject failure",
+	// "l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
+	// "l1-stack-reference":                  "eject failure",
+	// "l2-engine-update-options":            "eject failure",
+	// "l2-explicit-parameterized-provider":  "eject failure",
+	// "l2-invoke-options-depends-on":        "eject failure",
+	// "l2-large-string":                     "gRPC message exceeds max size during converter test",
+	// "l2-parallel-resources":               "eject failure",
+	// "l2-parameterized-invoke":             "eject failure",
+	// "l2-parameterized-resource":           "eject failure",
+	// "l2-parameterized-resource-twice":     "eject failure",
+	// "l2-resource-asset-archive":           "eject failure",
+	// "l2-resource-option-alias":            "eject failure",
+	// "l2-resource-option-env-var-mappings": "eject failure",
+	// "l2-resource-option-replace-with":     "eject failure",
+	// "l2-target-up-with-new-dependency":    "eject failure",
 }
 
 func log(t *testing.T, name, message string) {
@@ -148,17 +172,20 @@ func TestLanguage(t *testing.T) {
 	require.NoError(t, err)
 
 	cancel := make(chan bool)
-
 	// Run the language plugin
 	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
 		Init: func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, "", true /* useRPCLoader */)
-			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
+			pulumirpc.RegisterLanguageRuntimeServer(srv, server.NewLanguageHost(engineAddress, "", true /* useRPCLoader */))
+			pulumirpc.RegisterConverterServer(srv, plugin.NewConverterServer(converter.New()))
 			return nil
 		},
 		Cancel: cancel,
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		close(cancel)
+		assert.NoError(t, <-handle.Done)
+	})
 
 	// Create a temp project dir for the test to run in
 	rootDir := t.TempDir()
@@ -166,11 +193,12 @@ func TestLanguage(t *testing.T) {
 	snapshotDir := "./testdata/"
 
 	// Prepare to run the tests
-	prepare, err := engine.PrepareLanguageTests(context.Background(), &testingrpc.PrepareLanguageTestsRequest{
-		LanguagePluginName:   "yaml",
-		LanguagePluginTarget: fmt.Sprintf("127.0.0.1:%d", handle.Port),
-		TemporaryDirectory:   rootDir,
-		SnapshotDirectory:    snapshotDir,
+	prepare, err := engine.PrepareLanguageTests(t.Context(), &testingrpc.PrepareLanguageTestsRequest{
+		LanguagePluginName:    "yaml",
+		LanguagePluginTarget:  fmt.Sprintf("127.0.0.1:%d", handle.Port),
+		TemporaryDirectory:    rootDir,
+		SnapshotDirectory:     snapshotDir,
+		ConverterPluginTarget: fmt.Sprintf("127.0.0.1:%d", handle.Port),
 	})
 	require.NoError(t, err)
 
@@ -192,8 +220,9 @@ func TestLanguage(t *testing.T) {
 			}
 
 			result, err := engine.RunLanguageTest(context.Background(), &testingrpc.RunLanguageTestRequest{
-				Token: prepare.Token,
-				Test:  tt,
+				Token:            prepare.Token,
+				Test:             tt,
+				SkipConvertTests: tt != "l2-resource-names",
 			})
 
 			require.NoError(t, err)
@@ -205,9 +234,4 @@ func TestLanguage(t *testing.T) {
 			assert.True(t, result.Success)
 		})
 	}
-
-	t.Cleanup(func() {
-		close(cancel)
-		assert.NoError(t, <-handle.Done)
-	})
 }
