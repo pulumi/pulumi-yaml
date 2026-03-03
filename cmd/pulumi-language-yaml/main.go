@@ -49,6 +49,12 @@ func main() {
 	logging.InitLogging(false, 0, false)
 	cmdutil.InitTracing("pulumi-language-yaml", "pulumi-language-yaml", tracing)
 
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if err := cmdutil.InitOtelTracing("pulumi-language-yaml", otelEndpoint); err != nil {
+		logging.V(3).Infof("failed to initialize OTel tracing: %v", err)
+	}
+	defer cmdutil.CloseOtelTracing()
+
 	// Fetch the engine address if available so we can do logging, etc.
 	var engineAddress string
 	if len(args) > 0 {
@@ -68,6 +74,7 @@ func main() {
 			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
 			return nil
 		},
+		Options: rpcutil.TracingServerInterceptorOptions(nil),
 	})
 	if err != nil {
 		cmdutil.Exit(errors.Wrapf(err, "could not start language host RPC server"))

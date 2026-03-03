@@ -36,12 +36,14 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	providersdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi/provider"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
@@ -192,6 +194,9 @@ func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 
 // RPC endpoint for LanguageRuntimeServer::Run. This actually evaluates the JSON-based project.
 func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest) (*pulumirpc.RunResponse, error) {
+	tracer := otel.Tracer("pulumi-language-yaml")
+	ctx, otelSpan := cmdutil.StartSpan(ctx, tracer, "execYaml")
+	defer otelSpan.End()
 	configValue := req.GetConfig()
 	jsonConfigValue, err := json.Marshal(configValue)
 	if err != nil {
@@ -338,7 +343,7 @@ func (host *yamlLanguageHost) RunPlugin(
 	req *pulumirpc.RunPluginRequest, server pulumirpc.LanguageRuntime_RunPluginServer,
 ) error {
 	logging.V(5).Infof("Attempting to run yaml plugin in %s", req.Info.ProgramDirectory)
-	ctx := context.Background()
+	ctx := server.Context()
 
 	closer, stdout, stderr, err := rpcutil.MakeRunPluginStreams(server, false)
 	if err != nil {
