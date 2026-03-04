@@ -133,8 +133,6 @@ var expectedFailures = map[string]string{
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
-	"l1-stack-reference": "test doesn't seem to be working",
-
 	"l1-builtin-require-pulumi-version":   "ejecting require-pulumi-version not implemented",
 	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
 	"l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
