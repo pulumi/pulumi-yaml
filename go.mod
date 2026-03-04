@@ -12,7 +12,7 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.224.1-0.20260304142101-ca6228e034a1
+	github.com/pulumi/pulumi/pkg/v3 v3.224.1-0.20260304203209-e3eece1a08e6
 	github.com/pulumi/pulumi/sdk/v3 v3.224.1-0.20260304132128-21b4452b91ce
 	github.com/spf13/afero v1.9.5
 	github.com/stretchr/testify v1.11.1
