@@ -1,0 +1,9 @@
+resources:
+  targetOnly:
+    type: simple:Resource
+    properties:
+      value: true
+  unrelated:
+    type: simple:Resource
+    properties:
+      value: true

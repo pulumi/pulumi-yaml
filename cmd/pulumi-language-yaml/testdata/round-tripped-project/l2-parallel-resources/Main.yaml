@@ -1,0 +1,10 @@
+resources:
+  block1:
+    type: sync:Block
+    name: block-1
+  block2:
+    type: sync:Block
+    name: block-2
+  block3:
+    type: sync:Block
+    name: block-3
