@@ -1,0 +1,48 @@
+resources:
+  classResource:
+    type: simple:Resource
+    name: class
+    properties:
+      value: true
+  exportResource:
+    type: simple:Resource
+    name: export
+    properties:
+      value: true
+  modResource:
+    type: simple:Resource
+    name: mod
+    properties:
+      value: true
+  import:
+    type: simple:Resource
+    properties:
+      value: true
+  objectResource:
+    type: simple:Resource
+    name: object
+    properties:
+      value: true
+  selfResource:
+    type: simple:Resource
+    name: self
+    properties:
+      value: true
+  thisResource:
+    type: simple:Resource
+    name: this
+    properties:
+      value: true
+  ifResource:
+    type: simple:Resource
+    name: if
+    properties:
+      value: true
+outputs:
+  class: ${classResource}
+  export: ${exportResource}
+  mod: ${modResource}
+  object: ${objectResource}
+  self: ${selfResource}
+  this: ${thisResource}
+  if: ${ifResource}

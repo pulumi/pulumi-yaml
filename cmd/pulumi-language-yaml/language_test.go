@@ -25,8 +25,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pulumi/pulumi-yaml/pkg/converter"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
@@ -100,8 +102,10 @@ var expectedFailures = map[string]string{
 	"l1-builtin-can":                               "#721 generation unimplemented",
 	"l1-builtin-list":                              "Unknown Function; YAML does not support fn::length",
 	"l1-builtin-object":                            "Unknown Function; YAML does not support fn::entries",
+	"l1-builtin-secret":                            "Unknown Function; YAML does not support fn::unsecret",
 	"l1-builtin-stash":                             "not yet implemented",
 	"l1-builtin-try":                               "#721 generation unimplemented",
+	"l1-config-secret":                             "*model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
 	"l1-config-types-object":                       "not yet implemented",
 	"l1-config-types-primitive":                    "not yet implemented",
 	"l1-proxy-index":                               "run bailed",
@@ -126,7 +130,22 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
-	"l2-rtti":                                      "test failing",
+}
+
+// Add test names here that are expected to fail the converter (eject) round-trip test.
+var expectedEjectFailures = map[string]string{
+	"l1-builtin-require-pulumi-version":   "ejecting require-pulumi-version not implemented",
+	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
+	"l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
+	"l2-explicit-parameterized-provider":  "parameterization is not preserved",
+	"l2-invoke-options-depends-on":        "does not generate out depends on",
+	"l2-large-string":                     "gRPC message exceeds max size during converter test",
+	"l2-parameterized-invoke":             "parameterization is not preserved",
+	"l2-parameterized-resource":           "parameterization is not preserved",
+	"l2-parameterized-resource-twice":     "parameterization is not preserved",
+	"l2-resource-option-alias":            "alias not ejected",
+	"l2-resource-option-env-var-mappings": "panic: interface conversion: interface {} is nil, not resource.PropertyMap",
+	"l2-resource-option-replace-with":     "not implemented",
 }
 
 func log(t *testing.T, name, message string) {
@@ -148,17 +167,20 @@ func TestLanguage(t *testing.T) {
 	require.NoError(t, err)
 
 	cancel := make(chan bool)
-
 	// Run the language plugin
 	handle, err := rpcutil.ServeWithOptions(rpcutil.ServeOptions{
 		Init: func(srv *grpc.Server) error {
-			host := server.NewLanguageHost(engineAddress, "", true /* useRPCLoader */)
-			pulumirpc.RegisterLanguageRuntimeServer(srv, host)
+			pulumirpc.RegisterLanguageRuntimeServer(srv, server.NewLanguageHost(engineAddress, "", true /* useRPCLoader */))
+			pulumirpc.RegisterConverterServer(srv, plugin.NewConverterServer(converter.New()))
 			return nil
 		},
 		Cancel: cancel,
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		close(cancel)
+		assert.NoError(t, <-handle.Done)
+	})
 
 	// Create a temp project dir for the test to run in
 	rootDir := t.TempDir()
@@ -166,11 +188,12 @@ func TestLanguage(t *testing.T) {
 	snapshotDir := "./testdata/"
 
 	// Prepare to run the tests
-	prepare, err := engine.PrepareLanguageTests(context.Background(), &testingrpc.PrepareLanguageTestsRequest{
-		LanguagePluginName:   "yaml",
-		LanguagePluginTarget: fmt.Sprintf("127.0.0.1:%d", handle.Port),
-		TemporaryDirectory:   rootDir,
-		SnapshotDirectory:    snapshotDir,
+	prepare, err := engine.PrepareLanguageTests(t.Context(), &testingrpc.PrepareLanguageTestsRequest{
+		LanguagePluginName:    "yaml",
+		LanguagePluginTarget:  fmt.Sprintf("127.0.0.1:%d", handle.Port),
+		TemporaryDirectory:    rootDir,
+		SnapshotDirectory:     snapshotDir,
+		ConverterPluginTarget: fmt.Sprintf("127.0.0.1:%d", handle.Port),
 	})
 	require.NoError(t, err)
 
@@ -191,9 +214,10 @@ func TestLanguage(t *testing.T) {
 				t.Skipf("Skipping known failure: %s", expected)
 			}
 
-			result, err := engine.RunLanguageTest(context.Background(), &testingrpc.RunLanguageTestRequest{
-				Token: prepare.Token,
-				Test:  tt,
+			result, err := engine.RunLanguageTest(t.Context(), &testingrpc.RunLanguageTestRequest{
+				Token:            prepare.Token,
+				Test:             tt,
+				SkipConvertTests: has(expectedEjectFailures, tt),
 			})
 
 			require.NoError(t, err)
@@ -205,9 +229,6 @@ func TestLanguage(t *testing.T) {
 			assert.True(t, result.Success)
 		})
 	}
-
-	t.Cleanup(func() {
-		close(cancel)
-		assert.NoError(t, <-handle.Done)
-	})
 }
+
+func has[K comparable, V any, M ~map[K]V](m M, k K) bool { _, ok := m[k]; return ok }

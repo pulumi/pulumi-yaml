@@ -1,0 +1,12 @@
+resources:
+  res:
+    type: simple:Resource
+    properties:
+      value: true
+outputs:
+  inv:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: test
+      return: result

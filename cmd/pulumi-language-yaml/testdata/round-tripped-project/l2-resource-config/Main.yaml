@@ -1,0 +1,12 @@
+resources:
+  prov:
+    type: pulumi:providers:config
+    properties:
+      name: my config
+      pluginDownloadURL: not the same as the pulumi resource option
+  res:
+    type: config:Resource
+    properties:
+      text: ${prov.version}
+outputs:
+  pluginDownloadURL: ${prov.pluginDownloadURL}

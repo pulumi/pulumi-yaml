@@ -1,0 +1,12 @@
+resources:
+  noDependsOn:
+    type: simple:Resource
+    properties:
+      value: true
+  withDependsOn:
+    type: simple:Resource
+    properties:
+      value: false
+    options:
+      dependsOn:
+        - ${noDependsOn}

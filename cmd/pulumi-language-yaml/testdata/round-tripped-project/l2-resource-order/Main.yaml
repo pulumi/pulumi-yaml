@@ -1,0 +1,13 @@
+resources:
+  res2:
+    type: simple:Resource
+    properties:
+      value: ${localVar}
+  res1:
+    type: simple:Resource
+    properties:
+      value: true
+variables:
+  localVar: ${res1.value}
+outputs:
+  out: ${res2.value}

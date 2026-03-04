@@ -1,0 +1,21 @@
+outputs:
+  secret:
+    fn::invoke:
+      function: scalar-returns:invokeSecret
+      arguments:
+        value: goodbye
+  array:
+    fn::invoke:
+      function: scalar-returns:invokeArray
+      arguments:
+        value: the word
+  map:
+    fn::invoke:
+      function: scalar-returns:invokeMap
+      arguments:
+        value: hello
+  secretMap:
+    fn::invoke:
+      function: scalar-returns:invokeMap
+      arguments:
+        value: secret

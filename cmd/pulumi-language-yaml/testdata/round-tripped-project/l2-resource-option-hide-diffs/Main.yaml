@@ -1,0 +1,12 @@
+resources:
+  hideDiffs:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      hideDiffs:
+        - value
+  notHideDiffs:
+    type: simple:Resource
+    properties:
+      value: true
