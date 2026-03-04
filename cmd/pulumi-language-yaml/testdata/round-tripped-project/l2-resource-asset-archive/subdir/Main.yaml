@@ -1,0 +1,34 @@
+resources:
+  ass:
+    type: asset-archive:AssetResource
+    properties:
+      value:
+        fn::FileAsset: ../test.txt
+  arc:
+    type: asset-archive:ArchiveResource
+    properties:
+      value:
+        fn::FileArchive: ../archive.tar
+  dir:
+    type: asset-archive:ArchiveResource
+    properties:
+      value:
+        fn::FileArchive: ../folder
+  assarc:
+    type: asset-archive:ArchiveResource
+    properties:
+      value:
+        fn::AssetArchive:
+          string:
+            fn::StringAsset: file contents
+          file:
+            fn::FileAsset: ../test.txt
+          folder:
+            fn::FileArchive: ../folder
+          archive:
+            fn::FileArchive: ../archive.tar
+  remoteass:
+    type: asset-archive:AssetResource
+    properties:
+      value:
+        fn::RemoteAsset: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/test.txt

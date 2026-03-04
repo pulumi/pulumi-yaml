@@ -147,7 +147,6 @@ var expectedEjectFailures = map[string]string{
 	"l2-parameterized-invoke":             "eject failure",
 	"l2-parameterized-resource":           "eject failure",
 	"l2-parameterized-resource-twice":     "eject failure",
-	"l2-resource-asset-archive":           "eject failure",
 	"l2-resource-option-alias":            "eject failure",
 	"l2-resource-option-env-var-mappings": "eject failure",
 	"l2-resource-option-replace-with":     "eject failure",
