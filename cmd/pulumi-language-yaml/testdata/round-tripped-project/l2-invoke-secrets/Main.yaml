@@ -1,0 +1,28 @@
+resources:
+  res:
+    type: simple:Resource
+    properties:
+      value: true
+outputs:
+  nonSecret:
+    fn::invoke:
+      function: simple-invoke:secretInvoke
+      arguments:
+        value: hello
+        secretResponse: false
+      return: response
+  firstSecret:
+    fn::invoke:
+      function: simple-invoke:secretInvoke
+      arguments:
+        value: hello
+        secretResponse: ${res.value}
+      return: response
+  secondSecret:
+    fn::invoke:
+      function: simple-invoke:secretInvoke
+      arguments:
+        value:
+          fn::secret: goodbye
+        secretResponse: false
+      return: response

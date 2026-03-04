@@ -1,0 +1,63 @@
+resources:
+  configGrpcProvider:
+    type: pulumi:providers:config-grpc
+    name: config_grpc_provider
+    properties:
+      string1:
+        fn::invoke:
+          function: config-grpc:toSecret
+          arguments:
+            string1: SECRET
+          return: string1
+      int1:
+        fn::invoke:
+          function: config-grpc:toSecret
+          arguments:
+            int1: 1.23456789e+09
+          return: int1
+      num1:
+        fn::invoke:
+          function: config-grpc:toSecret
+          arguments:
+            num1: 123456.789
+          return: num1
+      bool1:
+        fn::invoke:
+          function: config-grpc:toSecret
+          arguments:
+            bool1: true
+          return: bool1
+      listString1:
+        fn::invoke:
+          function: config-grpc:toSecret
+          arguments:
+            listString1:
+              - SECRET
+              - SECRET2
+          return: listString1
+      listString2:
+        - VALUE
+        - fn::invoke:
+            function: config-grpc:toSecret
+            arguments:
+              string1: SECRET
+            return: string1
+      mapString2:
+        key1: value1
+        key2:
+          fn::invoke:
+            function: config-grpc:toSecret
+            arguments:
+              string1: SECRET
+            return: string1
+      objString2:
+        x:
+          fn::invoke:
+            function: config-grpc:toSecret
+            arguments:
+              string1: SECRET
+            return: string1
+  config:
+    type: config-grpc:ConfigFetcher
+    options:
+      provider: ${configGrpcProvider}

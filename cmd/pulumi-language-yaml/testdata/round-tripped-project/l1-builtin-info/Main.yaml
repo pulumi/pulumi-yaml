@@ -1,0 +1,4 @@
+outputs:
+  stackOutput: ${pulumi.stack}
+  projectOutput: ${pulumi.project}
+  organizationOutput: ${pulumi.organization}

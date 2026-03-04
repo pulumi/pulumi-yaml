@@ -1,0 +1,13 @@
+resources:
+  component1:
+    type: component:ComponentCustomRefOutput
+    properties:
+      value: foo-bar-baz
+  custom1:
+    type: component:Custom
+    properties:
+      value: ${component1.value}
+  custom2:
+    type: component:Custom
+    properties:
+      value: ${component1.ref.value}

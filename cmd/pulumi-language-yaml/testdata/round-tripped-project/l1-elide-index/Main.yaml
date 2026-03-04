@@ -1,0 +1,8 @@
+resources:
+  myStash:
+    type: pulumi:Stash
+    properties:
+      input: test
+outputs:
+  stashInput: ${myStash.input}
+  stashOutput: ${myStash.output}

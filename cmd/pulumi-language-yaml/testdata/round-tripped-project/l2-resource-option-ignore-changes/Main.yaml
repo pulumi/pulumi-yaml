@@ -1,0 +1,12 @@
+resources:
+  ignoreChanges:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      ignoreChanges:
+        - value
+  notIgnoreChanges:
+    type: simple:Resource
+    properties:
+      value: true

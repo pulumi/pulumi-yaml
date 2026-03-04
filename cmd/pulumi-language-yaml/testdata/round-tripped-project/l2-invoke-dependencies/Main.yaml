@@ -1,0 +1,15 @@
+resources:
+  first:
+    type: simple:Resource
+    properties:
+      value: false
+  second:
+    type: simple:Resource
+    properties:
+      value:
+        fn::invoke:
+          function: simple-invoke:secretInvoke
+          arguments:
+            value: hello
+            secretResponse: ${first.value}
+          return: secret

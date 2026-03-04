@@ -1,0 +1,14 @@
+resources:
+  firstResource:
+    type: camelNames:CoolModule:SomeResource
+    properties:
+      theInput: true
+  secondResource:
+    type: camelNames:CoolModule:SomeResource
+    properties:
+      theInput: ${firstResource.theOutput}
+  thirdResource:
+    type: camelNames:CoolModule:SomeResource
+    properties:
+      theInput: true
+      resourceName: my-cluster
