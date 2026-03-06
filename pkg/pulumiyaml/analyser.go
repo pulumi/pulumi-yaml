@@ -949,6 +949,12 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 	if len(accessors) == 0 {
 		return root
 	}
+	// If the type is any, allow any property/subscript access and return any. This handles cases like accessing a
+	// property of a variable that holds an element of an object-typed config value, where the element type is any.
+	if codegen.UnwrapType(root) == schema.AnyType {
+		return schema.AnyType
+	}
+
 	if root, ok := root.(*schema.UnionType); ok {
 		var possibilities OrderedTypeSet
 		errs := []*notAssignable{}

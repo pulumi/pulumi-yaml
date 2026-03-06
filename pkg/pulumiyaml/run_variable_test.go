@@ -13,6 +13,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that we can evaluate the Pulumi built-in variable.
@@ -362,4 +363,36 @@ func testVariableDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	assert.NoError(t, err)
 	assert.Equal(t, 1, testInvokeCalls)
 	return nil
+}
+
+// Regression test for https://github.com/pulumi/pulumi-yaml/issues/959
+// Dot-notation property access on a variable that holds an element from an
+// object-typed config value should not produce a type error.
+func TestVariableDotAccessOnObjectConfigElement(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+config:
+  data:
+    type: object
+variables:
+  nametag: ${data.nametag}
+  team: ${nametag.Team}
+`
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	configMap := resource.PropertyMap{
+		resource.PropertyKey(testProject + ":data"): resource.NewObjectProperty(resource.PropertyMap{
+			"nametag": resource.NewObjectProperty(resource.PropertyMap{
+				"Team": resource.NewStringProperty("dev"),
+			}),
+		}),
+	}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return RunTemplate(ctx, tmpl, configMap, newMockPackageMap())
+	}, pulumi.WithMocks(testProject, "dev", &testMonitor{}))
+	require.NoError(t, err)
 }

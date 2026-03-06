@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Fix property access of `any` typed objects
+time: 2026-03-06T12:20:24.975982Z
+custom:
+    PR: "974"
