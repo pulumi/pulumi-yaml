@@ -1,0 +1,41 @@
+resources:
+  provider:
+    type: pulumi:providers:simple
+  parent1:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      provider: ${provider}
+  child1:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent1}
+  parent2:
+    type: primitive:Resource
+    properties:
+      boolean: false
+      float: 0
+      integer: 0
+      string: ""
+      numberArray: []
+      booleanMap: {}
+  child2:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      parent: ${parent2}
+  child3:
+    type: primitive:Resource
+    properties:
+      boolean: false
+      float: 0
+      integer: 0
+      string: ""
+      numberArray: []
+      booleanMap: {}
+    options:
+      parent: ${parent1}
