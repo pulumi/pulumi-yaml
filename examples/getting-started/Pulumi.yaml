@@ -30,5 +30,6 @@ resources:
     options:
       dependsOn:
         - ${ownershipControls}
+        - ${publicAccessBlock}
 outputs:
   bucketEndpoint: http://${my-bucket.websiteEndpoint}
