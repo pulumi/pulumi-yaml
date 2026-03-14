@@ -1,0 +1,99 @@
+name: Renovate Conformance Update
+
+on:
+  pull_request:
+    types: [opened]
+
+env:
+  GOLANGCI_LINT_VERSION: v2.5.0
+
+jobs:
+  update-conformance-tests:
+    if: github.actor == 'pulumi-renovate[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.PULUMI_BOT_TOKEN }}
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.13.x'
+
+      - name: Install Python deps
+        run: python -m pip install --upgrade pip requests wheel urllib3 chardet
+
+      - name: Set up DotNet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '8.x'
+
+      - name: Set up Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '22.x'
+
+      - name: Install yarn
+        run: npm install -g yarn@1.22
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@8582a9e8cc630786854029b4e09281acd6794b58 # v6
+        with:
+          pulumi-version: dev
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" "$GOLANGCI_LINT_VERSION"
+
+      - id: list-schemas
+        name: List required schemas
+        run: |
+          {
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "schemas<<$EOF"
+            LIST_ONLY=true ./scripts/get_schemas.sh
+            echo "$EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore cached schemas
+        uses: actions/cache@v3
+        with:
+          key: ${{ hashFiles('scripts/get_schemas.sh') }}
+          path: ${{ steps.list-schemas.outputs.schemas }}
+
+      - name: Configure git
+        run: |
+          git config user.name "pulumi-bot"
+          git config user.email "bot@pulumi.com"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run update-conformance-tests skill
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude --dangerously-skip-permissions \
+            -p "$(cat .claude/commands/update-conformance-tests.md)"
+
+      - name: Check for dirty worktree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Worktree is dirty after skill run:"
+            git status
+            exit 1
+          fi
+
+      - name: Push commits to PR branch
+        run: git push origin HEAD:${{ github.head_ref }}
