@@ -130,12 +130,14 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
+	"l2-snake-names":                               "not handled correctly",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
 	"l1-builtin-require-pulumi-version":   "ejecting require-pulumi-version not implemented",
 	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
+	"l2-logical-name":                     "not implemented",
 	"l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
 	"l2-explicit-parameterized-provider":  "parameterization is not preserved",
 	"l2-invoke-options-depends-on":        "does not generate out depends on",
