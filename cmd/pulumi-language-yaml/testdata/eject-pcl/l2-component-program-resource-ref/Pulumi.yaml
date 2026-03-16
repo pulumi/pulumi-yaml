@@ -1,2 +1,2 @@
-name: roundtrip
-runtime: pcl
+name: l2-component-program-resource-ref
+runtime: yaml

@@ -1,0 +1,11 @@
+configuration:
+  configLexicalName:
+    type: bool
+resources:
+  resourceLexicalName:
+    type: simple:Resource
+    properties:
+      value: ${configLexicalName}
+outputs:
+  "bB-Beta_beta.\U0001F49C⁉": ${resourceLexicalName.value}
+  "dD-Delta_delta.\U0001F525⁉": ${resourceLexicalName.value}
