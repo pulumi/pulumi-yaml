@@ -1,0 +1,34 @@
+configuration:
+  aString:
+    type: string
+  aNumber:
+    type: number
+  aList:
+    type: list(string)
+  aSecret:
+    type: output(string)
+variables:
+  # Nested object using config values
+  nestedObject:
+    anObject:
+      name: ${aString}
+      items: ${aList}
+    a_secret: ${aSecret}
+outputs:
+  stringOutput:
+    fn::toJSON: ${aString}
+  numberOutput:
+    fn::toJSON: ${aNumber}
+  boolOutput:
+    fn::toJSON: true
+  arrayOutput:
+    fn::toJSON:
+      - x
+      - y
+      - z
+  objectOutput:
+    fn::toJSON:
+      key: value
+      count: 1
+  nestedOutput:
+    fn::toJSON: ${nestedObject}
