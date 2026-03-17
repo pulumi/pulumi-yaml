@@ -138,7 +138,6 @@ var expectedEjectFailures = map[string]string{
 	"l1-builtin-require-pulumi-version":   "ejecting require-pulumi-version not implemented",
 	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
 	"l2-logical-name":                     "not implemented",
-	"l1-output-string":                    "PCL contains invalid HCL escape sequences after eject",
 	"l2-explicit-parameterized-provider":  "parameterization is not preserved",
 	"l2-invoke-options-depends-on":        "does not generate out depends on",
 	"l2-large-string":                     "gRPC message exceeds max size during converter test",
@@ -148,6 +147,7 @@ var expectedEjectFailures = map[string]string{
 	"l2-resource-option-alias":            "alias not ejected",
 	"l2-resource-option-env-var-mappings": "panic: interface conversion: interface {} is nil, not resource.PropertyMap",
 	"l2-resource-option-replace-with":     "not implemented",
+	"l1-builtin-to-json":                  "NYI",
 }
 
 func log(t *testing.T, name, message string) {

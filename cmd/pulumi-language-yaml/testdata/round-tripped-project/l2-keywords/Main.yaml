@@ -3,9 +3,23 @@ resources:
     type: keywords:SomeResource
     properties:
       builtins: builtins
+      lambda: lambda
       property: property
   secondResource:
     type: keywords:SomeResource
     properties:
       builtins: ${firstResource.builtins}
+      lambda: ${firstResource.lambda}
       property: ${firstResource.property}
+  lambdaModuleResource:
+    type: keywords:lambda:SomeResource
+    properties:
+      builtins: builtins
+      lambda: lambda
+      property: property
+  lambdaResource:
+    type: keywords:Lambda
+    properties:
+      builtins: builtins
+      lambda: lambda
+      property: property
