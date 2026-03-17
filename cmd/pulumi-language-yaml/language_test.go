@@ -144,7 +144,6 @@ var expectedEjectFailures = map[string]string{
 	"l2-parameterized-invoke":             "parameterization is not preserved",
 	"l2-parameterized-resource":           "parameterization is not preserved",
 	"l2-parameterized-resource-twice":     "parameterization is not preserved",
-	"l2-resource-option-alias":            "alias not ejected",
 	"l2-resource-option-env-var-mappings": "panic: interface conversion: interface {} is nil, not resource.PropertyMap",
 	"l2-resource-option-replace-with":     "not implemented",
 	"l1-builtin-to-json":                  "NYI",

@@ -843,11 +843,26 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
-	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, version
+	// TODO: resource options not supported by PCL: component, additional secret outputs, custom timeouts, delete before replace, version
 
 	resourceOptions := &model.Block{
 		Type: "options",
 		Body: &model.Body{},
+	}
+	if resource.Options.Aliases != nil {
+		aliasHint := &schema.ArrayType{ElementType: &schema.ObjectType{
+			Properties: []*schema.Property{
+				{Name: "name", Type: schema.StringType},
+				{Name: "noParent", Type: schema.BoolType},
+				{Name: "parent", Type: &schema.ResourceType{}},
+			},
+		}}
+		aliasExpr, adiags := imp.importExpr(resource.Options.Aliases, aliasHint)
+		diags.Extend(adiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "aliases",
+			Value: aliasExpr,
+		})
 	}
 	if resource.Options.DependsOn != nil {
 		refs, rdiags := imp.getResourceRefList(resource.Options.DependsOn, name, "dependsOn")
