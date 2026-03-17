@@ -989,6 +989,19 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		})
 	}
 
+	if resource.Options.ReplaceWith != nil {
+		refs, rdiags := imp.getResourceRefList(resource.Options.ReplaceWith, name, "replaceWith")
+		diags.Extend(rdiags...)
+		if len(refs) > 0 {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name: "replaceWith",
+				Value: &model.TupleConsExpression{
+					Expressions: refs,
+				},
+			})
+		}
+	}
+
 	if len(resourceOptions.Body.Items) > 0 {
 		items = append(items, resourceOptions)
 	}
