@@ -1002,6 +1002,15 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
+	if resource.Options.EnvVarMappings != nil {
+		expr, ediags := imp.importExpr(resource.Options.EnvVarMappings, nil)
+		diags.Extend(ediags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "envVarMappings",
+			Value: expr,
+		})
+	}
+
 	if len(resourceOptions.Body.Items) > 0 {
 		items = append(items, resourceOptions)
 	}
