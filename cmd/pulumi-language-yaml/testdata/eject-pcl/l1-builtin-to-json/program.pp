@@ -6,6 +6,15 @@ config aNumber number {
 	__logicalName = "aNumber"
 }
 
+config aList "list(string)" {
+	__logicalName = "aList"
+}
+
+config aSecret string {
+	__logicalName = "aSecret"
+	secret = true
+}
+
 nestedObject = {
 	"anObject" = {
 		"name" = aString,
