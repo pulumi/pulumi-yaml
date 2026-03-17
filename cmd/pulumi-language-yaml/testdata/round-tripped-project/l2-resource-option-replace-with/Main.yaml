@@ -1,0 +1,16 @@
+resources:
+  target:
+    type: simple:Resource
+    properties:
+      value: true
+  replaceWith:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replaceWith:
+        - ${target}
+  notReplaceWith:
+    type: simple:Resource
+    properties:
+      value: true

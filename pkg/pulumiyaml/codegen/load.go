@@ -843,11 +843,26 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
-	// TODO: resource options not supported by PCL: component, additional secret outputs, aliases, custom timeouts, delete before replace, version
+	// TODO: resource options not supported by PCL: component, additional secret outputs, delete before replace, version
 
 	resourceOptions := &model.Block{
 		Type: "options",
 		Body: &model.Body{},
+	}
+	if resource.Options.Aliases != nil {
+		aliasHint := &schema.ArrayType{ElementType: &schema.ObjectType{
+			Properties: []*schema.Property{
+				{Name: "name", Type: schema.StringType},
+				{Name: "noParent", Type: schema.BoolType},
+				{Name: "parent", Type: &schema.ResourceType{}},
+			},
+		}}
+		aliasExpr, adiags := imp.importExpr(resource.Options.Aliases, aliasHint)
+		diags.Extend(adiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "aliases",
+			Value: aliasExpr,
+		})
 	}
 	if resource.Options.DependsOn != nil {
 		refs, rdiags := imp.getResourceRefList(resource.Options.DependsOn, name, "dependsOn")
@@ -971,6 +986,54 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "hideDiffs",
 			Value: &model.TupleConsExpression{Expressions: paths},
+		})
+	}
+
+	if resource.Options.ReplaceWith != nil {
+		refs, rdiags := imp.getResourceRefList(resource.Options.ReplaceWith, name, "replaceWith")
+		diags.Extend(rdiags...)
+		if len(refs) > 0 {
+			resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+				Name: "replaceWith",
+				Value: &model.TupleConsExpression{
+					Expressions: refs,
+				},
+			})
+		}
+	}
+
+	if resource.Options.EnvVarMappings != nil {
+		expr, ediags := imp.importExpr(resource.Options.EnvVarMappings, nil)
+		diags.Extend(ediags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "envVarMappings",
+			Value: expr,
+		})
+	}
+
+	if ct := resource.Options.CustomTimeouts; ct != nil {
+		var items []model.ObjectConsItem
+		if ct.Create != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("create"),
+				Value: quotedLit(ct.Create.Value),
+			})
+		}
+		if ct.Update != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("update"),
+				Value: quotedLit(ct.Update.Value),
+			})
+		}
+		if ct.Delete != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("delete"),
+				Value: quotedLit(ct.Delete.Value),
+			})
+		}
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "customTimeouts",
+			Value: &model.ObjectConsExpression{Items: items},
 		})
 	}
 

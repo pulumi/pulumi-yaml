@@ -122,7 +122,6 @@ var expectedFailures = map[string]string{
 	"l2-resource-elide-unknowns":                   `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                        "Unknown Function; YAML does not support fn::pulumiResourceName",
 	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
-	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
 	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
 	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
 	"l2-resource-option-replace-on-changes":        "not yet implemented",
@@ -135,19 +134,16 @@ var expectedFailures = map[string]string{
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
-	"l1-builtin-require-pulumi-version":   "ejecting require-pulumi-version not implemented",
-	"l1-empty":                            "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
-	"l2-logical-name":                     "not implemented",
-	"l2-explicit-parameterized-provider":  "parameterization is not preserved",
-	"l2-invoke-options-depends-on":        "does not generate out depends on",
-	"l2-large-string":                     "gRPC message exceeds max size during converter test",
-	"l2-parameterized-invoke":             "parameterization is not preserved",
-	"l2-parameterized-resource":           "parameterization is not preserved",
-	"l2-parameterized-resource-twice":     "parameterization is not preserved",
-	"l2-resource-option-alias":            "alias not ejected",
-	"l2-resource-option-env-var-mappings": "panic: interface conversion: interface {} is nil, not resource.PropertyMap",
-	"l2-resource-option-replace-with":     "not implemented",
-	"l1-builtin-to-json":                  "NYI",
+	"l1-builtin-require-pulumi-version":  "ejecting require-pulumi-version not implemented",
+	"l1-empty":                           "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
+	"l2-logical-name":                    "not implemented",
+	"l2-explicit-parameterized-provider": "parameterization is not preserved",
+	"l2-invoke-options-depends-on":       "does not generate out depends on",
+	"l2-large-string":                    "gRPC message exceeds max size during converter test",
+	"l2-parameterized-invoke":            "parameterization is not preserved",
+	"l2-parameterized-resource":          "parameterization is not preserved",
+	"l2-parameterized-resource-twice":    "parameterization is not preserved",
+	"l1-builtin-to-json":                 "NYI",
 }
 
 func log(t *testing.T, name, message string) {
