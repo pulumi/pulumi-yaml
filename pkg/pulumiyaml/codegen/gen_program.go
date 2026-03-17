@@ -263,6 +263,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		contract.Assertf(ok, "Expected a list node, got %T", elems)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("aliases"), elems))
 	}
+	if opts.CustomTimeouts != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("customTimeouts"),
+			g.expr(opts.CustomTimeouts)))
+	}
 	if opts.EnvVarMappings != nil {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("envVarMappings"),
 			g.expr(opts.EnvVarMappings)))

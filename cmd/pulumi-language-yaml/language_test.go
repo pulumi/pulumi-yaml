@@ -122,7 +122,6 @@ var expectedFailures = map[string]string{
 	"l2-resource-elide-unknowns":                   `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                        "Unknown Function; YAML does not support fn::pulumiResourceName",
 	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
-	"l2-resource-option-custom-timeouts":           "https://github.com/pulumi/pulumi-yaml/issues/942",
 	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
 	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
 	"l2-resource-option-replace-on-changes":        "not yet implemented",

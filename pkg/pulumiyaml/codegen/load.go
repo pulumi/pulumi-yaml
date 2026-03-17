@@ -843,7 +843,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
-	// TODO: resource options not supported by PCL: component, additional secret outputs, custom timeouts, delete before replace, version
+	// TODO: resource options not supported by PCL: component, additional secret outputs, delete before replace, version
 
 	resourceOptions := &model.Block{
 		Type: "options",
@@ -1008,6 +1008,32 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "envVarMappings",
 			Value: expr,
+		})
+	}
+
+	if ct := resource.Options.CustomTimeouts; ct != nil {
+		var items []model.ObjectConsItem
+		if ct.Create != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("create"),
+				Value: quotedLit(ct.Create.Value),
+			})
+		}
+		if ct.Update != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("update"),
+				Value: quotedLit(ct.Update.Value),
+			})
+		}
+		if ct.Delete != nil {
+			items = append(items, model.ObjectConsItem{
+				Key:   plainLit("delete"),
+				Value: quotedLit(ct.Delete.Value),
+			})
+		}
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "customTimeouts",
+			Value: &model.ObjectConsExpression{Items: items},
 		})
 	}
 
