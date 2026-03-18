@@ -1,0 +1,22 @@
+resources:
+  explicitProvider:
+    type: pulumi:providers:simple-invoke
+  first:
+    type: simple-invoke:StringResource
+    properties:
+      text: first hello
+  second:
+    type: simple-invoke:StringResource
+    properties:
+      text: ${data.result}
+variables:
+  data:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: hello
+      options:
+        dependsOn:
+          - ${first}
+outputs:
+  hello: ${data.result}

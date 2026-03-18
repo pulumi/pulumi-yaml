@@ -360,6 +360,18 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		if node.CallOpts.PluginDownloadURL != nil {
 			appendOption("pluginDownloadUrl", node.CallOpts.PluginDownloadURL)
 		}
+		if node.CallOpts.DependsOn != nil {
+			refs, rdiags := imp.getResourceRefList(node.CallOpts.DependsOn, node.Token.Value, "dependsOn")
+			diags.Extend(rdiags...)
+			if len(refs) > 0 {
+				invokeOptions = append(invokeOptions, model.ObjectConsItem{
+					Key: plainLit("dependsOn"),
+					Value: &model.TupleConsExpression{
+						Expressions: refs,
+					},
+				})
+			}
+		}
 
 		if len(invokeOptions) > 0 {
 			invokeArgs = append(invokeArgs, &model.ObjectConsExpression{
