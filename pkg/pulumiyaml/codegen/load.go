@@ -582,29 +582,38 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		defaultValue = v
 	}
 
-	// TODO(pdg): secret configuration -- requires changes in PCL
 	labels := []string{configName.Name}
 	if typeExpr != "" {
 		labels = append(labels, typeExpr)
+	}
+
+	bodyItems := []model.BodyItem{
+		&model.Attribute{
+			Name:  pcl.LogicalNamePropertyKey,
+			Value: quotedLit(kvp.Key.GetValue()),
+		},
+	}
+	if config.Secret != nil && config.Secret.Value {
+		bodyItems = append(bodyItems, &model.Attribute{
+			Name: "secret",
+			Value: &model.LiteralValueExpression{
+				Value: cty.True,
+			},
+		})
+	}
+	if defaultValue != nil {
+		bodyItems = append(bodyItems, &model.Attribute{
+			Name:  "default",
+			Value: defaultValue,
+		})
 	}
 
 	configDef := &model.Block{
 		Type:   "config",
 		Labels: labels,
 		Body: &model.Body{
-			Items: []model.BodyItem{
-				&model.Attribute{
-					Name:  pcl.LogicalNamePropertyKey,
-					Value: quotedLit(kvp.Key.GetValue()),
-				},
-			},
+			Items: bodyItems,
 		},
-	}
-	if defaultValue != nil {
-		configDef.Body.Items = append(configDef.Body.Items, &model.Attribute{
-			Name:  "default",
-			Value: defaultValue,
-		})
 	}
 	return configDef, nil
 }

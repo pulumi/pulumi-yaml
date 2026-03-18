@@ -9,7 +9,6 @@ configuration:
     type: string
     secret: true
 variables:
-  # Nested object using config values
   nestedObject:
     anObject:
       name: ${aString}

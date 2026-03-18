@@ -713,9 +713,27 @@ func (g *generator) expr(e model.Expression) syn.Node {
 	}
 }
 
+// pclTypeToYAMLConfigType converts a PCL model.Type to a YAML config type string.
+// YAML uses angle-bracket syntax (e.g. "list<string>") while PCL uses parentheses
+// (e.g. "list(string)"). Output types are unwrapped since YAML represents secrets
+// via a separate "secret" property rather than a type wrapper.
+func pclTypeToYAMLConfigType(t model.Type) (yamlType string, isSecret bool) {
+	switch t := t.(type) {
+	case *model.OutputType:
+		yamlType, _ = pclTypeToYAMLConfigType(t.ElementType)
+		return yamlType, true
+	case *model.ListType:
+		elem, secret := pclTypeToYAMLConfigType(t.ElementType)
+		return fmt.Sprintf("list<%s>", elem), secret
+	default:
+		return t.String(), false
+	}
+}
+
 func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
+	yamlType, isSecret := pclTypeToYAMLConfigType(n.Type())
 	entries := []syn.ObjectPropertyDef{
-		g.TypeProperty(n.Type().String()),
+		g.TypeProperty(yamlType),
 	}
 
 	if n.Name() != n.LogicalName() {
@@ -724,6 +742,9 @@ func (g *generator) genConfigVariable(n *pcl.ConfigVariable) {
 	if n.DefaultValue != nil {
 		prop := syn.ObjectProperty(syn.String("default"), g.expr(n.DefaultValue))
 		entries = append(entries, prop)
+	}
+	if isSecret || n.Secret {
+		entries = append(entries, syn.ObjectProperty(syn.String("secret"), syn.Boolean(true)))
 	}
 
 	k := syn.StringSyntax(trivia(n.Definition), n.Name())

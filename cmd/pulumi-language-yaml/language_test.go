@@ -143,7 +143,6 @@ var expectedEjectFailures = map[string]string{
 	"l2-parameterized-invoke":            "parameterization is not preserved",
 	"l2-parameterized-resource":          "parameterization is not preserved",
 	"l2-parameterized-resource-twice":    "parameterization is not preserved",
-	"l1-builtin-to-json":                 "NYI",
 }
 
 func log(t *testing.T, name, message string) {
