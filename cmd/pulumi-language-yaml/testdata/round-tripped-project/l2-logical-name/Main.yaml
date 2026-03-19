@@ -1,9 +1,11 @@
 configuration:
   configLexicalName:
     type: bool
+    name: "cC-Charlie_charlie.\U0001F603⁉️"
 resources:
   resourceLexicalName:
     type: simple:Resource
+    name: "aA-Alpha_alpha.\U0001F92F⁉️"
     properties:
       value: ${configLexicalName}
 outputs:
