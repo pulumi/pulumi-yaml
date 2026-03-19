@@ -138,7 +138,6 @@ var expectedEjectFailures = map[string]string{
 	"l1-empty":                           "empty YAML program cannot be ejected (yamlgen.Eject returns 'no diagnostics')",
 	"l2-logical-name":                    "not implemented",
 	"l2-explicit-parameterized-provider": "parameterization is not preserved",
-	"l2-invoke-options-depends-on":       "does not generate out depends on",
 	"l2-large-string":                    "gRPC message exceeds max size during converter test",
 	"l2-parameterized-invoke":            "parameterization is not preserved",
 	"l2-parameterized-resource":          "parameterization is not preserved",
