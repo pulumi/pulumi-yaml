@@ -864,8 +864,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
-	// TODO: resource options not supported by PCL: component, additional secret outputs, delete before replace, version
-
+	// TODO: resource options not supported by PCL: component
 	resourceOptions := &model.Block{
 		Type: "options",
 		Body: &model.Body{},
@@ -924,6 +923,42 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "protect",
 			Value: protectExpr,
+		})
+	}
+	if resource.Options.RetainOnDelete != nil {
+		retainExpr, vdiags := imp.importExpr(resource.Options.RetainOnDelete, schema.BoolType)
+		diags.Extend(vdiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "retainOnDelete",
+			Value: retainExpr,
+		})
+	}
+	if resource.Options.DeleteBeforeReplace != nil {
+		dbrExpr, vdiags := imp.importExpr(resource.Options.DeleteBeforeReplace, schema.BoolType)
+		diags.Extend(vdiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "deleteBeforeReplace",
+			Value: dbrExpr,
+		})
+	}
+	if len(resource.Options.AdditionalSecretOutputs.GetElements()) != 0 {
+		var paths []model.Expression
+		for _, v := range resource.Options.AdditionalSecretOutputs.Elements {
+			paths = append(paths, plainLit(v.Value))
+		}
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "additionalSecretOutputs",
+			Value: &model.TupleConsExpression{Expressions: paths},
+		})
+	}
+	if len(resource.Options.ReplaceOnChanges.GetElements()) != 0 {
+		var paths []model.Expression
+		for _, v := range resource.Options.ReplaceOnChanges.Elements {
+			paths = append(paths, plainLit(v.Value))
+		}
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "replaceOnChanges",
+			Value: &model.TupleConsExpression{Expressions: paths},
 		})
 	}
 	if resource.Options.Import != nil {

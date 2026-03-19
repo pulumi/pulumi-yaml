@@ -1,0 +1,16 @@
+resources:
+  withOption:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      deleteBeforeReplace: true
+      replaceOnChanges:
+        - value
+  withoutOption:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replaceOnChanges:
+        - value
