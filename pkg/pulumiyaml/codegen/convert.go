@@ -69,22 +69,20 @@ func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader
 	}
 	programText := fmt.Sprintf("%v", templateBody)
 
-	if programText == "" {
-		return "", diags, diags
-	}
-
 	return programText, diags, nil
 }
 
 func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*pcl.Program, hcl.Diagnostics, error) {
 	programText, yamlDiags, err := ConvertTemplateIL(template, loader)
-	if err != nil || programText == "" {
+	if err != nil {
 		return nil, yamlDiags, err
 	}
 
 	parser := hclsyntax.NewParser()
-	if err := parser.ParseFile(strings.NewReader(programText), "program.pp"); err != nil {
-		return nil, yamlDiags, err
+	if programText != "" {
+		if err := parser.ParseFile(strings.NewReader(programText), "program.pp"); err != nil {
+			return nil, yamlDiags, err
+		}
 	}
 	diags := parser.Diagnostics
 	if diags.HasErrors() {
