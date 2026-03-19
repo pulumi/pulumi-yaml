@@ -267,6 +267,32 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("customTimeouts"),
 			g.expr(opts.CustomTimeouts)))
 	}
+	if opts.RetainOnDelete != nil {
+		expr := mustCoerceBoolean(g.expr(opts.RetainOnDelete))
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("retainOnDelete"), expr))
+	}
+	if opts.DeleteBeforeReplace != nil {
+		expr := mustCoerceBoolean(g.expr(opts.DeleteBeforeReplace))
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("deleteBeforeReplace"), expr))
+	}
+	if opts.AdditionalSecretOutputs != nil {
+		elems := g.expr(opts.AdditionalSecretOutputs).(*syn.ListNode)
+		items := make([]syn.Node, elems.Len())
+		for i := range items {
+			items[i] = unquoteInterpolation(elems.Index(i))
+		}
+		list := syn.ListSyntax(elems.Syntax(), items...)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("additionalSecretOutputs"), list))
+	}
+	if opts.ReplaceOnChanges != nil {
+		elems := g.expr(opts.ReplaceOnChanges).(*syn.ListNode)
+		items := make([]syn.Node, elems.Len())
+		for i := range items {
+			items[i] = unquoteInterpolation(elems.Index(i))
+		}
+		list := syn.ListSyntax(elems.Syntax(), items...)
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("replaceOnChanges"), list))
+	}
 	if opts.EnvVarMappings != nil {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("envVarMappings"),
 			g.expr(opts.EnvVarMappings)))

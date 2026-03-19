@@ -121,14 +121,11 @@ var expectedFailures = map[string]string{
 	"l2-proxy-index":                               "test failing",
 	"l2-resource-elide-unknowns":                   `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                        "Unknown Function; YAML does not support fn::pulumiResourceName",
-	"l2-resource-option-additional-secret-outputs": "https://github.com/pulumi/pulumi-yaml/issues/934",
-	"l2-resource-option-delete-before-replace":     "https://github.com/pulumi/pulumi-yaml/issues/933",
+	"l2-resource-option-additional-secret-outputs": "program.pp: undefined variable value",
 	"l2-resource-option-plugin-download-url":       "https://github.com/pulumi/pulumi-yaml/issues/944",
-	"l2-resource-option-replace-on-changes":        "not yet implemented",
+	"l2-resource-option-replace-on-changes":        "update does not trigger replace at runtime",
 	"l2-resource-option-replacement-trigger":       "not yet implemented",
-	"l2-resource-option-retain-on-delete":          "#723 generation unimplemented",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
-	"l2-resource-parent-inheritance":               "expected parent to be retain on delete",
 	"l2-snake-names":                               "not handled correctly",
 }
 

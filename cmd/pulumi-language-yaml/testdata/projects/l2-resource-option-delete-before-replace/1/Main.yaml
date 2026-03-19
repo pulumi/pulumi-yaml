@@ -1,0 +1,20 @@
+resources:
+  # Stage 1: Change properties to trigger replacements
+
+  # // Resource with deleteBeforeReplace option - should delete before creating
+  withOption:
+    type: simple:Resource
+    properties:
+      value: false
+    options:
+      deleteBeforeReplace: true
+      replaceOnChanges:
+        - value
+  # Resource without deleteBeforeReplace - should create before deleting (default)
+  withoutOption:
+    type: simple:Resource
+    properties:
+      value: false
+    options:
+      replaceOnChanges:
+        - value

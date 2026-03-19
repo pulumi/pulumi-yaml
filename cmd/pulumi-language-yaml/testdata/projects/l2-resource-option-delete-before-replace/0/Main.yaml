@@ -1,0 +1,20 @@
+resources:
+  # Stage 0: Initial resource creation
+
+  # // Resource with deleteBeforeReplace option
+  withOption:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      deleteBeforeReplace: true
+      replaceOnChanges:
+        - value
+  # Resource without deleteBeforeReplace (default create-before-delete behavior)
+  withoutOption:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      replaceOnChanges:
+        - value
