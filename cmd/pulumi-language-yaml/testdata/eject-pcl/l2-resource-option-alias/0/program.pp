@@ -26,3 +26,8 @@ resource aliasParent "simple:index:Resource" {
 		parent = aliasURN
 	}
 }
+
+resource aliasType "component:index:Custom" {
+	__logicalName = "aliasType"
+	value = "true"
+}

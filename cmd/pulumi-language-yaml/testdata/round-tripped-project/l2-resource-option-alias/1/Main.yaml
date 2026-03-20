@@ -34,3 +34,10 @@ resources:
       parent: ${parent}
       aliases:
         - parent: ${aliasURN}
+  aliasType:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      aliases:
+        - type: component:index:Custom

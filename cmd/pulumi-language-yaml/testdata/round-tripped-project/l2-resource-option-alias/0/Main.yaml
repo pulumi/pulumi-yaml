@@ -21,3 +21,7 @@ resources:
       value: true
     options:
       parent: ${aliasURN}
+  aliasType:
+    type: component:Custom
+    properties:
+      value: 'true'
