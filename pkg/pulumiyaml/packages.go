@@ -109,28 +109,21 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 // GetReferencedPackages returns the packages and (if provided) versions for each referenced package
 // used in the program.
 func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {
-	packageMap := map[string]*packages.PackageDecl{}
-
-	// Iterate over the package declarations
+	// Build an index of SDK declarations for version/URL lookup, but don't add them to the
+	// result set. Only packages actually referenced by resources or invokes should be returned.
+	sdkIndex := map[string]*packages.PackageDecl{}
 	for _, pkg := range tmpl.Sdks {
 		name := pkg.Name
-		version := pkg.Version
 		if pkg.Parameterization != nil {
 			name = pkg.Parameterization.Name
-			version = pkg.Parameterization.Version
 		}
 
-		if entry, found := packageMap[name]; found {
-			if entry.Version == "" {
-				entry.Version = version
-			}
-			if entry.DownloadURL == "" {
-				entry.DownloadURL = pkg.DownloadURL
-			}
-		} else {
-			packageMap[name] = &pkg
+		if _, found := sdkIndex[name]; !found {
+			sdkIndex[name] = &pkg
 		}
 	}
+
+	packageMap := map[string]*packages.PackageDecl{}
 
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
@@ -149,6 +142,16 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 					r.sdiags.Extend(ast.ExprError(pluginDownloadURL, fmt.Sprintf("Package %v already declared with a conflicting plugin download URL: %v", pkg, entry.DownloadURL), ""))
 				}
 			}
+		} else if sdk, found := sdkIndex[pkg]; found {
+			// Use the SDK declaration as the base, then overlay any inline version/URL.
+			entry := *sdk
+			if v := version.GetValue(); v != "" {
+				entry.Version = v
+			}
+			if url := pluginDownloadURL.GetValue(); url != "" {
+				entry.DownloadURL = url
+			}
+			packageMap[pkg] = &entry
 		} else {
 			packageMap[pkg] = &packages.PackageDecl{
 				Name:        pkg,

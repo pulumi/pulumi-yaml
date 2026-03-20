@@ -47,3 +47,14 @@ resource aliasParent "simple:index:Resource" {
 		parent = parent
 	}
 }
+
+resource aliasType "simple:index:Resource" {
+	__logicalName = "aliasType"
+	value = true
+
+	options {
+		aliases = [{
+			type = "component:index:Custom"
+		}]
+	}
+}
