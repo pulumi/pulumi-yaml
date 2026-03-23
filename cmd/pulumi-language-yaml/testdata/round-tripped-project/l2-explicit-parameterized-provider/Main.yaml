@@ -1,0 +1,11 @@
+resources:
+  prov:
+    type: pulumi:providers:goodbye
+    properties:
+      text: World
+  res:
+    type: goodbye:Goodbye
+    options:
+      provider: ${prov}
+outputs:
+  parameterValue: ${res.parameterValue}
