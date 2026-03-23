@@ -599,10 +599,14 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		labels = append(labels, typeExpr)
 	}
 
+	logicalName := kvp.Key.GetValue()
+	if config.Name != nil {
+		logicalName = config.Name.Value
+	}
 	bodyItems := []model.BodyItem{
 		&model.Attribute{
 			Name:  pcl.LogicalNamePropertyKey,
-			Value: quotedLit(kvp.Key.GetValue()),
+			Value: quotedLit(logicalName),
 		},
 	}
 	if config.Secret != nil && config.Secret.Value {
@@ -817,10 +821,14 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 	contract.Assertf(props != nil,
 		"token(%s) was obtained by the same ResolveResource call as pkg(%s),"+
 			" so must produce a non nil value", token.String(), pkg.Name())
+	logicalName := name
+	if resource.Name != nil {
+		logicalName = resource.Name.Value
+	}
 	items := []model.BodyItem{
 		&model.Attribute{
 			Name:  pcl.LogicalNamePropertyKey,
-			Value: quotedLit(name),
+			Value: quotedLit(logicalName),
 		},
 	}
 

@@ -132,7 +132,6 @@ var expectedFailures = map[string]string{
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
 	"l1-builtin-require-pulumi-version":  "ejecting require-pulumi-version not implemented",
-	"l2-logical-name":                    "not implemented",
 	"l2-explicit-parameterized-provider": "parameterization is not preserved",
 	"l2-large-string":                    "gRPC message exceeds max size during converter test",
 	"l2-parameterized-invoke":            "parameterization is not preserved",
