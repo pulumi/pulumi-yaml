@@ -215,6 +215,21 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("parent"),
 			g.expr(opts.Parent)))
 	}
+	if opts.Providers != nil {
+		switch e := opts.Providers.(type) {
+		case *model.TupleConsExpression:
+			elems := g.expr(opts.Providers)
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("providers"), elems))
+		case *model.ObjectConsExpression:
+			items := make([]syn.Node, len(e.Items))
+			for i, item := range e.Items {
+				items[i] = g.expr(item.Value)
+			}
+			rOpts = append(rOpts, syn.ObjectProperty(syn.String("providers"), syn.List(items...)))
+		default:
+			contract.Failf("unexpected providers expression type: %T", opts.Providers)
+		}
+	}
 	if opts.DependsOn != nil {
 		elems := g.expr(opts.DependsOn)
 		_, ok := elems.(*syn.ListNode)
