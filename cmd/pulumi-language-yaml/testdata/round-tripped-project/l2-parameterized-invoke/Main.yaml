@@ -1,0 +1,7 @@
+outputs:
+  parameterValue:
+    fn::invoke:
+      function: subpackage:doHelloWorld
+      arguments:
+        input: goodbye
+      return: output

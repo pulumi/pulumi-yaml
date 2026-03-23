@@ -4,8 +4,10 @@ package codegen
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1332,9 +1334,57 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 		}
 	}
 
+	// Emit package blocks for parameterized packages so the PCL round-trip
+	// preserves parameterization information.
+	packageItems := imp.importPackageDescriptors()
+	items = append(packageItems, items...)
+
 	body := &model.Body{Items: items}
 	formatBody(body)
 	return body, diags
+}
+
+// importPackageDescriptors emits PCL package blocks for parameterized packages.
+func (imp *importer) importPackageDescriptors() []model.BodyItem {
+	// Collect package names and sort for deterministic output.
+	var names []tokens.Package
+	for name, desc := range imp.packageDescriptors {
+		if desc.Parameterization != nil {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+
+	var items []model.BodyItem
+	for _, name := range names {
+		desc := imp.packageDescriptors[name]
+		p := desc.Parameterization
+
+		paramItems := []model.BodyItem{
+			&model.Attribute{Name: "name", Value: quotedLit(p.Name)},
+			&model.Attribute{Name: "version", Value: quotedLit(p.Version.String())},
+			&model.Attribute{Name: "value", Value: quotedLit(base64.StdEncoding.EncodeToString(p.Value))},
+		}
+
+		bodyItems := []model.BodyItem{
+			&model.Attribute{Name: "baseProviderName", Value: quotedLit(desc.Name)},
+		}
+		if desc.Version != nil {
+			bodyItems = append(bodyItems, &model.Attribute{
+				Name: "baseProviderVersion", Value: quotedLit(desc.Version.String()),
+			})
+		}
+		bodyItems = append(bodyItems, &model.Block{
+			Type: "parameterization",
+			Body: &model.Body{Items: paramItems},
+		})
+
+		items = append(items, &model.Block{
+			Type: "package",
+			Body: &model.Body{Items: bodyItems},
+		})
+	}
+	return items
 }
 
 // ImportTemplate converts a YAML template to a PCL definition.

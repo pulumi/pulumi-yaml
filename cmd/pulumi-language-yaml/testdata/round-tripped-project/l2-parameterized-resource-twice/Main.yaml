@@ -1,0 +1,14 @@
+resources:
+  example1:
+    type: hipackage:HelloWorld
+  exampleComponent1:
+    type: hipackage:HelloWorldComponent
+  example2:
+    type: byepackage:GoodbyeWorld
+  exampleComponent2:
+    type: byepackage:GoodbyeWorldComponent
+outputs:
+  parameterValue1: ${example1.parameterValue}
+  parameterValueFromComponent1: ${exampleComponent1.parameterValue}
+  parameterValue2: ${example2.parameterValue}
+  parameterValueFromComponent2: ${exampleComponent2.parameterValue}
