@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1343,14 +1344,6 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 	return body, diags
 }
 
-func quotedStringLit(s string) model.Expression {
-	return &model.TemplateExpression{
-		Parts: []model.Expression{
-			&model.LiteralValueExpression{Value: cty.StringVal(s)},
-		},
-	}
-}
-
 // importPackageDescriptors emits PCL package blocks for parameterized packages.
 func (imp *importer) importPackageDescriptors() []model.BodyItem {
 	// Collect package names and sort for deterministic output.
@@ -1360,7 +1353,7 @@ func (imp *importer) importPackageDescriptors() []model.BodyItem {
 			names = append(names, name)
 		}
 	}
-	sort.Slice(names, func(i, j int) bool { return names[i] < names[j] })
+	slices.Sort(names)
 
 	var items []model.BodyItem
 	for _, name := range names {
@@ -1368,17 +1361,17 @@ func (imp *importer) importPackageDescriptors() []model.BodyItem {
 		p := desc.Parameterization
 
 		paramItems := []model.BodyItem{
-			&model.Attribute{Name: "name", Value: quotedStringLit(p.Name)},
-			&model.Attribute{Name: "version", Value: quotedStringLit(p.Version.String())},
-			&model.Attribute{Name: "value", Value: quotedStringLit(base64.StdEncoding.EncodeToString(p.Value))},
+			&model.Attribute{Name: "name", Value: quotedLit(p.Name)},
+			&model.Attribute{Name: "version", Value: quotedLit(p.Version.String())},
+			&model.Attribute{Name: "value", Value: quotedLit(base64.StdEncoding.EncodeToString(p.Value))},
 		}
 
 		bodyItems := []model.BodyItem{
-			&model.Attribute{Name: "baseProviderName", Value: quotedStringLit(desc.Name)},
+			&model.Attribute{Name: "baseProviderName", Value: quotedLit(desc.Name)},
 		}
 		if desc.Version != nil {
 			bodyItems = append(bodyItems, &model.Attribute{
-				Name: "baseProviderVersion", Value: quotedStringLit(desc.Version.String()),
+				Name: "baseProviderVersion", Value: quotedLit(desc.Version.String()),
 			})
 		}
 		bodyItems = append(bodyItems, &model.Block{
