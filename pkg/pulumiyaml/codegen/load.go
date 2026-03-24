@@ -1334,6 +1334,25 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 		}
 	}
 
+	// Import the pulumi block if requiredVersion is set.
+	if file.Pulumi.RequiredVersion != nil {
+		versionExpr, vdiags := imp.importExpr(file.Pulumi.RequiredVersion, nil)
+		diags.Extend(vdiags...)
+		if versionExpr != nil {
+			items = append(items, &model.Block{
+				Type: "pulumi",
+				Body: &model.Body{
+					Items: []model.BodyItem{
+						&model.Attribute{
+							Name:  "requiredVersionRange",
+							Value: versionExpr,
+						},
+					},
+				},
+			})
+		}
+	}
+
 	// Emit package blocks for parameterized packages so the PCL round-trip
 	// preserves parameterization information.
 	packageItems := imp.importPackageDescriptors()
