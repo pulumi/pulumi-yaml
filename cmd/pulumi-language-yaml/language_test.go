@@ -116,7 +116,6 @@ var expectedFailures = map[string]string{
 	"l2-module-format":                             "https://github.com/pulumi/pulumi-yaml/issues/951",
 	"l2-provider-call":                             "Traversal not allowed on function result",
 	"l2-provider-call-explicit":                    "Traversal not allowed on function result",
-	"l2-provider-grpc-config-schema-secret":        "Detected a secret leak in state",
 	"l2-proxy-index":                               "test failing",
 	"l2-resource-elide-unknowns":                   `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                        "Unknown Function; YAML does not support fn::pulumiResourceName",

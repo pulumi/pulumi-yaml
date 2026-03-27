@@ -463,19 +463,28 @@ func (p resourcePackage) IsComponent(typeName ResourceTypeToken) (bool, error) {
 }
 
 func (p resourcePackage) IsResourcePropertySecret(typeName ResourceTypeToken, propertyName string) (bool, error) {
-	if res, found, err := p.Resources().Get(string(typeName)); found {
-		for _, prop := range res.InputProperties {
-			if prop.Name == propertyName {
-				return prop.Secret, nil
-			}
+	var res *schema.Resource
+	if _, ok := p.resolveProvider(typeName.String()); ok {
+		prov, err := p.Provider()
+		if err != nil {
+			return false, err
 		}
-		return false, fmt.Errorf(
-			"unable to find property %q on resource %q in resource provider %q",
-			propertyName, typeName, p.Name())
+		res = prov
+	} else if r, found, err := p.Resources().Get(string(typeName)); found {
+		res = r
 	} else if err != nil {
 		return false, err
+	} else {
+		return false, fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
 	}
-	return false, fmt.Errorf("unable to find resource type %q in resource provider %q", typeName, p.Name())
+	for _, prop := range res.InputProperties {
+		if prop.Name == propertyName {
+			return prop.Secret, nil
+		}
+	}
+	return false, fmt.Errorf(
+		"unable to find property %q on resource %q in resource provider %q",
+		propertyName, typeName, p.Name())
 }
 
 func (p resourcePackage) Name() string {
