@@ -130,8 +130,7 @@ var expectedFailures = map[string]string{
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
 var expectedEjectFailures = map[string]string{
-	"l1-builtin-require-pulumi-version": "ejecting require-pulumi-version not implemented",
-	"l2-large-string":                   "gRPC message exceeds max size during converter test",
+	"l2-large-string": "gRPC message exceeds max size during converter test",
 }
 
 func log(t *testing.T, name, message string) {
