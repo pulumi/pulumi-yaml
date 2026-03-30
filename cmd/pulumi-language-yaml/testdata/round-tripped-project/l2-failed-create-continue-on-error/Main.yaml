@@ -1,0 +1,30 @@
+resources:
+  failing:
+    type: fail_on_create:Resource
+    properties:
+      value: false
+  dependent:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      dependsOn:
+        - ${failing}
+  dependentOnOutput:
+    type: simple:Resource
+    name: dependent_on_output
+    properties:
+      value: ${failing.value}
+  independent:
+    type: simple:Resource
+    properties:
+      value: true
+  doubleDependency:
+    type: simple:Resource
+    name: double_dependency
+    properties:
+      value: true
+    options:
+      dependsOn:
+        - ${independent}
+        - ${dependentOnOutput}
