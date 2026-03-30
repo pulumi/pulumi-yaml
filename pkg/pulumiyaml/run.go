@@ -1880,16 +1880,22 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.AdditionalSecretOutputs != nil {
 		opts = append(opts, pulumi.AdditionalSecretOutputs(listStrings(v.Options.AdditionalSecretOutputs)))
 	}
-	for _, prop := range resourceSchema.Properties {
-		if prop.Secret {
-			opts = append(opts, pulumi.AdditionalSecretOutputs([]string{prop.Name}))
+	if resourceSchema != nil {
+		for _, prop := range resourceSchema.Properties {
+			if prop.Secret {
+				opts = append(opts, pulumi.AdditionalSecretOutputs([]string{prop.Name}))
+			}
 		}
-	}
-	for _, alias := range resourceSchema.Aliases {
-		if alias.Type != "" {
-			opts = append(opts, pulumi.Aliases([]pulumi.Alias{
-				{Type: pulumi.String(alias.Type)},
-			}))
+		replaceOnChanges, _ := resourceSchema.ReplaceOnChanges()
+		if paths := schema.PropertyListJoinToString(replaceOnChanges, func(s string) string { return s }); len(paths) > 0 {
+			opts = append(opts, pulumi.ReplaceOnChanges(paths))
+		}
+		for _, alias := range resourceSchema.Aliases {
+			if alias.Type != "" {
+				opts = append(opts, pulumi.Aliases([]pulumi.Alias{
+					{Type: pulumi.String(alias.Type)},
+				}))
+			}
 		}
 	}
 

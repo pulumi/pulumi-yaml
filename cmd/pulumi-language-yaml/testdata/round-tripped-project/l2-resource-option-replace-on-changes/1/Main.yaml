@@ -1,0 +1,57 @@
+resources:
+  schemaReplace:
+    type: replaceonchanges:ResourceA
+    properties:
+      value: true
+      replaceProp: false
+  optionReplace:
+    type: replaceonchanges:ResourceB
+    properties:
+      value: false
+    options:
+      replaceOnChanges:
+        - value
+  bothReplaceValue:
+    type: replaceonchanges:ResourceA
+    properties:
+      value: false
+      replaceProp: true
+    options:
+      replaceOnChanges:
+        - value
+  bothReplaceProp:
+    type: replaceonchanges:ResourceA
+    properties:
+      value: true
+      replaceProp: false
+    options:
+      replaceOnChanges:
+        - value
+  regularUpdate:
+    type: replaceonchanges:ResourceB
+    properties:
+      value: false
+  noChange:
+    type: replaceonchanges:ResourceB
+    properties:
+      value: true
+    options:
+      replaceOnChanges:
+        - value
+  wrongPropChange:
+    type: replaceonchanges:ResourceA
+    properties:
+      value: true
+      replaceProp: false
+    options:
+      replaceOnChanges:
+        - value
+  multiplePropReplace:
+    type: replaceonchanges:ResourceA
+    properties:
+      value: false
+      replaceProp: true
+    options:
+      replaceOnChanges:
+        - value
+        - replaceProp
