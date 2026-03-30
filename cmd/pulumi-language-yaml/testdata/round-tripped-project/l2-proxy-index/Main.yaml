@@ -1,0 +1,30 @@
+resources:
+  res:
+    type: ref-ref:Resource
+    properties:
+      data:
+        innerData:
+          boolean: false
+          float: 2.17
+          integer: -12
+          string: Goodbye
+          boolArray:
+            - false
+            - true
+          stringMap:
+            two: turtle doves
+            three: french hens
+        boolean: true
+        float: 4.5
+        integer: 1024
+        string: Hello
+        boolArray:
+          - true
+        stringMap:
+          x: '100'
+          y: '200'
+outputs:
+  bool: ${res.data.boolean}
+  array: ${res.data.boolArray[0]}
+  map: ${res.data.stringMap.x}
+  nested: ${res.data.innerData.stringMap.three}
