@@ -124,6 +124,8 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-replace-on-changes":        "update does not trigger replace at runtime",
 	"l2-resource-option-replacement-trigger":       "not yet implemented",
 	"l2-resource-option-version":                   "https://github.com/pulumi/pulumi-yaml/issues/943",
+	"l2-resource-config-objects":                   "unrecognized type 'map(bool)' for config variable; undefined variable plainBooleanMap",
+	"l2-resource-config-primitives":                "*model.BinaryOpExpression; Unimplemented! Needed for  plainNumber + 0.5",
 	"l2-snake-names":                               "not handled correctly",
 }
 
