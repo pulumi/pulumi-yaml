@@ -1,0 +1,12 @@
+resources:
+  withSecret:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      additionalSecretOutputs:
+        - value
+  withoutSecret:
+    type: simple:Resource
+    properties:
+      value: true
