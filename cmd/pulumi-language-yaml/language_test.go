@@ -112,7 +112,6 @@ var expectedFailures = map[string]string{
 	"l2-builtin-object":                            "Unknown Function; YAML does not support fn::entries",
 	"l2-component-call-simple":                     "#722 generation unimplemented",
 	"l2-component-property-deps":                   "Traversal not allowed on function result",
-	"l2-failed-create-continue-on-error":           "#725 test failing",
 	"l2-module-format":                             "https://github.com/pulumi/pulumi-yaml/issues/951",
 	"l2-provider-call":                             "Traversal not allowed on function result",
 	"l2-provider-call-explicit":                    "Traversal not allowed on function result",
