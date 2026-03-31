@@ -1,0 +1,7 @@
+resources:
+  res:
+    type: large:String
+    properties:
+      value: hello world
+outputs:
+  output: ${res.value}

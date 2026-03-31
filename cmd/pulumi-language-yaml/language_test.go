@@ -125,9 +125,7 @@ var expectedFailures = map[string]string{
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
-var expectedEjectFailures = map[string]string{
-	"l2-large-string": "gRPC message exceeds max size during converter test",
-}
+var expectedEjectFailures = map[string]string{}
 
 func log(t *testing.T, name, message string) {
 	if os.Getenv("PULUMI_LANGUAGE_TEST_SHOW_FULL_OUTPUT") != "true" {
@@ -199,7 +197,7 @@ func TestLanguage(t *testing.T) {
 				Token:            prepare.Token,
 				Test:             tt,
 				SkipConvertTests: has(expectedEjectFailures, tt),
-			})
+			}, grpc.MaxCallRecvMsgSize(1024*1024*1024))
 
 			require.NoError(t, err)
 			for _, msg := range result.Messages {
