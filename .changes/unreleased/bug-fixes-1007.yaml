@@ -1,5 +1,0 @@
-kind: bug-fixes
-body: Fix secret handling for provider configuration properties
-component: runtime
-custom:
-  PR: 1007
