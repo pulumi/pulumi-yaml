@@ -1855,15 +1855,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.ReplacementTrigger != nil {
 		replacementTriggerValue, ok := e.evaluateExpr(v.Options.ReplacementTrigger)
 		if ok {
-			// ReplacementTrigger accepts Input. If the value is already an Input (like an Output),
-			// pass it directly to preserve unknown status. Otherwise, wrap it with pulumi.Any().
-			var input pulumi.Input
-			if output, isOutput := replacementTriggerValue.(pulumi.Output); isOutput {
-				input = output
-			} else {
-				input = pulumi.Any(replacementTriggerValue)
-			}
-			opts = append(opts, pulumi.ReplacementTrigger(input))
+			opts = append(opts, pulumi.ReplacementTrigger(pulumi.Any(replacementTriggerValue)))
 		} else {
 			e.error(v.Options.ReplacementTrigger, "couldn't evaluate the 'replacementTrigger' resource option")
 			overallOk = false

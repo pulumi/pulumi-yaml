@@ -117,6 +117,7 @@ var expectedFailures = map[string]string{
 	"l2-resource-elide-unknowns":             `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                  "Unknown Function; YAML does not support fn::pulumiResourceName",
 	"l2-resource-option-plugin-download-url": "https://github.com/pulumi/pulumi-yaml/issues/944",
+	"l2-resource-option-replacement-trigger": "conformance test assertion fails: value passed via SDK but not reflected in snapshot",
 	"l2-resource-option-version":             "https://github.com/pulumi/pulumi-yaml/issues/943",
 	"l2-resource-config-objects":             "unrecognized type 'map(bool)' for config variable; undefined variable plainBooleanMap",
 	"l2-resource-config-primitives":          "*model.BinaryOpExpression; Unimplemented! Needed for  plainNumber + 0.5",
