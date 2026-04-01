@@ -97,7 +97,7 @@ func NewPackageLoader(plugins *workspace.Plugins, packages map[string]workspace.
 	if err != nil {
 		return nil, err
 	}
-	return packageLoader{schema.NewPluginLoader(host), host}, nil
+	return packageLoader{schema.NewCachedLoader(schema.NewPluginLoader(host)), host}, nil
 }
 
 // Unsafely create a PackageLoader from a schema.Loader, forfeiting the ability to close the host
