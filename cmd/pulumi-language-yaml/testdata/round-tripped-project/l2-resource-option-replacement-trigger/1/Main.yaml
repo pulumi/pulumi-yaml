@@ -4,17 +4,17 @@ resources:
     properties:
       value: true
     options:
-      replacementTrigger: test
+      replacementTrigger: test2
   unknown:
     type: output:Resource
     properties:
-      value: 1
+      value: 2
   unknownReplacementTrigger:
     type: simple:Resource
     properties:
       value: true
     options:
-      replacementTrigger: hellohello
+      replacementTrigger: ${unknown.output}
   notReplacementTrigger:
     type: simple:Resource
     properties:
@@ -26,6 +26,6 @@ resources:
     options:
       replacementTrigger:
         fn::secret:
-          - 1
-          - 2
           - 3
+          - 2
+          - 1

@@ -3,13 +3,13 @@ resource replacementTrigger "simple:index:Resource" {
 	value = true
 
 	options {
-		replacementTrigger = "test"
+		replacementTrigger = "test2"
 	}
 }
 
 resource unknown "output:index:Resource" {
 	__logicalName = "unknown"
-	value = 1
+	value = 2
 }
 
 resource unknownReplacementTrigger "simple:index:Resource" {
@@ -17,7 +17,7 @@ resource unknownReplacementTrigger "simple:index:Resource" {
 	value = true
 
 	options {
-		replacementTrigger = "hellohello"
+		replacementTrigger = unknown.output
 	}
 }
 
@@ -32,9 +32,9 @@ resource secretReplacementTrigger "simple:index:Resource" {
 
 	options {
 		replacementTrigger = secret([
-			1,
+			3,
 			2,
-			3
+			1
 		])
 	}
 }

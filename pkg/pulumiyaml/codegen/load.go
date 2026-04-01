@@ -1077,6 +1077,15 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		})
 	}
 
+	if resource.Options.ReplacementTrigger != nil {
+		expr, rdiags := imp.importExpr(resource.Options.ReplacementTrigger, nil)
+		diags.Extend(rdiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "replacementTrigger",
+			Value: expr,
+		})
+	}
+
 	if ct := resource.Options.CustomTimeouts; ct != nil {
 		var items []model.ObjectConsItem
 		if ct.Create != nil {
