@@ -100,6 +100,7 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 // Add test names here that are expected to fail and the reason why they are failing
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                         "#721 generation unimplemented",
+	"l1-builtin-sha1":                        "Unknown Function; YAML does not support fn::sha1",
 	"l1-builtin-list":                        "Unknown Function; YAML does not support fn::length",
 	"l1-builtin-object":                      "Unknown Function; YAML does not support fn::entries",
 	"l1-builtin-secret":                      "Unknown Function; YAML does not support fn::unsecret",
