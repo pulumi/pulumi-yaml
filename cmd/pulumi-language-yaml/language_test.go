@@ -117,6 +117,7 @@ var expectedFailures = map[string]string{
 	"l2-provider-call-explicit":              "Traversal not allowed on function result",
 	"l2-resource-elide-unknowns":             `*model.BinaryOpExpression; Unimplemented! Needed for  unknown.output == "hello"`,
 	"l2-resource-name-type":                  "Unknown Function; YAML does not support fn::pulumiResourceName",
+	"l2-resource-optional":                   "*model.ConditionalExpression; Unimplemented! YAML does not support conditional expressions",
 	"l2-resource-option-ignore-changes":      "incorrect property path format for map keys with dots and special characters",
 	"l2-resource-primitive-defaults":         "missing required property boolean: YAML runtime does not apply primitive defaults",
 	"l2-resource-option-plugin-download-url": "https://github.com/pulumi/pulumi-yaml/issues/944",
