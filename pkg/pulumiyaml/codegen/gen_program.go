@@ -308,6 +308,10 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		list := syn.ListSyntax(elems.Syntax(), items...)
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("replaceOnChanges"), list))
 	}
+	if opts.ReplacementTrigger != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("replacementTrigger"),
+			g.expr(opts.ReplacementTrigger)))
+	}
 	if opts.EnvVarMappings != nil {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("envVarMappings"),
 			g.expr(opts.EnvVarMappings)))

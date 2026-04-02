@@ -106,6 +106,8 @@ type ResourceOptions struct {
 	// If set, the provider's Delete method will not be called for this resource if the specified resource is being
 	// deleted as well.
 	DeletedWith string `json:",omitempty" yaml:",omitempty"`
+	// ReplacementTrigger specifies a list of paths that will trigger a replacement if changed.
+	ReplacementTrigger interface{} `json:",omitempty" yaml:",omitempty"`
 	// EnvVarMappings specifies environment variable remappings for provider resources.
 	EnvVarMappings map[string]string `json:",omitempty" yaml:",omitempty"`
 }
