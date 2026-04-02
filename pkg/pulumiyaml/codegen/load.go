@@ -1068,6 +1068,15 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		}
 	}
 
+	if resource.Options.ReplacementTrigger != nil {
+		expr, rdiags := imp.importExpr(resource.Options.ReplacementTrigger, nil)
+		diags.Extend(rdiags...)
+		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
+			Name:  "replacementTrigger",
+			Value: expr,
+		})
+	}
+
 	if resource.Options.EnvVarMappings != nil {
 		expr, ediags := imp.importExpr(resource.Options.EnvVarMappings, nil)
 		diags.Extend(ediags...)

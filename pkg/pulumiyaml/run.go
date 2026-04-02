@@ -1828,6 +1828,14 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.HideDiffs != nil {
 		opts = append(opts, pulumi.HideDiffs(listStrings(v.Options.HideDiffs)))
 	}
+	if v.Options.ReplacementTrigger != nil {
+		value, ok := e.evaluateExpr(v.Options.ReplacementTrigger)
+		if ok {
+			opts = append(opts, pulumi.ReplacementTrigger(pulumi.Any(value)))
+		} else {
+			overallOk = false
+		}
+	}
 	if v.Options.EnvVarMappings != nil {
 		value, ok := e.evaluateExpr(v.Options.EnvVarMappings)
 		if !ok {
