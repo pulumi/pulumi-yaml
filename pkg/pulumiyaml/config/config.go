@@ -54,6 +54,15 @@ func (t typ) Pcl() (model.Type, error) {
 			return nil, fmt.Errorf("unknown array element PCL type")
 		}
 		return model.NewListType(inner), nil
+	case *schema.MapType:
+		inner, err := typ{t.ElementType}.Pcl()
+		if err != nil {
+			return nil, fmt.Errorf("unknown map element PCL type")
+		}
+		return model.NewMapType(inner), nil
+	}
+	if t.inner == schema.AnyType {
+		return model.DynamicType, nil
 	}
 
 	// We should never hit this, but if we do an error should be reported instead of

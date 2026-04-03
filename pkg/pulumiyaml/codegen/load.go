@@ -564,6 +564,11 @@ func importParameterType(s string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	// YAML's "object" type (map<any>) has no precise PCL equivalent as a config type
+	// annotation. Returning empty skips the type label, defaulting to dynamic.
+	if t == config.Object {
+		return "", true
+	}
 	pcl, err := t.Pcl()
 	if err != nil {
 		return "", false

@@ -1,0 +1,25 @@
+configuration:
+  anObject:
+    type: object
+  anyObject:
+    type: object
+variables:
+  lVar:
+    fn::secret:
+      - 1
+  mVar:
+    fn::secret:
+      key: true
+  cVar:
+    fn::secret: ${anObject}
+  oVar:
+    fn::secret:
+      property: value
+  aVar:
+    fn::secret: ${anyObject}
+outputs:
+  l: ${lVar[0]}
+  m: ${mVar.key}
+  c: ${cVar.property}
+  o: ${oVar.property}
+  a: ${aVar.property}

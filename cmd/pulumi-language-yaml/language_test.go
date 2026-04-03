@@ -107,7 +107,6 @@ var expectedFailures = map[string]string{
 	"l1-config-secret":                       "*model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
 	"l1-config-types-object":                 "not yet implemented",
 	"l1-config-types-primitive":              "not yet implemented",
-	"l1-proxy-index":                         "run bailed",
 	"l2-builtin-object":                      "Unknown Function; YAML does not support fn::entries",
 	"l2-component-call-simple":               "#722 generation unimplemented",
 	"l2-component-property-deps":             "Traversal not allowed on function result",
