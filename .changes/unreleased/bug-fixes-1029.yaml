@@ -1,0 +1,7 @@
+component: runtime
+kind: bug-fixes
+body: Cache schema loader in GeneratePackage to avoid redundant GetSchema calls
+time: 2026-04-06T15:30:00-04:00
+custom:
+  PR: "1029"
+
