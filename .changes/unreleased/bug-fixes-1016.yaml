@@ -1,5 +1,0 @@
-kind: bug-fixes
-body: Apply schema-defined replaceOnChanges to resources at runtime
-component: runtime
-custom:
-  PR: 1016

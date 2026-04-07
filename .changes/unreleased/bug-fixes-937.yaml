@@ -1,6 +1,0 @@
-component: runtime
-kind: bug-fixes
-body: Allow GetRequiredPackages to run against a YAML based plugin
-time: 2026-04-07T17:57:02.991439+02:00
-custom:
-    PR: "937"

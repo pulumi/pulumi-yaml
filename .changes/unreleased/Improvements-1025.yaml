@@ -1,5 +1,0 @@
-kind: Improvements
-body: Support replacementTrigger resource option
-component: runtime
-custom:
-  PR: 1025
