@@ -161,7 +161,7 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 		}
 	}
 
-	diags := newRunner(tmpl, nil).Run(walker{
+	w := walker{
 		VisitResource: func(r *Runner, node resourceNode) bool {
 			res := node.Value
 
@@ -183,7 +183,20 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 			}
 			return true
 		},
-	})
+	}
+
+	// Walk top-level resources, then walk each component's resources.
+	// Components have their own nested templates that also implement ast.Template.
+	diags := newRunner(tmpl, nil).Run(w)
+	if !diags.HasErrors() {
+		for _, comp := range tmpl.Components.Entries {
+			compDiags := newRunner(comp.Value, nil).Run(w)
+			diags.Extend(compDiags...)
+			if compDiags.HasErrors() {
+				break
+			}
+		}
+	}
 
 	if diags.HasErrors() {
 		return nil, diags

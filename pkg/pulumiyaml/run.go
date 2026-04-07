@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -113,21 +114,35 @@ func conflictingEnvVars(env []string) []string {
 	return duplicates
 }
 
+var ErrMissingTemplateFile = errors.New("missing template file")
+
+func probeForFile(dir string, filenames ...string) ([]byte, string, error) {
+	contract.Assertf(len(filenames) > 0, "must have at least one option")
+	for _, filename := range filenames {
+		f, err := os.ReadFile(filepath.Join(dir, filename))
+		if err == nil {
+			return f, filename, nil
+		}
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		return nil, "", err
+	}
+	return nil, filenames[0], ErrMissingTemplateFile
+}
+
 // Load a template from the given directory.
 func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 	// Read in the template file - search first for Main.json, then Main.yaml, then Pulumi.yaml.
 	// The last of these will actually read the proram from the same Pulumi.yaml project file used by
 	// Pulumi CLI, which now plays double duty, and allows a Pulumi deployment that uses a single file.
-	var filename string
-	var bs []byte
-	if b, err := os.ReadFile(filepath.Join(directory, MainTemplate+".json")); err == nil {
-		filename, bs = MainTemplate+".json", b
-	} else if b, err := os.ReadFile(filepath.Join(directory, MainTemplate+".yaml")); err == nil {
-		filename, bs = MainTemplate+".yaml", b
-	} else if b, err := os.ReadFile(filepath.Join(directory, "Pulumi.yaml")); err == nil {
-		filename, bs = "Pulumi.yaml", b
-	} else {
-		return nil, nil, fmt.Errorf("reading template %s: %w", MainTemplate, err)
+	bs, filename, err := probeForFile(directory,
+		MainTemplate+".json",
+		MainTemplate+".yaml",
+		"Pulumi.yaml",
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading template %s: %w", filename, err)
 	}
 
 	template, diags, err := LoadYAMLBytes(filename, bs)
