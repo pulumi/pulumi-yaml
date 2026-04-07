@@ -149,6 +149,9 @@ func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 	}
 
 	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
+	if errors.Is(err, pulumiyaml.ErrMissingTemplateFile) {
+		template, diags, err = host.loadPluginTemplate(req.Info.ProgramDirectory)
+	}
 	if err != nil {
 		return nil, err
 	}

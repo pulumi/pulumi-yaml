@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -30,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // countingLoaderServer wraps a codegenrpc.LoaderServer and counts GetSchema
@@ -194,4 +197,74 @@ func TestGeneratePackageCachesSchemaLoadsRegression(t *testing.T) {
 	// how many resources reference it. Without caching this would be numResources.
 	assert.Equal(t, 1, counter.callCount("dep"),
 		"expected 1 GetSchema call for dep, got %d (caching not working)", counter.callCount("dep"))
+}
+
+func TestGetRequiredPackages(t *testing.T) {
+	t.Parallel()
+
+	newRequest := func(dir string) *pulumirpc.GetRequiredPackagesRequest {
+		return &pulumirpc.GetRequiredPackagesRequest{
+			Info: &pulumirpc.ProgramInfo{
+				ProgramDirectory: dir,
+				EntryPoint:       ".",
+				Options:          &structpb.Struct{},
+			},
+		}
+	}
+
+	t.Run("Pulumi.yaml", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Pulumi.yaml"), []byte(`
+name: test-project
+runtime: yaml
+resources:
+  bucket:
+    type: aws:s3:Bucket
+  pet:
+    type: random:RandomPet
+    properties:
+      length: 2
+`), 0o600))
+
+		host := &yamlLanguageHost{templateCache: make(map[string]templateCacheEntry)}
+		resp, err := host.GetRequiredPackages(t.Context(), newRequest(dir))
+		require.NoError(t, err)
+
+		assert.Equal(t, []*pulumirpc.PackageDependency{
+			{Kind: "resource", Name: "aws"},
+			{Kind: "resource", Name: "random"},
+		}, resp.Packages)
+	})
+
+	t.Run("PulumiPlugin.yaml", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "PulumiPlugin.yaml"), []byte(`
+name: my-component
+runtime: yaml
+components:
+  myComponent:
+    inputs:
+      length:
+        type: integer
+    resources:
+      pet:
+        type: random:RandomPet
+        properties:
+          length: ${length}
+    outputs:
+      name: ${pet.id}
+`), 0o600))
+
+		host := &yamlLanguageHost{templateCache: make(map[string]templateCacheEntry)}
+		resp, err := host.GetRequiredPackages(t.Context(), newRequest(dir))
+		require.NoError(t, err)
+
+		assert.Equal(t, []*pulumirpc.PackageDependency{
+			{Kind: "resource", Name: "random"},
+		}, resp.Packages)
+	})
 }
