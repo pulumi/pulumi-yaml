@@ -1,6 +1,0 @@
-component: runtime
-kind: bug-fixes
-body: Cache package loads so they aren't re-loaded over and over
-time: 2026-04-01T20:32:32.230505+01:00
-custom:
-    PR: "1022"
