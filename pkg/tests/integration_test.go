@@ -305,6 +305,9 @@ func TestPluginDownloadURLUsed(t *testing.T) {
 	e := ptesting.NewEnvironment(t)
 	defer e.DeleteIfNotFailed()
 
+	// TODO https://github.com/pulumi/pulumi-yaml/issues/1036
+	// The provider in our testadata pins the version to 1.30.0 of the pulumi-yaml repo to avoid breakage due to the
+	// addition of a symlink that the tar extraction code can't handle.
 	e.ImportDirectory(filepath.Join("testdata", "plugin-download-url"))
 
 	e.RunCommand("pulumi", "login", "--cloud-url", e.LocalURL())
