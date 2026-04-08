@@ -770,7 +770,14 @@ func pclTypeToYAMLConfigType(t model.Type) (yamlType string, isSecret bool) {
 	case *model.ListType:
 		elem, secret := pclTypeToYAMLConfigType(t.ElementType)
 		return fmt.Sprintf("list<%s>", elem), secret
+	case *model.ObjectType:
+		return "object", false
+	case *model.MapType:
+		return "object", false
 	default:
+		if t == model.DynamicType {
+			return "object", false
+		}
 		return t.String(), false
 	}
 }

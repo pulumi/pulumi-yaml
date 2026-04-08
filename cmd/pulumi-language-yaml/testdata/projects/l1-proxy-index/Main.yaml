@@ -1,0 +1,26 @@
+configuration:
+  # We use `secret` to lift plain values to output space, then check we can index into them
+  anObject:
+    type: object
+  anyObject:
+    type: object
+variables:
+  l:
+    fn::secret:
+      - 1
+  m:
+    fn::secret:
+      key: true
+  c:
+    fn::secret: ${anObject}
+  o:
+    fn::secret:
+      property: value
+  a:
+    fn::secret: ${anyObject}
+outputs:
+  l: ${l[0]}
+  m: ${m.key}
+  c: ${c.property}
+  o: ${o.property}
+  a: ${a.property}
