@@ -5,6 +5,7 @@ resources:
     type: pulumi:providers:random-plugin-component
     defaultProvider: true
     options:
+      version: 1.30.0
       pluginDownloadURL: git://github.com/pulumi/pulumi-yaml/pkg/tests/testdata/component/provider
   randomPet:
     type: random-plugin-component:index:randomPetGenerator
