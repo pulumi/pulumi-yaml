@@ -564,16 +564,28 @@ func importParameterType(s string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	// YAML's "object" type (map<any>) has no precise PCL equivalent as a config type
-	// annotation. Returning empty skips the type label, defaulting to dynamic.
-	if t == config.Object {
-		return "", true
-	}
 	pcl, err := t.Pcl()
 	if err != nil {
 		return "", false
 	}
-	return pcl.String(), true
+	return typeString(pcl), true
+}
+
+// typeString converts a PCL model type to its parseable string representation.
+// model.DynamicType.String() returns "dynamic", but PCL's TypeScope uses "any" as the
+// keyword for the dynamic type. This function ensures we produce valid PCL type expressions.
+func typeString(t model.Type) string {
+	switch t := t.(type) {
+	case *model.MapType:
+		return fmt.Sprintf("map(%s)", typeString(t.ElementType))
+	case *model.ListType:
+		return fmt.Sprintf("list(%s)", typeString(t.ElementType))
+	default:
+		if t == model.DynamicType {
+			return "any"
+		}
+		return t.String()
+	}
 }
 
 // importConfig imports a template config variable. The parameter is imported as a simple config variable definition.

@@ -1,8 +1,8 @@
-config anObject {
+config anObject "map(any)" {
 	__logicalName = "anObject"
 }
 
-config anyObject {
+config anyObject "map(any)" {
 	__logicalName = "anyObject"
 }
 
