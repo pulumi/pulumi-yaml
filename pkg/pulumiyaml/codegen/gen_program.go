@@ -447,13 +447,34 @@ func isEscapedString(s string) bool {
 	return true
 }
 
-func (g *generator) Traversal(traversal hcl.Traversal) Traversal {
+// traversableType extracts the concrete type from a Traversable. For most types this
+// delegates to model.GetTraversableType, but for pcl.ResourceProperty it returns the
+// actual PropertyType rather than the opaque ResourcePropertyType.
+func traversableType(t model.Traversable) model.Type {
+	if rp, ok := t.(*pcl.ResourceProperty); ok {
+		return rp.PropertyType
+	}
+	return model.GetTraversableType(t)
+}
+
+// Traversal converts an HCL traversal into a Traversal.
+//
+// parts provides the PCL type information at each step of the traversal. parts[i] is
+// the type being traversed by traversal[i] (after splitting off the root). When parts
+// is provided, TraverseIndex with string keys uses bracket notation for maps and dot
+// notation for objects. When parts is nil, the behavior falls back to treating
+// TraverseIndex string keys as map accesses (bracket notation).
+func (g *generator) Traversal(traversal hcl.Traversal, parts ...model.Traversable) Traversal {
 	var segments []TraversalSegment
 	if !traversal.IsRelative() {
 		traversal = traversal.SimpleSplit().Rel
 	}
-	for _, t := range traversal {
-		segments = append(segments, g.TraversalSegment(t))
+	for i, t := range traversal {
+		var sourceType model.Type
+		if i < len(parts) {
+			sourceType = traversableType(parts[i])
+		}
+		segments = append(segments, g.TraversalSegment(t, sourceType))
 	}
 	return Traversal{"", segments, g}
 }
@@ -527,6 +548,21 @@ func (g *generator) checkPropertyKeyIndex(n string, subject *hcl.Range) string {
 //	`bar"` -> `"bar"`
 //
 // `foo"bar` -> `"foo\"bar"`
+// quoteIndex produces a quoted string suitable for use as a bracket index key,
+// e.g. quoteIndex(`with.dot`) returns `"with.dot"`.
+func quoteIndex(s string) string {
+	var out strings.Builder
+	out.WriteRune('"')
+	for _, c := range s {
+		if c == '"' || c == '\\' {
+			out.WriteRune('\\')
+		}
+		out.WriteRune(c)
+	}
+	out.WriteRune('"')
+	return out.String()
+}
+
 func asEscapedString(s string) string {
 	s = strings.TrimSuffix(s, `"`)
 	s = strings.TrimPrefix(s, `"`)
@@ -551,49 +587,72 @@ func asEscapedString(s string) string {
 	return out.String()
 }
 
-func (g *generator) TraversalSegment(t hcl.Traverser) TraversalSegment {
-	var key cty.Value
+// TraversalSegment converts an HCL traverser into a TraversalSegment.
+//
+// sourceType is the PCL type of the value being traversed. When non-nil, it determines
+// the notation for TraverseIndex with string keys: bracket notation for maps, dot
+// notation for objects. When nil, TraverseIndex string keys default to map-style
+// bracket notation.
+func (g *generator) TraversalSegment(t hcl.Traverser, sourceType model.Type) TraversalSegment {
 	switch t := t.(type) {
 	case hcl.TraverseAttr:
-		key = cty.StringVal(t.Name)
-	case hcl.TraverseIndex:
-		key = t.Key
-	default:
-		contract.Failf("Unexpected traverser of type %T: '%v'", t, t.SourceRange())
-	}
-
-	switch key.Type() {
-	case cty.String:
-		keyVal := key.AsString()
+		keyVal := t.Name
 		if s := g.checkPropertyName(keyVal, t.SourceRange().Ptr()); s != "" {
 			// We convert invalid property names to property accesses.
 			return TraversalSegment{
 				segment: s,
-				joinFmt: "%s[%s]",
+				joinFmt: "[%s]",
 			}
 		}
 		return TraversalSegment{
 			segment: keyVal,
 			joinFmt: ".%s",
 		}
-	case cty.Number:
-		idx, _ := key.AsBigFloat().Int64()
-		return TraversalSegment{
-			segment: fmt.Sprintf("%d", idx),
-			joinFmt: "[%s]",
+	case hcl.TraverseIndex:
+		key := t.Key
+		switch key.Type() {
+		case cty.String:
+			// Use dot notation when indexing into an object (the key is a known
+			// attribute). Use bracket notation when indexing into a map.
+			if _, isMap := sourceType.(*model.MapType); !isMap && sourceType != model.DynamicType && sourceType != nil {
+				keyVal := key.AsString()
+				if s := g.checkPropertyName(keyVal, t.SourceRange().Ptr()); s != "" {
+					return TraversalSegment{
+						segment: s,
+						joinFmt: "[%s]",
+					}
+				}
+				return TraversalSegment{
+					segment: keyVal,
+					joinFmt: ".%s",
+				}
+			}
+			return TraversalSegment{
+				segment: quoteIndex(key.AsString()),
+				joinFmt: "[%s]",
+			}
+		case cty.Number:
+			idx, _ := key.AsBigFloat().Int64()
+			return TraversalSegment{
+				segment: fmt.Sprintf("%d", idx),
+				joinFmt: "[%s]",
+			}
+		default:
+			keyExpr := &model.LiteralValueExpression{Value: key}
+			diags := keyExpr.Typecheck(false)
+			contract.Ignore(diags)
+			segment := fmt.Sprintf("%v", keyExpr)
+			if s := g.checkPropertyKeyIndex(segment, t.SourceRange().Ptr()); s != "" {
+				segment = s
+			}
+			return TraversalSegment{
+				segment: segment,
+				joinFmt: "[%s]",
+			}
 		}
 	default:
-		keyExpr := &model.LiteralValueExpression{Value: key}
-		diags := keyExpr.Typecheck(false)
-		contract.Ignore(diags)
-		segment := fmt.Sprintf("%v", keyExpr)
-		if s := g.checkPropertyKeyIndex(segment, t.SourceRange().Ptr()); s != "" {
-			segment = s
-		}
-		return TraversalSegment{
-			segment: segment,
-			joinFmt: "%s[%s]",
-		}
+		contract.Failf("Unexpected traverser of type %T: '%v'", t, t.SourceRange())
+		return TraversalSegment{} // unreachable
 	}
 }
 
@@ -661,7 +720,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 		if f, ok := e.Source.(*model.FunctionCallExpression); ok {
 			// Invokes can process a return type
 			if f.Name == pcl.Invoke {
-				return g.MustInvoke(f, g.Traversal(e.Traversal).String())
+				return g.MustInvoke(f, g.Traversal(e.Traversal, e.Parts...).String())
 			}
 			// But normal functions cannot
 			if len(e.Traversal) > 0 {
@@ -686,7 +745,7 @@ func (g *generator) expr(e model.Expression) syn.Node {
 
 	case *model.ScopeTraversalExpression:
 		rootName := e.RootName
-		traversal := g.Traversal(e.Traversal).WithRoot(rootName, e.Tokens.Root.Range().Ptr())
+		traversal := g.Traversal(e.Traversal, e.Parts...).WithRoot(rootName, e.Tokens.Root.Range().Ptr())
 		s := fmt.Sprintf("${%s}", traversal)
 		return syn.String(s)
 
