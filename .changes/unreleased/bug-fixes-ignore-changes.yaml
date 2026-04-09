@@ -1,0 +1,3 @@
+kind: bug-fixes
+body: Fix property path codegen for map index keys in ignoreChanges
+component: codegen

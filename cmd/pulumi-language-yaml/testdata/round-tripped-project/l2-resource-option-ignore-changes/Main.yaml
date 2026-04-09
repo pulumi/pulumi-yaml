@@ -1,12 +1,24 @@
 resources:
-  ignoreChanges:
-    type: simple:Resource
+  receiverIgnore:
+    type: nestedobject:Receiver
     properties:
-      value: true
+      details:
+        - key: a
+          value: b
     options:
       ignoreChanges:
-        - value
-  notIgnoreChanges:
-    type: simple:Resource
+        - details[0].key
+  mapIgnore:
+    type: nestedobject:MapContainer
     properties:
-      value: true
+      tags:
+        env: prod
+    options:
+      ignoreChanges:
+        - tags["env"]
+        - tags["with.dot"]
+        - tags["with escaped \""]
+  noIgnore:
+    type: nestedobject:Target
+    properties:
+      name: nothing
