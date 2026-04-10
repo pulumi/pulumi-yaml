@@ -9,6 +9,7 @@ import (
 	"github.com/hexops/autogold"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVersionValueComplex(t *testing.T) {
@@ -230,7 +231,11 @@ resources:
 
 	tmpl := yamlTemplate(t, strings.TrimSpace(text))
 	plugins, diags := GetReferencedPackages(tmpl)
-	assert.Contains(t, diagString(diags[0]), "<stdin>:13:16: Package test already declared with a conflicting version: 1.23.425-beta.6")
-	assert.Contains(t, diagString(diags[1]), "<stdin>:14:26: Package test already declared with a conflicting plugin download URL: https://example.com")
-	assert.Empty(t, plugins)
+	assert.Empty(t, diags)
+	// Per-resource version/URL are runtime directives. The first resource's
+	// version is used when there is no SDK declaration.
+	require.Len(t, plugins, 1)
+	assert.Equal(t, "test", plugins[0].Name)
+	assert.Equal(t, "1.23.425-beta.6", plugins[0].Version)
+	assert.Equal(t, "https://example.com", plugins[0].DownloadURL)
 }

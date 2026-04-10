@@ -2028,6 +2028,12 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			pkg = tokens.Package(typ.Name())
 		}
 		packageRef := e.packageRefs[pkg]
+		// When a resource specifies an explicit version or pluginDownloadURL option,
+		// clear the package ref so the engine builds the provider request from those
+		// options instead of using the SDK-registered package (which has a fixed version).
+		if v.Options.Version != nil || v.Options.PluginDownloadURL != nil {
+			packageRef = ""
+		}
 		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
 	}
 	if err != nil {

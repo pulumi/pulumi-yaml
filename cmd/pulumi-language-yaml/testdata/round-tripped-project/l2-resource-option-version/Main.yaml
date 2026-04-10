@@ -15,3 +15,5 @@ resources:
     type: simple:Resource
     properties:
       value: true
+    options:
+      version: 26.0.0
