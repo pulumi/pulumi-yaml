@@ -59,6 +59,7 @@ resource myBucket "aws:s3/bucket:Bucket" {
 	__logicalName = "MyBucket"
 
 	options {
+		provider = usEast2Provider
 		version = "5.4.0"
 	}
 }
