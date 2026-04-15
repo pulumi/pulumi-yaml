@@ -1,5 +1,0 @@
-kind: bug-fixes
-body: Fix codegen for config variables with object and dynamic types
-component: codegen
-custom:
-  PR: 1027
