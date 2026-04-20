@@ -183,7 +183,7 @@ func TestGeneratePackageCachesSchemaLoadsRegression(t *testing.T) {
 	// schema.BindSpec. Before the fix, BindSpec received an uncached loader and
 	// would issue a GetSchema RPC for every cross-package type reference.
 	host := &yamlLanguageHost{}
-	resp, err := host.GeneratePackage(context.Background(), &pulumirpc.GeneratePackageRequest{
+	resp, err := host.GeneratePackage(t.Context(), &pulumirpc.GeneratePackageRequest{
 		Directory:    t.TempDir(),
 		Schema:       string(mainJSON),
 		LoaderTarget: lis.Addr().String(),
