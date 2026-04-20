@@ -1,6 +1,6 @@
 module github.com/pulumi/pulumi-yaml
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/blang/semver v3.5.1+incompatible

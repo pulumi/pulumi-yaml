@@ -1,0 +1,6 @@
+component: codegen
+kind: Improvements
+body: update golang to 1.25.9
+time: 2026-04-10T11:43:58.964626335+02:00
+custom:
+    PR: "1044"
