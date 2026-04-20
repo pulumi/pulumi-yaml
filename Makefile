@@ -67,10 +67,13 @@ clean::
 	rm -f ./bin/*
 	rm -f pkg/pulumiyaml/testing/test/testdata/{aws,azure-native,azure,kubernetes,random,eks,aws-native,docker}.json
 
-.phony: lint
+.PHONY: lint lint-golang lint-copyright
+
 lint:: lint-copyright lint-golang
+
 lint-golang:
 	golangci-lint run
+
 lint-copyright:
     # Generated examples don't have the copyright notice.
 	pulumictl copyright -x 'pkg/tests/transpiled_examples/**'

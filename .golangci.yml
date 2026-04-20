@@ -9,7 +9,12 @@ linters:
     - paralleltest
     - revive
     - unconvert
+    - usetesting
   settings:
+    usetesting:
+      os-temp-dir: true
+      context-background: true
+      context-todo: true
     govet:
       enable:
         - nilness
