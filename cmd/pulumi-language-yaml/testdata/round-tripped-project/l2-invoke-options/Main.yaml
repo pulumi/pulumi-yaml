@@ -1,7 +1,9 @@
 resources:
   explicitProvider:
     type: pulumi:providers:simple-invoke
-    options: {}
+    options:
+      version: 10.0.0
+      pluginDownloadURL: https://example.com/github/example
 variables:
   data:
     fn::invoke:

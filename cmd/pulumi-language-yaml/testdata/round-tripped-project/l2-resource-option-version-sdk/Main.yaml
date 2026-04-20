@@ -3,3 +3,5 @@ resources:
     type: simple:Resource
     properties:
       value: true
+    options:
+      version: 2.0.0

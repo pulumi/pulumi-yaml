@@ -127,30 +127,16 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
-		if entry, found := packageMap[pkg]; found {
-			if v := version.GetValue(); v != "" && entry.Version != v {
-				if entry.Version == "" {
-					entry.Version = v
-				} else {
-					r.sdiags.Extend(ast.ExprError(version, fmt.Sprintf("Package %v already declared with a conflicting version: %v", pkg, entry.Version), ""))
-				}
-			}
-			if url := pluginDownloadURL.GetValue(); url != "" && entry.DownloadURL != url {
-				if entry.DownloadURL == "" {
-					entry.DownloadURL = url
-				} else {
-					r.sdiags.Extend(ast.ExprError(pluginDownloadURL, fmt.Sprintf("Package %v already declared with a conflicting plugin download URL: %v", pkg, entry.DownloadURL), ""))
-				}
-			}
-		} else if sdk, found := sdkIndex[pkg]; found {
-			// Use the SDK declaration as the base, then overlay any inline version/URL.
+		if _, found := packageMap[pkg]; found {
+			// Package already registered. Per-resource version/URL options are runtime
+			// directives handled by the engine; they don't change the project-level
+			// package dependency.
+			return
+		}
+		if sdk, found := sdkIndex[pkg]; found {
+			// Use the SDK declaration as the canonical package entry. Per-resource
+			// version/URL options only override at runtime, not at the dependency level.
 			entry := *sdk
-			if v := version.GetValue(); v != "" {
-				entry.Version = v
-			}
-			if url := pluginDownloadURL.GetValue(); url != "" {
-				entry.DownloadURL = url
-			}
 			packageMap[pkg] = &entry
 		} else {
 			packageMap[pkg] = &packages.PackageDecl{
@@ -267,10 +253,16 @@ func loadPackage(
 			Version:     version,
 			DownloadURL: pluginDownloadURL,
 		}
-	}
-	if version != nil {
-		// Override the version if one was passed in.
-		descriptor.Version = version
+	} else if version != nil || pluginDownloadURL != "" {
+		// Override the version and/or download URL if one was passed in, but don't mutate the shared descriptor.
+		d := *descriptor
+		if version != nil {
+			d.Version = version
+		}
+		if pluginDownloadURL != "" {
+			d.DownloadURL = pluginDownloadURL
+		}
+		descriptor = &d
 	}
 
 	pkg, err := loader.LoadPackage(ctx, descriptor)

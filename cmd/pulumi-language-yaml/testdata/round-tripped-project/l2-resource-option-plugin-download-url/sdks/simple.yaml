@@ -1,0 +1,4 @@
+packageDeclarationVersion: 1
+name: simple
+version: 27.0.0
+downloadUrl: https://github.com/pulumi/pulumi-simple/releases/v${VERSION}

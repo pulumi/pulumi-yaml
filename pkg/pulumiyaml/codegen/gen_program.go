@@ -316,6 +316,14 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 		rOpts = append(rOpts, syn.ObjectProperty(syn.String("envVarMappings"),
 			g.expr(opts.EnvVarMappings)))
 	}
+	if opts.Version != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("version"),
+			g.expr(opts.Version)))
+	}
+	if opts.PluginDownloadURL != nil {
+		rOpts = append(rOpts, syn.ObjectProperty(syn.String("pluginDownloadURL"),
+			g.expr(opts.PluginDownloadURL)))
+	}
 
 	return syn.Object(rOpts...)
 }
