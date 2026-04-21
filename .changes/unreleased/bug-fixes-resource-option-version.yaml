@@ -1,3 +1,0 @@
-kind: bug-fixes
-body: Fix per-resource version and pluginDownloadURL options to correctly create distinct providers
-component: runtime, codegen, convert
