@@ -12,7 +12,12 @@ repository, run `mise trust` to allow the installation of the tools listed in
 Changelog management is done via [`changie`](https://changie.dev/).
 See the [installation](https://changie.dev/guide/installation/) guide for `changie`.
 
-Run `changie new` in the top level directory. Here is an example of what that looks like:
+Always use `changie new` to create entries. Do not hand-write the YAML files
+in `.changes/unreleased/`: the rendered changelog embeds the pull request
+number from `custom.PR`, and omitting it causes links to render as
+`<no value>`.
+
+Here is an example of what `changie new` looks like:
 
 ```shell
 $ changie new
