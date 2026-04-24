@@ -344,8 +344,9 @@ func (g *generator) genResource(n *pcl.Resource) {
 		g.missingSchema()
 	}
 
+	token, _ := n.GetToken()
 	entries := []syn.ObjectPropertyDef{
-		g.TypeProperty(collapseToken(n.Token)),
+		g.TypeProperty(collapseToken(token)),
 	}
 
 	if n.Name() != n.LogicalName() {
