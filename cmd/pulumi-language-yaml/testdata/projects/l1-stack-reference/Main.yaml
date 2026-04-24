@@ -1,6 +1,6 @@
 resources:
   ref:
-    type: pulumi:StackReference
+    type: pulumi:pulumi:StackReference
     properties:
       name: organization/other/dev
 outputs:

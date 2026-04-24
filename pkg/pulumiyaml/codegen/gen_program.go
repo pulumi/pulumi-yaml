@@ -345,6 +345,10 @@ func (g *generator) genResource(n *pcl.Resource) {
 	}
 
 	token, _ := n.GetToken()
+	// Workaround binder issue that returned "pulumi::StackReference" instead of "pulumi:pulumi:StackReference".
+	if token == "pulumi::StackReference" {
+		token = "pulumi:pulumi:StackReference"
+	}
 	entries := []syn.ObjectPropertyDef{
 		g.TypeProperty(collapseToken(token)),
 	}
