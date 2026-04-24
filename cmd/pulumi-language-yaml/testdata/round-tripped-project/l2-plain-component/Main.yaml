@@ -1,0 +1,11 @@
+resources:
+  myComponent:
+    type: plaincomponent:Component
+    properties:
+      name: my-resource
+      settings:
+        enabled: true
+        tags:
+          env: test
+outputs:
+  label: ${myComponent.label}

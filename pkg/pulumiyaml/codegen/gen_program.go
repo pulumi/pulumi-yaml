@@ -344,8 +344,13 @@ func (g *generator) genResource(n *pcl.Resource) {
 		g.missingSchema()
 	}
 
+	token, _ := n.GetToken()
+	// Workaround binder issue that returned "pulumi::StackReference" instead of "pulumi:pulumi:StackReference".
+	if token == "pulumi::StackReference" { //nolint:gosec // Not a credential, just a type token
+		token = "pulumi:pulumi:StackReference" //nolint:gosec // Not a credential, just a type token
+	}
 	entries := []syn.ObjectPropertyDef{
-		g.TypeProperty(collapseToken(n.Token)),
+		g.TypeProperty(collapseToken(token)),
 	}
 
 	if n.Name() != n.LogicalName() {

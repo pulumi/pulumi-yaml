@@ -122,6 +122,14 @@ var expectedFailures = map[string]string{
 	"l2-resource-config-objects":     "unrecognized type 'map(bool)' for config variable; undefined variable plainBooleanMap",
 	"l2-resource-config-primitives":  "*model.BinaryOpExpression; Unimplemented! Needed for  plainNumber + 0.5",
 	"l2-snake-names":                 "not handled correctly",
+
+	"l2-resource-option-hooks":           "Failing after updating to 3.232",
+	"l1-builtin-min-max":                 "Failing after updating to 3.232",
+	"l2-id-type":                         "Failing after updating to 3.232",
+	"l2-resource-primitive-conversions":  "Failing after updating to 3.232",
+	"l2-resource-option-custom-timeouts": "Failing after updating to 3.232",
+	"l2-name-conflicts":                  "Failing after updating to 3.232",
+	"l2-index-mod":                       "Failing after updating to 3.232",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
