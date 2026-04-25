@@ -739,6 +739,38 @@ func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, 
 	return ReadFileSyntax(node, name, path), nil
 }
 
+type PulumiResourceNameExpr struct {
+	builtinNode
+	Resource Expr
+}
+
+func PulumiResourceNameSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *PulumiResourceNameExpr {
+	return &PulumiResourceNameExpr{
+		builtinNode: builtin(node, name, args),
+		Resource:    args,
+	}
+}
+
+func parsePulumiResourceName(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return PulumiResourceNameSyntax(node, name, args), nil
+}
+
+type PulumiResourceTypeExpr struct {
+	builtinNode
+	Resource Expr
+}
+
+func PulumiResourceTypeSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *PulumiResourceTypeExpr {
+	return &PulumiResourceTypeExpr{
+		builtinNode: builtin(node, name, args),
+		Resource:    args,
+	}
+}
+
+func parsePulumiResourceType(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return PulumiResourceTypeSyntax(node, name, args), nil
+}
+
 func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) {
 	if node.Len() != 1 {
 		return nil, nil, false
@@ -783,6 +815,10 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::secret", parseSecret)
 	case "fn::readfile":
 		set("fn::readFile", parseReadFile)
+	case "fn::pulumiresourcename":
+		set("fn::pulumiResourceName", parsePulumiResourceName)
+	case "fn::pulumiresourcetype":
+		set("fn::pulumiResourceType", parsePulumiResourceType)
 	default:
 		k := kvp.Key.Value()
 		// fn::invoke can be called as fn::${pkg}:${module}(:${name})?
