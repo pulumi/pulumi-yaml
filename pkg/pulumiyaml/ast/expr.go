@@ -739,6 +739,38 @@ func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, 
 	return ReadFileSyntax(node, name, path), nil
 }
 
+type FileBase64Expr struct {
+	builtinNode
+	Path Expr
+}
+
+func FileBase64Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *FileBase64Expr {
+	return &FileBase64Expr{
+		builtinNode: builtin(node, name, args),
+		Path:        args,
+	}
+}
+
+func parseFileBase64(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return FileBase64Syntax(node, name, args), nil
+}
+
+type FileBase64Sha256Expr struct {
+	builtinNode
+	Path Expr
+}
+
+func FileBase64Sha256Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *FileBase64Sha256Expr {
+	return &FileBase64Sha256Expr{
+		builtinNode: builtin(node, name, args),
+		Path:        args,
+	}
+}
+
+func parseFileBase64Sha256(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return FileBase64Sha256Syntax(node, name, args), nil
+}
+
 type Sha1Expr struct {
 	builtinNode
 	Value Expr
@@ -831,6 +863,10 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::secret", parseSecret)
 	case "fn::readfile":
 		set("fn::readFile", parseReadFile)
+	case "fn::filebase64":
+		set("fn::filebase64", parseFileBase64)
+	case "fn::filebase64sha256":
+		set("fn::filebase64sha256", parseFileBase64Sha256)
 	case "fn::sha1":
 		set("fn::sha1", parseSha1)
 	case "fn::pulumiresourcename":

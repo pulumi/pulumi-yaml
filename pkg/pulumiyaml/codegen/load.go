@@ -450,6 +450,18 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "readFile",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.FileBase64Expr:
+		path, pdiags := imp.importExpr(node.Path, nil)
+		return &model.FunctionCallExpression{
+			Name: "filebase64",
+			Args: []model.Expression{path},
+		}, pdiags
+	case *ast.FileBase64Sha256Expr:
+		path, pdiags := imp.importExpr(node.Path, nil)
+		return &model.FunctionCallExpression{
+			Name: "filebase64sha256",
+			Args: []model.Expression{path},
+		}, pdiags
 	case *ast.ToJSONExpr:
 		path, pdiags := imp.importExpr(node.Args(), nil)
 		return &model.FunctionCallExpression{

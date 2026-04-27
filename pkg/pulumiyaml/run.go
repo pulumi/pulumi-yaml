@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec
+	"crypto/sha256"
 	b64 "encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -2185,6 +2186,10 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
 		return e.evaluateBuiltinReadFile(x)
+	case *ast.FileBase64Expr:
+		return e.evaluateBuiltinFileBase64(x)
+	case *ast.FileBase64Sha256Expr:
+		return e.evaluateBuiltinFileBase64Sha256(x)
 	case *ast.Sha1Expr:
 		return e.evaluateBuiltinSha1(x)
 	case *ast.PulumiResourceNameExpr:
@@ -2947,6 +2952,43 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	})
 
 	return readFileF(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinFileBase64(s *ast.FileBase64Expr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Path)
+	if !ok {
+		return nil, false
+	}
+	return e.lift(func(args ...interface{}) (interface{}, bool) {
+		path, ok := args[0].(string)
+		if !ok {
+			return e.error(s.Path, fmt.Sprintf("fn::filebase64 requires a string path, got %v", typeString(args[0])))
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return e.error(s.Path, fmt.Sprintf("fn::filebase64 error reading file %v: %v", path, err))
+		}
+		return b64.StdEncoding.EncodeToString(data), true
+	})(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinFileBase64Sha256(s *ast.FileBase64Sha256Expr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Path)
+	if !ok {
+		return nil, false
+	}
+	return e.lift(func(args ...interface{}) (interface{}, bool) {
+		path, ok := args[0].(string)
+		if !ok {
+			return e.error(s.Path, fmt.Sprintf("fn::filebase64sha256 requires a string path, got %v", typeString(args[0])))
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return e.error(s.Path, fmt.Sprintf("fn::filebase64sha256 error reading file %v: %v", path, err))
+		}
+		h := sha256.Sum256(data)
+		return b64.StdEncoding.EncodeToString(h[:]), true
+	})(expr)
 }
 
 func (e *programEvaluator) evaluateBuiltinSha1(s *ast.Sha1Expr) (interface{}, bool) {
