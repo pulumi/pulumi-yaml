@@ -1,0 +1,8 @@
+configuration:
+  input:
+    type: string
+variables:
+  hashVar:
+    fn::sha1: ${input}
+outputs:
+  hash: ${hashVar}

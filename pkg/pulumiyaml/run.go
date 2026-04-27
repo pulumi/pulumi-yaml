@@ -5,7 +5,9 @@ package pulumiyaml
 import (
 	"bytes"
 	"context"
+	"crypto/sha1" //nolint:gosec
 	b64 "encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -2183,6 +2185,8 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
 		return e.evaluateBuiltinReadFile(x)
+	case *ast.Sha1Expr:
+		return e.evaluateBuiltinSha1(x)
 	case *ast.PulumiResourceNameExpr:
 		return e.evaluateBuiltinPulumiResourceName(x)
 	case *ast.PulumiResourceTypeExpr:
@@ -2943,6 +2947,21 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	})
 
 	return readFileF(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinSha1(s *ast.Sha1Expr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Value)
+	if !ok {
+		return nil, false
+	}
+	return e.lift(func(args ...interface{}) (interface{}, bool) {
+		str, ok := args[0].(string)
+		if !ok {
+			return e.error(s.Value, fmt.Sprintf("fn::sha1 requires a string, got %v", typeString(args[0])))
+		}
+		h := sha1.Sum([]byte(str)) //nolint:gosec
+		return hex.EncodeToString(h[:]), true
+	})(expr)
 }
 
 func (e *programEvaluator) evaluateBuiltinPulumiResourceName(s *ast.PulumiResourceNameExpr) (interface{}, bool) {
