@@ -739,6 +739,22 @@ func parseReadFile(node *syntax.ObjectNode, name *StringExpr, path Expr) (Expr, 
 	return ReadFileSyntax(node, name, path), nil
 }
 
+type Sha1Expr struct {
+	builtinNode
+	Value Expr
+}
+
+func Sha1Syntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *Sha1Expr {
+	return &Sha1Expr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
+func parseSha1(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return Sha1Syntax(node, name, args), nil
+}
+
 type PulumiResourceNameExpr struct {
 	builtinNode
 	Resource Expr
@@ -815,6 +831,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::secret", parseSecret)
 	case "fn::readfile":
 		set("fn::readFile", parseReadFile)
+	case "fn::sha1":
+		set("fn::sha1", parseSha1)
 	case "fn::pulumiresourcename":
 		set("fn::pulumiResourceName", parsePulumiResourceName)
 	case "fn::pulumiresourcetype":

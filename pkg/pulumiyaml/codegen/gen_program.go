@@ -938,6 +938,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("readFile", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
+	case "sha1":
+		return wrapFn("sha1", g.expr(f.Args[0]))
 	case "pulumiResourceName":
 		return wrapFn("pulumiResourceName", g.expr(f.Args[0]))
 	case "pulumiResourceType":

@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Support the `fn:sha1` built-in function
+time: 2026-04-27T14:31:59.495798+01:00
+custom:
+    PR: "1062"
