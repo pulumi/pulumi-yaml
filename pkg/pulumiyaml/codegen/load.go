@@ -468,6 +468,18 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "fromBase64",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.PulumiResourceNameExpr:
+		res, rdiags := imp.importExpr(node.Resource, nil)
+		return &model.FunctionCallExpression{
+			Name: "pulumiResourceName",
+			Args: []model.Expression{res},
+		}, rdiags
+	case *ast.PulumiResourceTypeExpr:
+		res, rdiags := imp.importExpr(node.Resource, nil)
+		return &model.FunctionCallExpression{
+			Name: "pulumiResourceType",
+			Args: []model.Expression{res},
+		}, rdiags
 	default:
 		contract.Failf("unexpected builtin type %T", node)
 		return nil, nil

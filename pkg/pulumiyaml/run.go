@@ -747,6 +747,7 @@ type lateboundResource interface {
 type lateboundCustomResourceState struct {
 	pulumi.CustomResourceState
 	name           string
+	resourceType   string
 	Outputs        pulumi.MapOutput `pulumi:""`
 	resourceSchema *schema.Resource
 }
@@ -790,6 +791,7 @@ func (st *lateboundCustomResourceState) GetResourceSchema() *schema.Resource {
 type lateboundProviderResourceState struct {
 	pulumi.ProviderResourceState
 	name           string
+	resourceType   string
 	Outputs        pulumi.MapOutput `pulumi:""`
 	resourceSchema *schema.Resource
 }
@@ -1891,12 +1893,12 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 	isProvider := false
 	if strings.HasPrefix(v.Type.Value, "pulumi:providers:") {
-		r := lateboundProviderResourceState{name: resourceName, resourceSchema: resourceSchema}
+		r := lateboundProviderResourceState{name: resourceName, resourceType: string(typ), resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 		isProvider = true
 	} else {
-		r := lateboundCustomResourceState{name: resourceName, resourceSchema: resourceSchema}
+		r := lateboundCustomResourceState{name: resourceName, resourceType: string(typ), resourceSchema: resourceSchema}
 		state = &r
 		res = &r
 	}
@@ -2181,6 +2183,10 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinSecret(x)
 	case *ast.ReadFileExpr:
 		return e.evaluateBuiltinReadFile(x)
+	case *ast.PulumiResourceNameExpr:
+		return e.evaluateBuiltinPulumiResourceName(x)
+	case *ast.PulumiResourceTypeExpr:
+		return e.evaluateBuiltinPulumiResourceType(x)
 	default:
 		panic(fmt.Sprintf("fatal: invalid expr type %v", reflect.TypeOf(x)))
 	}
@@ -2937,6 +2943,36 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	})
 
 	return readFileF(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinPulumiResourceName(s *ast.PulumiResourceNameExpr) (interface{}, bool) {
+	res, ok := e.evaluateExpr(s.Resource)
+	if !ok {
+		return nil, false
+	}
+	switch r := res.(type) {
+	case *lateboundCustomResourceState:
+		return r.name, true
+	case *lateboundProviderResourceState:
+		return r.name, true
+	default:
+		return e.error(s.Resource, fmt.Sprintf("fn::pulumiResourceName requires a resource, got %v", typeString(res)))
+	}
+}
+
+func (e *programEvaluator) evaluateBuiltinPulumiResourceType(s *ast.PulumiResourceTypeExpr) (interface{}, bool) {
+	res, ok := e.evaluateExpr(s.Resource)
+	if !ok {
+		return nil, false
+	}
+	switch r := res.(type) {
+	case *lateboundCustomResourceState:
+		return r.resourceType, true
+	case *lateboundProviderResourceState:
+		return r.resourceType, true
+	default:
+		return e.error(s.Resource, fmt.Sprintf("fn::pulumiResourceType requires a resource, got %v", typeString(res)))
+	}
 }
 
 func hasOutputs(v interface{}) bool {

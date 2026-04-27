@@ -1,0 +1,10 @@
+resources:
+  res1:
+    type: simple:Resource
+    properties:
+      value: true
+outputs:
+  name:
+    fn::pulumiResourceName: ${res1}
+  type:
+    fn::pulumiResourceType: ${res1}
