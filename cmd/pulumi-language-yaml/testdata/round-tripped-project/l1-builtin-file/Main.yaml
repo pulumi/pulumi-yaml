@@ -1,0 +1,11 @@
+variables:
+  fileContentVar:
+    fn::readFile: testfile.txt
+  fileB64Var:
+    fn::filebase64: testfile.txt
+  fileShaVar:
+    fn::filebase64sha256: testfile.txt
+outputs:
+  fileContent: ${fileContentVar}
+  fileB64: ${fileB64Var}
+  fileSha: ${fileShaVar}

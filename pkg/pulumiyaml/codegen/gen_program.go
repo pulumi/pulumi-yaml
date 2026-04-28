@@ -936,6 +936,10 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("select", syn.List(args[1], args[0]))
 	case "readFile":
 		return wrapFn("readFile", g.expr(f.Args[0]))
+	case "filebase64":
+		return wrapFn("filebase64", g.expr(f.Args[0]))
+	case "filebase64sha256":
+		return wrapFn("filebase64sha256", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
 	case "sha1":
