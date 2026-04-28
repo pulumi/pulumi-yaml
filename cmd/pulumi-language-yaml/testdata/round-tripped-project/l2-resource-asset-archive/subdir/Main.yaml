@@ -3,37 +3,37 @@ resources:
     type: asset-archive:AssetResource
     properties:
       value:
-        fn::FileAsset: ../test.txt
+        fn::fileAsset: ../test.txt
   arc:
     type: asset-archive:ArchiveResource
     properties:
       value:
-        fn::FileArchive: ../archive.tar
+        fn::fileArchive: ../archive.tar
   dir:
     type: asset-archive:ArchiveResource
     properties:
       value:
-        fn::FileArchive: ../folder
+        fn::fileArchive: ../folder
   assarc:
     type: asset-archive:ArchiveResource
     properties:
       value:
-        fn::AssetArchive:
+        fn::assetArchive:
           string:
-            fn::StringAsset: file contents
+            fn::stringAsset: file contents
           file:
-            fn::FileAsset: ../test.txt
+            fn::fileAsset: ../test.txt
           folder:
-            fn::FileArchive: ../folder
+            fn::fileArchive: ../folder
           archive:
-            fn::FileArchive: ../archive.tar
+            fn::fileArchive: ../archive.tar
   remoteass:
     type: asset-archive:AssetResource
     properties:
       value:
-        fn::RemoteAsset: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/test.txt
+        fn::remoteAsset: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/test.txt
   remotearc:
     type: asset-archive:ArchiveResource
     properties:
       value:
-        fn::RemoteArchive: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/archive.tar
+        fn::remoteArchive: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/archive.tar

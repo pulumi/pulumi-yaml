@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/hcl/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -283,4 +284,53 @@ func TestComponentSchemaGeneration(t *testing.T) {
 }
 `
 	require.JSONEq(t, expectedSchema, string(marshalled))
+}
+
+const oldCasingAssetExample = `
+name: simple-yaml
+runtime: yaml
+resources:
+  index.html:
+    type: aws:s3/bucketObject:BucketObject
+    properties:
+      bucket: my-bucket
+      source:
+        fn::FileAsset: ./index.html
+`
+
+// TestOldCasingAssetWarns verifies that legacy PascalCase asset/archive function
+// names (e.g. fn::FileAsset) are still accepted but emit a miscapitalization
+// warning steering users toward the canonical camelCase form (fn::fileAsset).
+func TestOldCasingAssetWarns(t *testing.T) {
+	t.Parallel()
+
+	syntax, sdiags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(oldCasingAssetExample)), nil)
+	require.Len(t, sdiags, 0)
+
+	template, diags := ParseTemplate([]byte(oldCasingAssetExample), syntax)
+	require.False(t, diags.HasErrors(), diags.Error())
+
+	var warnings []string
+	for _, d := range diags {
+		if d.Severity == hcl.DiagWarning {
+			warnings = append(warnings, d.Summary)
+		}
+	}
+	assert.Equal(t, []string{
+		"'fn::FileAsset' looks like a miscapitalization of 'fn::fileAsset'",
+	}, warnings)
+
+	resources := template.Resources.Entries
+	require.Len(t, resources, 1)
+	props := resources[0].Value.Properties.PropertyMap
+	require.NotNil(t, props)
+	var source Expr
+	for _, e := range props.Entries {
+		if e.Key.Value == "source" {
+			source = e.Value
+		}
+	}
+	require.NotNil(t, source)
+	_, ok := source.(*FileAssetExpr)
+	assert.True(t, ok, "expected *FileAssetExpr, got %T", source)
 }
