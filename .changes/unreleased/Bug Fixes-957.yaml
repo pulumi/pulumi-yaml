@@ -1,0 +1,6 @@
+component: runtime
+kind: Bug Fixes
+body: YAML components can now be instantiated multiple times in a single stack. Child resource names are prefixed with the component instance name (e.g. `cp1-res`); aliases to the un-prefixed name are emitted so existing single-instance stacks migrate without replacement.
+time: 2026-04-28T12:40:00.000000-07:00
+custom:
+    PR: "957"

@@ -1888,6 +1888,16 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		resourceName = v.Name.Value
 	}
 
+	// When evaluating inside a component, prefix child resource names with the component
+	// instance name so multiple instances of the same component don't collide on URN.
+	// Emit an alias to the un-prefixed name so existing single-instance stacks migrate
+	// without replacement.
+	if e.parent != nil {
+		originalName := resourceName
+		resourceName = e.parent.PulumiResourceName() + "-" + resourceName
+		opts = append(opts, pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String(originalName)}}))
+	}
+
 	var state lateboundResource
 	var res pulumi.Resource
 	var resourceSchema *schema.Resource

@@ -313,3 +313,74 @@ components:
 	require.NoError(t, err)
 	assert.True(t, invokeCalled, "expected invoke to be called")
 }
+
+// TestComponentResourceMultipleInstances exercises the fix for #957: instantiating the
+// same YAML component twice in a single stack must not produce duplicate URNs. Each
+// child resource's name is prefixed with the component instance name, and an alias to
+// the un-prefixed name is emitted so existing single-instance stacks migrate cleanly.
+func TestComponentResourceMultipleInstances(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+components:
+  myComponent:
+    resources:
+      inner:
+        type: ` + testResourceToken + `
+        properties:
+          foo: bar
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	var innerNames []string
+	var innerAliasNames [][]string
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "test:index:myComponent":
+				return "", resource.PropertyMap{}, nil
+			case testResourceToken:
+				innerNames = append(innerNames, args.Name)
+				var aliasNames []string
+				if args.RegisterRPC != nil {
+					for _, a := range args.RegisterRPC.Aliases {
+						if spec := a.GetSpec(); spec != nil {
+							aliasNames = append(aliasNames, spec.GetName())
+						}
+					}
+				}
+				innerAliasNames = append(innerAliasNames, aliasNames)
+				return "innerID", resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+					"bar": resource.NewStringProperty("baz"),
+				}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("unexpected resource type %s", args.TypeToken)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, _, err := RunComponentTemplate(ctx,
+			"test:index:myComponent", "cp1", nil,
+			template, pulumi.Map{}, newMockPackageMap(),
+		)
+		if err != nil {
+			return err
+		}
+		_, _, err = RunComponentTemplate(ctx,
+			"test:index:myComponent", "cp2", nil,
+			template, pulumi.Map{}, newMockPackageMap(),
+		)
+		return err
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"cp1-inner", "cp2-inner"}, innerNames)
+	require.Len(t, innerAliasNames, 2)
+	for _, names := range innerAliasNames {
+		assert.Equal(t, []string{"inner"}, names)
+	}
+}
