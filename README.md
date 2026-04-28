@@ -106,4 +106,4 @@ The specification for the Pulumi YAML format, and documentation for built-in fun
 [Pulumi YAML reference](https://pulumi.com/docs/reference/yaml).
 
 Contribute to the specification by editing [the markdown file in
-pulumi/pulumi-hugo](https://github.com/pulumi/pulumi-hugo/blob/master/themes/default/content/docs/intro/languages/yaml.md).
+pulumi/docs](https://github.com/pulumi/docs/blob/master/content/docs/iac/languages-sdks/yaml/yaml-language-reference.md).
