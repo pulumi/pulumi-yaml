@@ -564,7 +564,7 @@ func RunComponentTemplate(ctx *pulumi.Context,
 		},
 	}
 
-	if err := ctx.RegisterComponentResource(typ, name, component, options); err != nil {
+	if err := ctx.RegisterComponentResourceV2(typ, name, inputs, component, options); err != nil {
 		return pulumi.URNOutput{}, nil, err
 	}
 	component.evaluator.parent = component

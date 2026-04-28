@@ -31,16 +31,14 @@ type componentProvider struct {
 
 	host      *grpc.ClientConn
 	name      string
+	version   string
 	schema    []byte
 	construct provider.ConstructFunc
 }
 
 // GetPluginInfo returns generic information about this plugin, like its version.
 func (p *componentProvider) GetPluginInfo(context.Context, *emptypb.Empty) (*pulumirpc.PluginInfo, error) {
-	// We fill in the version on the engine side for components.
-	return &pulumirpc.PluginInfo{
-		Version: "0.0.0",
-	}, nil
+	return &pulumirpc.PluginInfo{Version: p.version}, nil
 }
 
 // GetSchema returns the JSON-encoded schema for this provider's package.
