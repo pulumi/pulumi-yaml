@@ -11,7 +11,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ettle/strcase"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
@@ -913,7 +912,7 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return g.MustInvoke(f, "")
 	case "fileArchive", "remoteArchive", "assetArchive",
 		"fileAsset", "stringAsset", "remoteAsset":
-		return wrapFn(strcase.ToPascal(f.Name), g.expr(f.Args[0]))
+		return wrapFn(f.Name, g.expr(f.Args[0]))
 	case "join":
 		args := make([]syn.Node, len(f.Args))
 		for i, arg := range f.Args {

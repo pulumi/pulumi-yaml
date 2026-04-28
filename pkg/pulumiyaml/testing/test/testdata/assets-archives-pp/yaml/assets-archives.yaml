@@ -7,61 +7,61 @@ resources:
       bucket: ${siteBucket.id}
       # Reference the s3.Bucket object
       source:
-        fn::FileAsset: file.txt
+        fn::fileAsset: file.txt
   testStringAsset:
     type: aws:s3:BucketObject
     properties:
       bucket: ${siteBucket.id}
       # Reference the s3.Bucket object
       source:
-        fn::StringAsset: <h1>File contents</h1>
+        fn::stringAsset: <h1>File contents</h1>
   testRemoteAsset:
     type: aws:s3:BucketObject
     properties:
       bucket: ${siteBucket.id}
       # Reference the s3.Bucket object
       source:
-        fn::RemoteAsset: https://pulumi.test
+        fn::remoteAsset: https://pulumi.test
   testFileArchive:
     type: aws:lambda:Function
     properties:
       role: ${siteBucket.arn}
       # Reference the s3.Bucket object
       code:
-        fn::FileArchive: file.tar.gz
+        fn::fileArchive: file.tar.gz
   testRemoteArchive:
     type: aws:lambda:Function
     properties:
       role: ${siteBucket.arn}
       # Reference the s3.Bucket object
       code:
-        fn::RemoteArchive: https://pulumi.test/foo.tar.gz
+        fn::remoteArchive: https://pulumi.test/foo.tar.gz
   testAssetArchive:
     type: aws:lambda:Function
     properties:
       role: ${siteBucket.arn}
       # Reference the s3.Bucket object
       code:
-        fn::AssetArchive:
+        fn::assetArchive:
           file.txt:
-            fn::FileAsset: file.txt
+            fn::fileAsset: file.txt
           string.txt:
-            fn::StringAsset: <h1>File contents</h1>
+            fn::stringAsset: <h1>File contents</h1>
           remote.txt:
-            fn::RemoteAsset: https://pulumi.test
+            fn::remoteAsset: https://pulumi.test
           file.tar:
-            fn::FileArchive: file.tar.gz
+            fn::fileArchive: file.tar.gz
           remote.tar:
-            fn::RemoteArchive: https://pulumi.test/foo.tar.gz
+            fn::remoteArchive: https://pulumi.test/foo.tar.gz
           .nestedDir:
-            fn::AssetArchive:
+            fn::assetArchive:
               file.txt:
-                fn::FileAsset: file.txt
+                fn::fileAsset: file.txt
               string.txt:
-                fn::StringAsset: <h1>File contents</h1>
+                fn::stringAsset: <h1>File contents</h1>
               remote.txt:
-                fn::RemoteAsset: https://pulumi.test
+                fn::remoteAsset: https://pulumi.test
               file.tar:
-                fn::FileArchive: file.tar.gz
+                fn::fileArchive: file.tar.gz
               remote.tar:
-                fn::RemoteArchive: https://pulumi.test/foo.tar.gz
+                fn::remoteArchive: https://pulumi.test/foo.tar.gz

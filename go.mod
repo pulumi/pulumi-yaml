@@ -4,7 +4,6 @@ go 1.25.9
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/ettle/strcase v0.1.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/go-multierror v1.1.1
