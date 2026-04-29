@@ -1,0 +1,16 @@
+name: component-alias-test
+runtime: yaml
+resources:
+  myComp:
+    type: aliasplugin:index:withChild
+  # A top-level sibling with the same name AND type as the un-prefixed URN our
+  # auto-alias targets. If the alias were not properly scoped to the component's
+  # parent-type chain, it would also match this resource (or be ambiguous about
+  # which to rebind), which would replace `child`'s random value.
+  child:
+    type: random:RandomString
+    properties:
+      length: 8
+outputs:
+  componentChild: ${myComp.childResult}
+  topLevelChild: ${child.result}

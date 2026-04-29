@@ -1,0 +1,11 @@
+name: aliasplugin
+runtime: yaml
+components:
+  withChild:
+    resources:
+      child:
+        type: random:RandomString
+        properties:
+          length: 8
+    outputs:
+      childResult: ${child.result}

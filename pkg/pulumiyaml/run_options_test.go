@@ -335,7 +335,7 @@ components:
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
 	var innerNames []string
-	var innerAliasNames [][]string
+	var innerAliasURNs [][]string
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			switch args.TypeToken {
@@ -343,15 +343,15 @@ components:
 				return "", resource.PropertyMap{}, nil
 			case testResourceToken:
 				innerNames = append(innerNames, args.Name)
-				var aliasNames []string
+				var aliasURNs []string
 				if args.RegisterRPC != nil {
 					for _, a := range args.RegisterRPC.Aliases {
-						if spec := a.GetSpec(); spec != nil {
-							aliasNames = append(aliasNames, spec.GetName())
+						if u := a.GetUrn(); u != "" {
+							aliasURNs = append(aliasURNs, u)
 						}
 					}
 				}
-				innerAliasNames = append(innerAliasNames, aliasNames)
+				innerAliasURNs = append(innerAliasURNs, aliasURNs)
 				return "innerID", resource.PropertyMap{
 					"foo": resource.NewStringProperty("bar"),
 					"bar": resource.NewStringProperty("baz"),
@@ -379,9 +379,13 @@ components:
 	}
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"cp1-inner", "cp2-inner"}, innerNames)
-	require.Len(t, innerAliasNames, 2)
-	for _, names := range innerAliasNames {
-		assert.Equal(t, []string{"inner"}, names)
+	require.Len(t, innerAliasURNs, 2)
+	// Both instances alias to the same un-prefixed URN — that was the singleton URN
+	// before the fix. Each registration gets exactly one alias entry, scoped via
+	// component-derived URN to its own component instance.
+	expected := "urn:pulumi:stackDev::projectFoo::test:index:myComponent$" + testResourceToken + "::inner"
+	for _, urns := range innerAliasURNs {
+		assert.Equal(t, []string{expected}, urns)
 	}
 }
 
@@ -407,7 +411,7 @@ components:
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
 	var leafName string
-	var leafAliases []string
+	var leafAliasURNs []string
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			switch args.TypeToken {
@@ -417,8 +421,8 @@ components:
 				leafName = args.Name
 				if args.RegisterRPC != nil {
 					for _, a := range args.RegisterRPC.Aliases {
-						if spec := a.GetSpec(); spec != nil {
-							leafAliases = append(leafAliases, spec.GetName())
+						if u := a.GetUrn(); u != "" {
+							leafAliasURNs = append(leafAliasURNs, u)
 						}
 					}
 				}
@@ -444,7 +448,12 @@ components:
 	}
 	require.NoError(t, err)
 	assert.Equal(t, "outer-inner-leaf", leafName)
-	assert.Equal(t, []string{"leaf"}, leafAliases)
+	// The alias URN is derived from the parent component's URN (whose name is
+	// "outer-inner"), confirming the alias is scoped under the nested component.
+	assert.Equal(t,
+		[]string{"urn:pulumi:stackDev::projectFoo::test:index:myComponent$" + testResourceToken + "::leaf"},
+		leafAliasURNs,
+	)
 }
 
 // TestComponentResourceExplicitName verifies that an explicit `name:` field on a
@@ -467,7 +476,7 @@ components:
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
 	var registeredName string
-	var aliases []string
+	var aliasURNs []string
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			switch args.TypeToken {
@@ -477,8 +486,8 @@ components:
 				registeredName = args.Name
 				if args.RegisterRPC != nil {
 					for _, a := range args.RegisterRPC.Aliases {
-						if spec := a.GetSpec(); spec != nil {
-							aliases = append(aliases, spec.GetName())
+						if u := a.GetUrn(); u != "" {
+							aliasURNs = append(aliasURNs, u)
 						}
 					}
 				}
@@ -502,7 +511,10 @@ components:
 	}
 	require.NoError(t, err)
 	assert.Equal(t, "cp1-customName", registeredName)
-	assert.Equal(t, []string{"customName"}, aliases)
+	assert.Equal(t,
+		[]string{"urn:pulumi:stackDev::projectFoo::test:index:myComponent$" + testResourceToken + "::customName"},
+		aliasURNs,
+	)
 }
 
 // TestComponentResourceUserAliasesCombined verifies that a user-supplied alias on a
@@ -527,7 +539,8 @@ components:
 `
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
-	var aliases []string
+	var aliasNames []string
+	var aliasURNs []string
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 			switch args.TypeToken {
@@ -536,8 +549,11 @@ components:
 			case testResourceToken:
 				if args.RegisterRPC != nil {
 					for _, a := range args.RegisterRPC.Aliases {
-						if spec := a.GetSpec(); spec != nil {
-							aliases = append(aliases, spec.GetName())
+						if u := a.GetUrn(); u != "" {
+							aliasURNs = append(aliasURNs, u)
+						}
+						if spec := a.GetSpec(); spec != nil && spec.GetName() != "" {
+							aliasNames = append(aliasNames, spec.GetName())
 						}
 					}
 				}
@@ -560,9 +576,13 @@ components:
 		requireNoErrors(t, template, diags)
 	}
 	require.NoError(t, err)
-	// Both aliases must be present: the user-supplied one and the auto-generated one
-	// for backwards compatibility with un-prefixed stacks.
-	assert.ElementsMatch(t, []string{"legacyName", "inner"}, aliases)
+	// Both aliases must be present: the user-supplied Name-only one and the
+	// auto-generated URN-scoped one for backwards compatibility with un-prefixed stacks.
+	assert.Equal(t, []string{"legacyName"}, aliasNames)
+	assert.Equal(t,
+		[]string{"urn:pulumi:stackDev::projectFoo::test:index:myComponent$" + testResourceToken + "::inner"},
+		aliasURNs,
+	)
 }
 
 // TestComponentResourceProviderAndRead verifies that the prefix logic also applies on
@@ -587,9 +607,9 @@ components:
 	template := yamlTemplate(t, strings.TrimSpace(text))
 
 	type observation struct {
-		name    string
-		read    bool
-		aliases []string
+		name      string
+		read      bool
+		aliasURNs []string
 	}
 	var observed []observation
 	mocks := &testMonitor{
@@ -604,8 +624,8 @@ components:
 				}
 				if args.RegisterRPC != nil {
 					for _, a := range args.RegisterRPC.Aliases {
-						if spec := a.GetSpec(); spec != nil {
-							obs.aliases = append(obs.aliases, spec.GetName())
+						if u := a.GetUrn(); u != "" {
+							obs.aliasURNs = append(obs.aliasURNs, u)
 						}
 					}
 				}
@@ -642,6 +662,9 @@ components:
 	require.NotNil(t, providerObs, "expected provider resource registered as cp1-myProvider; got %+v", observed)
 	require.NotNil(t, readObs, "expected read resource registered as cp1-readMe; got %+v", observed)
 	assert.False(t, providerObs.read, "provider resource should not be a read")
-	assert.Equal(t, []string{"myProvider"}, providerObs.aliases)
+	assert.Equal(t,
+		[]string{"urn:pulumi:stackDev::projectFoo::test:index:myComponent$pulumi:providers:test::myProvider"},
+		providerObs.aliasURNs,
+	)
 	assert.True(t, readObs.read, "readMe should go through the read path (Get.Id was set)")
 }
