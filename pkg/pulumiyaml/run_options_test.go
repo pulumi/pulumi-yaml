@@ -668,3 +668,99 @@ components:
 	)
 	assert.True(t, readObs.read, "readMe should go through the read path (Get.Id was set)")
 }
+
+// TestComponentResourceAliasSuppressedOnSiblingCollision verifies that when a child's
+// post-fix name would equal another sibling's literal pre-fix name, the auto-alias is
+// suppressed for that child to avoid emitting an alias whose target URN duplicates the
+// sibling's current URN — which the engine would reject as an ambiguous claim. The
+// sibling's own alias still gets emitted.
+//
+// Component "Outer" with siblings "child" and "res-child", instantiated as "res":
+//   - "child"     → post-fix "res-child"     ; alias would target "::child"
+//   - "res-child" → post-fix "res-res-child" ; alias targets "::res-child"
+//
+// "child" post-fix URN matches "res-child"'s pre-fix URN, so "child"'s alias must
+// be suppressed.
+func TestComponentResourceAliasSuppressedOnSiblingCollision(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+components:
+  myComponent:
+    resources:
+      child:
+        type: ` + testResourceToken + `
+        properties:
+          foo: bar
+      res-child:
+        type: ` + testResourceToken + `
+        properties:
+          foo: bar
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+
+	type observation struct {
+		name      string
+		aliasURNs []string
+	}
+	var observed []observation
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "test:index:myComponent":
+				return "", resource.PropertyMap{}, nil
+			case testResourceToken:
+				obs := observation{name: args.Name}
+				if args.RegisterRPC != nil {
+					for _, a := range args.RegisterRPC.Aliases {
+						if u := a.GetUrn(); u != "" {
+							obs.aliasURNs = append(obs.aliasURNs, u)
+						}
+					}
+				}
+				observed = append(observed, obs)
+				return "id", resource.PropertyMap{
+					"foo": resource.NewStringProperty("bar"),
+					"bar": resource.NewStringProperty("baz"),
+				}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("unexpected resource type %s", args.TypeToken)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, _, err := RunComponentTemplate(ctx,
+			"test:index:myComponent", "res", nil,
+			template, pulumi.Map{}, newMockPackageMap(),
+		)
+		return err
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	require.NoError(t, err)
+
+	var childObs, resChildObs *observation
+	for i := range observed {
+		switch observed[i].name {
+		case "res-child":
+			childObs = &observed[i]
+		case "res-res-child":
+			resChildObs = &observed[i]
+		}
+	}
+	require.NotNil(t, childObs, "expected post-fix `res-child` (from `child`); got %+v", observed)
+	require.NotNil(t, resChildObs, "expected post-fix `res-res-child` (from `res-child`); got %+v", observed)
+
+	// `child` (post-fix `res-child`) must NOT carry an alias — its target URN
+	// would collide with `res-child` sibling's pre-fix URN.
+	assert.Empty(t, childObs.aliasURNs,
+		"child's alias must be suppressed to avoid colliding with sibling's pre-fix URN")
+
+	// `res-child` (post-fix `res-res-child`) keeps its alias to the un-prefixed URN.
+	assert.Equal(t,
+		[]string{"urn:pulumi:stackDev::projectFoo::test:index:myComponent$" + testResourceToken + "::res-child"},
+		resChildObs.aliasURNs,
+	)
+}
