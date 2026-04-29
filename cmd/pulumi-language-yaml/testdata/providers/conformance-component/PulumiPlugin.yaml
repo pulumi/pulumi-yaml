@@ -1,0 +1,17 @@
+name: conformance-component
+version: 22.0.0
+runtime: yaml
+components:
+  Simple:
+    inputs:
+      value:
+        type: boolean
+    resources:
+      child:
+        type: simple:index:Resource
+        properties:
+          value: false
+        options:
+          version: 2.0.0
+    outputs:
+      value: ${value}

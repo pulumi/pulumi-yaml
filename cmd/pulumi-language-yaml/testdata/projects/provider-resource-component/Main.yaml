@@ -1,0 +1,10 @@
+resources:
+  res:
+    type: conformance-component:Simple
+    properties:
+      value: true
+  # Make a simple resource so that plugin detection works.
+  simpleResource:
+    type: simple:Resource
+    properties:
+      value: false

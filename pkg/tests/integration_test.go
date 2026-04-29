@@ -221,6 +221,79 @@ func TestAuthoredComponent(t *testing.T) {
 	require.Len(t, strings.TrimSuffix(stdout, "\n"), 8, fmt.Sprintf("expected %s to have 8 characters", stdout))
 }
 
+// TestComponentChildAliasMigration verifies end-to-end that when a stack already exists
+// containing a child resource at the *un-prefixed* URN (the shape produced by code from
+// before the #957 fix), running `pulumi up` with the current YAML runtime rebinds the
+// existing resource via the auto-generated alias instead of creating a fresh one.
+//
+// The program also declares a top-level resource named `child` of the same type
+// (`random:RandomString`) as the un-prefixed inner URN. This pins the alias scope: an
+// alias that was not properly scoped to the component's parent-type chain would either
+// match this top-level sibling (rebinding the wrong resource and leaving the inner one
+// orphaned) or be rejected as ambiguous. A correct URN-based alias only matches the
+// inner child because the parent-type chains differ.
+func TestComponentChildAliasMigration(t *testing.T) {
+	t.Parallel()
+
+	e := ptesting.NewEnvironment(t)
+	defer e.DeleteIfNotFailed()
+
+	e.ImportDirectory(filepath.Join("testdata", "component-alias-migration"))
+
+	e.RunCommand("pulumi", "login", "--cloud-url", e.LocalURL())
+
+	e.CWD = filepath.Join(e.RootPath, "program")
+	e.RunCommand("pulumi", "stack", "init", "organization/component-alias-test/test")
+	e.RunCommand("pulumi", "package", "add", "../provider")
+
+	// Step 1: initial up. Under the current code this produces:
+	//   - a top-level `child` at  ...pulumi:Stack$random:RandomString::child
+	//   - an inner child at      ...withChild$random:RandomString::myComp-child
+	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
+
+	originalComponentChild, _ := e.RunCommand("pulumi", "stack", "output", "componentChild")
+	originalComponentChild = strings.TrimSuffix(originalComponentChild, "\n")
+	require.Len(t, originalComponentChild, 8, "component child output should be 8 characters")
+
+	originalTopLevelChild, _ := e.RunCommand("pulumi", "stack", "output", "topLevelChild")
+	originalTopLevelChild = strings.TrimSuffix(originalTopLevelChild, "\n")
+	require.Len(t, originalTopLevelChild, 8, "top-level child output should be 8 characters")
+
+	// Step 2: rewrite the stack state so the inner child sits at the un-prefixed URN
+	// (".../withChild$random:RandomString::child"), simulating a stack created before the
+	// #957 fix. We deliberately don't touch the top-level `child`, whose URN already ends
+	// in `::child` but is parented by the Stack type rather than the component type.
+	stateJSON, _ := e.RunCommand("pulumi", "stack", "export")
+	const prefixedSuffix = "$random:index/randomString:RandomString::myComp-child"
+	const unprefixedSuffix = "$random:index/randomString:RandomString::child"
+	require.Contains(t, stateJSON, prefixedSuffix,
+		"expected initial state to contain the prefixed child URN")
+	rewritten := strings.ReplaceAll(stateJSON, prefixedSuffix, unprefixedSuffix)
+	require.NotEqual(t, stateJSON, rewritten, "expected state rewrite to change the URN")
+
+	rewrittenPath := filepath.Join(e.CWD, "rewritten-state.json")
+	require.NoError(t, os.WriteFile(rewrittenPath, []byte(rewritten), 0o600))
+	e.RunCommand("pulumi", "stack", "import", "--file", rewrittenPath)
+
+	// Step 3: run `pulumi up` again. With a correctly-scoped alias URN the engine should
+	// recognize only the *inner* un-prefixed `child` (parent type withChild) and rebind
+	// it under the new prefixed name. The top-level `child` (parent type Stack) must
+	// remain untouched.
+	e.RunCommand("pulumi", "up", "--non-interactive", "--skip-preview", "--yes")
+
+	// Both outputs must equal their pre-migration values: the alias correctly migrated
+	// the inner child, and the alias did NOT spuriously match the top-level sibling.
+	migratedComponentChild, _ := e.RunCommand("pulumi", "stack", "output", "componentChild")
+	migratedComponentChild = strings.TrimSuffix(migratedComponentChild, "\n")
+	assert.Equal(t, originalComponentChild, migratedComponentChild,
+		"expected alias to rebind the inner child; got a fresh random value")
+
+	migratedTopLevelChild, _ := e.RunCommand("pulumi", "stack", "output", "topLevelChild")
+	migratedTopLevelChild = strings.TrimSuffix(migratedTopLevelChild, "\n")
+	assert.Equal(t, originalTopLevelChild, migratedTopLevelChild,
+		"top-level child must be untouched; alias scope leaked outside the component")
+}
+
 func TestRemoteComponent(t *testing.T) {
 	t.Parallel()
 

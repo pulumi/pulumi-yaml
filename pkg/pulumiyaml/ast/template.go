@@ -708,6 +708,7 @@ type TemplateDecl struct {
 	Name          *StringExpr
 	Namespace     *StringExpr
 	Description   *StringExpr
+	Version       *StringExpr
 	Pulumi        PulumiDecl
 	Configuration ConfigMapDecl
 	Config        ConfigMapDecl
@@ -874,10 +875,14 @@ func (d *TemplateDecl) GenerateSchema() (schema.PackageSpec, error) {
 	if d.Namespace != nil {
 		namespace = d.Namespace.Value
 	}
+	version := "0.0.0"
+	if d.Version != nil && d.Version.Value != "" {
+		version = d.Version.Value
+	}
 	schemaDef := schema.PackageSpec{
 		Name:        d.Name.Value,
 		Description: description,
-		Version:     "0.0.0",
+		Version:     version,
 		Namespace:   namespace,
 		Language: map[string]schema.RawMessage{
 			"nodejs": schema.RawMessage(`{"respectSchemaVersion": true}`),

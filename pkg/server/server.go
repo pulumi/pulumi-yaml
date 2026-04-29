@@ -37,6 +37,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/logging"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/rpcutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
@@ -382,9 +383,19 @@ func (host *yamlLanguageHost) RunPlugin(
 
 	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
 	// time RunWithContext returns we should be done with all async work.
-	loader, err := pulumiyaml.NewPackageLoader(nil, nil)
-	if err != nil {
-		return err
+	var loader pulumiyaml.PackageLoader
+	if req.LoaderTarget != "" {
+		schemaLoader, lerr := schema.NewLoaderClient(req.LoaderTarget)
+		if lerr != nil {
+			return lerr
+		}
+		defer contract.IgnoreClose(schemaLoader)
+		loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(schema.NewCachedLoader(schemaLoader))
+	} else {
+		loader, err = pulumiyaml.NewPackageLoader(nil, nil)
+		if err != nil {
+			return err
+		}
 	}
 	defer loader.Close()
 
@@ -404,23 +415,30 @@ func (host *yamlLanguageHost) RunPlugin(
 		return fmt.Errorf("fatal: could not connect to host RPC: %w", err)
 	}
 
-	// If we have a host cancel our cancellation context if it fails the healthcheck
-	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel our gRPC server when either the engine fails its healthcheck or the RunPlugin RPC
+	// itself is cancelled by the engine (e.g. when the engine is done with this plugin instance).
+	// Without the latter, this in-process plugin would stay alive for the entire engine lifetime.
+	healthCtx, cancel := context.WithCancel(server.Context())
 	// map the context Done channel to the rpcutil boolean cancel channel
 	cancelChannel = make(chan bool)
 	go func() {
-		<-ctx.Done()
+		<-healthCtx.Done()
 		close(cancelChannel)
 	}()
-	err = rpcutil.Healthcheck(ctx, host.engineAddress, 5*time.Minute, cancel)
+	err = rpcutil.Healthcheck(healthCtx, host.engineAddress, 5*time.Minute, cancel)
 	if err != nil {
 		return fmt.Errorf("could not start health check host RPC server: %w", err)
 	}
 
+	var templateVersion string
+	if template.Version != nil {
+		templateVersion = template.Version.Value
+	}
 	prov := &componentProvider{
-		host:   providerHost.EngineConn(),
-		name:   template.Name.Value,
-		schema: jsonSchema,
+		host:    providerHost.EngineConn(),
+		name:    template.Name.Value,
+		version: templateVersion,
+		schema:  jsonSchema,
 		construct: func(ctx *pulumi.Context, typ, name string, inputs providersdk.ConstructInputs,
 			options pulumi.ResourceOption,
 		) (*providersdk.ConstructResult, error) {

@@ -564,7 +564,7 @@ func RunComponentTemplate(ctx *pulumi.Context,
 		},
 	}
 
-	if err := ctx.RegisterComponentResource(typ, name, component, options); err != nil {
+	if err := ctx.RegisterComponentResourceV2(typ, name, inputs, component, options); err != nil {
 		return pulumi.URNOutput{}, nil, err
 	}
 	component.evaluator.parent = component
@@ -1886,6 +1886,50 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	resourceName := k
 	if v.Name != nil && v.Name.Value != "" {
 		resourceName = v.Name.Value
+	}
+
+	// When evaluating inside a component, prefix child resource names with the
+	// component instance name so multiple instances of the same component don't
+	// collide on URN.
+	//
+	// For backwards compatibility (pre 1.33.0), emit an alias to the un-prefixed URN
+	// so existing single-instance stacks migrate without replacement. Suppress the
+	// alias when its target URN's name would also be the post-fix URN name of
+	// another sibling in the same component — emitting it would create an
+	// ambiguous alias claim that the engine would reject.
+	if e.parent != nil {
+		originalName := resourceName
+		resourceName = e.parent.PulumiResourceName() + "-" + resourceName
+
+		// Walk siblings in this component template once to detect alias collisions.
+		// If this resource's post-fix name (resourceName) is also the literal pre-fix
+		// name of another sibling in the component, the sibling's auto-alias would
+		// target the same URN as this resource's *current* URN — and the engine
+		// would reject the conflicting alias claim. Suppress this resource's alias
+		// in that case so the sibling's alias remains unambiguous.
+		aliasCollidesWithSibling := false
+		for _, sibling := range e.Runner.t.GetResources().Entries {
+			if sibling.Key.Value == k {
+				continue
+			}
+			siblingName := sibling.Key.Value
+			if sibling.Value.Name != nil && sibling.Value.Name.Value != "" {
+				siblingName = sibling.Value.Name.Value
+			}
+			if siblingName == resourceName {
+				aliasCollidesWithSibling = true
+				break
+			}
+		}
+
+		if !aliasCollidesWithSibling {
+			resourceType := tokens.Type(typ)
+			aliasURN := e.parent.URN().ApplyT(func(parentURN pulumi.URN) pulumi.URN {
+				p := urn.URN(parentURN)
+				return pulumi.URN(urn.New(p.Stack(), p.Project(), p.QualifiedType(), resourceType, originalName))
+			}).(pulumi.URNOutput)
+			opts = append(opts, pulumi.Aliases([]pulumi.Alias{{URN: aliasURN}}))
+		}
 	}
 
 	var state lateboundResource
