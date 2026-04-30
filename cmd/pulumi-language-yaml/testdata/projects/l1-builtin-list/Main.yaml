@@ -1,0 +1,29 @@
+configuration:
+  aList:
+    type: list<string>
+  singleOrNoneList:
+    type: list<string>
+  aString:
+    type: string
+outputs:
+  elementOutput1:
+    fn::select:
+      - 1
+      - ${aList}
+  elementOutput2:
+    fn::select:
+      - 2
+      - ${aList}
+  joinOutput:
+    fn::join:
+      - '|'
+      - ${aList}
+  lengthOutput:
+    fn::length: ${aList}
+  splitOutput:
+    fn::split:
+      - '-'
+      - ${aString}
+  # Wrap in list to avoid unsafe-null-output (see l1-builtin-try/main.pp).
+  singleOrNoneOutput:
+    - fn::singleOrNone: ${singleOrNoneList}

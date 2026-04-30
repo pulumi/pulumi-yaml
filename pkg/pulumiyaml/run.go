@@ -2192,6 +2192,10 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinFileBase64Sha256(x)
 	case *ast.Sha1Expr:
 		return e.evaluateBuiltinSha1(x)
+	case *ast.LengthExpr:
+		return e.evaluateBuiltinLength(x)
+	case *ast.SingleOrNoneExpr:
+		return e.evaluateBuiltinSingleOrNone(x)
 	case *ast.PulumiResourceNameExpr:
 		return e.evaluateBuiltinPulumiResourceName(x)
 	case *ast.PulumiResourceTypeExpr:
@@ -2952,6 +2956,44 @@ func (e *programEvaluator) evaluateBuiltinReadFile(s *ast.ReadFileExpr) (interfa
 	})
 
 	return readFileF(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinLength(s *ast.LengthExpr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Value)
+	if !ok {
+		return nil, false
+	}
+	return e.lift(func(args ...interface{}) (interface{}, bool) {
+		switch v := args[0].(type) {
+		case []interface{}:
+			return float64(len(v)), true
+		case map[string]interface{}:
+			return float64(len(v)), true
+		default:
+			return e.error(s.Value, fmt.Sprintf("fn::length requires a list or map, got %v", typeString(args[0])))
+		}
+	})(expr)
+}
+
+func (e *programEvaluator) evaluateBuiltinSingleOrNone(s *ast.SingleOrNoneExpr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Value)
+	if !ok {
+		return nil, false
+	}
+	return e.lift(func(args ...interface{}) (interface{}, bool) {
+		list, ok := args[0].([]interface{})
+		if !ok {
+			return e.error(s.Value, fmt.Sprintf("fn::singleOrNone requires a list, got %v", typeString(args[0])))
+		}
+		switch len(list) {
+		case 0:
+			return nil, true
+		case 1:
+			return list[0], true
+		default:
+			return e.error(s.Value, fmt.Sprintf("fn::singleOrNone expected a list of 0 or 1 elements, got %d", len(list)))
+		}
+	})(expr)
 }
 
 func (e *programEvaluator) evaluateBuiltinFileBase64(s *ast.FileBase64Expr) (interface{}, bool) {

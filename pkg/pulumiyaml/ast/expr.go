@@ -787,6 +787,38 @@ func parseSha1(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, synt
 	return Sha1Syntax(node, name, args), nil
 }
 
+type LengthExpr struct {
+	builtinNode
+	Value Expr
+}
+
+func LengthSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *LengthExpr {
+	return &LengthExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
+func parseLength(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return LengthSyntax(node, name, args), nil
+}
+
+type SingleOrNoneExpr struct {
+	builtinNode
+	Value Expr
+}
+
+func SingleOrNoneSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *SingleOrNoneExpr {
+	return &SingleOrNoneExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
+func parseSingleOrNone(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return SingleOrNoneSyntax(node, name, args), nil
+}
+
 type PulumiResourceNameExpr struct {
 	builtinNode
 	Resource Expr
@@ -869,6 +901,10 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::filebase64sha256", parseFileBase64Sha256)
 	case "fn::sha1":
 		set("fn::sha1", parseSha1)
+	case "fn::length":
+		set("fn::length", parseLength)
+	case "fn::singleornone":
+		set("fn::singleOrNone", parseSingleOrNone)
 	case "fn::pulumiresourcename":
 		set("fn::pulumiResourceName", parsePulumiResourceName)
 	case "fn::pulumiresourcetype":

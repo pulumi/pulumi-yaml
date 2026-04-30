@@ -486,6 +486,18 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "sha1",
 			Args: []model.Expression{val},
 		}, vdiags
+	case *ast.LengthExpr:
+		val, vdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "length",
+			Args: []model.Expression{val},
+		}, vdiags
+	case *ast.SingleOrNoneExpr:
+		val, vdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "singleOrNone",
+			Args: []model.Expression{val},
+		}, vdiags
 	case *ast.PulumiResourceNameExpr:
 		res, rdiags := imp.importExpr(node.Resource, nil)
 		return &model.FunctionCallExpression{

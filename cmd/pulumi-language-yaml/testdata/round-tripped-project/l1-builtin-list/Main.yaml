@@ -1,0 +1,22 @@
+configuration:
+  aList:
+    type: list<string>
+  singleOrNoneList:
+    type: list<string>
+  aString:
+    type: string
+outputs:
+  elementOutput1: ${aList[1]}
+  elementOutput2: ${aList[2]}
+  joinOutput:
+    fn::join:
+      - '|'
+      - ${aList}
+  lengthOutput:
+    fn::length: ${aList}
+  splitOutput:
+    fn::split:
+      - '-'
+      - ${aString}
+  singleOrNoneOutput:
+    - fn::singleOrNone: ${singleOrNoneList}

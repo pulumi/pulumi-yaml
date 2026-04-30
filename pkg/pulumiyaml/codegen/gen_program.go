@@ -920,7 +920,7 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		}
 		return wrapFn("join", syn.List(args...))
 	case "split":
-		return wrapFn("split", syn.List(g.expr(f.Args[1]), g.expr(f.Args[0])))
+		return wrapFn("split", syn.List(g.expr(f.Args[0]), g.expr(f.Args[1])))
 	case "toBase64":
 		return wrapFn("toBase64", g.expr(f.Args[0]))
 	case "fromBase64":
@@ -943,6 +943,10 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("secret", g.expr(f.Args[0]))
 	case "sha1":
 		return wrapFn("sha1", g.expr(f.Args[0]))
+	case "length":
+		return wrapFn("length", g.expr(f.Args[0]))
+	case "singleOrNone":
+		return wrapFn("singleOrNone", g.expr(f.Args[0]))
 	case "pulumiResourceName":
 		return wrapFn("pulumiResourceName", g.expr(f.Args[0]))
 	case "pulumiResourceType":
