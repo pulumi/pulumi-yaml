@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Support the pulumiresourcename and pulumiresourcetype functions
-time: 2026-04-25T11:37:31.333419+01:00
-custom:
-    PR: "1060"
