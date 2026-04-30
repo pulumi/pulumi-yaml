@@ -15,5 +15,5 @@ resources:
         fn::select:
           - 0
           - fn::split:
-              - '-'
               - '{}-foo'
+              - '-'
