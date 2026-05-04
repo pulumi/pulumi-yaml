@@ -1173,6 +1173,8 @@ func (r *Runner) Run(e Evaluator) syntax.Diagnostics {
 	switch eval := e.(type) {
 	case programEvaluator:
 		ctx = eval.pulumiCtx
+	case *componentEvaluator:
+		ctx = eval.evaluator.pulumiCtx
 	}
 	r.ensureSetup(ctx)
 

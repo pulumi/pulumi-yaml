@@ -130,6 +130,10 @@ var expectedFailures = map[string]string{
 	"provider-alias-component":               "needs YAML testdata for the Simple component provider plus alias-migration support",
 	"provider-ignore-changes-component":      "needs YAML testdata for the Simple component provider plus ignoreChanges support",
 	"provider-replacement-trigger-component": "needs YAML testdata for the Simple component provider plus replaceOnChanges support",
+
+	"l1-stack-reference":      "Unknown Function; YAML does not support fn::unsecret",
+	"l2-resource-read":        "*pcl.ReadResource generation unimplemented",
+	"l2-component-call-plain": "Unknown Function; YAML does not support fn::call",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
