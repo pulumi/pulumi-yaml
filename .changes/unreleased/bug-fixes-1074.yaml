@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Resolve `${pulumi.organization}`, `${pulumi.project}`, and `${pulumi.stack}` inside YAML components
+time: 2026-05-04T21:43:08.876684+02:00
+custom:
+    PR: "1074"
