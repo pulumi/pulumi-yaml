@@ -1,0 +1,9 @@
+name: builtin-info-component
+version: 37.0.0
+runtime: yaml
+components:
+  BuiltinInfo:
+    outputs:
+      organization: ${pulumi.organization}
+      project: ${pulumi.project}
+      stack: ${pulumi.stack}
