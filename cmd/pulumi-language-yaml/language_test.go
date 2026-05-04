@@ -126,6 +126,10 @@ var expectedFailures = map[string]string{
 	"l2-resource-option-custom-timeouts": "Failing after updating to 3.232",
 	"l2-name-conflicts":                  "Failing after updating to 3.232",
 	"l2-index-mod":                       "Failing after updating to 3.232",
+
+	"provider-alias-component":               "needs YAML testdata for the Simple component provider plus alias-migration support",
+	"provider-ignore-changes-component":      "needs YAML testdata for the Simple component provider plus ignoreChanges support",
+	"provider-replacement-trigger-component": "needs YAML testdata for the Simple component provider plus replaceOnChanges support",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
@@ -177,6 +181,7 @@ func TestLanguage(t *testing.T) {
 		TemporaryDirectory:    rootDir,
 		SnapshotDirectory:     snapshotDir,
 		ConverterPluginTarget: fmt.Sprintf("127.0.0.1:%d", handle.Port),
+		ProvidersDirectory:    "testdata/providers",
 	})
 	require.NoError(t, err)
 
@@ -189,10 +194,6 @@ func TestLanguage(t *testing.T) {
 			if strings.HasPrefix(tt, "policy-") {
 				t.Skip("YAML does not support policy tests")
 			}
-			if strings.HasPrefix(tt, "provider-") {
-				t.Skip("YAML does not support provider tests")
-			}
-
 			if expected, ok := expectedFailures[tt]; ok {
 				t.Skipf("Skipping known failure: %s", expected)
 			}

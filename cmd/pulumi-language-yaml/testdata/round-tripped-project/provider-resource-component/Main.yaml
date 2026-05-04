@@ -1,0 +1,9 @@
+resources:
+  res:
+    type: conformance-component:Simple
+    properties:
+      value: true
+  simpleResource:
+    type: simple:Resource
+    properties:
+      value: false
