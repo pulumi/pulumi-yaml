@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Support `filebase64` and `filebase64sha256` intrinsic functions
-time: 2026-04-27T21:41:35.239586+01:00
-custom:
-    PR: "1063"
