@@ -48,3 +48,22 @@ jobs:
           go-version-file: go.mod
       - name: Lint
         run: make lint-copyright
+
+  lint-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check if folder is empty
+        id: folder_check
+        run: |
+          if [ -z "$(ls .changes/unreleased)" ]; then
+            echo "empty=true" >> $GITHUB_OUTPUT
+          else
+            echo "empty=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Check the changelog is batchable
+        # There are changes so check changie will batch them
+        if: steps.folder_check.outputs.empty == 'false'
+        uses: miniscruff/changie-action@v2
+        with:
+          args: batch auto --dry-run
