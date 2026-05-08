@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Allow `fn::join` to accept the result of `fn::split` by returning a generic list rather than a string-typed slice
+time: 2026-05-08T16:24:29+02:00
+custom:
+    PR: "1083"

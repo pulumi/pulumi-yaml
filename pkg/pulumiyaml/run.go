@@ -2796,7 +2796,12 @@ func (e *programEvaluator) evaluateBuiltinSplit(v *ast.SplitExpr) (interface{}, 
 		if !delimOk || !sourceOk {
 			return nil, false
 		}
-		return strings.Split(s, d), true
+		parts := strings.Split(s, d)
+		result := make([]interface{}, len(parts))
+		for i, p := range parts {
+			result[i] = p
+		}
+		return result, true
 	})
 	return split(delimiter, source)
 }
