@@ -37,3 +37,24 @@ resources:
     properties:
       value:
         fn::remoteArchive: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/archive.tar
+outputs:
+  assetOutput:
+    fn::fileAsset: ../test.txt
+  archiveOutput:
+    fn::fileArchive: ../archive.tar
+  assetList:
+    - fn::fileAsset: ../test.txt
+    - fn::stringAsset: file contents
+  archiveList:
+    - fn::fileArchive: ../archive.tar
+    - fn::fileArchive: ../folder
+  assetMap:
+    file:
+      fn::fileAsset: ../test.txt
+    string:
+      fn::stringAsset: file contents
+  archiveMap:
+    tar:
+      fn::fileArchive: ../archive.tar
+    folder:
+      fn::fileArchive: ../folder

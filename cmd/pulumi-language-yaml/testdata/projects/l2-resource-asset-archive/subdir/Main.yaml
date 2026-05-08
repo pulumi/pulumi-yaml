@@ -37,3 +37,28 @@ resources:
     properties:
       value:
         fn::remoteArchive: https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/archive.tar
+outputs:
+  # Plain (non-nested) asset/archive outputs must round-trip through stack
+  # // outputs in every language.
+  assetOutput:
+    fn::fileAsset: ../test.txt
+  archiveOutput:
+    fn::fileArchive: ../archive.tar
+  # Regression test for pulumi/pulumi#16384: array and map of assets/archives
+  # // must compose properly through Go program generation.
+  assetList:
+    - fn::fileAsset: ../test.txt
+    - fn::stringAsset: file contents
+  archiveList:
+    - fn::fileArchive: ../archive.tar
+    - fn::fileArchive: ../folder
+  assetMap:
+    file:
+      fn::fileAsset: ../test.txt
+    string:
+      fn::stringAsset: file contents
+  archiveMap:
+    tar:
+      fn::fileArchive: ../archive.tar
+    folder:
+      fn::fileArchive: ../folder

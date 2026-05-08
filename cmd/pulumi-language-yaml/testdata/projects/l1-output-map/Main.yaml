@@ -3,6 +3,15 @@ outputs:
   strings:
     greeting: Hello, world!
     farewell: Goodbye, world!
+  adversarialStrings:
+    __type: dunder type
+    __internal: dunder internal
+    __provider: dunder provider
+    __version: dunder version
+    "": empty key
+    empty value: ""
+    dunder value: __dunder
+    "Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \e (escape), \a (bell), \0 (null), \U000E0021 (tag space)": "Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \e (escape), \a (bell), \0 (null), \U000E0021 (tag space)"
   numbers:
     '1': 1
     '2': 2
