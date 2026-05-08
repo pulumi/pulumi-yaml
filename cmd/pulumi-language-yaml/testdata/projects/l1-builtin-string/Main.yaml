@@ -1,0 +1,17 @@
+configuration:
+  aString:
+    type: string
+outputs:
+  lengthResult:
+    fn::length: ${aString}
+  splitResult:
+    fn::split:
+      - '-'
+      - ${aString}
+  joinResult:
+    fn::join:
+      - '|'
+      - fn::split:
+          - '-'
+          - ${aString}
+  interpolateResult: prefix-${aString}
