@@ -723,6 +723,19 @@ func SecretSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *SecretE
 	}
 }
 
+type UnsecretExpr struct {
+	builtinNode
+
+	Value Expr
+}
+
+func UnsecretSyntax(node *syntax.ObjectNode, name *StringExpr, args Expr) *UnsecretExpr {
+	return &UnsecretExpr{
+		builtinNode: builtin(node, name, args),
+		Value:       args,
+	}
+}
+
 type ReadFileExpr struct {
 	builtinNode
 	Path Expr
@@ -893,6 +906,8 @@ func tryParseFunction(node *syntax.ObjectNode) (Expr, syntax.Diagnostics, bool) 
 		set("fn::assetArchive", parseAssetArchive)
 	case "fn::secret":
 		set("fn::secret", parseSecret)
+	case "fn::unsecret":
+		set("fn::unsecret", parseUnsecret)
 	case "fn::readfile":
 		set("fn::readFile", parseReadFile)
 	case "fn::filebase64":
@@ -1081,6 +1096,10 @@ func parseStackReference(node *syntax.ObjectNode, name *StringExpr, args Expr) (
 
 func parseSecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
 	return SecretSyntax(node, name, args), nil
+}
+
+func parseUnsecret(node *syntax.ObjectNode, name *StringExpr, args Expr) (Expr, syntax.Diagnostics) {
+	return UnsecretSyntax(node, name, args), nil
 }
 
 // We expect the following format

@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Support `fn::unsecret` to unwrap a secret value, matching PCL's `unsecret()` builtin
+time: 2026-05-08T15:59:05+00:00
+custom:
+    PR: "1086"

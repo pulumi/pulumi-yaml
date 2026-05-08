@@ -1,0 +1,15 @@
+configuration:
+  aSecret:
+    type: string
+    secret: true
+  notSecret:
+    type: string
+outputs:
+  roundtripSecret: ${aSecret}
+  roundtripNotSecret: ${notSecret}
+  double:
+    fn::secret: ${aSecret}
+  open:
+    fn::unsecret: ${aSecret}
+  close:
+    fn::secret: ${notSecret}
