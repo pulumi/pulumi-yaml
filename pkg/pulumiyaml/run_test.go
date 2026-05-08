@@ -977,7 +977,7 @@ func TestSplit(t *testing.T) {
 
 	tests := []struct {
 		input    *ast.SplitExpr
-		expected []string
+		expected []interface{}
 		isOutput bool
 	}{
 		{
@@ -985,21 +985,21 @@ func TestSplit(t *testing.T) {
 				Delimiter: ast.String(","),
 				Source:    ast.String("a,b"),
 			},
-			expected: []string{"a", "b"},
+			expected: []interface{}{"a", "b"},
 		},
 		{
 			input: &ast.SplitExpr{
 				Delimiter: ast.String(","),
 				Source:    ast.String("a"),
 			},
-			expected: []string{"a"},
+			expected: []interface{}{"a"},
 		},
 		{
 			input: &ast.SplitExpr{
 				Delimiter: ast.String(","),
 				Source:    ast.String(""),
 			},
-			expected: []string{""},
+			expected: []interface{}{""},
 		},
 		{
 			input: &ast.SplitExpr{
@@ -1013,13 +1013,17 @@ func TestSplit(t *testing.T) {
 				},
 				Delimiter: ast.String("-"),
 			},
-			expected: []string{"1", "2", "3", "4"},
+			expected: []interface{}{"1", "2", "3", "4"},
 			isOutput: true,
 		},
 	}
 	//nolint:paralleltest // false positive that the "tt" var isn't used, it is via "tt.expected"
 	for _, tt := range tests {
-		t.Run(strings.Join(tt.expected, ","), func(t *testing.T) {
+		name := make([]string, len(tt.expected))
+		for i, p := range tt.expected {
+			name[i] = p.(string)
+		}
+		t.Run(strings.Join(name, ","), func(t *testing.T) {
 			t.Parallel()
 
 			tmpl := template(t, &Template{
