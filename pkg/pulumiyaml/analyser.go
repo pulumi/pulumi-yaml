@@ -1143,6 +1143,9 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	case *ast.SecretExpr:
 		// The type of a secret is the type of its argument
 		tc.exprs[t] = tc.exprs[t.Value]
+	case *ast.UnsecretExpr:
+		// The type of an unsecret is the type of its argument
+		tc.exprs[t] = tc.exprs[t.Value]
 	case *ast.SplitExpr:
 		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
 		tc.assertTypeAssignable(ctx, t.Source, schema.StringType)

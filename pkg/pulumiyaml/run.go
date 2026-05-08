@@ -2232,6 +2232,8 @@ func (e *programEvaluator) evaluateExpr(x ast.Expr) (interface{}, bool) {
 		return e.evaluateBuiltinStackReference(x)
 	case *ast.SecretExpr:
 		return e.evaluateBuiltinSecret(x)
+	case *ast.UnsecretExpr:
+		return e.evaluateBuiltinUnsecret(x)
 	case *ast.ReadFileExpr:
 		return e.evaluateBuiltinReadFile(x)
 	case *ast.FileBase64Expr:
@@ -2957,6 +2959,14 @@ func (e *programEvaluator) evaluateBuiltinSecret(s *ast.SecretExpr) (interface{}
 		return nil, false
 	}
 	return pulumi.ToSecret(expr), true
+}
+
+func (e *programEvaluator) evaluateBuiltinUnsecret(s *ast.UnsecretExpr) (interface{}, bool) {
+	expr, ok := e.evaluateExpr(s.Value)
+	if !ok {
+		return nil, false
+	}
+	return pulumi.Unsecret(pulumi.ToOutput(expr)), true
 }
 
 func (e *programEvaluator) evaluateInterpolatedBuiltinAssetArchive(x, s ast.Expr) (interface{}, bool) {

@@ -941,6 +941,8 @@ func (g *generator) function(f *model.FunctionCallExpression) syn.Node {
 		return wrapFn("filebase64sha256", g.expr(f.Args[0]))
 	case "secret":
 		return wrapFn("secret", g.expr(f.Args[0]))
+	case "unsecret":
+		return wrapFn("unsecret", g.expr(f.Args[0]))
 	case "sha1":
 		return wrapFn("sha1", g.expr(f.Args[0]))
 	case "length":

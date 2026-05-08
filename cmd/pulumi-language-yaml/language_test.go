@@ -101,7 +101,6 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 var expectedFailures = map[string]string{
 	"l1-builtin-can":                 "#721 generation unimplemented",
 	"l1-builtin-object":              "Unknown Function; YAML does not support fn::entries",
-	"l1-builtin-secret":              "Unknown Function; YAML does not support fn::unsecret",
 	"l1-builtin-try":                 "#721 generation unimplemented",
 	"l1-config-secret":               "*model.BinaryOpExpression; Unimplemented! Needed for  aNumber + 1.25",
 	"l1-config-types-object":         "not yet implemented",

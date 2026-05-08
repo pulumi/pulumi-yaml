@@ -307,6 +307,12 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 			Name: "secret",
 			Args: []model.Expression{path},
 		}, pdiags
+	case *ast.UnsecretExpr:
+		path, pdiags := imp.importExpr(node.Args(), nil)
+		return &model.FunctionCallExpression{
+			Name: "unsecret",
+			Args: []model.Expression{path},
+		}, pdiags
 	case *ast.InvokeExpr:
 		var diags syntax.Diagnostics
 
@@ -1241,6 +1247,7 @@ func (imp *importer) assignNames() {
 		"stack",
 		"toBase64",
 		"toJSON",
+		"unsecret",
 	)
 
 	assign := func(name, suffix string) *model.Variable {
