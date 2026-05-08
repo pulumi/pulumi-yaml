@@ -28,6 +28,8 @@ import (
 	"github.com/google/shlex"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/rivo/uniseg"
+
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/urn"
@@ -3020,8 +3022,10 @@ func (e *programEvaluator) evaluateBuiltinLength(s *ast.LengthExpr) (interface{}
 			return float64(len(v)), true
 		case map[string]interface{}:
 			return float64(len(v)), true
+		case string:
+			return float64(uniseg.GraphemeClusterCount(v)), true
 		default:
-			return e.error(s.Value, fmt.Sprintf("fn::length requires a list or map, got %v", typeString(args[0])))
+			return e.error(s.Value, fmt.Sprintf("fn::length requires a list, map, or string, got %v", typeString(args[0])))
 		}
 	})(expr)
 }
