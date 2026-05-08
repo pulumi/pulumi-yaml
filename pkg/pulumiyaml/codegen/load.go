@@ -1147,24 +1147,20 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 
 	if ct := resource.Options.CustomTimeouts; ct != nil {
 		var items []model.ObjectConsItem
-		if ct.Create != nil {
+		addItem := func(name string, expr ast.Expr) {
+			if expr == nil {
+				return
+			}
+			value, vdiags := imp.importExpr(expr, nil)
+			diags.Extend(vdiags...)
 			items = append(items, model.ObjectConsItem{
-				Key:   plainLit("create"),
-				Value: quotedLit(ct.Create.Value),
+				Key:   plainLit(name),
+				Value: value,
 			})
 		}
-		if ct.Update != nil {
-			items = append(items, model.ObjectConsItem{
-				Key:   plainLit("update"),
-				Value: quotedLit(ct.Update.Value),
-			})
-		}
-		if ct.Delete != nil {
-			items = append(items, model.ObjectConsItem{
-				Key:   plainLit("delete"),
-				Value: quotedLit(ct.Delete.Value),
-			})
-		}
+		addItem("create", ct.Create)
+		addItem("update", ct.Update)
+		addItem("delete", ct.Delete)
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "customTimeouts",
 			Value: &model.ObjectConsExpression{Items: items},

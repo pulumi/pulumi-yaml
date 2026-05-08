@@ -1,3 +1,6 @@
+configuration:
+  createTimeout:
+    type: string
 resources:
   noTimeouts:
     type: simple:Resource
@@ -33,3 +36,10 @@ resources:
         create: 2m
         update: 4m
         delete: 1m
+  configTimeout:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      customTimeouts:
+        create: ${createTimeout}
