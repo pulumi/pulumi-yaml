@@ -539,16 +539,16 @@ func Resource(
 type CustomTimeoutsDecl struct {
 	declNode
 
-	Create *StringExpr
-	Update *StringExpr
-	Delete *StringExpr
+	Create Expr
+	Update Expr
+	Delete Expr
 }
 
 func (d *CustomTimeoutsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del *StringExpr) *CustomTimeoutsDecl {
+func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del Expr) *CustomTimeoutsDecl {
 	return &CustomTimeoutsDecl{
 		declNode: declNode{syntax: node},
 		Create:   create,
@@ -557,7 +557,7 @@ func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del *StringEx
 	}
 }
 
-func CustomTimeouts(create, update, del *StringExpr) *CustomTimeoutsDecl {
+func CustomTimeouts(create, update, del Expr) *CustomTimeoutsDecl {
 	return CustomTimeoutsSyntax(nil, create, update, del)
 }
 

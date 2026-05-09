@@ -1,3 +1,7 @@
+config createTimeout string {
+	__logicalName = "createTimeout"
+}
+
 resource noTimeouts "simple:index:Resource" {
 	__logicalName = "noTimeouts"
 	value = true
@@ -45,6 +49,17 @@ resource allTimeouts "simple:index:Resource" {
 			create = "2m",
 			update = "4m",
 			delete = "1m"
+		}
+	}
+}
+
+resource configTimeout "simple:index:Resource" {
+	__logicalName = "configTimeout"
+	value = true
+
+	options {
+		customTimeouts = {
+			create = createTimeout
 		}
 	}
 }

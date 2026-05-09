@@ -1708,14 +1708,30 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 	if v.Options.CustomTimeouts != nil {
 		var cts pulumi.CustomTimeouts
-		if v.Options.CustomTimeouts.Create != nil {
-			cts.Create = v.Options.CustomTimeouts.Create.Value
+		evalTimeout := func(expr ast.Expr, field string, dst *string) bool {
+			if expr == nil {
+				return true
+			}
+			value, ok := e.evaluateExpr(expr)
+			if !ok {
+				return false
+			}
+			s, ok := value.(string)
+			if !ok {
+				e.error(expr, fmt.Sprintf("customTimeouts.%s must be a string, got %v", field, typeString(value)))
+				return false
+			}
+			*dst = s
+			return true
 		}
-		if v.Options.CustomTimeouts.Update != nil {
-			cts.Update = v.Options.CustomTimeouts.Update.Value
+		if !evalTimeout(v.Options.CustomTimeouts.Create, "create", &cts.Create) {
+			overallOk = false
 		}
-		if v.Options.CustomTimeouts.Delete != nil {
-			cts.Delete = v.Options.CustomTimeouts.Delete.Value
+		if !evalTimeout(v.Options.CustomTimeouts.Update, "update", &cts.Update) {
+			overallOk = false
+		}
+		if !evalTimeout(v.Options.CustomTimeouts.Delete, "delete", &cts.Delete) {
+			overallOk = false
 		}
 
 		opts = append(opts, pulumi.Timeouts(&cts))
