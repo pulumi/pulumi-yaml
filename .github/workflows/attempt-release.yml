@@ -94,7 +94,6 @@ jobs:
           sed -i "s|__VERSION__|${VERSION}|g" /tmp/pr-body.md
 
           gh pr create \
-            --draft \
             --base main \
             --head "$BRANCH" \
             --title "Changelog for ${VERSION}" \
