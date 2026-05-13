@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Support `fn::length` on strings, returning the grapheme cluster count to match PCL's `length()` builtin
-time: 2026-05-08T17:25:00+02:00
-custom:
-    PR: "1085"
