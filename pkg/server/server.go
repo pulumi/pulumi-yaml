@@ -647,6 +647,38 @@ func (host *yamlLanguageHost) GenerateProgram(
 	}, nil
 }
 
+func (host *yamlLanguageHost) GenerateSnippet(
+	ctx context.Context, req *pulumirpc.GenerateSnippetRequest,
+) (*pulumirpc.GenerateSnippetResponse, error) {
+	loader, err := schema.NewLoaderClient(req.TargetLoader)
+	if err != nil {
+		return nil, err
+	}
+	defer contract.IgnoreClose(loader)
+
+	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(schema.NewCachedLoader(loader))
+	defer pkgLoader.Close()
+
+	body, diags, err := codegen.ImportSnippet(ctx, req.Token, req.Filename, req.Source, pkgLoader)
+	if err != nil {
+		return nil, err
+	}
+
+	rpcDiagnostics := plugin.HclDiagnosticsToRPCDiagnostics(diags.HCL())
+	if diags.HasErrors() {
+		return &pulumirpc.GenerateSnippetResponse{
+			Diagnostics: rpcDiagnostics,
+		}, nil
+	}
+
+	outFilename := strings.TrimSuffix(req.Filename, filepath.Ext(req.Filename)) + ".pp"
+	return &pulumirpc.GenerateSnippetResponse{
+		Filename:    outFilename,
+		Source:      []byte(fmt.Sprintf("%v", body)),
+		Diagnostics: rpcDiagnostics,
+	}, nil
+}
+
 func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirpc.GeneratePackageRequest) (*pulumirpc.GeneratePackageResponse, error) {
 	// YAML doesn't generally have "SDKs" per-se but we can write out a "lock file" for a given package name and
 	// version, and if using a parameterized package this is necessary so that we have somewhere to save the parameter
