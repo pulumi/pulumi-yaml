@@ -1,6 +1,6 @@
-# Copyright 2024, Pulumi Corporation.  All rights reserved.
+# Copyright 2026, Pulumi Corporation.  All rights reserved.
 
-name: Attempt weekly release
+name: Weekly release
 
 on:
   schedule:
@@ -15,43 +15,40 @@ jobs:
   attempt-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.PULUMI_BOT_TOKEN }}
 
+      - name: Install changie
+        uses: jaxxstorm/action-install-gh-release@v1.5.0
+        with:
+          repo: miniscruff/changie
+
       - name: Check for unreleased changes
         id: check
         run: |
-          # `.gitkeep` is always present; any other file is a pending fragment.
-          pending=$(ls -A .changes/unreleased | grep -v '^\.gitkeep$' || true)
-          if [ -z "$pending" ]; then
-            echo "No unreleased changes — nothing to release this week."
+          # `changie batch auto --dry-run` exits non-zero when there are no fragments;
+          # `|| true` keeps the step alive so we can inspect the message.
+          output=$(changie batch auto --dry-run 2>&1 || true)
+          if [[ "$output" == *"no unreleased changes"* ]]; then
             echo "has-changes=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Pending fragments:"
-            echo "$pending"
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Batch unreleased changes
         if: steps.check.outputs.has-changes == 'true'
-        uses: miniscruff/changie-action@v2
-        with:
-          args: batch auto
+        run: changie batch auto
 
       - name: Merge into CHANGELOG.md
         if: steps.check.outputs.has-changes == 'true'
-        uses: miniscruff/changie-action@v2
-        with:
-          args: merge
+        run: changie merge
 
       - name: Get the new version
         if: steps.check.outputs.has-changes == 'true'
         id: latest
-        uses: miniscruff/changie-action@v2
-        with:
-          args: latest
+        run: echo "output=$(changie latest)" >> "$GITHUB_OUTPUT"
 
       - name: Open release PR
         if: steps.check.outputs.has-changes == 'true'
