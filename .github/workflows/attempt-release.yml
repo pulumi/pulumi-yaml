@@ -107,4 +107,4 @@ jobs:
           token: ${{ secrets.RELEASE_BOT_TOKEN }}
           payload: |
             channel: "#team-iac-core"
-            text: "Release PR for ${{ steps.latest.outputs.output }} ready to merge: ${{ steps.pr.outputs.url }}"
+            text: "`pulumi-yaml` ${{ steps.latest.outputs.output }} release is ready to go! ${{ steps.pr.outputs.url }}"
