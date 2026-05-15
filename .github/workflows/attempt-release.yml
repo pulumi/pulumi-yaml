@@ -55,6 +55,7 @@ jobs:
 
       - name: Open release PR
         if: steps.check.outputs.has-changes == 'true'
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.PULUMI_BOT_TOKEN }}
           VERSION: ${{ steps.latest.outputs.output }}
@@ -69,10 +70,11 @@ jobs:
           git commit -m "Changelog for ${VERSION}"
           git push --force --set-upstream origin "$BRANCH"
 
-          # Skip PR creation if one is already open for this branch — the force-push above refreshed it.
-          existing=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          # If a PR is already open for this branch, the force-push above refreshed it; reuse its URL.
+          existing=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url')
           if [ -n "$existing" ]; then
-            echo "PR #${existing} already open for ${BRANCH}; refreshed the branch and exiting."
+            echo "PR already open: ${existing}; refreshed the branch."
+            echo "url=${existing}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -93,8 +95,30 @@ jobs:
           BODY
           sed -i "s|__VERSION__|${VERSION}|g" /tmp/pr-body.md
 
-          gh pr create \
+          pr_url=$(gh pr create \
             --base main \
             --head "$BRANCH" \
             --title "Changelog for ${VERSION}" \
-            --body-file /tmp/pr-body.md
+            --body-file /tmp/pr-body.md)
+          echo "url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack
+        if: steps.pr.outputs.url != ''
+        env:
+          SLACK_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          VERSION: ${{ steps.latest.outputs.output }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n \
+            --arg channel '#releases' \
+            --arg text "Release PR for ${VERSION} ready to merge: ${PR_URL}" \
+            '{channel: $channel, text: $text}')
+          response=$(curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${SLACK_TOKEN}" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data "$payload")
+          if [ "$(echo "$response" | jq -r '.ok')" != 'true' ]; then
+            echo "Slack API error: $response"
+            exit 1
+          fi
