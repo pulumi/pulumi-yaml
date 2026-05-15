@@ -22,6 +22,8 @@ jobs:
 
       - name: Install changie
         uses: jaxxstorm/action-install-gh-release@v1.5.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           repo: miniscruff/changie
 
@@ -99,7 +101,7 @@ jobs:
             --body-file /tmp/pr-body.md)
           echo "url=${pr_url}" >> "$GITHUB_OUTPUT"
 
-      - name: Notify Slack
+      - name: Notify Slack (release ready)
         if: steps.pr.outputs.url != ''
         uses: slackapi/slack-github-action@v2
         with:
@@ -108,3 +110,13 @@ jobs:
           payload: |
             channel: "#team-iac-core"
             text: "`pulumi-yaml` ${{ steps.latest.outputs.output }} release is ready to go! ${{ steps.pr.outputs.url }}"
+
+      - name: Notify Slack (no changes)
+        if: steps.check.outputs.has-changes == 'false'
+        uses: slackapi/slack-github-action@v2
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          payload: |
+            channel: "#team-iac-core"
+            text: "No `pulumi-yaml` release this week — no unreleased changes."
