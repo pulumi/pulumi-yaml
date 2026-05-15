@@ -104,21 +104,10 @@ jobs:
 
       - name: Notify Slack
         if: steps.pr.outputs.url != ''
-        env:
-          SLACK_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
-          PR_URL: ${{ steps.pr.outputs.url }}
-          VERSION: ${{ steps.latest.outputs.output }}
-        run: |
-          set -euo pipefail
-          payload=$(jq -n \
-            --arg channel '#releases' \
-            --arg text "Release PR for ${VERSION} ready to merge: ${PR_URL}" \
-            '{channel: $channel, text: $text}')
-          response=$(curl -sS -X POST https://slack.com/api/chat.postMessage \
-            -H "Authorization: Bearer ${SLACK_TOKEN}" \
-            -H 'Content-Type: application/json; charset=utf-8' \
-            --data "$payload")
-          if [ "$(echo "$response" | jq -r '.ok')" != 'true' ]; then
-            echo "Slack API error: $response"
-            exit 1
-          fi
+        uses: slackapi/slack-github-action@v2
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          payload: |
+            channel: "#team-iac-core"
+            text: "Release PR for ${{ steps.latest.outputs.output }} ready to merge: ${{ steps.pr.outputs.url }}"
