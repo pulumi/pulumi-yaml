@@ -125,6 +125,10 @@ var expectedFailures = map[string]string{
 	"l2-name-conflicts":                 "Failing after updating to 3.232",
 	"l2-index-mod":                      "Failing after updating to 3.232",
 
+	"l2-resource-hook-ignore-errors": "Failing after updating to 3.239: *pcl.Hook generation unimplemented",
+	"l2-resource-hook-after-failure": "Failing after updating to 3.239: *pcl.Hook generation unimplemented",
+	"l1-config-types-optional":       "Failing after updating to 3.239: YAML runtime rejects 'list<union(none, string)>' config type",
+
 	"provider-alias-component":               "needs YAML testdata for the Simple component provider plus alias-migration support",
 	"provider-ignore-changes-component":      "needs YAML testdata for the Simple component provider plus ignoreChanges support",
 	"provider-replacement-trigger-component": "needs YAML testdata for the Simple component provider plus replaceOnChanges support",
