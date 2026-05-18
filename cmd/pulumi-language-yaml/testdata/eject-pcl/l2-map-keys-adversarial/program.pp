@@ -1,0 +1,48 @@
+invokeResult = invoke("primitive:index:invoke", {
+	boolean = false,
+	float = 2.17,
+	integer = -12,
+	string = "adversarial",
+	numberArray = [
+		0,
+		1
+	],
+	booleanMap = {
+		"__type" = true,
+		"__internal" = false,
+		"__provider" = true,
+		"__version" = false,
+		"" = true,
+		"Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \u001b (escape), \u0007 (bell), \u0000 (null), \U000e0021 (tag space)" = false
+	}
+})
+
+resource res "primitive:index:Resource" {
+	__logicalName = "res"
+	boolean = false
+	float = 2.17
+	integer = -12
+	string = "adversarial"
+	numberArray = [
+		0,
+		1
+	]
+	booleanMap = {
+		"__type" = true,
+		"__internal" = false,
+		"__provider" = true,
+		"__version" = false,
+		"" = true,
+		"Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \u001b (escape), \u0007 (bell), \u0000 (null), \U000e0021 (tag space)" = false
+	}
+}
+
+output resourceBooleanMap {
+	__logicalName = "resourceBooleanMap"
+	value = res.booleanMap
+}
+
+output invokeBooleanMap {
+	__logicalName = "invokeBooleanMap"
+	value = invokeResult.booleanMap
+}

@@ -18,7 +18,7 @@ resources:
       lambda: lambda
       property: property
   lambdaResource:
-    type: keywords:Lambda
+    type: keywords:module:Lambda
     properties:
       builtins: builtins
       lambda: lambda
