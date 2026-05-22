@@ -18,7 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
+	"github.com/blang/semver"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	yamlgen "github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -26,6 +30,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
+	codegenrpc "github.com/pulumi/pulumi/sdk/v3/proto/go/codegen"
 	"github.com/spf13/afero"
 )
 
@@ -67,6 +72,91 @@ func writeProgram(fs afero.Fs, proj *workspace.Project, program *pcl.Program) er
 	}
 
 	return nil
+}
+
+// ConvertSnippet converts a YAML mapping describing the inputs to the resource, function, or
+// provider identified by req.Token into a PCL snippet. Each entry of req.Attributes is parsed as
+// its own YAML expression and rendered as a PCL expression keyed by attribute name, so callers can
+// pass template interpolations, fn::invoke calls, or structured values just like they would inside
+// a snippet body.
+func (*converter) ConvertSnippet(ctx context.Context,
+	req *plugin.ConvertSnippetRequest,
+) (*plugin.ConvertSnippetResponse, error) {
+	if req.Token == "" {
+		return nil, errors.New("ConvertSnippet: token is required")
+	}
+
+	loader, err := schema.NewLoaderClient(req.TargetLoader)
+	if err != nil {
+		return nil, err
+	}
+	defer contract.IgnoreClose(loader)
+
+	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(schema.NewCachedLoader(loader))
+	defer pkgLoader.Close()
+
+	descriptor, err := packageDescriptor(req.Package)
+	if err != nil {
+		return nil, err
+	}
+	pkg, err := pkgLoader.LoadPackage(ctx, descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("loading package %q: %w", descriptor.PackageName(), err)
+	}
+
+	body, bodyDiags, err := yamlgen.ImportSnippet(ctx, req.Token, req.Filename, req.Source, pkg, pkgLoader)
+	if err != nil {
+		return nil, err
+	}
+
+	attrs, attrDiags, err := yamlgen.ImportSnippetAttributes(ctx, req.Attributes, req.Token, pkg, pkgLoader)
+	if err != nil {
+		return nil, err
+	}
+
+	diags := append(bodyDiags.HCL(), attrDiags.HCL()...)
+	if bodyDiags.HasErrors() || attrDiags.HasErrors() {
+		return &plugin.ConvertSnippetResponse{Diagnostics: diags}, nil
+	}
+
+	outFilename := strings.TrimSuffix(req.Filename, filepath.Ext(req.Filename)) + ".pp"
+	return &plugin.ConvertSnippetResponse{
+		Filename:    outFilename,
+		Source:      []byte(fmt.Sprintf("%v", body)),
+		Diagnostics: diags,
+		Attributes:  attrs,
+	}, nil
+}
+
+// packageDescriptor builds a schema.PackageDescriptor from a ConvertSnippet request.
+func packageDescriptor(req *codegenrpc.GetSchemaRequest) (*schema.PackageDescriptor, error) {
+	if req == nil {
+		return nil, errors.New("package descriptor is required")
+	}
+
+	desc := &schema.PackageDescriptor{
+		Name:        req.Package,
+		DownloadURL: req.DownloadUrl,
+	}
+	if req.Version != "" {
+		v, err := semver.Parse(req.Version)
+		if err != nil {
+			return nil, fmt.Errorf("parsing package version %q: %w", req.Version, err)
+		}
+		desc.Version = &v
+	}
+	if p := req.Parameterization; p != nil {
+		pv, err := semver.Parse(p.Version)
+		if err != nil {
+			return nil, fmt.Errorf("parsing parameterization version %q: %w", p.Version, err)
+		}
+		desc.Parameterization = &schema.ParameterizationDescriptor{
+			Name:    p.Name,
+			Version: pv,
+			Value:   p.Value,
+		}
+	}
+	return desc, nil
 }
 
 func (*converter) ConvertProgram(ctx context.Context,

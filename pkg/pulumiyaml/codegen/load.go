@@ -39,6 +39,12 @@ type importer struct {
 	outputs         map[string]*model.Variable
 
 	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
+
+	// snippet is set when converting an isolated YAML fragment rather than a full template.
+	// In that mode there's no surrounding scope to bind references against, so importRef
+	// passes unknown symbols through as scope traversals without diagnosing them — the
+	// snippet's eventual PCL binder is responsible for resolving (or rejecting) them.
+	snippet bool
 }
 
 type packageInfo struct {
@@ -84,10 +90,14 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 		return x, nil
 	}
 
-	return &model.ScopeTraversalExpression{
+	traversal := &model.ScopeTraversalExpression{
 		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: camel(makeLegalIdentifier(name))}},
 		Parts:     []model.Traversable{model.DynamicType},
-	}, syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf("unknown config, variable, or resource '%v'", name), "")}
+	}
+	if imp.snippet {
+		return traversal, nil
+	}
+	return traversal, syntax.Diagnostics{ast.ExprError(node, fmt.Sprintf("unknown config, variable, or resource '%v'", name), "")}
 }
 
 // Handles the special object `pulumi` injected into the global namespace of YAML programs.
