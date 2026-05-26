@@ -136,6 +136,8 @@ var expectedFailures = map[string]string{
 	"l1-stack-reference":      "Unknown Function; YAML does not support fn::unsecret",
 	"l2-resource-read":        "*pcl.ReadResource generation unimplemented",
 	"l2-component-call-plain": "Unknown Function; YAML does not support fn::call",
+
+	"l1-expand-final": "Added by v3.243.0, not yet passing",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
