@@ -3,8 +3,9 @@ resources:
     type: simple:Resource
     properties:
       value: true
-  aliasURN:
+  aliasUrn:
     type: simple:Resource
+    name: aliasURN
     properties:
       value: true
   aliasName:
@@ -20,7 +21,7 @@ resources:
     properties:
       value: true
     options:
-      parent: ${aliasURN}
+      parent: ${aliasUrn}
   aliasType:
     type: component:Custom
     properties:

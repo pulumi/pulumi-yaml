@@ -9,7 +9,7 @@ resource res "config:index:Resource" {
 	text = prov.version
 }
 
-output pluginDownloadURL {
+output pluginDownloadUrl {
 	__logicalName = "pluginDownloadURL"
 	value = prov.pluginDownloadURL
 }

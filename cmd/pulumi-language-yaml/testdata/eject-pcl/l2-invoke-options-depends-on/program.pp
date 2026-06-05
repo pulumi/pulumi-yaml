@@ -4,10 +4,6 @@ data = invoke("simple-invoke:index:myInvoke", {
 	dependsOn = [first]
 })
 
-resource explicitProvider "pulumi:providers:simple-invoke" {
-	__logicalName = "explicitProvider"
-}
-
 resource first "simple-invoke:index:StringResource" {
 	__logicalName = "first"
 	text = "first hello"

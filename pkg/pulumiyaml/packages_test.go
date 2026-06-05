@@ -36,10 +36,8 @@ func TestResolveToken(t *testing.T) {
 			found:    true,
 		},
 		{
-			input: "gcp:iam:IAMMember",
-			// The lower casing of leading acronyms here is unfortunate, but is the expected behaviour.
-			// see https://github.com/pulumi/pulumi-terraform-bridge/blob/759c5f0f03591f698ababc8a983ec92f4218fe99/pkg/tfbridge/tokens/tokens.go#L45-L62 //nolint:lll
-			expected: "gcp:iam/iAMMember:IAMMember",
+			input:    "gcp:iam:IAMMember",
+			expected: "gcp:iam/iammember:IAMMember",
 			found:    true,
 		},
 		{

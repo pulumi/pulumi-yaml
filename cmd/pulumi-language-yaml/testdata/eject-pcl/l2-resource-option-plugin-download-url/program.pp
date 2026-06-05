@@ -1,9 +1,9 @@
-resource withDefaultURL "simple:index:Resource" {
+resource withDefaultUrl "simple:index:Resource" {
 	__logicalName = "withDefaultURL"
 	value = true
 }
 
-resource withExplicitDefaultURL "simple:index:Resource" {
+resource withExplicitDefaultUrl "simple:index:Resource" {
 	__logicalName = "withExplicitDefaultURL"
 	value = true
 
@@ -12,7 +12,7 @@ resource withExplicitDefaultURL "simple:index:Resource" {
 	}
 }
 
-resource withCustomURL1 "simple:index:Resource" {
+resource withCustomUrl1 "simple:index:Resource" {
 	__logicalName = "withCustomURL1"
 	value = true
 
@@ -21,7 +21,7 @@ resource withCustomURL1 "simple:index:Resource" {
 	}
 }
 
-resource withCustomURL2 "simple:index:Resource" {
+resource withCustomUrl2 "simple:index:Resource" {
 	__logicalName = "withCustomURL2"
 	value = false
 
