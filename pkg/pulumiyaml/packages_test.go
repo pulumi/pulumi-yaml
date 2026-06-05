@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/blang/semver"
@@ -37,8 +38,8 @@ func TestResolveToken(t *testing.T) {
 		},
 		{
 			input: "gcp:iam:IAMMember",
-			// The lower casing of leading acronyms here is unfortunate, but is the expected behaviour.
-			// see https://github.com/pulumi/pulumi-terraform-bridge/blob/759c5f0f03591f698ababc8a983ec92f4218fe99/pkg/tfbridge/tokens/tokens.go#L45-L62 //nolint:lll
+			// The schema names the module-qualified segment "iAMMember"; resolution
+			// matches it case-insensitively from the lower-cased shorthand.
 			expected: "gcp:iam/iAMMember:IAMMember",
 			found:    true,
 		},
@@ -61,9 +62,11 @@ func TestResolveToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
+			// The production resolver matches schema tokens case-insensitively and
+			// returns the schema's canonical token, so the mock does the same.
 			actual, found, err := resolveToken(tt.input, func(tk string) (string, bool, error) {
-				if tk == tt.expected {
-					return tk, true, nil
+				if strings.EqualFold(tk, tt.expected) {
+					return tt.expected, true, nil
 				}
 				return "", false, nil
 			})
@@ -77,6 +80,33 @@ func TestResolveToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestResolveTokenLeadingAcronym guards against a casing-sensitivity regression in
+// shorthand token resolution. Provider schemas name the module-qualified segment of a
+// token by lower-casing only the first rune of a leading acronym, e.g. the real
+// guardduty IPSet resource is "aws:guardduty/iPSet:IPSet". The synthesized segment
+// ("ipset") differs in case, so resolution must match case-insensitively.
+//
+// This drives the real ResolveResource path against a bound schema rather than a
+// hand-written resolver, so it exercises the same token lookup used at runtime.
+func TestResolveTokenLeadingAcronym(t *testing.T) {
+	t.Parallel()
+
+	const canonical = "aws:guardduty/iPSet:IPSet"
+	pkg, diags, err := schema.BindSpec(schema.PackageSpec{
+		Name:    "aws",
+		Version: "1.0.0",
+		Resources: map[string]schema.ResourceSpec{
+			canonical: {},
+		},
+	}, nil, schema.ValidationOptions{})
+	require.NoError(t, err)
+	require.False(t, diags.HasErrors(), "%v", diags)
+
+	tk, err := NewResourcePackage(pkg.Reference()).ResolveResource("aws:guardduty:IPSet")
+	require.NoError(t, err)
+	require.Equal(t, ResourceTypeToken(canonical), tk)
 }
 
 // capturingLoader records the descriptor passed to LoadPackage so tests can

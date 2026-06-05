@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"os/exec"
@@ -2006,9 +2007,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	}
 
 	constants := pkg.ResourceConstants(typ)
-	for k, v := range constants {
-		props[k] = v
-	}
+	maps.Copy(props, constants)
 
 	// For a StackReference we always use the name property as ID. We patch up
 	// the resource declaration's ID with this name.

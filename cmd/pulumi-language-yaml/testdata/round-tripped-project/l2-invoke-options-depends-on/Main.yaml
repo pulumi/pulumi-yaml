@@ -1,6 +1,4 @@
 resources:
-  explicitProvider:
-    type: pulumi:providers:simple-invoke
   first:
     type: simple-invoke:StringResource
     properties:

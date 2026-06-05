@@ -13,6 +13,7 @@ import (
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	pkgWorkspace "github.com/pulumi/pulumi/pkg/v3/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
@@ -39,7 +40,8 @@ func newPluginHost() (plugin.Host, error) {
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil, nil)
+	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil,
+		schema.NewLoaderServerFromHost, pkgWorkspace.EnsureLanguageInstalled)
 	if err != nil {
 		return nil, err
 	}

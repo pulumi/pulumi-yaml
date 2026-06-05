@@ -3,8 +3,9 @@ resources:
     type: simple:Resource
     properties:
       value: true
-  aliasURN:
+  aliasUrn:
     type: simple:Resource
+    name: aliasURN
     properties:
       value: true
     options:
@@ -33,7 +34,7 @@ resources:
     options:
       parent: ${parent}
       aliases:
-        - parent: ${aliasURN}
+        - parent: ${aliasUrn}
   aliasType:
     type: simple:Resource
     properties:

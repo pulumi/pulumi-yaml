@@ -1,22 +1,26 @@
 resources:
-  withDefaultURL:
+  withDefaultUrl:
     type: simple:Resource
+    name: withDefaultURL
     properties:
       value: true
-  withExplicitDefaultURL:
+  withExplicitDefaultUrl:
     type: simple:Resource
+    name: withExplicitDefaultURL
     properties:
       value: true
     options:
       pluginDownloadURL: https://github.com/pulumi/pulumi-simple/releases/v$${VERSION}
-  withCustomURL1:
+  withCustomUrl1:
     type: simple:Resource
+    name: withCustomURL1
     properties:
       value: true
     options:
       pluginDownloadURL: https://custom.pulumi.test/provider1
-  withCustomURL2:
+  withCustomUrl2:
     type: simple:Resource
+    name: withCustomURL2
     properties:
       value: false
     options:

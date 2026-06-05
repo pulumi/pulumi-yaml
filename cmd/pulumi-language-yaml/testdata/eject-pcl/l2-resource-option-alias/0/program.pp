@@ -3,7 +3,7 @@ resource parent "simple:index:Resource" {
 	value = true
 }
 
-resource aliasURN "simple:index:Resource" {
+resource aliasUrn "simple:index:Resource" {
 	__logicalName = "aliasURN"
 	value = true
 }
@@ -23,7 +23,7 @@ resource aliasParent "simple:index:Resource" {
 	value = true
 
 	options {
-		parent = aliasURN
+		parent = aliasUrn
 	}
 }
 

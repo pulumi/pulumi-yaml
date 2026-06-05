@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Resolve resource and function type tokens case-insensitively
+time: 2026-06-05T12:30:00.000000+01:00
+custom:
+    PR: "1120"
