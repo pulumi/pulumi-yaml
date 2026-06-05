@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	"github.com/iancoleman/strcase"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
@@ -372,6 +371,24 @@ func (p resourcePackage) resolveProvider(typeName string) (ResourceTypeToken, bo
 	return "", false
 }
 
+// tokenIter is the common surface of schema.ResourcesIter and schema.FunctionsIter
+// that findTokenFold needs.
+type tokenIter interface {
+	Token() string
+	Next() bool
+}
+
+// findTokenFold returns the member's canonical token that matches tk ignoring case.
+// Schema tokens are unique up to casing, so a case-insensitive match is unambiguous.
+func findTokenFold(it tokenIter, tk string) (string, bool) {
+	for it.Next() {
+		if strings.EqualFold(it.Token(), tk) {
+			return it.Token(), true
+		}
+	}
+	return "", false
+}
+
 func resolveToken(typeName string, resolve func(string) (string, bool, error)) (string, bool, error) {
 	typeParts := strings.Split(typeName, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
@@ -398,9 +415,11 @@ func resolveToken(typeName string, resolve func(string) (string, bool, error)) (
 	}
 
 	// A legacy of classic providers is resources with names like `aws:s3/bucket:Bucket`. Here, we
-	// allow the user to enter `aws:s3:Bucket`, and we interpolate in the 3rd label, camel cased.
+	// allow the user to enter `aws:s3:Bucket`, and we interpolate in the 3rd label. The schema's
+	// module-qualified segment differs from the type name only in casing (e.g. `iPSet` for `IPSet`),
+	// and resolve matches case-insensitively, so a lower-cased segment is sufficient.
 	if len(typeParts) == 3 {
-		repeatedSection := strcase.ToLowerCamel(typeParts[2])
+		repeatedSection := strings.ToLower(typeParts[2])
 		alternateName := fmt.Sprintf("%s:%s/%s:%s", typeParts[0], typeParts[1], repeatedSection, typeParts[2])
 		if token, found, err := resolve(alternateName); found {
 			return token, true, nil
@@ -422,6 +441,9 @@ func (p resourcePackage) ResolveResource(typeName string) (ResourceTypeToken, er
 			return res.Token, true, nil
 		} else if err != nil {
 			return "", false, err
+		}
+		if token, found := findTokenFold(p.Resources().Range(), tk); found {
+			return token, true, nil
 		}
 		return "", false, nil
 	})
@@ -446,6 +468,9 @@ func (p resourcePackage) ResolveFunction(typeName string) (FunctionTypeToken, er
 			return fn.Token, true, nil
 		} else if err != nil {
 			return "", false, err
+		}
+		if token, found := findTokenFold(p.Functions().Range(), tk); found {
+			return token, true, nil
 		}
 		return "", false, nil
 	})
