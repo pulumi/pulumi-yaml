@@ -16,6 +16,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	pkgWorkspace "github.com/pulumi/pulumi/pkg/v3/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
@@ -525,7 +526,7 @@ func (p resourcePackage) FunctionTypeHint(typeName FunctionTypeToken) *schema.Fu
 	return f
 }
 
-func (p resourcePackage) ResourceConstants(typeName ResourceTypeToken) map[string]interface{} {
+func (p resourcePackage) ResourceConstants(typeName ResourceTypeToken) map[string]any {
 	_, ok := p.resolveProvider(typeName.String())
 	if ok {
 		prov, err := p.Provider()
@@ -541,8 +542,8 @@ func (p resourcePackage) ResourceConstants(typeName ResourceTypeToken) map[strin
 	return nil
 }
 
-func getResourceConstants(props []*schema.Property) map[string]interface{} {
-	constantProps := map[string]interface{}{}
+func getResourceConstants(props []*schema.Property) map[string]any {
+	constantProps := map[string]any{}
 	for _, v := range props {
 		if v.ConstValue != nil {
 			constantProps[v.Name] = v.ConstValue
@@ -561,7 +562,8 @@ func newResourcePackageHost(plugins *workspace.Plugins, packages map[string]work
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil, nil)
+	pluginCtx, err := plugin.NewContextWithRoot(ctx, sink, sink, nil, cwd, cwd, nil, true, nil, plugins, packages, nil, nil,
+		schema.NewLoaderServerFromHost, pkgWorkspace.EnsureLanguageInstalled)
 	if err != nil {
 		return nil, err
 	}
