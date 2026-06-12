@@ -71,16 +71,13 @@ type yamlLanguageHost struct {
 	engineAddress string
 	tracing       string
 
-	useRPCLoader  bool
 	templateCache map[string]templateCacheEntry
 }
 
-func NewLanguageHost(engineAddress, tracing string, useRPCLoader bool) pulumirpc.LanguageRuntimeServer {
+func NewLanguageHost(engineAddress, tracing string) pulumirpc.LanguageRuntimeServer {
 	return &yamlLanguageHost{
 		engineAddress: engineAddress,
 		tracing:       tracing,
-
-		useRPCLoader:  useRPCLoader,
 		templateCache: make(map[string]templateCacheEntry),
 	}
 }
@@ -215,15 +212,6 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		fmt.Sprintf(`PULUMI_ROOT_DIRECTORY=%s`, req.Info.RootDirectory),
 	}
 
-	projPath, err := workspace.DetectProjectPathFrom(req.Info.RootDirectory)
-	if err != nil {
-		return nil, err
-	}
-	proj, err := workspace.LoadProject(projPath)
-	if err != nil {
-		return nil, err
-	}
-
 	compiler, err := parseCompiler(req.Info.Options.AsMap())
 	if err != nil {
 		return nil, err
@@ -306,20 +294,12 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 
 	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
 	// time RunWithContext returns we should be done with all async work.
-	var loader pulumiyaml.PackageLoader
-	if host.useRPCLoader {
-		rpcLoader, err := schema.NewLoaderClient(req.LoaderTarget)
-		if err != nil {
-			return &pulumirpc.RunResponse{Error: err.Error()}, nil
-		}
-		loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(
-			schema.NewCachedLoader(rpcLoader))
-	} else {
-		loader, err = pulumiyaml.NewPackageLoader(proj.Plugins, proj.GetPackageSpecs())
-		if err != nil {
-			return &pulumirpc.RunResponse{Error: err.Error()}, nil
-		}
+	rpcLoader, err := schema.NewLoaderClient(req.LoaderTarget)
+	if err != nil {
+		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
+	loader := pulumiyaml.NewPackageLoaderFromSchemaLoader(
+		schema.NewCachedLoader(rpcLoader))
 	defer loader.Close()
 
 	// Now instruct the Pulumi Go SDK to run the pulumi YAML interpreter.
@@ -381,22 +361,19 @@ func (host *yamlLanguageHost) RunPlugin(
 	}
 	defer pctx.Close()
 
+	loaderTarget := req.LoaderTarget
+	if loaderTarget == "" {
+		loaderTarget = host.engineAddress
+	}
+	rpcLoader, err := schema.NewLoaderClient(loaderTarget)
+	if err != nil {
+		return err
+	}
+	defer contract.IgnoreClose(rpcLoader)
+
 	// Because of async applies we may need the package loader to outlast the RunTemplate function. But by the
 	// time RunWithContext returns we should be done with all async work.
-	var loader pulumiyaml.PackageLoader
-	if req.LoaderTarget != "" {
-		schemaLoader, lerr := schema.NewLoaderClient(req.LoaderTarget)
-		if lerr != nil {
-			return lerr
-		}
-		defer contract.IgnoreClose(schemaLoader)
-		loader = pulumiyaml.NewPackageLoaderFromSchemaLoader(schema.NewCachedLoader(schemaLoader))
-	} else {
-		loader, err = pulumiyaml.NewPackageLoader(nil, nil)
-		if err != nil {
-			return err
-		}
-	}
+	loader := pulumiyaml.NewPackageLoaderFromSchemaLoader(schema.NewCachedLoader(rpcLoader))
 	defer loader.Close()
 
 	schema, err := template.GenerateSchema()
