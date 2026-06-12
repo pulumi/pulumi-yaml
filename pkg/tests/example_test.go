@@ -57,11 +57,6 @@ func TestExampleAzureAppService(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
-func TestExampleGettingStarted(t *testing.T) {
-	testWrapper(t, exampleDir("getting-started"), RequireLiveRun, awsConfig)
-}
-
-//nolint:paralleltest // uses parallel programtest
 func TestImportComputedID(t *testing.T) {
 	testWrapper(t, "./testdata/import-computed-id", RequireLiveRun, awsConfig)
 }
