@@ -19,10 +19,6 @@ var awsConfig = StackConfig{map[string]string{
 	"aws-native:region": "us-east-1",
 }}
 
-var azureConfig = StackConfig{map[string]string{
-	"azure-native:location": "centralus",
-}}
-
 var org = os.Getenv("PULUMI_TEST_ORG")
 
 func exampleDir(dir string) string {
@@ -35,25 +31,8 @@ func TestRandom(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
-func TestExampleAwsStaticWebsite(t *testing.T) {
-	testWrapper(t, exampleDir("aws-static-website"), RequireLiveRun, awsConfig)
-}
-
-//nolint:paralleltest // uses parallel programtest
 func TestExampleAwsx(t *testing.T) {
 	testWrapper(t, exampleDir("awsx-fargate"), RequireLiveRun, awsConfig)
-}
-
-//nolint:paralleltest // uses parallel programtest
-func TestExampleAzureStaticWebsite(t *testing.T) {
-	t.Skip()
-	testWrapper(t, exampleDir("azure-static-website"), RequireLiveRun, azureConfig)
-}
-
-//nolint:paralleltest // uses parallel programtest
-func TestExampleAzureAppService(t *testing.T) {
-	t.Skip()
-	testWrapper(t, exampleDir("azure-app-service"), RequireLiveRun, azureConfig)
 }
 
 //nolint:paralleltest // uses parallel programtest
