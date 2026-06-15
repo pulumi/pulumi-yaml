@@ -26,6 +26,12 @@ jobs:
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             echo "::error go.mod not tidy"
+            echo "::group::git status"
+            git status --porcelain
+            echo "::endgroup::"
+            echo "::group::git diff"
+            git diff
+            echo "::endgroup::"
             exit 1
           fi
       - name: golangci-lint
