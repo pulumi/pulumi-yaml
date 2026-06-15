@@ -27,6 +27,13 @@ resources:
     options:
       customTimeouts:
         delete: 3m
+  readOnly:
+    type: simple:Resource
+    properties:
+      value: true
+    options:
+      customTimeouts:
+        read: 9m
   allTimeouts:
     type: simple:Resource
     properties:
@@ -36,6 +43,7 @@ resources:
         create: 2m
         update: 4m
         delete: 1m
+        read: 5m
   configTimeout:
     type: simple:Resource
     properties:

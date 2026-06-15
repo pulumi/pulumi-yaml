@@ -138,6 +138,11 @@ var expectedFailures = map[string]string{
 	"l2-component-call-plain": "Unknown Function; YAML does not support fn::call",
 
 	"l1-expand-final": "Added by v3.243.0, not yet passing",
+
+	"l2-primitive-ref-optional":     "Added by v3.246.0: YAML does not support '== null' comparisons or conditional expressions",
+	"l2-provider-config-enum":       "Added by v3.246.0: YAML does not type-check enum values read from a provider's output",
+	"l2-resource-schema-secret":     "Added by v3.246.0: YAML does not mark schema-declared secret outputs as secret",
+	"l2-config-default-from-invoke": "Added by v3.246.0: YAML does not support config defaults derived from an invoke result",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.

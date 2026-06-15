@@ -1734,6 +1734,9 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		if !evalTimeout(v.Options.CustomTimeouts.Delete, "delete", &cts.Delete) {
 			overallOk = false
 		}
+		if !evalTimeout(v.Options.CustomTimeouts.Read, "read", &cts.Read) {
+			overallOk = false
+		}
 
 		opts = append(opts, pulumi.Timeouts(&cts))
 	}

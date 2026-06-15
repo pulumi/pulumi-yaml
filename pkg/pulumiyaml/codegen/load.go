@@ -1171,6 +1171,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		addItem("create", ct.Create)
 		addItem("update", ct.Update)
 		addItem("delete", ct.Delete)
+		addItem("read", ct.Read)
 		resourceOptions.Body.Items = append(resourceOptions.Body.Items, &model.Attribute{
 			Name:  "customTimeouts",
 			Value: &model.ObjectConsExpression{Items: items},

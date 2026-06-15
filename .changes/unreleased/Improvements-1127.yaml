@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add support for the `read` custom timeout on resources (`customTimeouts.read`).
+time: 2026-06-15T15:06:19.000000Z
+custom:
+    PR: "1127"

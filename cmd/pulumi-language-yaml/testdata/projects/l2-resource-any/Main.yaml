@@ -1,0 +1,32 @@
+resources:
+  aString:
+    type: any-handled:Resource
+    properties:
+      value: a string
+  aBoolean:
+    type: any-handled:Resource
+    properties:
+      value: true
+  aNumber:
+    type: any-handled:Resource
+    properties:
+      value: 42
+  aList:
+    type: any-handled:Resource
+    properties:
+      value:
+        - 1
+        - true
+        - three
+  anObject:
+    type: any-handled:Resource
+    properties:
+      value:
+        key: value
+        nested:
+          count: 1
+  anAsset:
+    type: any-handled:Resource
+    properties:
+      value:
+        fn::stringAsset: the asset contents

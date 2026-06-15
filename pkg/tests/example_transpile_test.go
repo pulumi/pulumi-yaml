@@ -38,13 +38,6 @@ var (
 		// PCL does not have stringAssets
 		"getting-started",
 	}
-
-	pclBindOpts = map[string][]pcl.BindOption{
-		// pulumi/pulumi#11572
-		"azure-app-service": {pcl.SkipResourceTypechecking},
-
-		"aws-static-website": {pcl.SkipResourceTypechecking},
-	}
 )
 
 func makeAbs(path string) string {
@@ -164,9 +157,8 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]b
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	bindOpts := append(pclBindOpts[strings.TrimSuffix(fileName, ".pp")],
-		pcl.Loader(rootPluginLoader.ReferenceLoader))
-	_, pdiags, err := pcl.BindProgram(parser.Files, bindOpts...)
+	bindOpts := pcl.Loader(rootPluginLoader.ReferenceLoader)
+	_, pdiags, err := pcl.BindProgram(parser.Files, bindOpts)
 	if err != nil {
 		return []byte(program), diags, err
 	}

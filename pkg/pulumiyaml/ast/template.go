@@ -542,23 +542,25 @@ type CustomTimeoutsDecl struct {
 	Create Expr
 	Update Expr
 	Delete Expr
+	Read   Expr
 }
 
 func (d *CustomTimeoutsDecl) recordSyntax() *syntax.Node {
 	return &d.syntax
 }
 
-func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del Expr) *CustomTimeoutsDecl {
+func CustomTimeoutsSyntax(node *syntax.ObjectNode, create, update, del, read Expr) *CustomTimeoutsDecl {
 	return &CustomTimeoutsDecl{
 		declNode: declNode{syntax: node},
 		Create:   create,
 		Update:   update,
 		Delete:   del,
+		Read:     read,
 	}
 }
 
-func CustomTimeouts(create, update, del Expr) *CustomTimeoutsDecl {
-	return CustomTimeoutsSyntax(nil, create, update, del)
+func CustomTimeouts(create, update, del, read Expr) *CustomTimeoutsDecl {
+	return CustomTimeoutsSyntax(nil, create, update, del, read)
 }
 
 type Template interface {

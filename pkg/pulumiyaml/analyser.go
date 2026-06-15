@@ -1566,6 +1566,9 @@ func (e walker) walkResourceOptions(ctx *evalContext, opts ast.ResourceOptionsDe
 		if !e.walk(ctx, ct.Update) {
 			return false
 		}
+		if !e.walk(ctx, ct.Read) {
+			return false
+		}
 	}
 	return true
 }
