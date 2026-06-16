@@ -547,6 +547,11 @@ func RunComponentTemplate(ctx *pulumi.Context,
 	}
 	runner := newRunner(templ, loader)
 
+	// fill in the package descriptors from the templates package decls
+	if err := runner.setPackageDesciptors(); err != nil {
+		return pulumi.URNOutput{}, nil, err
+	}
+
 	_, diags := TypeCheck(runner)
 	if diags.HasErrors() {
 		return pulumi.URNOutput{}, nil, diags
