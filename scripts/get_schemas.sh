@@ -4,7 +4,7 @@ LIST_ONLY=${LIST_ONLY:-false}
 
 default_url_template='https://raw.githubusercontent.com/pulumi/pulumi-_NAME_/v_VERSION_/provider/cmd/pulumi-resource-_NAME_/schema.json'
 awsx_url='https://raw.githubusercontent.com/pulumi/pulumi-awsx/v_VERSION_/awsx/schema.json'
-function pulumi_schema { echo "$1@$2@https://raw.githubusercontent.com/pulumi/pulumi/master/tests/testdata/codegen/$1-$2.json"; }
+function pulumi_schema { echo "$1@$2@pulumi/tests/testdata/codegen/$1-$2.json"; }
 schemas=(
   "awsx@1.0.0-beta.5@${awsx_url}"
   "random@4.11.2"
@@ -43,8 +43,17 @@ for s in "${schemas[@]}"; do
       fi
   fi
   if [ ! -f "${FILEPATH}" ]; then
-    echo "Downloading ${FILEPATH} FROM ${URL}"
-    curl "${URL}" \
-      | jq ".version = \"${VERSION}\"" > "${FILEPATH}"
+    if [[ "${URL}" == http* ]]; then
+      echo "Downloading ${FILEPATH} from ${URL}"
+      curl "${URL}" \
+        | jq ".version = \"${VERSION}\"" > "${FILEPATH}"
+    else
+      if [ ! -f "${URL}" ]; then
+        echo "Missing ${URL}; run 'git submodule update --init' to fetch it" >&2
+        exit 1
+      fi
+      echo "Copying ${FILEPATH} from ${URL}"
+      jq ".version = \"${VERSION}\"" "${URL}" > "${FILEPATH}"
+    fi
   fi
 done
