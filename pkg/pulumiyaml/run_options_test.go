@@ -12,6 +12,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 )
 
 const fakeName = "foo"
@@ -183,6 +185,74 @@ variables:
 		requireNoErrors(t, template, diags)
 	}
 	assert.NoError(t, err)
+}
+
+func TestComponentParameterizedPackage(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+components:
+  myComponent:
+    resources:
+      playbook:
+        type: ansible:index:Playbook
+`
+	template := yamlTemplate(t, strings.TrimSpace(text))
+	template.Sdks = []packages.PackageDecl{{
+		PackageDeclarationVersion: 1,
+		Name:                      "terraform-provider",
+		Version:                   "0.0.1",
+		Parameterization: &packages.ParameterizationDecl{
+			Name:    "ansible",
+			Version: "1.1.3",
+		},
+	}}
+
+	// A loader that only knows about the base "terraform-provider" package.
+	// Resolving "ansible:index:Playbook" therefore only succeeds if the
+	// component's parameterization descriptor is used to load the package; with
+	// no descriptor the loader falls back to looking up "ansible" and fails.
+	loader := MockPackageLoader{
+		packages: map[string]Package{
+			"terraform-provider": MockPackage{
+				resourceTypeHint: func(typeName string) *schema.ResourceType {
+					return inputProperties(typeName)
+				},
+				isComponent: func(typeName string) (bool, error) {
+					return false, nil
+				},
+			},
+		},
+	}
+
+	playbookCreated := false
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			switch args.TypeToken {
+			case "test:index:myComponent":
+				return "", resource.PropertyMap{}, nil
+			case "ansible:index:Playbook":
+				playbookCreated = true
+				return "playbookID", resource.PropertyMap{}, nil
+			}
+			return "", resource.PropertyMap{}, fmt.Errorf("unexpected resource type %s", args.TypeToken)
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, _, err := RunComponentTemplate(ctx,
+			"test:index:myComponent", "myComp",
+			nil,
+			template, pulumi.Map{}, loader,
+		)
+		return err
+	}, pulumi.WithMocks("projectFoo", "stackDev", mocks))
+	if diags, ok := HasDiagnostics(err); ok {
+		requireNoErrors(t, template, diags)
+	}
+	require.NoError(t, err)
+	assert.True(t, playbookCreated, "expected the parameterized component resource to be created")
 }
 
 func TestComponentResourceParent(t *testing.T) {
