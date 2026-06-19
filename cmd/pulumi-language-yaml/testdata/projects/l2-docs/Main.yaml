@@ -1,0 +1,16 @@
+resources:
+  enumRes:
+    type: enum:Res
+    properties:
+      intEnum: 1
+      stringEnum: one
+  res:
+    type: docs:Resource
+    properties:
+      in:
+        fn::invoke:
+          function: docs:fun
+          arguments:
+            in: false
+          return: out
+      externalEnum: one

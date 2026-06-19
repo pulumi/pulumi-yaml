@@ -1,0 +1,7 @@
+resources:
+  first:
+    type: constant:Resource
+    properties:
+      kind: Constant
+outputs:
+  kind: ${first.kind}

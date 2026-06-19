@@ -16,6 +16,8 @@ resources:
         __version: false
         "": true
         "Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \e (escape), \a (bell), \0 (null), \U000E0021 (tag space)": false
+        ? 'Format and glob specifiers: %percent ...ellipsis {open }close *asterisk ?question ,comma &&and ||or !not =>arrow ==equal :colon /slash'
+        : true
 variables:
   invokeResult:
     fn::invoke:
@@ -35,6 +37,8 @@ variables:
           __version: false
           "": true
           "Some $${common} \"characters\" 'that' need escaping: \\ (backslash), \t (tab), \e (escape), \a (bell), \0 (null), \U000E0021 (tag space)": false
+          ? 'Format and glob specifiers: %percent ...ellipsis {open }close *asterisk ?question ,comma &&and ||or !not =>arrow ==equal :colon /slash'
+          : true
 outputs:
   resourceBooleanMap: ${res.booleanMap}
   invokeBooleanMap: ${invokeResult.booleanMap}

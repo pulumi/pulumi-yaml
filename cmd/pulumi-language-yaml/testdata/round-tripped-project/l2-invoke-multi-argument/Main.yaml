@@ -1,0 +1,14 @@
+outputs:
+  both:
+    fn::invoke:
+      function: multi-argument-invoke:multiArgumentInvoke
+      arguments:
+        first: hello
+        second: world
+      return: result
+  onlyRequired:
+    fn::invoke:
+      function: multi-argument-invoke:multiArgumentInvoke
+      arguments:
+        first: hello
+      return: result
