@@ -9,10 +9,12 @@ import (
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/pulumi/pulumi/pkg/v3/codegen/convert"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
 	hclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	pkghost "github.com/pulumi/pulumi/pkg/v3/host"
 	pkgWorkspace "github.com/pulumi/pulumi/pkg/v3/workspace"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/diag"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
@@ -31,33 +33,45 @@ import (
 // higher-level languages using PCL as an intermediate representation.
 type GenerateFunc func(program *pcl.Program) (map[string][]byte, hcl.Diagnostics, error)
 
-func newPluginHost() (plugin.Host, error) {
+// newPluginContext constructs a plugin context backed by a freshly booted host. The host is owned
+// by the context as far as the caller is concerned, so the returned closer tears down both: the
+// context first, then the host it was bound to.
+func newPluginContext() (*plugin.Context, func(), error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sink := diag.DefaultSink(os.Stderr, os.Stderr, diag.FormatOptions{
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	pluginCtx, err := plugin.NewContext(ctx, sink, sink, nil, nil, cwd, nil, true, nil,
-		schema.NewLoaderServerFromHost, pkgWorkspace.EnsureLanguageInstalled)
+	host, err := pkghost.New(ctx, sink, sink, nil, pkgWorkspace.EnsureLanguageInstalled)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return pluginCtx.Host, nil
+	pluginCtx, err := plugin.NewContext(ctx, sink, sink, host, nil, cwd, nil, true, nil,
+		schema.NewLoaderServerFromContext, convert.NewMapperServerFromContext)
+	if err != nil {
+		contract.IgnoreClose(host)
+		return nil, nil, err
+	}
+	closer := func() {
+		contract.IgnoreClose(pluginCtx)
+		contract.IgnoreClose(host)
+	}
+	return pluginCtx, closer, nil
 }
 
 func ConvertTemplateIL(template *ast.TemplateDecl, loader schema.ReferenceLoader) (string, hcl.Diagnostics, error) {
 	var diags hcl.Diagnostics
 
 	if loader == nil {
-		host, err := newPluginHost()
+		pluginCtx, closer, err := newPluginContext()
 		if err != nil {
 			return "", diags, err
 		}
-		loader = schema.NewPluginLoader(host)
-		defer contract.IgnoreClose(host)
+		defer closer()
+		loader = schema.NewPluginLoader(pluginCtx)
 	}
 
 	pkgLoader := pulumiyaml.NewPackageLoaderFromSchemaLoader(loader)

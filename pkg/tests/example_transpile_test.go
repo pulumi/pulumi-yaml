@@ -123,7 +123,7 @@ func TestGenerateExamples(t *testing.T) {
 }
 
 func newPluginLoader() schema.ReferenceLoader {
-	return schema.NewPluginLoader(utils.NewHost(schemaLoadPath))
+	return schema.NewPluginLoader(utils.NewContext(schemaLoadPath))
 }
 
 type mockPackageLoader struct{ schema.ReferenceLoader }

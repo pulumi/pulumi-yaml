@@ -47,7 +47,7 @@ var providerSchema = pschema.PackageSpec{
 
 	Config: pschema.ConfigSpec{},
 
-	Provider: pschema.ResourceSpec{
+	Provider: &pschema.ResourceSpec{
 		ObjectTypeSpec: pschema.ObjectTypeSpec{
 			Description: "The provider type for the testprovider package.",
 			Type:        "object",
