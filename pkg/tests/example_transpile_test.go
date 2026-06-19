@@ -123,7 +123,23 @@ func TestGenerateExamples(t *testing.T) {
 }
 
 func newPluginLoader() schema.ReferenceLoader {
-	return schema.NewPluginLoader(utils.NewHost(schemaLoadPath))
+	return schema.NewPluginLoader(utils.NewContextWithProviders(schemaLoadPath, testSchemaProviders()...))
+}
+
+// testSchemaProviders are the providers with schema files committed under
+// schemaLoadPath. We register them explicitly rather than relying on
+// utils.NewContext's built-in defaults, which dropped kubernetes and awsx in
+// pulumi v3.247.0.
+func testSchemaProviders() []utils.SchemaProvider {
+	return []utils.SchemaProvider{
+		utils.NewSchemaProvider("aws", "5.4.0"),
+		utils.NewSchemaProvider("awsx", "1.0.0-beta.5"),
+		utils.NewSchemaProvider("kubernetes", "3.7.0"),
+		utils.NewSchemaProvider("other", "0.1.0"),
+		utils.NewSchemaProvider("random", "4.11.2"),
+		utils.NewSchemaProvider("std", "1.0.0"),
+		utils.NewSchemaProvider("using-dashes", "1.0.0"),
+	}
 }
 
 type mockPackageLoader struct{ schema.ReferenceLoader }

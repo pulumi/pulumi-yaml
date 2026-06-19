@@ -41,7 +41,7 @@ func (l testPackageLoader) Close() {}
 
 func newPluginLoader() schema.Loader {
 	schemaLoadPath := filepath.Join("..", "testing", "test", "testdata")
-	return schema.NewPluginLoader(utils.NewHost(schemaLoadPath))
+	return schema.NewPluginLoader(utils.NewContext(schemaLoadPath))
 }
 
 var rootPluginLoader = newPluginLoader()

@@ -670,8 +670,8 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 		}
 		lock.DownloadURL = pkg.PluginDownloadURL
 	} else {
-		lock.Name = pkg.Parameterization.BaseProvider.Name
-		lock.Version = pkg.Parameterization.BaseProvider.Version.String()
+		lock.Name = pkg.Parameterization.BasePlugin.Name
+		lock.Version = pkg.Parameterization.BasePlugin.Version.String()
 		lock.DownloadURL = pkg.PluginDownloadURL
 		if pkg.Version == nil {
 			return nil, errors.New("parameterized package must have a version")

@@ -23,8 +23,18 @@ resources:
         stringMap:
           x: '100'
           y: '200'
+        innerDataList:
+          - boolean: false
+            float: 3.14
+            integer: 42
+            string: Partridge
+            boolArray:
+              - true
+            stringMap:
+              one: in a pear tree
 outputs:
   bool: ${res.data.boolean}
   array: ${res.data.boolArray[0]}
   map: ${res.data.stringMap.x}
   nested: ${res.data.innerData.stringMap.three}
+  listIndex: ${res.data.innerDataList[0].string}

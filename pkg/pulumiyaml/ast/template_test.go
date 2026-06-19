@@ -195,7 +195,6 @@ func TestComponentSchemaGeneration(t *testing.T) {
     }
   },
   "config": {},
-  "provider": {},
   "resources": {
     "yaml-plugin:index:aComponent": {
       "description": "A component",
