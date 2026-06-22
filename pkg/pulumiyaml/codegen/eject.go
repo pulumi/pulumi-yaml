@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 )
 
@@ -30,9 +31,7 @@ func Eject(dir string, loader schema.ReferenceLoader) (*workspace.Project, *pcl.
 	// To avoid panics (see https://github.com/pulumi/pulumi/issues/10875), we make it the
 	// caller's responsibility to cleanup the loader used. This prevents us from providing
 	// a default loader, since there would be no way to clean it up correctly.
-	if loader == nil {
-		panic("must provide a non-nil loader")
-	}
+	contract.Assertf(loader != nil, "must provide a non-nil loader")
 	proj, template, diags, err := LoadTemplate(dir)
 	if err != nil {
 		return nil, nil, err
