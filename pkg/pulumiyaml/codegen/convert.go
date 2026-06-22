@@ -45,12 +45,13 @@ func newPluginContext() (*plugin.Context, func(), error) {
 		Color: cmdutil.GetGlobalColorization(),
 	})
 	ctx := context.Background()
-	host, err := pkghost.New(ctx, sink, sink, nil, pkgWorkspace.EnsureLanguageInstalled)
+	host, err := pkghost.New(ctx, sink, sink, nil, pkgWorkspace.EnsureLanguageInstalled,
+		schema.NewLoaderServerFromContext, convert.NewMapperServerFromContext,
+		nil, pkgWorkspace.CloudCredentialEnv(nil))
 	if err != nil {
 		return nil, nil, err
 	}
-	pluginCtx, err := plugin.NewContext(ctx, sink, sink, host, nil, cwd, nil, true, nil,
-		schema.NewLoaderServerFromContext, convert.NewMapperServerFromContext)
+	pluginCtx, err := plugin.NewContext(ctx, sink, sink, host, nil, cwd, nil, true, nil)
 	if err != nil {
 		contract.IgnoreClose(host)
 		return nil, nil, err
