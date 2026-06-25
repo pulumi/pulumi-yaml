@@ -123,7 +123,7 @@ func TestGeneratePackageCachesSchemaLoadsRegression(t *testing.T) {
 		},
 	}
 
-	depPkg, err := schema.ImportSpec(depSpec, nil, schema.ValidationOptions{})
+	depPkg, err := schema.ImportSpec(depSpec, nil, schema.NewNullLoader(), schema.ValidationOptions{})
 	require.NoError(t, err)
 
 	// Build a "main" package whose resources reference the dependency types many

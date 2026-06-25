@@ -589,7 +589,6 @@ func (host *yamlLanguageHost) GenerateProgram(
 	}
 
 	bindOptions := []pcl.BindOption{
-		pcl.Loader(schema.NewCachedLoader(loader)),
 		pcl.PreferOutputVersionedInvokes,
 	}
 
@@ -597,7 +596,7 @@ func (host *yamlLanguageHost) GenerateProgram(
 		bindOptions = append(bindOptions, pcl.NonStrictBindOptions()...)
 	}
 
-	program, diags, err := pcl.BindProgram(parser.Files, bindOptions...)
+	program, diags, err := pcl.BindProgram(parser.Files, schema.NewCachedLoader(loader), bindOptions...)
 	if err != nil {
 		return nil, err
 	}

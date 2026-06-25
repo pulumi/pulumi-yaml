@@ -173,8 +173,7 @@ func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]b
 		return nil, diags, err
 	}
 	diags = diags.Extend(parser.Diagnostics)
-	bindOpts := pcl.Loader(rootPluginLoader.ReferenceLoader)
-	_, pdiags, err := pcl.BindProgram(parser.Files, bindOpts)
+	_, pdiags, err := pcl.BindProgram(parser.Files, rootPluginLoader.ReferenceLoader)
 	if err != nil {
 		return []byte(program), diags, err
 	}
