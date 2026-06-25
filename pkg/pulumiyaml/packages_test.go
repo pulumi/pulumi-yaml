@@ -100,7 +100,7 @@ func TestResolveTokenLeadingAcronym(t *testing.T) {
 		Resources: map[string]schema.ResourceSpec{
 			canonical: {},
 		},
-	}, nil, schema.ValidationOptions{})
+	}, schema.NewNullLoader(), schema.ValidationOptions{})
 	require.NoError(t, err)
 	require.False(t, diags.HasErrors(), "%v", diags)
 
