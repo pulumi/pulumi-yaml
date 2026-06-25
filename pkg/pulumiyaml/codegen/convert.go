@@ -223,8 +223,7 @@ func EjectProgram(template *ast.TemplateDecl, loader schema.ReferenceLoader) (*p
 		pcl.AllowMissingProperties,
 		pcl.AllowMissingVariables,
 	}
-	bindOpts = append(bindOpts, pcl.Loader(loader))
-	program, pdiags, err := pcl.BindProgram(parser.Files, bindOpts...)
+	program, pdiags, err := pcl.BindProgram(parser.Files, loader, bindOpts...)
 	diags = diags.Extend(pdiags)
 	if err != nil {
 		return nil, append(yamlDiags, diags...), err
