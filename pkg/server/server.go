@@ -32,7 +32,6 @@ import (
 	pbempty "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
-	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource/plugin"
@@ -387,7 +386,7 @@ func (host *yamlLanguageHost) RunPlugin(
 	}
 
 	var cancelChannel chan bool
-	providerHost, err := provider.NewHostClient(host.engineAddress)
+	providerHost, err := providersdk.NewHostClient(host.engineAddress)
 	if err != nil {
 		return fmt.Errorf("fatal: could not connect to host RPC: %w", err)
 	}

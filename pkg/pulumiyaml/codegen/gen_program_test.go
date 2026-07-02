@@ -19,6 +19,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
+	"github.com/pulumi/pulumi/pkg/v3/resource/plugin"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -39,9 +40,17 @@ func (l testPackageLoader) LoadPackage(ctx context.Context, descriptor *schema.P
 
 func (l testPackageLoader) Close() {}
 
-func newPluginLoader() schema.Loader {
+func newPluginContext() *plugin.Context {
 	schemaLoadPath := filepath.Join("..", "testing", "test", "testdata")
-	return schema.NewPluginLoader(utils.NewContext(schemaLoadPath))
+	return utils.NewContextWithProviders(schemaLoadPath,
+		utils.NewSchemaProvider("aws", "5.4.0"),
+		utils.NewSchemaProvider("other", "0.1.0"),
+		utils.NewSchemaProvider("using-dashes", "1.0.0"),
+	)
+}
+
+func newPluginLoader() schema.Loader {
+	return schema.NewPluginLoader(newPluginContext())
 }
 
 var rootPluginLoader = newPluginLoader()
@@ -164,12 +173,14 @@ func TestGenerateProgram(t *testing.T) {
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
 			{
-				Directory:   "direct-invoke",
-				Description: "Use an invoke directly",
+				Directory:     "direct-invoke",
+				Description:   "Use an invoke directly",
+				PluginContext: newPluginContext(),
 			},
 			{
-				Directory:   "join-template",
-				Description: "Converting a template expression into a join invoke",
+				Directory:     "join-template",
+				Description:   "Converting a template expression into a join invoke",
+				PluginContext: newPluginContext(),
 			},
 		}
 		for _, tt := range tests {
@@ -260,8 +271,9 @@ func TestGenerateProgram(t *testing.T) {
 		TestCases: append(
 			filter(test.PulumiPulumiProgramTests),
 			test.ProgramTest{
-				Directory:   "negative-literals",
-				Description: "Negative literals in Pulumi Programs",
+				Directory:     "negative-literals",
+				Description:   "Negative literals in Pulumi Programs",
+				PluginContext: newPluginContext(),
 			},
 		),
 	})
