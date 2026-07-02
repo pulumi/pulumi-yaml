@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	pschema "github.com/pulumi/pulumi/pkg/v3/codegen/schema"
-	"github.com/pulumi/pulumi/pkg/v3/resource/provider"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/cmdutil"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -102,7 +101,7 @@ func providerForURN(urn string) (testProvider, string, bool) {
 
 //nolint:unused,deadcode
 func main() {
-	if err := provider.Main(providerName, func(host *provider.HostClient) (rpc.ResourceProviderServer, error) {
+	if err := pulumiprovider.Main(providerName, func(host *pulumiprovider.HostClient) (rpc.ResourceProviderServer, error) {
 		return makeProvider(host, providerName, version)
 	}); err != nil {
 		cmdutil.ExitError(err.Error())
@@ -114,12 +113,12 @@ type testproviderProvider struct {
 
 	parameter string
 
-	host    *provider.HostClient
+	host    *pulumiprovider.HostClient
 	name    string
 	version string
 }
 
-func makeProvider(host *provider.HostClient, name, version string) (rpc.ResourceProviderServer, error) {
+func makeProvider(host *pulumiprovider.HostClient, name, version string) (rpc.ResourceProviderServer, error) {
 	// Return the new provider
 	return &testproviderProvider{
 		host:    host,
