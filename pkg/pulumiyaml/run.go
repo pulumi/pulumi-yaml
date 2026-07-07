@@ -1057,36 +1057,39 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
+// buildRegisterPackageRequest builds the RegisterPackage request for the descriptor stored under key.
+func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescriptor) *pulumirpc.RegisterPackageRequest {
+	var version string
+	if pkg.Version != nil {
+		version = pkg.Version.String()
+	}
+	req := &pulumirpc.RegisterPackageRequest{
+		Name:        pkg.Name,
+		Version:     version,
+		DownloadUrl: pkg.DownloadURL,
+	}
+	if pkg.Parameterization != nil {
+		p := &pulumirpc.Parameterization{
+			Name:    pkg.Parameterization.Name,
+			Version: pkg.Parameterization.Version.String(),
+			Value:   pkg.Parameterization.Value,
+		}
+		if key == tokens.Package(pkg.Name) {
+			req.Extension = p
+		} else {
+			req.Parameterization = p
+		}
+	}
+	return req
+}
+
 func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]string, syntax.Diagnostics) {
 	// Register package refs for all packages we know upfront
 	packageRefs := make(map[tokens.Package]string)
 	for key, pkg := range r.packageDescriptors {
-		name := pkg.Name
-		// If parametrized use the parametrized name
-		var parameterization *pulumirpc.Parameterization
-		if pkg.Parameterization != nil {
-			key = tokens.Package(pkg.Parameterization.Name)
-
-			parameterization = &pulumirpc.Parameterization{
-				Name:    pkg.Parameterization.Name,
-				Version: pkg.Parameterization.Version.String(),
-				Value:   pkg.Parameterization.Value,
-			}
-		}
-
-		var version string
-		if pkg.Version != nil {
-			version = pkg.Version.String()
-		}
-
-		resp, err := ctx.RegisterPackage(&pulumirpc.RegisterPackageRequest{
-			Name:             pkg.Name,
-			Version:          version,
-			DownloadUrl:      pkg.DownloadURL,
-			Parameterization: parameterization,
-		})
+		resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(key, pkg))
 		if err != nil {
-			err = fmt.Errorf("registering package %s: %w", name, err)
+			err = fmt.Errorf("registering package %s: %w", pkg.Name, err)
 			return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 		}
 		packageRefs[key] = resp.Ref
