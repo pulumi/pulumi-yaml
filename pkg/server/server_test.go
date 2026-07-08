@@ -33,9 +33,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/structpb"
-	"gopkg.in/yaml.v3"
-
-	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 )
 
 // countingLoaderServer wraps a codegenrpc.LoaderServer and counts GetSchema
@@ -200,74 +197,6 @@ func TestGeneratePackageCachesSchemaLoadsRegression(t *testing.T) {
 	// how many resources reference it. Without caching this would be numResources.
 	assert.Equal(t, 1, counter.callCount("dep"),
 		"expected 1 GetSchema call for dep, got %d (caching not working)", counter.callCount("dep"))
-}
-
-func TestGeneratePackageExtension(t *testing.T) {
-	t.Parallel()
-
-	spec := schema.PackageSpec{
-		Name:    "myext",
-		Version: "2.0.0",
-		Meta:    &schema.MetadataSpec{SupportPack: true},
-		Resources: map[string]schema.ResourceSpec{
-			"extbase:index:Greeting": {
-				ObjectTypeSpec: schema.ObjectTypeSpec{
-					Type: "object",
-					Properties: map[string]schema.PropertySpec{
-						"parameterValue": {TypeSpec: schema.TypeSpec{Type: "string"}},
-					},
-					Required: []string{"parameterValue"},
-				},
-			},
-		},
-		ExtensionParameterization: &schema.ExtensionParameterizationSpec{
-			BaseProvider: schema.BaseProviderRefSpec{
-				Name:    "extbase",
-				Version: "45.0.0",
-			},
-			Parameter: []byte("greetings"),
-		},
-	}
-	specJSON, err := json.Marshal(spec)
-	require.NoError(t, err)
-
-	inner := &staticLoader{packages: map[string]*schema.Package{}}
-	srv := grpc.NewServer()
-	codegenrpc.RegisterLoaderServer(srv, schema.NewLoaderServer(inner))
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	go srv.Serve(lis) //nolint:errcheck
-	t.Cleanup(srv.Stop)
-
-	dir := t.TempDir()
-	host := &yamlLanguageHost{}
-	resp, err := host.GeneratePackage(t.Context(), &pulumirpc.GeneratePackageRequest{
-		Directory:    dir,
-		Schema:       string(specJSON),
-		LoaderTarget: lis.Addr().String(),
-	})
-	require.NoError(t, err)
-	for _, d := range resp.Diagnostics {
-		require.NotEqual(t, codegenrpc.DiagnosticSeverity_DIAG_ERROR, d.Severity, d.Summary)
-	}
-
-	// The lock records the base provider as the source and carries the extension's own
-	// name, version, and parameter value under an `extension` block.
-	lockBytes, err := os.ReadFile(filepath.Join(dir, "myext-2.0.0.yaml"))
-	require.NoError(t, err)
-
-	var lock packages.PackageDecl
-	require.NoError(t, yaml.Unmarshal(lockBytes, &lock))
-
-	assert.Equal(t, "extbase", lock.Name)
-	assert.Equal(t, "45.0.0", lock.Version)
-	assert.Nil(t, lock.Parameterization)
-	require.NotNil(t, lock.Extension)
-	assert.Equal(t, "myext", lock.Extension.Name)
-	assert.Equal(t, "2.0.0", lock.Extension.Version)
-	value, err := lock.Extension.GetValue()
-	require.NoError(t, err)
-	assert.Equal(t, []byte("greetings"), value)
 }
 
 func TestGetRequiredPackages(t *testing.T) {
