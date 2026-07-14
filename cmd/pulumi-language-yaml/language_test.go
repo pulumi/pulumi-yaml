@@ -147,6 +147,8 @@ var expectedFailures = map[string]string{
 	"l2-invoke-multi-argument":            "Added by v3.251.0: YAML does not support multi-argument invokes",
 	"l2-extension-and-base-resource":      "Added by v3.251.0: YAML does not support extension resources",
 	"l2-extension-parameterized-resource": "Added by v3.251.0: YAML does not support extension resources",
+
+	"l2-failed-create-recover-continue-on-error": "Added by v3.252.0: Unknown Function; YAML does not support fn::recover",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
