@@ -101,6 +101,9 @@ func parseSnippetExpr(filename string, source []byte) (ast.Expr, syntax.Diagnost
 		diags.Extend(syntax.Error(nil, err.Error(), ""))
 		return nil, diags
 	}
+	if yamlNode.Kind == 0 {
+		return nil, diags
+	}
 	// yaml.Unmarshal wraps the parsed value in a document node; unwrap so UnmarshalYAML sees the
 	// real content.
 	if yamlNode.Kind == yaml.DocumentNode {
@@ -141,6 +144,9 @@ func ImportSnippet(
 	diags.Extend(pdiags...)
 	if pdiags.HasErrors() {
 		return nil, diags, nil
+	}
+	if expr == nil {
+		return &model.Body{}, diags, nil
 	}
 	obj, ok := expr.(*ast.ObjectExpr)
 	if !ok {
