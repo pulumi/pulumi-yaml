@@ -172,12 +172,12 @@ func TestLoadPackageOverrides(t *testing.T) {
 				Version:     &sharedVersion,
 				DownloadURL: sharedURL,
 			}
-			descriptors := map[tokens.Package]*schema.PackageDescriptor{
-				"test": shared,
+			descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+				"test": {shared},
 			}
 
 			loader := &capturingLoader{}
-			_, err := loadPackage(t.Context(), loader, descriptors,
+			_, err := loadPackages(t.Context(), loader, descriptors,
 				"test:resource:type", tt.version, tt.pluginDownloadURL,
 			)
 			require.NoError(t, err)

@@ -138,8 +138,12 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 	return packages, nil
 }
 
-func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.PackageDescriptor, error) {
-	packageDescriptors := make(map[tokens.Package]*schema.PackageDescriptor)
+// ToPackageDescriptors groups package descriptors by the namespace their tokens live in. A
+// single namespace can be served by more than one package: a base provider plus one or more
+// extensions layered onto it (e.g. base "kubernetes" plus a CRD extension), which is why the
+// values are slices rather than a single descriptor.
+func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package][]*schema.PackageDescriptor, error) {
+	packageDescriptors := make(map[tokens.Package][]*schema.PackageDescriptor)
 	for _, pkg := range packages {
 
 		name := pkg.Name
@@ -181,12 +185,13 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.Pa
 			version = &v
 		}
 
-		packageDescriptors[tokens.Package(name)] = &schema.PackageDescriptor{
+		key := tokens.Package(name)
+		packageDescriptors[key] = append(packageDescriptors[key], &schema.PackageDescriptor{
 			Name:             pkg.Name,
 			Version:          version,
 			DownloadURL:      pkg.DownloadURL,
 			Parameterization: parameterization,
-		}
+		})
 	}
 
 	return packageDescriptors, nil

@@ -98,39 +98,43 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {
 	// Build an index of SDK declarations for version/URL lookup, but don't add them to the
 	// result set. Only packages actually referenced by resources or invokes should be returned.
-	sdkIndex := map[string]*packages.PackageDecl{}
-	for _, pkg := range tmpl.Sdks {
+	// A namespace can be served by more than one declaration (a base provider plus extensions
+	// layered onto it), so the index maps a namespace to all of its declarations.
+	sdkIndex := map[string][]*packages.PackageDecl{}
+	for i := range tmpl.Sdks {
+		pkg := &tmpl.Sdks[i]
 		name := pkg.Name
 		if pkg.Parameterization != nil {
 			name = pkg.Parameterization.Name
 		}
-
-		if _, found := sdkIndex[name]; !found {
-			sdkIndex[name] = &pkg
-		}
+		sdkIndex[name] = append(sdkIndex[name], pkg)
 	}
 
-	packageMap := map[string]*packages.PackageDecl{}
+	accepted := map[string]bool{}
+	var result []packages.PackageDecl
 
 	acceptType := func(r *Runner, typeName string, version, pluginDownloadURL *ast.StringExpr) {
 		pkg := ResolvePkgName(typeName)
-		if _, found := packageMap[pkg]; found {
-			// Package already registered. Per-resource version/URL options are runtime
+		if accepted[pkg] {
+			// Namespace already registered. Per-resource version/URL options are runtime
 			// directives handled by the engine; they don't change the project-level
 			// package dependency.
 			return
 		}
-		if sdk, found := sdkIndex[pkg]; found {
-			// Use the SDK declaration as the canonical package entry. Per-resource
-			// version/URL options only override at runtime, not at the dependency level.
-			entry := *sdk
-			packageMap[pkg] = &entry
+		accepted[pkg] = true
+		if sdks, found := sdkIndex[pkg]; found {
+			// Use the SDK declarations as the canonical package entries: every package serving
+			// this namespace (base and extensions) is a dependency. Per-resource version/URL
+			// options only override at runtime, not at the dependency level.
+			for _, sdk := range sdks {
+				result = append(result, *sdk)
+			}
 		} else {
-			packageMap[pkg] = &packages.PackageDecl{
+			result = append(result, packages.PackageDecl{
 				Name:        pkg,
 				Version:     version.GetValue(),
 				DownloadURL: pluginDownloadURL.GetValue(),
-			}
+			})
 		}
 	}
 
@@ -176,12 +180,12 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 	}
 
 	var packages []packages.PackageDecl
-	for _, pkg := range packageMap {
+	for _, pkg := range result {
 		// Skip the built-in pulumi package
 		if pkg.Name == "pulumi" {
 			continue
 		}
-		packages = append(packages, *pkg)
+		packages = append(packages, pkg)
 	}
 
 	sort.Slice(packages, func(i, j int) bool {
@@ -193,6 +197,14 @@ func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, synt
 			return pI.Version < pJ.Version
 		}
 		if pI.Parameterization == nil && pJ.Parameterization == nil {
+			// A base provider (no extension) sorts before an extension layered onto it, and
+			// extensions sort by their own name, so the ordering is deterministic.
+			if (pI.Extension != nil) != (pJ.Extension != nil) {
+				return pI.Extension == nil
+			}
+			if pI.Extension != nil && pJ.Extension != nil && pI.Extension.Name != pJ.Extension.Name {
+				return pI.Extension.Name < pJ.Extension.Name
+			}
 			return pI.DownloadURL < pJ.DownloadURL
 		}
 		if pI.Parameterization == nil {
@@ -221,45 +233,61 @@ func ResolvePkgName(typeString string) string {
 	return typeParts[0]
 }
 
-func loadPackage(
+// resolvedPackage pairs a loaded package with the descriptor it was loaded from, so callers can
+// route registration to the specific package (base or extension) that a token resolved against.
+type resolvedPackage struct {
+	pkg        Package
+	descriptor *schema.PackageDescriptor
+}
+
+// loadPackages loads every package registered for a token's namespace. A namespace can be served
+// by more than one package (a base provider plus extensions layered onto it), so resolution must
+// try each until one recognizes the token.
+func loadPackages(
 	ctx context.Context, loader PackageLoader,
-	descriptors map[tokens.Package]*schema.PackageDescriptor, typeString string, version *semver.Version,
+	descriptors map[tokens.Package][]*schema.PackageDescriptor, typeString string, version *semver.Version,
 	pluginDownloadURL string,
-) (Package, error) {
+) ([]resolvedPackage, error) {
 	typeParts := strings.Split(typeString, ":")
 	if len(typeParts) < 2 || len(typeParts) > 3 {
 		return nil, fmt.Errorf("invalid type token %q", typeString)
 	}
 
 	packageName := ResolvePkgName(typeString)
-	descriptor := descriptors[tokens.Package(packageName)]
-	if descriptor == nil {
+	nsDescriptors := descriptors[tokens.Package(packageName)]
+	if len(nsDescriptors) == 0 {
 		// Fall back to just the package name and passed in version if we don't have a descriptor.
-		descriptor = &schema.PackageDescriptor{
+		nsDescriptors = []*schema.PackageDescriptor{{
 			Name:        packageName,
 			Version:     version,
 			DownloadURL: pluginDownloadURL,
-		}
-	} else if version != nil || pluginDownloadURL != "" {
-		// Override the version and/or download URL if one was passed in, but don't mutate the shared descriptor.
-		d := *descriptor
-		if version != nil {
-			d.Version = version
-		}
-		if pluginDownloadURL != "" {
-			d.DownloadURL = pluginDownloadURL
-		}
-		descriptor = &d
+		}}
 	}
 
-	pkg, err := loader.LoadPackage(ctx, descriptor)
-	if errors.Is(err, schema.ErrGetSchemaNotImplemented) {
-		return nil, fmt.Errorf("error loading schema for %q: %w", packageName, err)
-	} else if err != nil {
-		return nil, fmt.Errorf("internal error loading package %q: %w", packageName, err)
+	result := make([]resolvedPackage, 0, len(nsDescriptors))
+	for _, descriptor := range nsDescriptors {
+		if version != nil || pluginDownloadURL != "" {
+			// Override the version and/or download URL if one was passed in, but don't mutate the shared descriptor.
+			d := *descriptor
+			if version != nil {
+				d.Version = version
+			}
+			if pluginDownloadURL != "" {
+				d.DownloadURL = pluginDownloadURL
+			}
+			descriptor = &d
+		}
+
+		pkg, err := loader.LoadPackage(ctx, descriptor)
+		if errors.Is(err, schema.ErrGetSchemaNotImplemented) {
+			return nil, fmt.Errorf("error loading schema for %q: %w", packageName, err)
+		} else if err != nil {
+			return nil, fmt.Errorf("internal error loading package %q: %w", packageName, err)
+		}
+		result = append(result, resolvedPackage{pkg: pkg, descriptor: descriptor})
 	}
 
-	return pkg, nil
+	return result, nil
 }
 
 // Unavailable in Docker versions <4.
@@ -282,60 +310,72 @@ var helmResourceNames = map[string]struct{}{
 
 // ResolveResource determines the appropriate package for a resource, loads that package, then calls
 // the package's ResolveResource method to determine the canonical name of the resource, returning
-// both the package and the canonical name.
+// the package, the canonical name, and the descriptor the package was loaded from (so the caller can
+// route registration to the specific base or extension package that recognized the token).
 func ResolveResource(ctx context.Context, loader PackageLoader,
-	descriptors map[tokens.Package]*schema.PackageDescriptor,
+	descriptors map[tokens.Package][]*schema.PackageDescriptor,
 	typeString string, version *semver.Version,
 	pluginDownloadURL string,
-) (Package, ResourceTypeToken, error) {
+) (Package, ResourceTypeToken, *schema.PackageDescriptor, error) {
 	if issue, found := kubernetesResourceNames[typeString]; found {
-		return nil, "", fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
+		return nil, "", nil, fmt.Errorf("The resource type [%v] is not supported in YAML at this time, see: %v", typeString, issue)
 	}
 
 	if _, found := helmResourceNames[typeString]; found {
-		return nil, "", fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
+		return nil, "", nil, fmt.Errorf("Helm Chart resources are not supported in YAML, consider using the Helm Release resource instead: https://www.pulumi.com/registry/packages/kubernetes/api-docs/helm/v3/release/")
 	}
 
-	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
+	pkgs, err := loadPackages(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 
-	if _, found := docker3ResourceNames[typeString]; found {
-		// To avoid requiring the user to manually specify the version to use, we check if
-		// the *resolved* pkg version is greater then 4.*.
-		if v := pkg.Version(); v == nil || v.Major <= 3 {
-			contract.Assertf(version == nil || version.Major <= 3, "make sure we have not requested an appropriately versioned package")
-			return nil, "", fmt.Errorf("Docker Image resources are not supported in YAML without major version >= 4, see: https://github.com/pulumi/pulumi-yaml/issues/421")
+	var lastErr error
+	for _, rp := range pkgs {
+		if _, found := docker3ResourceNames[typeString]; found {
+			// To avoid requiring the user to manually specify the version to use, we check if
+			// the *resolved* pkg version is greater then 4.*.
+			if v := rp.pkg.Version(); v == nil || v.Major <= 3 {
+				contract.Assertf(version == nil || version.Major <= 3, "make sure we have not requested an appropriately versioned package")
+				return nil, "", nil, fmt.Errorf("Docker Image resources are not supported in YAML without major version >= 4, see: https://github.com/pulumi/pulumi-yaml/issues/421")
+			}
 		}
+
+		canonicalName, err := rp.pkg.ResolveResource(typeString)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return rp.pkg, canonicalName, rp.descriptor, nil
 	}
 
-	canonicalName, err := pkg.ResolveResource(typeString)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return pkg, canonicalName, nil
+	return nil, "", nil, lastErr
 }
 
 // ResolveFunction determines the appropriate package for a function, loads that package, then calls
 // the package's ResolveFunction method to determine the canonical name of the function, returning
-// both the package and the canonical name.
+// the package, the canonical name, and the descriptor the package was loaded from.
 func ResolveFunction(ctx context.Context, loader PackageLoader,
-	descriptors map[tokens.Package]*schema.PackageDescriptor,
+	descriptors map[tokens.Package][]*schema.PackageDescriptor,
 	typeString string, version *semver.Version,
 	pluginDownloadURL string,
-) (Package, FunctionTypeToken, error) {
-	pkg, err := loadPackage(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
+) (Package, FunctionTypeToken, *schema.PackageDescriptor, error) {
+	pkgs, err := loadPackages(ctx, loader, descriptors, typeString, version, pluginDownloadURL)
 	if err != nil {
-		return nil, "", err
-	}
-	canonicalName, err := pkg.ResolveFunction(typeString)
-	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 
-	return pkg, canonicalName, nil
+	var lastErr error
+	for _, rp := range pkgs {
+		canonicalName, err := rp.pkg.ResolveFunction(typeString)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return rp.pkg, canonicalName, rp.descriptor, nil
+	}
+
+	return nil, "", nil, lastErr
 }
 
 type resourcePackage struct {

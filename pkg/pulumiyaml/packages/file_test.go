@@ -85,8 +85,10 @@ func TestToPackageDescriptorsExtension(t *testing.T) {
 	require.NoError(t, err)
 
 	// An extension keeps the base provider's name as its namespace key.
-	desc, ok := descriptors[tokens.Package("base")]
+	descs, ok := descriptors[tokens.Package("base")]
 	require.True(t, ok, "extension descriptor should be keyed by the base provider name")
+	require.Len(t, descs, 1)
+	desc := descs[0]
 	assert.Equal(t, "base", desc.Name)
 	require.NotNil(t, desc.Parameterization)
 	assert.Equal(t, "ext", desc.Parameterization.Name)

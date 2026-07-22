@@ -685,7 +685,7 @@ type providerInfo struct {
 
 type Runner struct {
 	t                  ast.Template
-	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
+	packageDescriptors map[tokens.Package][]*schema.PackageDescriptor
 
 	pkgLoader PackageLoader
 	config    map[string]interface{}
@@ -1057,6 +1057,17 @@ func (e programEvaluator) EvalOutput(r *Runner, node ast.PropertyMapEntry) bool 
 	return true
 }
 
+// distinctName is the name that uniquely identifies a package within a program: its
+// parameterization name for a replacement or extension, otherwise its own name. Two packages can
+// share a namespace (a base provider and an extension layered onto it) but always have distinct
+// names, so package refs are keyed by this rather than the namespace.
+func distinctName(pkg *schema.PackageDescriptor) tokens.Package {
+	if pkg.Parameterization != nil {
+		return tokens.Package(pkg.Parameterization.Name)
+	}
+	return tokens.Package(pkg.Name)
+}
+
 // buildRegisterPackageRequest builds the RegisterPackage request for the descriptor stored under key.
 func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescriptor) *pulumirpc.RegisterPackageRequest {
 	var version string
@@ -1084,15 +1095,19 @@ func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescript
 }
 
 func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]string, syntax.Diagnostics) {
-	// Register package refs for all packages we know upfront
+	// Register package refs for all packages we know upfront. A namespace can be served by more
+	// than one package (a base provider plus extensions), so refs are keyed by the package's
+	// distinct name and resolution routes each resource to the package that recognized it.
 	packageRefs := make(map[tokens.Package]string)
-	for key, pkg := range r.packageDescriptors {
-		resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(key, pkg))
-		if err != nil {
-			err = fmt.Errorf("registering package %s: %w", pkg.Name, err)
-			return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+	for key, pkgs := range r.packageDescriptors {
+		for _, pkg := range pkgs {
+			resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(key, pkg))
+			if err != nil {
+				err = fmt.Errorf("registering package %s: %w", pkg.Name, err)
+				return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
+			}
+			packageRefs[distinctName(pkg)] = resp.Ref
 		}
-		packageRefs[key] = resp.Ref
 	}
 	return packageRefs, nil
 }
@@ -1492,7 +1507,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.PluginDownloadURL != nil {
 		pluginDownloadURL = v.Options.PluginDownloadURL.Value
 	}
-	pkg, typ, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version,
+	pkg, typ, resolvedDescriptor, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version,
 		pluginDownloadURL)
 	if err != nil {
 		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))
@@ -2106,6 +2121,11 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 			// This is a provider resource, so the package is actually the name in the token, not the package.
 			pkg = tokens.Package(typ.Name())
 		}
+		// Route to the specific package (base or extension) that resolved this resource; the
+		// namespace alone can be ambiguous when a base provider and an extension share it.
+		if resolvedDescriptor != nil {
+			pkg = distinctName(resolvedDescriptor)
+		}
 		packageRef := e.packageRefs[pkg]
 		// When a resource specifies an explicit version or pluginDownloadURL option,
 		// clear the package ref so the engine builds the provider request from those
@@ -2687,14 +2707,18 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 		if t.CallOpts.PluginDownloadURL != nil {
 			pluginDownloadURL = t.CallOpts.PluginDownloadURL.Value
 		}
-		pkg, functionName, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
+		pkg, functionName, resolvedDescriptor, err := ResolveFunction(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
 		hint := pkg.FunctionTypeHint(functionName)
 
 		typ := tokens.Type(functionName)
-		packageRef := e.packageRefs[typ.Package()]
+		refKey := typ.Package()
+		if resolvedDescriptor != nil {
+			refKey = distinctName(resolvedDescriptor)
+		}
+		packageRef := e.packageRefs[refKey]
 		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, packageRef, opts...)
 		if err != nil {
 			return e.error(t, err.Error())
