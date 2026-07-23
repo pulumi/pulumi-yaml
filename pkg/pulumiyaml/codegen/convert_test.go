@@ -187,6 +187,20 @@ extra = "hello"
 `,
 		},
 		{
+			name:     "empty source",
+			token:    "snippet:index:Bucket",
+			filename: "inputs.yaml",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "comments-only source",
+			token:    "pulumi:providers:snippet",
+			filename: "provider.yaml",
+			input:    "# no config\n",
+			expected: "",
+		},
+		{
 			name:     "fn::length builtin",
 			token:    "snippet:index:Bucket",
 			filename: "inputs.yaml",

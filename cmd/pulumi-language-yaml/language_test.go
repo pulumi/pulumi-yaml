@@ -143,6 +143,10 @@ var expectedFailures = map[string]string{
 	"l2-provider-config-enum":       "Added by v3.246.0: YAML does not type-check enum values read from a provider's output",
 	"l2-resource-schema-secret":     "Added by v3.246.0: YAML does not mark schema-declared secret outputs as secret",
 	"l2-config-default-from-invoke": "Added by v3.246.0: YAML does not support config defaults derived from an invoke result",
+
+	"l2-invoke-multi-argument": "Added by v3.251.0: YAML does not support multi-argument invokes",
+
+	"l2-failed-create-recover-continue-on-error": "Added by v3.252.0: Unknown Function; YAML does not support fn::recover",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
