@@ -608,7 +608,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	if v.Options.PluginDownloadURL != nil {
 		pluginDownloadURL = v.Options.PluginDownloadURL.Value
 	}
-	pkg, typ, err := ResolveResource(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, v.Type.Value, version, pluginDownloadURL)
+	pkg, typ, _, err := ResolveResource(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, v.Type.Value, version, pluginDownloadURL)
 	if err != nil {
 		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
@@ -824,7 +824,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 	if t.CallOpts.PluginDownloadURL != nil {
 		pluginDownloadURL = t.CallOpts.PluginDownloadURL.Value
 	}
-	pkg, functionName, err := ResolveFunction(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
+	pkg, functionName, _, err := ResolveFunction(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
 	if err != nil {
 		_, b := ctx.error(t, err.Error())
 		return b

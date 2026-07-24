@@ -38,7 +38,7 @@ type importer struct {
 	resources       map[string]*model.Variable
 	outputs         map[string]*model.Variable
 
-	packageDescriptors map[tokens.Package]*schema.PackageDescriptor
+	packageDescriptors map[tokens.Package][]*schema.PackageDescriptor
 
 	// snippet is set when converting an isolated YAML fragment rather than a full template.
 	// In that mode there's no surrounding scope to bind references against, so importRef
@@ -334,7 +334,7 @@ func (imp *importer) importBuiltin(node ast.BuiltinExpr) (model.Expression, synt
 		if node.CallOpts.PluginDownloadURL != nil {
 			pluginDownloadURL = node.CallOpts.PluginDownloadURL.Value
 		}
-		pkg, functionName, err := pulumiyaml.ResolveFunction(context.TODO(), imp.loader, imp.packageDescriptors, node.Token.Value, version, pluginDownloadURL)
+		pkg, functionName, _, err := pulumiyaml.ResolveFunction(context.TODO(), imp.loader, imp.packageDescriptors, node.Token.Value, version, pluginDownloadURL)
 		if err != nil {
 			return nil, syntax.Diagnostics{ast.ExprError(node.Token, fmt.Sprintf("unable to resolve function name: %v", err), "")}
 		}
@@ -890,7 +890,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 	if resource.Options.PluginDownloadURL != nil {
 		pluginDownloadURL = resource.Options.PluginDownloadURL.Value
 	}
-	pkg, token, err := pulumiyaml.ResolveResource(context.TODO(), imp.loader, imp.packageDescriptors, resource.Type.Value, version, pluginDownloadURL)
+	pkg, token, _, err := pulumiyaml.ResolveResource(context.TODO(), imp.loader, imp.packageDescriptors, resource.Type.Value, version, pluginDownloadURL)
 	if err != nil {
 		return nil, syntax.Diagnostics{ast.ExprError(resource.Type, fmt.Sprintf("unable to resolve resource type: %v", err), "")}
 	}
@@ -1441,18 +1441,29 @@ func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax
 
 // importPackageDescriptors emits PCL package blocks for parameterized packages.
 func (imp *importer) importPackageDescriptors() []model.BodyItem {
-	// Collect package names and sort for deterministic output.
-	var names []tokens.Package
-	for name, desc := range imp.packageDescriptors {
-		if desc.Parameterization != nil {
-			names = append(names, name)
+	// Collect parameterized descriptors and sort for deterministic output. A namespace can hold
+	// more than one descriptor (a base provider plus extensions).
+	var descs []*schema.PackageDescriptor
+	for _, nsDescs := range imp.packageDescriptors {
+		for _, desc := range nsDescs {
+			if desc.Parameterization != nil {
+				descs = append(descs, desc)
+			}
 		}
 	}
-	slices.Sort(names)
+	slices.SortFunc(descs, func(a, b *schema.PackageDescriptor) int {
+		switch {
+		case a.Parameterization.Name < b.Parameterization.Name:
+			return -1
+		case a.Parameterization.Name > b.Parameterization.Name:
+			return 1
+		default:
+			return 0
+		}
+	})
 
 	var items []model.BodyItem
-	for _, name := range names {
-		desc := imp.packageDescriptors[name]
+	for _, desc := range descs {
 		p := desc.Parameterization
 
 		paramItems := []model.BodyItem{

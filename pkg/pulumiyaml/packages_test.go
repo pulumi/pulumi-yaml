@@ -10,6 +10,8 @@ import (
 	"github.com/blang/semver"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
+	pulumirpc "github.com/pulumi/pulumi/sdk/v3/proto/go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -170,12 +172,12 @@ func TestLoadPackageOverrides(t *testing.T) {
 				Version:     &sharedVersion,
 				DownloadURL: sharedURL,
 			}
-			descriptors := map[tokens.Package]*schema.PackageDescriptor{
-				"test": shared,
+			descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+				"test": {shared},
 			}
 
 			loader := &capturingLoader{}
-			_, err := loadPackage(t.Context(), loader, descriptors,
+			_, err := loadPackages(t.Context(), loader, descriptors,
 				"test:resource:type", tt.version, tt.pluginDownloadURL,
 			)
 			require.NoError(t, err)
@@ -190,4 +192,65 @@ func TestLoadPackageOverrides(t *testing.T) {
 			}, *shared)
 		})
 	}
+}
+
+func TestBuildRegisterPackageRequest(t *testing.T) {
+	t.Parallel()
+
+	version := semver.MustParse("1.0.0")
+	baseVersion := semver.MustParse("0.0.1")
+
+	t.Run("descriptor without parameterization sets neither field", func(t *testing.T) {
+		t.Parallel()
+		req := buildRegisterPackageRequest(tokens.Package("random"), &schema.PackageDescriptor{
+			Name:    "random",
+			Version: &version,
+		})
+		assert.Equal(t, "random", req.Name)
+		assert.Equal(t, "1.0.0", req.Version)
+		assert.Nil(t, req.Parameterization)
+		assert.Nil(t, req.Extension)
+	})
+
+	t.Run("descriptor keyed by the parameterization name sets Parameterization", func(t *testing.T) {
+		t.Parallel()
+		req := buildRegisterPackageRequest(tokens.Package("pkg"), &schema.PackageDescriptor{
+			Name:    "testprovider",
+			Version: &baseVersion,
+			Parameterization: &schema.ParameterizationDescriptor{
+				Name:    "pkg",
+				Version: version,
+				Value:   []byte("pkg"),
+			},
+		})
+		assert.Equal(t, "testprovider", req.Name)
+		assert.Equal(t, "0.0.1", req.Version)
+		assert.Nil(t, req.Extension)
+		assert.Equal(t, &pulumirpc.Parameterization{
+			Name:    "pkg",
+			Version: "1.0.0",
+			Value:   []byte("pkg"),
+		}, req.Parameterization)
+	})
+
+	t.Run("descriptor keyed by the base provider name sets Extension", func(t *testing.T) {
+		t.Parallel()
+		req := buildRegisterPackageRequest(tokens.Package("testprovider"), &schema.PackageDescriptor{
+			Name:    "testprovider",
+			Version: &baseVersion,
+			Parameterization: &schema.ParameterizationDescriptor{
+				Name:    "ext",
+				Version: version,
+				Value:   []byte("ext"),
+			},
+		})
+		assert.Equal(t, "testprovider", req.Name)
+		assert.Equal(t, "0.0.1", req.Version)
+		assert.Nil(t, req.Parameterization)
+		assert.Equal(t, &pulumirpc.Parameterization{
+			Name:    "ext",
+			Version: "1.0.0",
+			Value:   []byte("ext"),
+		}, req.Extension)
+	})
 }

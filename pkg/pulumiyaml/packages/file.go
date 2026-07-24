@@ -46,8 +46,10 @@ type PackageDecl struct {
 	Version string `yaml:"version,omitempty"`
 	// PluginDownloadURL is the URL to download the plugin from.
 	DownloadURL string `yaml:"downloadUrl,omitempty"`
-	// Parameterization is the parameterization of the package.
+	// Parameterization is the replacement parameterization of the package.
 	Parameterization *ParameterizationDecl `yaml:"parameterization,omitempty"`
+	// Extension is the extension parameterization of the package.
+	Extension *ParameterizationDecl `yaml:"extension,omitempty"`
 }
 
 // Validate checks if a package declaration is valid. The first return value is a boolean indicating if the package declaration is even a
@@ -63,6 +65,10 @@ func (p *PackageDecl) Validate() (bool, error) {
 		return true, fmt.Errorf("package name is required")
 	}
 
+	if p.Parameterization != nil && p.Extension != nil {
+		return true, fmt.Errorf("package cannot declare both parameterization and extension")
+	}
+
 	// If parameterization is not nil, it must be valid.
 	if p.Parameterization != nil {
 		if p.Parameterization.Name == "" {
@@ -70,6 +76,15 @@ func (p *PackageDecl) Validate() (bool, error) {
 		}
 		if p.Parameterization.Version == "" {
 			return true, fmt.Errorf("parameterization version is required")
+		}
+	}
+
+	if p.Extension != nil {
+		if p.Extension.Name == "" {
+			return true, fmt.Errorf("extension name is required")
+		}
+		if p.Extension.Version == "" {
+			return true, fmt.Errorf("extension version is required")
 		}
 	}
 
@@ -123,28 +138,39 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 	return packages, nil
 }
 
-func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.PackageDescriptor, error) {
-	packageDescriptors := make(map[tokens.Package]*schema.PackageDescriptor)
+// ToPackageDescriptors groups package descriptors by the namespace their tokens live in. A
+// single namespace can be served by more than one package: a base provider plus one or more
+// extensions layered onto it (e.g. base "kubernetes" plus a CRD extension), which is why the
+// values are slices rather than a single descriptor.
+func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package][]*schema.PackageDescriptor, error) {
+	packageDescriptors := make(map[tokens.Package][]*schema.PackageDescriptor)
 	for _, pkg := range packages {
 
 		name := pkg.Name
-		// If parametrized use the parametrized name
-		var parameterization *schema.ParameterizationDescriptor
-		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
 
-			value, err := pkg.Parameterization.GetValue()
-			if err != nil {
-				return nil, fmt.Errorf("decoding parameterization value for package %s: %w", name, err)
+		param := pkg.Parameterization
+		if pkg.Extension != nil {
+			param = pkg.Extension
+		}
+
+		var parameterization *schema.ParameterizationDescriptor
+		if param != nil {
+			if pkg.Parameterization != nil {
+				name = pkg.Parameterization.Name
 			}
 
-			version, err := semver.Parse(pkg.Parameterization.Version)
+			value, err := param.GetValue()
 			if err != nil {
-				return nil, fmt.Errorf("parsing version %s for package %s: %w", pkg.Parameterization.Version, name, err)
+				return nil, fmt.Errorf("decoding parameterization value for package %s: %w", param.Name, err)
+			}
+
+			version, err := semver.Parse(param.Version)
+			if err != nil {
+				return nil, fmt.Errorf("parsing version %s for package %s: %w", param.Version, param.Name, err)
 			}
 
 			parameterization = &schema.ParameterizationDescriptor{
-				Name:    pkg.Parameterization.Name,
+				Name:    param.Name,
 				Version: version,
 				Value:   value,
 			}
@@ -159,12 +185,13 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package]*schema.Pa
 			version = &v
 		}
 
-		packageDescriptors[tokens.Package(name)] = &schema.PackageDescriptor{
+		key := tokens.Package(name)
+		packageDescriptors[key] = append(packageDescriptors[key], &schema.PackageDescriptor{
 			Name:             pkg.Name,
 			Version:          version,
 			DownloadURL:      pkg.DownloadURL,
 			Parameterization: parameterization,
-		}
+		})
 	}
 
 	return packageDescriptors, nil

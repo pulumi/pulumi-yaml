@@ -166,15 +166,25 @@ func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 	}
 	var packages []*pulumirpc.PackageDependency
 	for _, pkg := range pkgs {
-		var parameterization *pulumirpc.PackageParameterization
-		if pkg.Parameterization != nil {
-			value, err := pkg.Parameterization.GetValue()
+		var parameterization, extension *pulumirpc.PackageParameterization
+		if param := pkg.Parameterization; param != nil {
+			value, err := param.GetValue()
 			if err != nil {
 				return nil, fmt.Errorf("decoding parameter value for package %s: %w", pkg.Name, err)
 			}
 			parameterization = &pulumirpc.PackageParameterization{
-				Name:    pkg.Parameterization.Name,
-				Version: pkg.Parameterization.Version,
+				Name:    param.Name,
+				Version: param.Version,
+				Value:   value,
+			}
+		} else if param := pkg.Extension; param != nil {
+			value, err := param.GetValue()
+			if err != nil {
+				return nil, fmt.Errorf("decoding extension value for package %s: %w", pkg.Name, err)
+			}
+			extension = &pulumirpc.PackageParameterization{
+				Name:    param.Name,
+				Version: param.Version,
 				Value:   value,
 			}
 		}
@@ -185,6 +195,7 @@ func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 			Version:          pkg.Version,
 			Server:           pkg.DownloadURL,
 			Parameterization: parameterization,
+			Extension:        extension,
 		})
 	}
 	return &pulumirpc.GetRequiredPackagesResponse{
@@ -497,9 +508,12 @@ func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *p
 	for _, pkg := range pkgs {
 		name := pkg.Name
 		version := pkg.Version
-		if pkg.Parameterization != nil {
-			name = pkg.Parameterization.Name
-			version = pkg.Parameterization.Version
+		if param := pkg.Parameterization; param != nil {
+			name = param.Name
+			version = param.Version
+		} else if param := pkg.Extension; param != nil {
+			name = param.Name
+			version = param.Version
 		}
 
 		dependencies = append(dependencies, &pulumirpc.DependencyInfo{
@@ -660,14 +674,23 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 	lock := packages.PackageDecl{
 		PackageDeclarationVersion: 1,
 	}
-	// The format of the lock file differs based on if this is a parameterized package or not.
-	if pkg.Parameterization == nil {
-		lock.Name = pkg.Name
-		if pkg.Version != nil {
-			lock.Version = pkg.Version.String()
-		}
+	// The format of the lock file differs based on whether this is a plain, replacement, or
+	// extension package.
+	switch {
+	case pkg.ExtensionParameterization != nil:
+		base := pkg.ExtensionParameterization.BaseProvider
+		lock.Name = base.Name
+		lock.Version = base.Version.String()
 		lock.DownloadURL = pkg.PluginDownloadURL
-	} else {
+		if pkg.Version == nil {
+			return nil, errors.New("extension package must have a version")
+		}
+		lock.Extension = &packages.ParameterizationDecl{
+			Name:    pkg.Name,
+			Version: pkg.Version.String(),
+		}
+		lock.Extension.SetValue(pkg.ExtensionParameterization.Parameter)
+	case pkg.Parameterization != nil:
 		lock.Name = pkg.Parameterization.BasePlugin.Name
 		lock.Version = pkg.Parameterization.BasePlugin.Version.String()
 		lock.DownloadURL = pkg.PluginDownloadURL
@@ -679,6 +702,12 @@ func (host *yamlLanguageHost) GeneratePackage(ctx context.Context, req *pulumirp
 			Version: pkg.Version.String(),
 		}
 		lock.Parameterization.SetValue(pkg.Parameterization.Parameter)
+	default:
+		lock.Name = pkg.Name
+		if pkg.Version != nil {
+			lock.Version = pkg.Version.String()
+		}
+		lock.DownloadURL = pkg.PluginDownloadURL
 	}
 
 	// Write out a yaml file for this package

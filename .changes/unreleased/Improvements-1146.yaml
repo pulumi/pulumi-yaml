@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Support extension parameterization packages, whose resources are layered onto a base provider's namespace
+time: 2026-07-07T16:45:40.130654-07:00
+custom:
+    PR: "1146"

@@ -85,7 +85,7 @@ func newSnippetImporter(loader pulumiyaml.PackageLoader) *importer {
 		stackReferences:    map[string]*model.Variable{},
 		resources:          map[string]*model.Variable{},
 		outputs:            map[string]*model.Variable{},
-		packageDescriptors: map[tokens.Package]*schema.PackageDescriptor{},
+		packageDescriptors: map[tokens.Package][]*schema.PackageDescriptor{},
 		snippet:            true,
 	}
 }

@@ -1,0 +1,14 @@
+resources:
+  greeting:
+    type: extbase:Greeting
+  greetingComp:
+    type: extbase:GreetingComponent
+outputs:
+  parameterValue: ${greeting.parameterValue}
+  parameterValueFromComponent: ${greetingComp.parameterValue}
+  invokeGreeting:
+    fn::invoke:
+      function: extbase:greet
+      arguments:
+        name: Pulumi
+      return: greeting

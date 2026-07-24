@@ -1,0 +1,8 @@
+resources:
+  greeting:
+    type: extbase:Greeting
+  base:
+    type: extbase:Base
+outputs:
+  parameterValue: ${greeting.parameterValue}
+  baseValue: ${base.baseValue}
