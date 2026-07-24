@@ -14,3 +14,18 @@ resources:
     properties:
       intEnum: 1
       stringEnum: two
+  sink4:
+    type: enum:Deluxe
+    properties:
+      numberEnum: 0.1
+      wordyEnum: It's got apostrophes
+      arrayOfEnum:
+        - one
+        - two
+      mapOfEnum:
+        small: 1
+        large: 2
+      holder:
+        size: 2
+        color: one
+      unionEnum: A Value With Spaces.
