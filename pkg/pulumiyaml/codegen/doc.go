@@ -114,6 +114,24 @@ func (d DocLanguageHelper) GetMethodName(m *schema.Method) string {
 	return ""
 }
 
+// ResolveDocRef renders a doc ref as it appears in YAML: property refs use the schema property
+// name verbatim and resource and function refs use the collapsed token form (e.g. pkg:mod:Name).
+// Named types have no YAML rendering, so type refs fall back to the default rendering.
+func (d DocLanguageHelper) ResolveDocRef(pkg schema.PackageReference, selfRef, ref schema.DocRef) (string, bool, error) {
+	switch ref.Kind {
+	case schema.DocRefKindResource:
+		return collapseToken(ref.ResourceToken()), true, nil
+	case schema.DocRefKindFunction:
+		return collapseToken(ref.Function.Token), true, nil
+	case schema.DocRefKindResourceProperty, schema.DocRefKindResourceInputProperty,
+		schema.DocRefKindFunctionInputProperty, schema.DocRefKindFunctionOutputProperty,
+		schema.DocRefKindTypeProperty:
+		return ref.Property, true, nil
+	default:
+		return "", false, nil
+	}
+}
+
 // Doc links
 
 func (d DocLanguageHelper) GetModuleDocLink(pkg *schema.Package, modName string) (string, string) {

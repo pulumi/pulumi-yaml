@@ -40,6 +40,66 @@ func TestActuallDocLanguageHelper(t *testing.T) {
 	func(codegen.DocLanguageHelper) {}(DocLanguageHelper{})
 }
 
+func TestResolveDocRef(t *testing.T) {
+	t.Parallel()
+
+	helper := DocLanguageHelper{}
+
+	tests := []struct {
+		name     string
+		ref      schema.DocRef
+		expected string
+		resolved bool
+	}{
+		{
+			name: "resource",
+			ref: schema.DocRef{
+				Kind: schema.DocRefKindResource,
+				Type: &schema.ResourceType{Token: "pkg:mod/resToken:ResToken"},
+			},
+			expected: "pkg:mod:ResToken",
+			resolved: true,
+		},
+		{
+			name: "function",
+			ref: schema.DocRef{
+				Kind:     schema.DocRefKindFunction,
+				Function: &schema.Function{Token: "pkg:index:getThing"},
+			},
+			expected: "pkg:getThing",
+			resolved: true,
+		},
+		{
+			name: "resource property",
+			ref: schema.DocRef{
+				Kind:     schema.DocRefKindResourceProperty,
+				Property: "someProp",
+			},
+			expected: "someProp",
+			resolved: true,
+		},
+		{
+			name: "type",
+			ref: schema.DocRef{
+				Kind: schema.DocRefKindType,
+				Type: &schema.ObjectType{Token: "pkg:mod/type:Type"},
+			},
+			expected: "",
+			resolved: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			name, ok, err := helper.ResolveDocRef(nil, schema.DocRef{}, tt.ref)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.resolved, ok)
+			assert.Equal(t, tt.expected, name)
+		})
+	}
+}
+
 func TestGetTypeName(t *testing.T) {
 	t.Parallel()
 	helper := DocLanguageHelper{}
