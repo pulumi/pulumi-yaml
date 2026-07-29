@@ -16,13 +16,17 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi-yaml/pkg/converter"
 	"github.com/pulumi/pulumi-yaml/pkg/server"
@@ -35,10 +39,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
-func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
+func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient, func()) {
 	// We can't just go run the pulumi-test-language package because of
 	// https://github.com/golang/go/issues/39172, so we build it to a temp file then run that.
 	binary := t.TempDir() + "/pulumi-test-language"
@@ -88,13 +94,31 @@ func runTestingHost(t *testing.T) (string, testingrpc.LanguageTestClient) {
 	client := testingrpc.NewLanguageTestClient(conn)
 
 	t.Cleanup(func() {
-		assert.NoError(t, cmd.Process.Kill())
+		if err := cmd.Process.Kill(); !errors.Is(err, os.ErrProcessDone) {
+			require.NoError(t, err)
+		}
 		wg.Wait()
 		// We expect this to error because we just killed it.
 		contract.IgnoreError(cmd.Wait())
 	})
 
-	return address, client
+	// Makes the engine dump its goroutine stacks to stderr (logged above), so
+	// engine hangs like https://github.com/pulumi/pulumi-yaml/issues/1158 are
+	// diagnosable. The engine process exits as a result.
+	dumpEngineStacks := func() {
+		contract.IgnoreError(cmd.Process.Signal(syscall.SIGQUIT))
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+		}
+	}
+
+	return address, client, dumpEngineStacks
 }
 
 // Add test names here that are expected to fail and the reason why they are failing
@@ -166,7 +190,7 @@ func log(t *testing.T, name, message string) {
 func TestLanguage(t *testing.T) {
 	t.Parallel()
 
-	engineAddress, engine := runTestingHost(t)
+	engineAddress, engine, dumpEngineStacks := runTestingHost(t)
 
 	tests, err := engine.GetLanguageTests(t.Context(), &testingrpc.GetLanguageTestsRequest{})
 	require.NoError(t, err)
@@ -216,12 +240,23 @@ func TestLanguage(t *testing.T) {
 				t.Skipf("Skipping known failure: %s", expected)
 			}
 
-			result, err := engine.RunLanguageTest(t.Context(), &testingrpc.RunLanguageTestRequest{
+			// Tests normally finish within a minute; a much longer run means the
+			// engine process is hung (https://github.com/pulumi/pulumi-yaml/issues/1158).
+			// Fail just this test with a stack dump instead of timing out the
+			// whole suite without diagnostics.
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+			defer cancel()
+
+			result, err := engine.RunLanguageTest(ctx, &testingrpc.RunLanguageTestRequest{
 				Token:            prepare.Token,
 				Test:             tt,
 				SkipConvertTests: has(expectedEjectFailures, tt),
 			}, grpc.MaxCallRecvMsgSize(1024*1024*1024))
 
+			if status.Code(err) == codes.DeadlineExceeded {
+				dumpEngineStacks()
+				require.Failf(t, "test hung", "test %s hung, see engine goroutine dump in the logs", tt)
+			}
 			require.NoError(t, err)
 			for _, msg := range result.Messages {
 				t.Log(msg)
