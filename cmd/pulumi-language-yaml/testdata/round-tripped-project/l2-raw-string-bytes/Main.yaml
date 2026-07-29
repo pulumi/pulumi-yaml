@@ -1,0 +1,10 @@
+resources:
+  source:
+    type: bytesource:Resource
+    properties:
+      base64: AGhlbGxvIID+/yB3b3JsZPAo
+  sink:
+    type: bytesink:Resource
+    properties:
+      bytes: ${source.bytes}
+      expectBase64: ${source.base64}
