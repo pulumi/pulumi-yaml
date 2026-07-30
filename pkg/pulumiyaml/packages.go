@@ -255,13 +255,24 @@ func loadPackages(
 
 	packageName := ResolvePkgName(typeString)
 	nsDescriptors := descriptors[tokens.Package(packageName)]
-	if len(nsDescriptors) == 0 {
-		// Fall back to just the package name and passed in version if we don't have a descriptor.
-		nsDescriptors = []*schema.PackageDescriptor{{
+	// For parameterized extensions, add the base provider as an additional resolution candidate.
+	needsBase := true
+	for _, d := range nsDescriptors {
+		if d.Parameterization == nil { // plain unparameterized provider
+			needsBase = false
+			break
+		}
+		if d.Parameterization.Name == packageName { // replacement parameterized provider
+			needsBase = false
+			break
+		}
+	}
+	if needsBase {
+		nsDescriptors = append(nsDescriptors, &schema.PackageDescriptor{
 			Name:        packageName,
 			Version:     version,
 			DownloadURL: pluginDownloadURL,
-		}}
+		})
 	}
 
 	result := make([]resolvedPackage, 0, len(nsDescriptors))
