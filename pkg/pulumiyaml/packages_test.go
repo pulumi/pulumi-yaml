@@ -4,6 +4,7 @@ package pulumiyaml
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -111,18 +112,27 @@ func TestResolveTokenLeadingAcronym(t *testing.T) {
 	require.Equal(t, ResourceTypeToken(canonical), tk)
 }
 
-// capturingLoader records the descriptor passed to LoadPackage so tests can
-// assert on what loadPackage resolved.
+// capturingLoader records every descriptor passed to LoadPackage so tests can
+// assert on what loadPackages resolved against.
 type capturingLoader struct {
-	got *schema.PackageDescriptor
+	loaded []schema.PackageDescriptor
 }
 
 func (l *capturingLoader) LoadPackage(_ context.Context, descriptor *schema.PackageDescriptor) (Package, error) {
-	l.got = descriptor
+	l.loaded = append(l.loaded, *descriptor)
 	return MockPackage{}, nil
 }
 
 func (l *capturingLoader) Close() {}
+
+func (l *capturingLoader) loadedBase(name string) bool {
+	for _, d := range l.loaded {
+		if d.Name == name && d.Parameterization == nil {
+			return true
+		}
+	}
+	return false
+}
 
 // TestLoadPackageOverrides verifies that per-resource version and
 // pluginDownloadURL values override a shared descriptor without mutating it.
@@ -181,8 +191,8 @@ func TestLoadPackageOverrides(t *testing.T) {
 				"test:resource:type", tt.version, tt.pluginDownloadURL,
 			)
 			require.NoError(t, err)
-			require.NotNil(t, loader.got)
-			require.Equal(t, tt.expected, *loader.got)
+			require.Len(t, loader.loaded, 1)
+			require.Equal(t, tt.expected, loader.loaded[0])
 
 			// The shared descriptor must not be mutated by loadPackage.
 			require.Equal(t, schema.PackageDescriptor{
@@ -192,6 +202,168 @@ func TestLoadPackageOverrides(t *testing.T) {
 			}, *shared)
 		})
 	}
+}
+
+func TestLoadPackagesBaseFallback(t *testing.T) {
+	t.Parallel()
+
+	extVersion := semver.MustParse("2.0.0")
+
+	t.Run("empty namespace synthesizes a base", func(t *testing.T) {
+		t.Parallel()
+		loader := &capturingLoader{}
+		_, err := loadPackages(t.Context(), loader,
+			map[tokens.Package][]*schema.PackageDescriptor{},
+			"aws:s3:Bucket", nil, "",
+		)
+		require.NoError(t, err)
+		require.Len(t, loader.loaded, 1)
+		assert.True(t, loader.loadedBase("aws"))
+	})
+
+	t.Run("extension-only namespace synthesizes the base", func(t *testing.T) {
+		t.Parallel()
+		loader := &capturingLoader{}
+		descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+			"extbase": {{
+				Name: "extbase",
+				Parameterization: &schema.ParameterizationDescriptor{
+					Name:    "myext",
+					Version: extVersion,
+				},
+			}},
+		}
+		_, err := loadPackages(t.Context(), loader, descriptors, "extbase:Base", nil, "")
+		require.NoError(t, err)
+		assert.True(t, loader.loadedBase("extbase"),
+			"an extension-only namespace must add its base provider as a resolution candidate")
+	})
+
+	t.Run("namespace with an explicit base does not synthesize another", func(t *testing.T) {
+		t.Parallel()
+		loader := &capturingLoader{}
+		descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+			"extbase": {
+				{Name: "extbase"},
+				{
+					Name: "extbase",
+					Parameterization: &schema.ParameterizationDescriptor{
+						Name:    "myext",
+						Version: extVersion,
+					},
+				},
+			},
+		}
+		_, err := loadPackages(t.Context(), loader, descriptors, "extbase:Base", nil, "")
+		require.NoError(t, err)
+		require.Len(t, loader.loaded, 2, "must load exactly the two declared descriptors")
+	})
+
+	t.Run("replacement parameterization does not synthesize a base", func(t *testing.T) {
+		t.Parallel()
+		loader := &capturingLoader{}
+		descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+			"subpackage": {{
+				Name: "parameterized",
+				Parameterization: &schema.ParameterizationDescriptor{
+					Name:    "subpackage",
+					Version: extVersion,
+				},
+			}},
+		}
+		_, err := loadPackages(t.Context(), loader, descriptors, "subpackage:HelloWorld", nil, "")
+		require.NoError(t, err)
+		require.Len(t, loader.loaded, 1,
+			"a replacement package serves its whole namespace; no base plugin named after the parameterization exists")
+		assert.False(t, loader.loadedBase("subpackage"))
+	})
+}
+
+// resolvingPackage is a MockPackage that recognizes only the given tokens, so a test can
+// observe which package in a namespace a token was routed to.
+func resolvingPackage(toks ...string) MockPackage {
+	known := make(map[string]bool, len(toks))
+	for _, tk := range toks {
+		known[tk] = true
+	}
+	return MockPackage{
+		resolveResource: func(typeName string) (ResourceTypeToken, error) {
+			if known[typeName] {
+				return ResourceTypeToken(typeName), nil
+			}
+			return "", fmt.Errorf("package does not recognize %q", typeName)
+		},
+	}
+}
+
+// funcLoader loads packages via a per-test callback keyed on the descriptor.
+type funcLoader func(*schema.PackageDescriptor) (Package, error)
+
+func (l funcLoader) LoadPackage(_ context.Context, d *schema.PackageDescriptor) (Package, error) {
+	return l(d)
+}
+
+func (l funcLoader) Close() {}
+
+func TestResolveResourceRouting(t *testing.T) {
+	t.Parallel()
+
+	extVersion := semver.MustParse("2.0.0")
+
+	t.Run("extension namespace routes base and extension tokens to their own packages", func(t *testing.T) {
+		t.Parallel()
+		base := resolvingPackage("extbase:Base")
+		ext := resolvingPackage("extbase:Greeting")
+		loader := funcLoader(func(d *schema.PackageDescriptor) (Package, error) {
+			if d.Parameterization == nil {
+				return base, nil
+			}
+			return ext, nil
+		})
+		// Thin lock: only the extension is declared, so the base must be synthesized.
+		descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+			"extbase": {{
+				Name:             "extbase",
+				Parameterization: &schema.ParameterizationDescriptor{Name: "myext", Version: extVersion},
+			}},
+		}
+
+		_, tk, desc, err := ResolveResource(t.Context(), loader, descriptors, "extbase:Base", nil, "")
+		require.NoError(t, err)
+		assert.Equal(t, ResourceTypeToken("extbase:Base"), tk)
+		assert.Nil(t, desc.Parameterization,
+			"a base token must resolve against the synthesized base, not the extension")
+
+		_, tk, desc, err = ResolveResource(t.Context(), loader, descriptors, "extbase:Greeting", nil, "")
+		require.NoError(t, err)
+		assert.Equal(t, ResourceTypeToken("extbase:Greeting"), tk)
+		require.NotNil(t, desc.Parameterization)
+		assert.Equal(t, "myext", desc.Parameterization.Name)
+	})
+
+	t.Run("replacement namespace routes to the parameterized package with no base synthesized", func(t *testing.T) {
+		t.Parallel()
+		repl := resolvingPackage("subpackage:HelloWorld")
+		loader := funcLoader(func(d *schema.PackageDescriptor) (Package, error) {
+			// A synthesized base would be a plain descriptor named after the parameterization,
+			// for which no plugin exists. Fail loudly so the regression surfaces here.
+			if d.Parameterization == nil {
+				return nil, fmt.Errorf("no plugin named %q exists", d.Name)
+			}
+			return repl, nil
+		})
+		descriptors := map[tokens.Package][]*schema.PackageDescriptor{
+			"subpackage": {{
+				Name:             "parameterized",
+				Parameterization: &schema.ParameterizationDescriptor{Name: "subpackage", Version: extVersion},
+			}},
+		}
+
+		_, tk, desc, err := ResolveResource(t.Context(), loader, descriptors, "subpackage:HelloWorld", nil, "")
+		require.NoError(t, err)
+		assert.Equal(t, ResourceTypeToken("subpackage:HelloWorld"), tk)
+		assert.Equal(t, "parameterized", desc.Name)
+	})
 }
 
 func TestBuildRegisterPackageRequest(t *testing.T) {

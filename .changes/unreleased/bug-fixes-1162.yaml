@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Resolve base provider resources after the provider has been extended via `pulumi package add`; the base package is no longer dropped as a resolution candidate
+time: 2026-07-29T17:03:59.043574-07:00
+custom:
+    PR: "1162"
