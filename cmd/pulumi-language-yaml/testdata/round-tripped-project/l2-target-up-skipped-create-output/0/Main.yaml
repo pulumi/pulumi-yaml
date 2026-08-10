@@ -1,0 +1,10 @@
+resources:
+  target:
+    type: simple:Resource
+    properties:
+      value: true
+  other:
+    type: nestedobject:Container
+    properties:
+      inputs:
+        - a
