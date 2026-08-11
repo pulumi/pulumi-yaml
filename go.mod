@@ -100,9 +100,8 @@ require (
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/git-pkgs/manifests v0.4.1 // indirect
-	github.com/git-pkgs/packageurl-go v0.3.1 // indirect
-	github.com/git-pkgs/purl v0.1.10 // indirect
-	github.com/git-pkgs/vers v0.2.4 // indirect
+	github.com/git-pkgs/purl v0.1.15 // indirect
+	github.com/git-pkgs/vers v0.3.0 // indirect
 	github.com/go-git/gcfg/v2 v2.0.2 // indirect
 	github.com/go-git/go-billy/v6 v6.0.0-alpha.2 // indirect
 	github.com/go-git/go-git/v6 v6.0.0-alpha.5 // indirect
@@ -166,6 +165,7 @@ require (
 	github.com/nightlyone/lockfile v1.0.0 // indirect
 	github.com/opentracing/basictracer-go v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/package-url/packageurl-go v0.1.6 // indirect
 	github.com/pgavlin/fx v0.1.6 // indirect
 	github.com/pgavlin/fx/v2 v2.0.12 // indirect
 	github.com/pgavlin/goldmark v1.1.33-0.20200616210433-b5eb04559386 // indirect
