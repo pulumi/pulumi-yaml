@@ -1,4 +1,16 @@
 {
     $schema: "https://docs.renovatebot.com/renovate-schema.json",
     extends: ["github>pulumi/renovate-config//default.json5"],
+    packageRules: [
+        {
+            description: "Write a changie fragment for each dependency bump",
+            matchPackageNames: ["*"],
+            postUpgradeTasks: {
+                commands: [
+                    "make renovate DEP='{{{depName}}}' VERSION='{{{newVersion}}}' FILE='{{{packageFile}}}'",
+                ],
+                executionMode: "update",
+            },
+        },
+    ],
 }

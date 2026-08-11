@@ -73,7 +73,7 @@ These patterns are consistently flagged in PR review:
 
 ### Changelog
 
-Changes require a changelog entry via `changie new`. Components: `codegen`, `docs`, `runtime`, `convert`. Kinds: `Improvements` (minor), `Bug Fixes` (patch).
+Changes require a changelog entry via `changie new`. Components: `codegen`, `docs`, `runtime`, `convert`. Kinds: `Improvements` (minor), `Bug Fixes` (patch). The `Dependencies` kind is reserved for automated Renovate updates: a `postUpgradeTasks` hook runs `make renovate` (see `scripts/renovate-changelog.sh`), so those fragments carry no PR number.
 
 ## Architecture
 

@@ -54,6 +54,10 @@ update_plugin_docs::
 	./scripts/update_plugin_docs.sh azure-native ${PLUGIN_VERSION_AZURE_NATIVE}
 	./scripts/update_plugin_docs.sh awsx ${PLUGIN_VERSION_AWSX}
 
+.PHONY: renovate
+renovate:
+	./scripts/renovate-changelog.sh "$(DEP)" "$(VERSION)" "$(FILE)"
+
 .PHONY: install
 install: install_pulumi-language-yaml install_pulumi-converter-yaml
 
