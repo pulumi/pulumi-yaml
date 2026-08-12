@@ -236,6 +236,26 @@ size = length([
 `,
 		},
 		{
+			name:     "external references are not camelCased",
+			token:    "snippet:index:Bucket",
+			filename: "inputs.yaml",
+			input: `name: ${my_bucket.name}
+extra: ${my_password}
+`,
+			expected: `name = my_bucket.name
+extra = my_password
+`,
+		},
+		{
+			name:     "illegal identifier characters are still sanitized",
+			token:    "snippet:index:Bucket",
+			filename: "inputs.yaml",
+			input: `name: ${my-bucket.name}
+`,
+			expected: `name = my_bucket.name
+`,
+		},
+		{
 			name:     "fn::toJSON of nested structure",
 			token:    "snippet:index:Bucket",
 			filename: "inputs.yaml",
@@ -295,7 +315,7 @@ func TestImportSnippetAttributes(t *testing.T) {
 	// References to outside symbols (here ${bucket.arn}) are emitted as scope traversals — the
 	// engine resolves them when binding the merged PCL.
 	attrs := map[string]string{
-		"name":      "${bucket.arn}",
+		"name":      "${my_bucket.arn}",
 		"size":      "42",
 		"versioned": "true",
 		"tags": `fn::toJSON:
@@ -303,7 +323,7 @@ func TestImportSnippetAttributes(t *testing.T) {
 `,
 	}
 	expected := map[string]string{
-		"name":      "bucket.arn",
+		"name":      "my_bucket.arn",
 		"size":      "42",
 		"versioned": "true",
 		"tags": `toJSON({

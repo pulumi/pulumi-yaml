@@ -90,8 +90,16 @@ func (imp *importer) importRef(node ast.Expr, name string, environment map[strin
 		return x, nil
 	}
 
+	pclName := makeLegalIdentifier(name)
+	if !imp.snippet {
+		// camelCasing keeps references consistent with the declarations this converter
+		// generates elsewhere in a full template. A snippet has no such declarations: its
+		// unknown symbols are external references whose scope variables the caller declares
+		// under exactly the names given here, so they must pass through verbatim.
+		pclName = camel(pclName)
+	}
 	traversal := &model.ScopeTraversalExpression{
-		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: camel(makeLegalIdentifier(name))}},
+		Traversal: hcl.Traversal{hcl.TraverseRoot{Name: pclName}},
 		Parts:     []model.Traversable{model.DynamicType},
 	}
 	if imp.snippet {

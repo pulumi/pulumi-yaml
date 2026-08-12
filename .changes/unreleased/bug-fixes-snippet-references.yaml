@@ -1,0 +1,8 @@
+component: convert
+kind: bug-fixes
+body: Stop camelCasing external references in snippet conversion, so `pulumi do`
+  input expressions like `${my_bucket.bucket}` resolve against the identifiers the
+  caller declared
+time: 2026-08-12T13:18:00.000000+02:00
+custom:
+    PR: ""
