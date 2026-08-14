@@ -98,14 +98,16 @@ func NewPackageLoaderFromSchemaLoader(loader schema.ReferenceLoader) PackageLoad
 func GetReferencedPackages(tmpl *ast.TemplateDecl) ([]packages.PackageDecl, syntax.Diagnostics) {
 	// Build an index of SDK declarations for version/URL lookup, but don't add them to the
 	// result set. Only packages actually referenced by resources or invokes should be returned.
-	// A namespace can be served by more than one declaration (a base provider plus extensions
-	// layered onto it), so the index maps a namespace to all of its declarations.
+	// A declaration is indexed by the namespace its tokens live in: the parameterization name
+	// for a replacement or extension package, otherwise the package's own name.
 	sdkIndex := map[string][]*packages.PackageDecl{}
 	for i := range tmpl.Sdks {
 		pkg := &tmpl.Sdks[i]
 		name := pkg.Name
 		if pkg.Parameterization != nil {
 			name = pkg.Parameterization.Name
+		} else if pkg.Extension != nil {
+			name = pkg.Extension.Name
 		}
 		sdkIndex[name] = append(sdkIndex[name], pkg)
 	}

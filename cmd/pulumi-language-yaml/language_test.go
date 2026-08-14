@@ -152,6 +152,8 @@ var expectedFailures = map[string]string{
 
 	"l1-for-expression": "Added by v3.257.0: Pulumi YAML cannot represent for loops",
 
+	"l2-extension-and-base-resource": "Flaky: engine RegisterPackage dedups the plain base package onto the extension's ref when the extension registers first, wrongly stamping ExtensionRef on base resources (pulumi/pulumi#24336)",
+
 	"l2-invoke-dependencies":         "Tightened by v3.256.0: YAML invokes eagerly instead of declaring invoke dependencies to the engine",
 	"l2-invoke-depends-on-component": "Added by v3.256.0: YAML invokes eagerly and registers remote components as custom resources, so the engine gates on them forever",
 }

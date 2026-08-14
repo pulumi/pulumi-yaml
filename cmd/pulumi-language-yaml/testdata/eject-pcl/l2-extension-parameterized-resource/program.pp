@@ -9,11 +9,11 @@ package {
 	}
 }
 
-resource greeting "extbase:index:Greeting" {
+resource greeting "myext:index:Greeting" {
 	__logicalName = "greeting"
 }
 
-resource greetingComp "extbase:index:GreetingComponent" {
+resource greetingComp "myext:index:GreetingComponent" {
 	__logicalName = "greetingComp"
 }
 
@@ -29,7 +29,7 @@ output parameterValueFromComponent {
 
 output invokeGreeting {
 	__logicalName = "invokeGreeting"
-	value = invoke("extbase:index:greet", {
+	value = invoke("myext:index:greet", {
 		name = "Pulumi"
 	}).greeting
 }

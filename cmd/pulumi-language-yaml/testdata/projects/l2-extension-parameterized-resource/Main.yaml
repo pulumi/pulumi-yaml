@@ -1,14 +1,14 @@
 resources:
   greeting:
-    type: extbase:Greeting
+    type: myext:Greeting
   greetingComp:
-    type: extbase:GreetingComponent
+    type: myext:GreetingComponent
 outputs:
   parameterValue: ${greeting.parameterValue}
   parameterValueFromComponent: ${greetingComp.parameterValue}
   invokeGreeting:
     fn::invoke:
-      function: extbase:greet
+      function: myext:greet
       arguments:
         name: Pulumi
       return: greeting

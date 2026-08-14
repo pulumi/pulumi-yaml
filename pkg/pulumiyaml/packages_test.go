@@ -374,19 +374,19 @@ func TestBuildRegisterPackageRequest(t *testing.T) {
 
 	t.Run("descriptor without parameterization sets neither field", func(t *testing.T) {
 		t.Parallel()
-		req := buildRegisterPackageRequest(tokens.Package("random"), &schema.PackageDescriptor{
+		req := buildRegisterPackageRequest(&schema.PackageDescriptor{
 			Name:    "random",
 			Version: &version,
-		})
+		}, false)
 		assert.Equal(t, "random", req.Name)
 		assert.Equal(t, "1.0.0", req.Version)
 		assert.Nil(t, req.Parameterization)
 		assert.Nil(t, req.Extension)
 	})
 
-	t.Run("descriptor keyed by the parameterization name sets Parameterization", func(t *testing.T) {
+	t.Run("replacement parameterization sets Parameterization", func(t *testing.T) {
 		t.Parallel()
-		req := buildRegisterPackageRequest(tokens.Package("pkg"), &schema.PackageDescriptor{
+		req := buildRegisterPackageRequest(&schema.PackageDescriptor{
 			Name:    "testprovider",
 			Version: &baseVersion,
 			Parameterization: &schema.ParameterizationDescriptor{
@@ -394,7 +394,7 @@ func TestBuildRegisterPackageRequest(t *testing.T) {
 				Version: version,
 				Value:   []byte("pkg"),
 			},
-		})
+		}, false)
 		assert.Equal(t, "testprovider", req.Name)
 		assert.Equal(t, "0.0.1", req.Version)
 		assert.Nil(t, req.Extension)
@@ -405,9 +405,9 @@ func TestBuildRegisterPackageRequest(t *testing.T) {
 		}, req.Parameterization)
 	})
 
-	t.Run("descriptor keyed by the base provider name sets Extension", func(t *testing.T) {
+	t.Run("extension parameterization sets Extension", func(t *testing.T) {
 		t.Parallel()
-		req := buildRegisterPackageRequest(tokens.Package("testprovider"), &schema.PackageDescriptor{
+		req := buildRegisterPackageRequest(&schema.PackageDescriptor{
 			Name:    "testprovider",
 			Version: &baseVersion,
 			Parameterization: &schema.ParameterizationDescriptor{
@@ -415,7 +415,7 @@ func TestBuildRegisterPackageRequest(t *testing.T) {
 				Version: version,
 				Value:   []byte("ext"),
 			},
-		})
+		}, true)
 		assert.Equal(t, "testprovider", req.Name)
 		assert.Equal(t, "0.0.1", req.Version)
 		assert.Nil(t, req.Parameterization)

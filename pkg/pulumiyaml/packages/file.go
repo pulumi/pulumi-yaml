@@ -138,10 +138,9 @@ func SearchPackageDecls(directory string) ([]PackageDecl, error) {
 	return packages, nil
 }
 
-// ToPackageDescriptors groups package descriptors by the namespace their tokens live in. A
-// single namespace can be served by more than one package: a base provider plus one or more
-// extensions layered onto it (e.g. base "kubernetes" plus a CRD extension), which is why the
-// values are slices rather than a single descriptor.
+// ToPackageDescriptors groups package descriptors by the namespace their tokens live in: the
+// parameterization name for a replacement or extension package (extension resources live in the
+// extension's own namespace since pulumi v3.257.0), otherwise the package's own name.
 func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package][]*schema.PackageDescriptor, error) {
 	packageDescriptors := make(map[tokens.Package][]*schema.PackageDescriptor)
 	for _, pkg := range packages {
@@ -155,9 +154,7 @@ func ToPackageDescriptors(packages []PackageDecl) (map[tokens.Package][]*schema.
 
 		var parameterization *schema.ParameterizationDescriptor
 		if param != nil {
-			if pkg.Parameterization != nil {
-				name = pkg.Parameterization.Name
-			}
+			name = param.Name
 
 			value, err := param.GetValue()
 			if err != nil {

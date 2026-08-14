@@ -922,7 +922,7 @@ type Evaluator interface {
 type programEvaluator struct {
 	*evalContext
 	pulumiCtx   *pulumi.Context
-	packageRefs map[tokens.Package]string
+	packageRefs map[tokens.Package]packageRef
 	parent      pulumi.Resource // non-nil when evaluating inside a component
 }
 
@@ -1068,8 +1068,11 @@ func distinctName(pkg *schema.PackageDescriptor) tokens.Package {
 	return tokens.Package(pkg.Name)
 }
 
-// buildRegisterPackageRequest builds the RegisterPackage request for the descriptor stored under key.
-func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescriptor) *pulumirpc.RegisterPackageRequest {
+// buildRegisterPackageRequest builds the RegisterPackage request for a descriptor. A
+// schema.PackageDescriptor carries both parameterization flavors in the same slot, so the caller
+// must say whether the parameterization is an extension (layered onto the base provider) or a
+// replacement — the engine treats the two differently.
+func buildRegisterPackageRequest(pkg *schema.PackageDescriptor, isExtension bool) *pulumirpc.RegisterPackageRequest {
 	var version string
 	if pkg.Version != nil {
 		version = pkg.Version.String()
@@ -1085,7 +1088,7 @@ func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescript
 			Version: pkg.Parameterization.Version.String(),
 			Value:   pkg.Parameterization.Value,
 		}
-		if key == tokens.Package(pkg.Name) {
+		if isExtension {
 			req.Extension = p
 		} else {
 			req.Parameterization = p
@@ -1094,19 +1097,28 @@ func buildRegisterPackageRequest(key tokens.Package, pkg *schema.PackageDescript
 	return req
 }
 
-func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]string, syntax.Diagnostics) {
-	// Register package refs for all packages we know upfront. A namespace can be served by more
-	// than one package (a base provider plus extensions), so refs are keyed by the package's
-	// distinct name and resolution routes each resource to the package that recognized it.
-	packageRefs := make(map[tokens.Package]string)
-	for key, pkgs := range r.packageDescriptors {
+type packageRef string
+
+func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]packageRef, syntax.Diagnostics) {
+	// The descriptor map flattens extension and replacement parameterizations into the same
+	// slot, so recover which names are extensions from the program's package declarations.
+	extensionNames := map[string]bool{}
+	for _, sdk := range r.t.GetSdks() {
+		if sdk.Extension != nil {
+			extensionNames[sdk.Extension.Name] = true
+		}
+	}
+
+	packageRefs := make(map[tokens.Package]packageRef)
+	for _, pkgs := range r.packageDescriptors {
 		for _, pkg := range pkgs {
-			resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(key, pkg))
+			isExtension := pkg.Parameterization != nil && extensionNames[pkg.Parameterization.Name]
+			resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(pkg, isExtension))
 			if err != nil {
 				err = fmt.Errorf("registering package %s: %w", pkg.Name, err)
 				return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 			}
-			packageRefs[distinctName(pkg)] = resp.Ref
+			packageRefs[distinctName(pkg)] = packageRef(resp.Ref)
 		}
 	}
 	return packageRefs, nil
@@ -2065,7 +2077,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if isComponent {
 		typ := tokens.Type(typ)
 		packageRef := e.packageRefs[typ.Package()]
-		err = e.pulumiCtx.RegisterPackageRemoteComponentResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
+		err = e.pulumiCtx.RegisterPackageRemoteComponentResource(string(typ), resourceName, untypedArgs(props), res, string(packageRef), opts...)
 	} else if isRead {
 		s, ok := e.evaluateExpr(v.Get.Id)
 		if !ok {
@@ -2133,7 +2145,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 		if v.Options.Version != nil || v.Options.PluginDownloadURL != nil {
 			packageRef = ""
 		}
-		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, packageRef, opts...)
+		err = e.pulumiCtx.RegisterPackageResource(string(typ), resourceName, untypedArgs(props), res, string(packageRef), opts...)
 	}
 	if err != nil {
 		e.error(kvp.Key, err.Error())
@@ -2719,7 +2731,7 @@ func (e *programEvaluator) evaluateBuiltinInvoke(t *ast.InvokeExpr) (interface{}
 			refKey = distinctName(resolvedDescriptor)
 		}
 		packageRef := e.packageRefs[refKey]
-		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, packageRef, opts...)
+		secret, err := e.pulumiCtx.InvokePackageRaw(string(functionName), args[0], &result, string(packageRef), opts...)
 		if err != nil {
 			return e.error(t, err.Error())
 		}
