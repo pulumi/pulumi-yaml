@@ -1,0 +1,85 @@
+resources:
+  example1:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant1
+        payload: p1
+        extra: e1
+  example2:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant2
+        payload: p2
+        extra: e2
+  example3:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant3
+        payload: p3
+        count: 3
+  example4:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant4
+        payload: p4
+        enabled: true
+  example5:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant5
+        payload: p5
+        label: l5
+  example6:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant6
+        payload: p6
+        code: 6
+  example7:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant7
+        payload: p7
+        message: m7
+  example8:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant8
+        payload: p8
+        size: 8
+  example9:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant9
+        payload: p9
+        flag: false
+  example10:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf:
+        discriminantKind: variant10
+        payload: p10
+        note: n10
+  # A SubsetExample's unionOf is typed as a 3-variant subset union. We should be
+  # // able to assign that output to an Example's unionOf, which is typed as the
+  # // full 10-variant union.
+  subset1:
+    type: discriminated-union-many:SubsetExample
+    properties:
+      unionOf:
+        discriminantKind: variant3
+        payload: sp
+        count: 33
+  example11:
+    type: discriminated-union-many:Example
+    properties:
+      unionOf: ${subset1.unionOf}

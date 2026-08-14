@@ -1,0 +1,10 @@
+resources:
+  # A resource whose `elementType` property collides with the `ElementType()` method that
+  # generated Go SDK types must implement.
+  elem:
+    type: reservednames:ElementType
+    properties:
+      elementType:
+        elementType: nested
+outputs:
+  elementType: ${elem.elementType.elementType}

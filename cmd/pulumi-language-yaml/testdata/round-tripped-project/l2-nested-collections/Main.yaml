@@ -1,0 +1,6 @@
+resources:
+  foo:
+    type: nestedcollections:Foo
+outputs:
+  secondProp: ${foo.conditionSets[0][0][1].prop}
+  leaf: ${foo.privateEndpoint.outer.inner.leaf}

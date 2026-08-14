@@ -128,6 +128,7 @@ var expectedFailures = map[string]string{
 	"l2-resource-hook-ignore-errors": "Failing after updating to 3.239: *pcl.Hook generation unimplemented",
 	"l2-resource-hook-after-failure": "Failing after updating to 3.239: *pcl.Hook generation unimplemented",
 	"l2-resource-hook-on-error":      "*pcl.Hook generation unimplemented (added in 3.254)",
+	"l2-resource-hook-panic":         "*pcl.Hook generation unimplemented (added in 3.257)",
 	"l1-config-types-optional":       "Failing after updating to 3.239: YAML runtime rejects 'list<union(none, string)>' config type",
 
 	"provider-alias-component":               "needs YAML testdata for the Simple component provider plus alias-migration support",
@@ -148,6 +149,8 @@ var expectedFailures = map[string]string{
 	"l2-invoke-multi-argument": "Added by v3.251.0: YAML does not support multi-argument invokes",
 
 	"l2-failed-create-recover-continue-on-error": "Added by v3.252.0: Unknown Function; YAML does not support fn::recover",
+
+	"l1-for-expression": "Added by v3.257.0: Pulumi YAML cannot represent for loops",
 
 	"l2-invoke-dependencies":         "Tightened by v3.256.0: YAML invokes eagerly instead of declaring invoke dependencies to the engine",
 	"l2-invoke-depends-on-component": "Added by v3.256.0: YAML invokes eagerly and registers remote components as custom resources, so the engine gates on them forever",

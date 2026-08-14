@@ -1,0 +1,8 @@
+resources:
+  elem:
+    type: reservednames:ElementType
+    properties:
+      elementType:
+        elementType: nested
+outputs:
+  elementType: ${elem.elementType.elementType}
