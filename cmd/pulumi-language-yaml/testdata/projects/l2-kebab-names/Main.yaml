@@ -1,0 +1,14 @@
+resources:
+  # The package name and module name are kebab-case. Resource and object type names cannot be
+  # // kebab-case yet (the metaschema forbids hyphens in the member segment of a token), and kebab-case
+  # // property names are not yet handled by all code generators.
+  first:
+    type: kebab-names:kebab-module:someResource
+    properties:
+      theInput: true
+      nested:
+        nestedValue: nested
+  second:
+    type: kebab-names:kebab-module:anotherResource
+    properties:
+      theInput: ${first.theOutput.nestedOutput}

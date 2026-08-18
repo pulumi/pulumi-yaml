@@ -1,0 +1,11 @@
+resources:
+  first:
+    type: kebab-names:kebab-module:someResource
+    properties:
+      theInput: true
+      nested:
+        nestedValue: nested
+  second:
+    type: kebab-names:kebab-module:anotherResource
+    properties:
+      theInput: ${first.theOutput.nestedOutput}
