@@ -156,6 +156,8 @@ var expectedFailures = map[string]string{
 
 	"l2-invoke-dependencies":         "Tightened by v3.256.0: YAML invokes eagerly instead of declaring invoke dependencies to the engine",
 	"l2-invoke-depends-on-component": "Added by v3.256.0: YAML invokes eagerly and registers remote components as custom resources, so the engine gates on them forever",
+
+	"l1-component-sourceless": "Added by v3.259.0: *pcl.Component generation unimplemented",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.

@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/blang/semver"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
-	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/test"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/testing/utils"
@@ -217,7 +217,7 @@ func TestGenerateProgram(t *testing.T) {
 			case "dynamic-entries", "csharp-typed-for-expressions":
 				// Pulumi YAML does not support for loops.
 			case "read-file-func", "python-regress-10914", "unknown-invoke":
-				tt.SkipCompile = codegen.NewStringSet("yaml")
+				tt.SkipCompile = mapset.NewSet("yaml")
 				l = append(l, tt)
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
@@ -226,7 +226,7 @@ func TestGenerateProgram(t *testing.T) {
 			case "config-variables":
 			case "logical-name":
 				// Needs config set in order to compile/run.
-				tt.SkipCompile = codegen.NewStringSet("yaml")
+				tt.SkipCompile = mapset.NewSet("yaml")
 				l = append(l, tt)
 			case "deferred-outputs":
 				// Reason: Pulumi YAML does not support deferred outputs.
@@ -239,7 +239,7 @@ func TestGenerateProgram(t *testing.T) {
 		return l
 	}
 
-	check := func(t *testing.T, output string, _ codegen.StringSet) {
+	check := func(t *testing.T, output string, _ mapset.Set[string]) {
 		file, err := os.ReadFile(output)
 		assert.NoError(t, err)
 		templateDecl, diags, err := pulumiyaml.LoadYAMLBytes(output, file)
