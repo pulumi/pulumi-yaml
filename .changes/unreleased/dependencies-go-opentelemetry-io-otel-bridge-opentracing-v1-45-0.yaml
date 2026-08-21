@@ -1,0 +1,4 @@
+component: runtime
+kind: dependencies
+body: Update go.opentelemetry.io/otel/bridge/opentracing to v1.45.0
+time: 2026-08-21T10:11:17.231906079Z
