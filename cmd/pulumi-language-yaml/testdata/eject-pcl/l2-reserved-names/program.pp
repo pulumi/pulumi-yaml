@@ -7,5 +7,10 @@ resource elem "reservednames:index:ElementType" {
 
 output elementType {
 	__logicalName = "elementType"
+	value = elem.elementType
+}
+
+output nested {
+	__logicalName = "nested"
 	value = elem.elementType.elementType
 }

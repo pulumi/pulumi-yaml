@@ -158,6 +158,15 @@ var expectedFailures = map[string]string{
 	"l2-invoke-depends-on-component": "Added by v3.256.0: YAML invokes eagerly and registers remote components as custom resources, so the engine gates on them forever",
 
 	"l1-component-sourceless": "Added by v3.259.0: *pcl.Component generation unimplemented",
+
+	"l2-resource-read-unknown": "Added by v3.260.0: *pcl.ReadResource generation unimplemented (panics in GenerateProject)",
+	"l2-invoke-default-argument": "Added by v3.260.0: YAML runtime does not apply schema defaults for omitted invoke arguments " +
+		"(invokeWithDefault fails with 'missing value')",
+	"l2-map-keys-invoke-call": "Added by v3.260.0: Traversal not allowed on function result; YAML cannot traverse fn::call results",
+	"l2-discriminated-union-marked-key": "Added by v3.260.0: YAML runtime turns the discriminant string into an empty object " +
+		"and drops secretness when a union output is passed to a union input",
+	"l2-kebab-names": "Tightened by v3.260.0 to use kebab-case property names: " +
+		"YAML does not support index access into object properties (${res[\"the-output\"]})",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
