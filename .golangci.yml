@@ -61,6 +61,12 @@ linters:
       # https://github.com/pulumi/pulumi/issues/9469
       - path: (.+)\.go$
         text: 'Name is deprecated: Name returns the variable or declaration name of the resource'
+      # G101 pattern-matches schema type tokens (e.g. Token: "pkg:mod:Member") and test-name
+      # tables as hardcoded credentials.
+      - linters:
+          - gosec
+        path: _test\.go$
+        text: 'G101:'
     paths:
       - third_party$
       - builtin$
