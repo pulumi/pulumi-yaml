@@ -35,7 +35,7 @@ func decodeValue(v reflect.Value) (syntax.Node, syntax.Diagnostics) {
 
 	for {
 		switch v.Kind() {
-		case reflect.Interface, reflect.Ptr:
+		case reflect.Interface, reflect.Pointer:
 			if v.IsNil() {
 				return syntax.Null(), nil
 			}
@@ -193,7 +193,7 @@ func encodeValue(n syntax.Node, v reflect.Value) syntax.Diagnostics {
 		return nil
 	}
 
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			if !v.CanSet() {
 				return nil

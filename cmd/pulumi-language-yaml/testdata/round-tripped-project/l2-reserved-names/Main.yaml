@@ -5,4 +5,5 @@ resources:
       elementType:
         elementType: nested
 outputs:
-  elementType: ${elem.elementType.elementType}
+  elementType: ${elem.elementType}
+  nested: ${elem.elementType.elementType}

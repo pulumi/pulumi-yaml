@@ -1,0 +1,8 @@
+resources:
+  res:
+    type: large:Map
+    properties:
+      value: leaf
+      depth: 300
+outputs:
+  output: ${res.value}

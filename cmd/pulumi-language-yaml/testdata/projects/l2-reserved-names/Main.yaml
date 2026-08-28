@@ -7,4 +7,8 @@ resources:
       elementType:
         elementType: nested
 outputs:
-  elementType: ${elem.elementType.elementType}
+  # The whole object checks that languages serialize typed objects in stack outputs with
+  # their wire-format (camelCase) keys; the nested string exercises traversal through the
+  # renamed members.
+  elementType: ${elem.elementType}
+  nested: ${elem.elementType.elementType}

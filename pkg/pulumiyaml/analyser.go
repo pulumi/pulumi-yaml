@@ -1280,7 +1280,7 @@ func newTypeCache() *typeCache {
 	)
 	return &typeCache{
 		exprs: map[ast.Expr]schema.Type{
-			pulumiExpr: &schema.ObjectType{
+			pulumiExpr: &schema.ObjectType{ //nolint:gosec // schema type token, not a credential
 				Token: "pulumi:builtin:pulumi",
 				Properties: []*schema.Property{
 					{Name: "cwd", Type: schema.StringType},

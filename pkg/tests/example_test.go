@@ -75,7 +75,7 @@ func TestExampleStackreference(t *testing.T) {
 				if info.Name() != "Pulumi.yaml" {
 					return nil
 				}
-				bytes, err := os.ReadFile(path)
+				bytes, err := os.ReadFile(path) //nolint:gosec // path comes from walking the in-repo examples directory
 				if err != nil {
 					return err
 				}
