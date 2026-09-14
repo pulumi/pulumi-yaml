@@ -330,12 +330,7 @@ func (g *generator) genResourceOpts(opts *pcl.ResourceOptions) *syn.ObjectNode {
 func (g *generator) genResource(n *pcl.Resource) {
 	properties := make([]syn.ObjectPropertyDef, len(n.Inputs))
 	for i, input := range n.Inputs {
-		value := input.Value
-		if f, ok := value.(*model.FunctionCallExpression); ok && f.Name == "secret" {
-			contract.Assertf(len(f.Args) == 1, "Expected exactly one argument to secret, got %d", len(f.Args))
-			value = f.Args[0]
-		}
-		v := g.expr(value)
+		v := g.expr(input.Value)
 		properties[i] = syn.ObjectProperty(
 			syn.StringSyntax(trivia(input), input.Name), v)
 	}
