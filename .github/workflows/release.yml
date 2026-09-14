@@ -55,7 +55,7 @@ jobs:
         if: steps.check-release.outputs.exists == 'false'
         uses: goreleaser/goreleaser-action@v2
         with:
-          version: latest
+          version: v2.18.0
           args: -p 10 -f .goreleaser.yml --clean --skip=validate --timeout 60m0s --release-notes=${{ env.RELEASE_NOTES_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
