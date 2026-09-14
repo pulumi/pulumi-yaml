@@ -3,5 +3,11 @@ resources:
     type: constant:Resource
     properties:
       kind: Constant
+      flag: true
+      count: 3
+      ratio: 1.5
 outputs:
   kind: ${first.kind}
+  flag: ${first.flag}
+  count: ${first.count}
+  ratio: ${first.ratio}
