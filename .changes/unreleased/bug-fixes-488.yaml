@@ -1,0 +1,6 @@
+component: codegen
+kind: bug-fixes
+body: Keep `secret()` on resource inputs when converting to YAML
+time: 2026-09-14T15:42:36.016094+02:00
+custom:
+    PR: "488"

@@ -182,6 +182,11 @@ func TestGenerateProgram(t *testing.T) {
 				Description:   "Converting a template expression into a join invoke",
 				PluginContext: newPluginContext(),
 			},
+			{
+				Directory:     "aws-secret",
+				Description:   "Keep secret() on a resource input",
+				PluginContext: newPluginContext(),
+			},
 		}
 		for _, tt := range tests {
 			switch tt.Directory {
