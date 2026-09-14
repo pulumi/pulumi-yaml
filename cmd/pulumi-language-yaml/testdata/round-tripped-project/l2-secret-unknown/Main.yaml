@@ -1,0 +1,8 @@
+resources:
+  r:
+    type: output:Resource
+    properties:
+      value: 1
+outputs:
+  wrapped:
+    fn::secret: ${r.output}

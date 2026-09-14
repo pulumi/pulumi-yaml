@@ -3,6 +3,13 @@ resources:
     type: constant:Resource
     properties:
       kind: Constant
+      flag: true
+      count: 3
+      ratio: 1.5
 outputs:
-  # `kind` has a constant value in the schema; reading it must bind without type errors.
+  # Every property has a constant value in the schema, one per constant kind; reading them must
+  # // bind without type errors.
   kind: ${first.kind}
+  flag: ${first.flag}
+  count: ${first.count}
+  ratio: ${first.ratio}
