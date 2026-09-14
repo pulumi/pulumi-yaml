@@ -8,8 +8,8 @@ _.path = [
 [tools]
 changie = "1.24.2"
 cue = "v0.12.0"
-go = "1.25.7"
-golangci-lint = "2.5.0"
+go = "1.26.6"
+golangci-lint = "2.13.2"
 jq = "latest"
 pulumi = "latest"
 "ubi:pulumi/pulumictl" = "latest"
