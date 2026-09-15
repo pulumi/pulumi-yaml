@@ -1,9 +1,0 @@
-resources:
-  vpc:
-    type: awsx:ec2:Vpc
-    properties:
-      subnetSpecs:
-        - type: Public
-          cidrMask: 22
-        - type: Private
-          cidrMask: 20

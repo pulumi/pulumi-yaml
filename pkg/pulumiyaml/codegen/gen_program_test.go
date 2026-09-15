@@ -4,7 +4,6 @@ package codegen
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -168,8 +167,8 @@ func (m FakePackage) Version() *semver.Version {
 	return nil
 }
 
-//nolint:paralleltest // mutates environment variables
 func TestGenerateProgram(t *testing.T) {
+	t.Parallel()
 	filter := func(tests []test.ProgramTest) []test.ProgramTest {
 		l := []test.ProgramTest{
 			{
@@ -190,53 +189,23 @@ func TestGenerateProgram(t *testing.T) {
 		}
 		for _, tt := range tests {
 			switch tt.Directory {
-			case "synthetic-resource-properties":
-				// https://github.com/pulumi/pulumi-yaml/issues/229
-			case "azure-sa":
-				// Reason: has dependencies between config variables
-			case "aws-eks", "aws-s3-folder", "simple-splat":
-				// Reason: missing splat
-				//
-				// Note: aws-s3-folder errors with
-				// 14,27-52: the asset parameter must be a string literal; the asset parameter must be a string literal
-				// But the actual error is that it is using a Splat operator.
 			case "components":
 				// https://github.com/pulumi/pulumi-yaml/issues/476
 			case "unknown-resource":
 				// https://github.com/pulumi/pulumi-yaml/issues/478
-			case "optional-complex-config":
-				// https://github.com/pulumi/pulumi-yaml/issues/479
 			case "interpolated-string-keys":
 				// https://github.com/pulumi/pulumi-yaml/issues/480
-			case "functions", "throw-not-implemented", "single-or-none":
-				// Pulumi YAML does not functions:
-				// secret or unsecret, notImplemented, singleOrNone.
-			case "python-resource-names", "python-reserved", "snowflake-python-12998", "python-regress-14037":
+			case "throw-not-implemented":
+				// Pulumi YAML does not support the notImplemented function.
+			case "python-reserved", "snowflake-python-12998":
 				// Reason: A python only test.
-			case "csharp-invoke-options":
-				// Reason: C# only test.
-			case "simple-range", "entries-function",
-				"iterating-optional-range-expressions",
-				"invoke-inside-conditional-range":
+			case "invoke-inside-conditional-range":
 				// Pulumi YAML does not support ranges
-			case "dynamic-entries", "csharp-typed-for-expressions":
-				// Pulumi YAML does not support for loops.
-			case "read-file-func", "python-regress-10914", "unknown-invoke":
+			case "read-file-func", "unknown-invoke":
 				tt.SkipCompile = mapset.NewSet("yaml")
 				l = append(l, tt)
 			case "traverse-union-repro":
 				// Reason: this example is known to be invalid
-			case "regress-node-12507":
-				// https://github.com/pulumi/pulumi-yaml/issues/494
-			case "config-variables":
-			case "logical-name":
-				// Needs config set in order to compile/run.
-				tt.SkipCompile = mapset.NewSet("yaml")
-				l = append(l, tt)
-			case "deferred-outputs":
-				// Reason: Pulumi YAML does not support deferred outputs.
-			case "this-keyword-resource-attr":
-				// Reason: Typescript only test
 			default:
 				l = append(l, tt)
 			}
@@ -255,17 +224,6 @@ func TestGenerateProgram(t *testing.T) {
 		}, pulumi.WithMocks("test", "gen", &testMonitor{}), func(ri *pulumi.RunInfo) { ri.DryRun = true })
 		assert.NoError(t, err)
 	}
-
-	c := struct {
-		StorageAccountNameParam string `json:"project:storageAccountNameParam"`
-		ResourceGroupNameParam  string `json:"project:resourceGroupNameParam"`
-	}{
-		"storageAccountNameParam",
-		"resourceGroupNameParam",
-	}
-	config, err := json.Marshal(c)
-	assert.NoError(t, err, "Failed to marshal fake config")
-	t.Setenv("PULUMI_CONFIG", string(config))
 
 	test.TestProgramCodegen(t, test.ProgramCodegenOptions{
 		Language:   "yaml",
@@ -287,80 +245,15 @@ func TestGenerateProgram(t *testing.T) {
 type testMonitor struct{}
 
 func (m *testMonitor) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
-	switch args.Token {
-	case "aws:index/getAmi:getAmi":
-		return resource.NewPropertyMapFromMap(map[string]interface{}{
-			"id": "1234",
-		}), nil
-
-	// For azure-sa-pp
-	case "azure:core/getResourceGroup:getResourceGroup":
-		return resource.NewPropertyMapFromMap(map[string]interface{}{
-			"location": "just-a-location",
-		}), nil
-
-	// For output-funcs-aws
-	case "aws:ec2/getPrefixList:getPrefixList":
-		return resource.NewPropertyMapFromMap(map[string]interface{}{
-			"cidrBlocks": []string{"some-list"},
-		}), nil
-
-	// For aws-fargate
-	case "aws:ec2/getSubnetIds:getSubnetIds":
-		return resource.NewPropertyMapFromMap(map[string]interface{}{
-			"ids": []string{"some-ids"},
-		}), nil
-	case "aws:ec2/getVpc:getVpc":
-		return resource.NewPropertyMapFromMap(map[string]interface{}{
-			"id": "some-id",
-		}), nil
-	case "aws:iam/getPolicyDocument:getPolicyDocument":
+	if args.Token == "aws:iam/getPolicyDocument:getPolicyDocument" {
 		return resource.NewPropertyMapFromMap(map[string]interface{}{
 			"json": `"some json"`,
 		}), nil
-
 	}
 	return resource.PropertyMap{}, nil
 }
 
 func (m *testMonitor) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
-	switch args.Name {
-	case "bucket":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"loggings": []interface{}{
-				map[string]string{
-					"targetBucket": "foo",
-				},
-			},
-		}), nil
-	case "logs":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"bucket": "foo",
-		}), nil
-	case "server":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"publicIp":  "some-public-ip",
-			"publicDns": "some-public-dns",
-		}), nil
-	case "securityGroup":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"name": "some-name",
-		}), nil
-
-	// For azure-sa-pp
-	case "storageAccountResource":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"name": "some-name",
-		}), nil
-
-	// For aws-fargate
-	case "webSecurityGroup":
-		return args.Name, resource.NewPropertyMapFromMap(map[string]interface{}{
-			"id": "some-id",
-		}), nil
-
-	}
-
 	return args.Name, resource.PropertyMap{}, nil
 }
 
