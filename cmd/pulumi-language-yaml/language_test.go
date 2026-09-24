@@ -135,9 +135,10 @@ var expectedFailures = map[string]string{
 	"provider-ignore-changes-component":      "needs YAML testdata for the Simple component provider plus ignoreChanges support",
 	"provider-replacement-trigger-component": "needs YAML testdata for the Simple component provider plus replaceOnChanges support",
 
-	"l1-stack-reference":      "Unknown Function; YAML does not support fn::unsecret",
-	"l2-resource-read":        "*pcl.ReadResource generation unimplemented",
-	"l2-component-call-plain": "Unknown Function; YAML does not support fn::call",
+	"l1-stack-reference":          "Unknown Function; YAML does not support fn::unsecret",
+	"l2-resource-read":            "*pcl.ReadResource generation unimplemented",
+	"l2-resource-read-depends-on": "*pcl.ReadResource generation unimplemented (added in 3.264)",
+	"l2-component-call-plain":     "Unknown Function; YAML does not support fn::call",
 
 	"l1-expand-final": "Added by v3.243.0, not yet passing",
 
