@@ -1,0 +1,12 @@
+resources:
+  root:
+    type: selfref:Node
+  child:
+    type: selfref:Node
+    properties:
+      parent: ${root}
+      parents:
+        - ${root}
+      namedParents:
+        root: ${root}
+      parentOrName: ${root}
