@@ -168,6 +168,10 @@ var expectedFailures = map[string]string{
 		"and drops secretness when a union output is passed to a union input",
 	"l2-kebab-names": "Tightened by v3.260.0 to use kebab-case property names: " +
 		"YAML does not support index access into object properties (${res[\"the-output\"]})",
+
+	"l1-builtin-range": "Added by v3.265.0: Unknown Function; YAML does not support fn::range",
+	"l2-failed-create-continue-on-error-read": "Added by v3.265.0: *pcl.ReadResource generation unimplemented " +
+		"(panics in GenerateProject)",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
