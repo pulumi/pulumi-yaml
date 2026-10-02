@@ -451,7 +451,7 @@ func (host *yamlLanguageHost) RunPlugin(
 			pulumirpc.RegisterResourceProviderServer(srv, prov)
 			return nil
 		},
-		Options: rpcutil.OpenTracingServerInterceptorOptions(nil),
+		Options: rpcutil.TracingServerInterceptorOptions(nil),
 	})
 	if err != nil {
 		return fmt.Errorf("fatal: %w", err)

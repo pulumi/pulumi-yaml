@@ -596,21 +596,21 @@ func (tc *typeCache) assertTypeAssignable(ctx *evalContext, from ast.Expr, to sc
 	ctx.addErrDiag(rng, summary, result.String())
 }
 
-func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
+func (tc *typeCache) typeResource(ctx context.Context, r *Runner, node resourceNode) bool {
 	k, v := node.Key.Value, node.Value
-	ctx := r.newContext(node)
+	rCtx := r.newContext(node)
 	version, err := ParseVersion(v.Options.Version)
 	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
+		rCtx.error(v.Type, fmt.Sprintf("unable to parse resource %v provider version: %v", k, err))
 		return true
 	}
 	pluginDownloadURL := ""
 	if v.Options.PluginDownloadURL != nil {
 		pluginDownloadURL = v.Options.PluginDownloadURL.Value
 	}
-	pkg, typ, _, err := ResolveResource(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, v.Type.Value, version, pluginDownloadURL)
+	pkg, typ, _, err := ResolveResource(ctx, rCtx.pkgLoader, rCtx.packageDescriptors, v.Type.Value, version, pluginDownloadURL)
 	if err != nil {
-		ctx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
+		rCtx.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", k, err))
 		return true
 	}
 	hint := pkg.ResourceTypeHint(typ)
@@ -629,7 +629,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	resourceHasProperties := (v.Properties.PropertyMap != nil && len(v.Properties.PropertyMap.Entries) > 0) || v.Properties.Expr != nil
 
 	if resourceIsGet && resourceHasProperties {
-		ctx.addErrDiag(node.Key.Syntax().Syntax().Range(),
+		rCtx.addErrDiag(node.Key.Syntax().Syntax().Range(),
 			"Resource fields properties and get are mutually exclusive",
 			"Properties is used to describe a resource managed by Pulumi.\n"+
 				"Get is used to describe a resource managed outside of the current Pulumi stack.\n"+
@@ -642,20 +642,20 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 	// 2. The resource doesn't have a `Get` field (catching missing properties)
 	if resourceHasProperties || !resourceIsGet {
 		if v.Properties.PropertyMap != nil {
-			tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Properties.PropertyMap.Entries, hint.Resource.InputProperties)
+			tc.typePropertyEntries(rCtx, k, typ.String(), fmtr, v.Properties.PropertyMap.Entries, hint.Resource.InputProperties)
 		} else if v.Properties.Expr != nil {
 			to := &schema.ObjectType{
 				Token:      typ.String(),
 				Properties: hint.Resource.InputProperties,
 			}
-			tc.assertTypeAssignable(ctx, v.Properties.Expr, to)
+			tc.assertTypeAssignable(rCtx, v.Properties.Expr, to)
 		}
 	}
 
 	tc.registerResource(k, node.Value, hint)
 
 	if v.Get.Id != nil {
-		tc.assertTypeAssignable(ctx, v.Get.Id, schema.StringType)
+		tc.assertTypeAssignable(rCtx, v.Get.Id, schema.StringType)
 	}
 
 	// State properties are the same as normal properties, but they are all optional.
@@ -675,7 +675,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 		MaxElements:         5,
 		FieldsAreProperties: true,
 	}
-	tc.typePropertyEntries(ctx, k, typ.String(), fmtr, v.Get.State.Entries, stateProps)
+	tc.typePropertyEntries(rCtx, k, typ.String(), fmtr, v.Get.State.Entries, stateProps)
 
 	// Check for extra fields that didn't make it into the resource or resource options object
 	options := ResourceOptionsTypeHint()
@@ -720,7 +720,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 				}
 
 				subject := prop.Key.Syntax().Range()
-				ctx.addErrDiag(subject, summary, detail)
+				rCtx.addErrDiag(subject, summary, detail)
 			}
 		}
 	}
@@ -746,11 +746,11 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 				}
 				summary, detail := fmtr.MessageWithDetail(key, key)
 				subject := prop.Key.Syntax().Range()
-				ctx.addErrDiag(subject, summary, detail)
+				rCtx.addErrDiag(subject, summary, detail)
 			}
 		}
 		if v.Options.Aliases != nil {
-			tc.assertTypeAssignable(ctx, v.Options.Aliases, &schema.ArrayType{ElementType: &schema.UnionType{
+			tc.assertTypeAssignable(rCtx, v.Options.Aliases, &schema.ArrayType{ElementType: &schema.UnionType{
 				ElementTypes: []schema.Type{
 					schema.StringType,
 					&schema.ObjectType{
@@ -774,7 +774,7 @@ func (tc *typeCache) typeResource(r *Runner, node resourceNode) bool {
 			}})
 		}
 		if v.Options.EnvVarMappings != nil {
-			tc.assertTypeAssignable(ctx, v.Options.EnvVarMappings, &schema.MapType{ElementType: schema.StringType})
+			tc.assertTypeAssignable(rCtx, v.Options.EnvVarMappings, &schema.MapType{ElementType: schema.StringType})
 		}
 	}
 
@@ -814,19 +814,19 @@ func (tc *typeCache) typePropertyEntries(ctx *evalContext, resourceName, resourc
 	tc.assertTypeAssignable(ctx, from, to)
 }
 
-func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
+func (tc *typeCache) typeInvoke(ctx context.Context, rCtx *evalContext, t *ast.InvokeExpr) bool {
 	version, err := ParseVersion(t.CallOpts.Version)
 	if err != nil {
-		ctx.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
+		rCtx.error(t.CallOpts.Version, fmt.Sprintf("unable to parse function provider version: %v", err))
 		return true
 	}
 	pluginDownloadURL := ""
 	if t.CallOpts.PluginDownloadURL != nil {
 		pluginDownloadURL = t.CallOpts.PluginDownloadURL.Value
 	}
-	pkg, functionName, _, err := ResolveFunction(context.TODO(), ctx.pkgLoader, ctx.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
+	pkg, functionName, _, err := ResolveFunction(ctx, rCtx.pkgLoader, rCtx.packageDescriptors, t.Token.Value, version, pluginDownloadURL)
 	if err != nil {
-		_, b := ctx.error(t, err.Error())
+		_, b := rCtx.error(t, err.Error())
 		return b
 	}
 	var existing []string
@@ -849,26 +849,26 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 			if typ, ok := inputs[k]; !ok {
 				summary, detail := fmtr.MessageWithDetail(k, k)
 				subject := prop.Key.Syntax().Syntax().Range()
-				ctx.addWarnDiag(subject, summary, detail)
+				rCtx.addWarnDiag(subject, summary, detail)
 			} else {
 				tc.exprs[prop.Value] = typ
 			}
 		}
 	}
 	if t.CallOpts.Parent != nil {
-		tc.typeExpr(ctx, t.CallOpts.Parent)
+		tc.typeExpr(ctx, rCtx, t.CallOpts.Parent)
 	}
 	if t.CallOpts.Provider != nil {
-		tc.typeExpr(ctx, t.CallOpts.Provider)
+		tc.typeExpr(ctx, rCtx, t.CallOpts.Provider)
 	}
 	if t.CallOpts.Version != nil {
-		tc.typeExpr(ctx, t.CallOpts.Version)
+		tc.typeExpr(ctx, rCtx, t.CallOpts.Version)
 	}
 	if t.CallOpts.PluginDownloadURL != nil {
-		tc.typeExpr(ctx, t.CallOpts.PluginDownloadURL)
+		tc.typeExpr(ctx, rCtx, t.CallOpts.PluginDownloadURL)
 	}
 	if t.CallOpts.DependsOn != nil {
-		tc.typeExpr(ctx, t.CallOpts.DependsOn)
+		tc.typeExpr(ctx, rCtx, t.CallOpts.DependsOn)
 	}
 
 	singleReturnType := hint.ReturnType
@@ -878,7 +878,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 
 	if singleReturnType != nil {
 		if t.Return != nil {
-			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(),
+			rCtx.addErrDiag(t.Return.Syntax().Syntax().Range(),
 				"fn::invoke has a non-object return value",
 				fmt.Sprintf("cannot specify property '%s' for function %s",
 					t.Return.Value, functionName.String()))
@@ -907,7 +907,7 @@ func (tc *typeCache) typeInvoke(ctx *evalContext, t *ast.InvokeExpr) bool {
 		}
 		if hint.Outputs == nil || !validReturn {
 			summary, detail := fmtr.MessageWithDetail(t.Return.Value, t.Return.Value)
-			ctx.addErrDiag(t.Return.Syntax().Syntax().Range(), summary, detail)
+			rCtx.addErrDiag(t.Return.Syntax().Syntax().Range(), summary, detail)
 		} else {
 			tc.exprs[t] = returnType
 		}
@@ -1068,12 +1068,12 @@ func typePropertyAccess(ctx *evalContext, root schema.Type,
 	}
 }
 
-func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
+func (tc *typeCache) typeExpr(ctx context.Context, rCtx *evalContext, t ast.Expr) bool {
 	switch t := t.(type) {
 	case *ast.InvokeExpr:
-		return tc.typeInvoke(ctx, t)
+		return tc.typeInvoke(ctx, rCtx, t)
 	case *ast.SymbolExpr:
-		return tc.typeSymbol(ctx, t)
+		return tc.typeSymbol(rCtx, t)
 	case *ast.StringExpr:
 		tc.exprs[t] = schema.StringType
 	case *ast.NumberExpr:
@@ -1090,7 +1090,7 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 	case *ast.ToJSONExpr:
 		tc.exprs[t] = schema.StringType
 	case *ast.JoinExpr:
-		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
+		tc.assertTypeAssignable(rCtx, t.Delimiter, schema.StringType)
 		tc.exprs[t] = schema.StringType
 	case *ast.ListExpr:
 		var types OrderedTypeSet
@@ -1147,12 +1147,12 @@ func (tc *typeCache) typeExpr(ctx *evalContext, t ast.Expr) bool {
 		// The type of an unsecret is the type of its argument
 		tc.exprs[t] = tc.exprs[t.Value]
 	case *ast.SplitExpr:
-		tc.assertTypeAssignable(ctx, t.Delimiter, schema.StringType)
-		tc.assertTypeAssignable(ctx, t.Source, schema.StringType)
+		tc.assertTypeAssignable(rCtx, t.Delimiter, schema.StringType)
+		tc.assertTypeAssignable(rCtx, t.Source, schema.StringType)
 		tc.exprs[t] = &schema.ArrayType{ElementType: schema.StringType}
 	case *ast.SelectExpr:
-		tc.assertTypeAssignable(ctx, t.Index, schema.IntType)
-		tc.assertTypeAssignable(ctx, t.Values,
+		tc.assertTypeAssignable(rCtx, t.Index, schema.IntType)
+		tc.assertTypeAssignable(rCtx, t.Values,
 			&schema.ArrayType{ElementType: schema.AnyType}) // We accept an array of any type
 		if valuesType, ok := tc.exprs[t.Values]; ok {
 			arr, ok := codegen.UnwrapType(valuesType).(*schema.ArrayType)
@@ -1301,13 +1301,18 @@ func newTypeCache() *typeCache {
 	}
 }
 
-func TypeCheck(r *Runner) (Typing, syntax.Diagnostics) {
+// TypeCheck type checks the template of r. Package loads use ctx.
+func TypeCheck(ctx context.Context, r *Runner) (Typing, syntax.Diagnostics) {
 	types := newTypeCache()
 
 	// Set roots
 	diags := r.Run(walker{
-		VisitResource: types.typeResource,
-		VisitExpr:     types.typeExpr,
+		VisitResource: func(r *Runner, node resourceNode) bool {
+			return types.typeResource(ctx, r, node)
+		},
+		VisitExpr: func(rCtx *evalContext, expr ast.Expr) bool {
+			return types.typeExpr(ctx, rCtx, expr)
+		},
 		VisitVariable: types.typeVariable,
 		VisitConfig:   types.typeConfig,
 		VisitMissing:  types.typeMissing,

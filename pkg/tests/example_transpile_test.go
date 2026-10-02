@@ -157,7 +157,7 @@ func (l mockPackageLoader) Close() {}
 
 func getValidPCLFile(t *testing.T, file *ast.TemplateDecl, fileName string) ([]byte, hcl.Diagnostics, error) {
 	// nil runner passed in since template is not executed and we can use pkgLoader
-	_, tdiags, err := pulumiyaml.PrepareTemplate(file, nil, rootPluginLoader)
+	_, tdiags, err := pulumiyaml.PrepareTemplate(t.Context(), file, nil, rootPluginLoader)
 	if err != nil {
 		return nil, tdiags.HCL(), err
 	}

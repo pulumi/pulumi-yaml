@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Keep schema spans and component plugin spans in the trace of the run when `--otel-traces` is set
+time: 2026-10-02T13:44:24.144302+02:00
+custom:
+    PR: "1207"
