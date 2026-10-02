@@ -378,7 +378,7 @@ func TestNonStringKeyInObjectReturnsError(t *testing.T) {
 			},
 		},
 	}
-	_ = tc.typeExpr(nil, expr)
+	_ = tc.typeExpr(t.Context(), nil, expr)
 	require.Equal(t, 1, len(tc.exprs))
 	require.Equal(t, "Object key must be a string, got *ast.BooleanExpr",
 		tc.exprs[expr].(*schema.InvalidType).Diagnostics[0].Summary)
