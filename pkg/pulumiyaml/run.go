@@ -1113,12 +1113,14 @@ func findPackageRefs(ctx *pulumi.Context, r *Runner) (map[tokens.Package]package
 	for _, pkgs := range r.packageDescriptors {
 		for _, pkg := range pkgs {
 			isExtension := pkg.Parameterization != nil && extensionNames[pkg.Parameterization.Name]
-			resp, err := ctx.RegisterPackage(buildRegisterPackageRequest(pkg, isExtension))
+			ref, err := ctx.GetOrRegisterPackageRef(pkg.String(), func() (*pulumirpc.RegisterPackageRequest, error) {
+				return buildRegisterPackageRequest(pkg, isExtension), nil
+			})
 			if err != nil {
 				err = fmt.Errorf("registering package %s: %w", pkg.Name, err)
 				return nil, syntax.Diagnostics{syntax.Error(nil, err.Error(), "")}
 			}
-			packageRefs[distinctName(pkg)] = packageRef(resp.Ref)
+			packageRefs[distinctName(pkg)] = packageRef(ref)
 		}
 	}
 	return packageRefs, nil

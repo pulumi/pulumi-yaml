@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Use an explicit `provider` for resources from an extension package
+time: 2026-10-02T14:50:42.428713+02:00
+custom:
+    PR: "1208"

@@ -1,0 +1,14 @@
+resources:
+  prov:
+    type: pulumi:providers:extbase
+  greeting:
+    type: myext:Greeting
+    options:
+      provider: ${prov}
+  base:
+    type: extbase:Base
+    options:
+      provider: ${prov}
+outputs:
+  parameterValue: ${greeting.parameterValue}
+  baseValue: ${base.baseValue}
