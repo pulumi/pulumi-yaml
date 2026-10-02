@@ -1,0 +1,22 @@
+resources:
+  # Baseline for invoke dependency propagation: an invoke that reads properties from two different
+  # // resources produces a return value whose consumer must depend on the union of both.
+  a:
+    type: simple-invoke:StringResource
+    properties:
+      text: hello
+  b:
+    type: simple:Resource
+    properties:
+      value: true
+  d:
+    type: simple-invoke:StringResource
+    properties:
+      text: ${data.response}
+variables:
+  data:
+    fn::invoke:
+      function: simple-invoke:secretInvoke
+      arguments:
+        value: ${a.text}
+        secretResponse: ${b.value}
