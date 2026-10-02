@@ -172,6 +172,10 @@ var expectedFailures = map[string]string{
 	"l1-builtin-range": "Added by v3.265.0: Unknown Function; YAML does not support fn::range",
 	"l2-failed-create-continue-on-error-read": "Added by v3.265.0: *pcl.ReadResource generation unimplemented " +
 		"(panics in GenerateProject)",
+
+	"l2-explicit-extension-provider": "Added by v3.266.0: expected exactly 1 resources of type \"pulumi:providers:extbase\"; " +
+		"YAML registers packages with ctx.RegisterPackage, so the Go SDK does not map the extension to its " +
+		"base provider and the extension resource gets a default provider",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.

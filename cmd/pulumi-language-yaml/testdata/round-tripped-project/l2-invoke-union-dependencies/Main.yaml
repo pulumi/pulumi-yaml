@@ -1,0 +1,20 @@
+resources:
+  a:
+    type: simple-invoke:StringResource
+    properties:
+      text: hello
+  b:
+    type: simple:Resource
+    properties:
+      value: true
+  d:
+    type: simple-invoke:StringResource
+    properties:
+      text: ${data.response}
+variables:
+  data:
+    fn::invoke:
+      function: simple-invoke:secretInvoke
+      arguments:
+        value: ${a.text}
+        secretResponse: ${b.value}
