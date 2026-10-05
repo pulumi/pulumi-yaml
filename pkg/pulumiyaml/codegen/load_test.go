@@ -97,6 +97,15 @@ outputs:
 				"Unknown property of the `pulumi` variable: 'bar'; "},
 		},
 		{
+			name: "resource without type",
+			input: `
+resources:
+  r: {}
+`,
+			diagErrors: []string{"resource without type.yaml:3,6-6: " +
+				"Required field 'type' is missing on resource \"r\"; "},
+		},
+		{
 			name: "interpolate pulumi variable",
 			input: `
 outputs:

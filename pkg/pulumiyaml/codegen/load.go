@@ -823,6 +823,9 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry, latestPkgInfo map
 // gets the latest package version specified on a resource
 func (imp *importer) getLatestPkgInfoResource(kvp ast.ResourcesMapEntry, pkgInfo map[string]*packageInfo) syntax.Diagnostics {
 	resource := kvp.Value
+	if resource.Type == nil {
+		return nil
+	}
 	pkg := pulumiyaml.ResolvePkgName(resource.Type.Value)
 
 	if resource.Options.Version != nil {
@@ -886,6 +889,12 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 
 	resourceVar, ok := imp.resources[name]
 	contract.Assertf(ok, "resource %q not found", name)
+
+	if resource.Type == nil {
+		return nil, syntax.Diagnostics{syntax.NodeError(
+			resource.Syntax(),
+			fmt.Sprintf("Required field 'type' is missing on resource \"%s\"", name), "")}
+	}
 
 	var diags syntax.Diagnostics
 
