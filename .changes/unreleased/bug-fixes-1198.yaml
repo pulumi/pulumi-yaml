@@ -1,0 +1,6 @@
+component: convert
+kind: bug-fixes
+body: Fix panic when resource has no type
+time: 2026-10-05T11:53:00.344190368+02:00
+custom:
+    PR: "1198"
