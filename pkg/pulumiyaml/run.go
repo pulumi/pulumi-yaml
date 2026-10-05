@@ -465,7 +465,9 @@ func (r *Runner) setPackageDesciptors() error {
 }
 
 // PrepareTemplate prepares a template for converting or running
-func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Runner, syntax.Diagnostics, error) {
+func PrepareTemplate(
+	ctx context.Context, t *ast.TemplateDecl, r *Runner, loader PackageLoader,
+) (*Runner, syntax.Diagnostics, error) {
 	// If running a template also, we need to pass a runner through, since setting intermediates
 	// requires config via the pulumi Context
 	if r == nil {
@@ -493,7 +495,7 @@ func PrepareTemplate(t *ast.TemplateDecl, r *Runner, loader PackageLoader) (*Run
 	}
 
 	// runner type checks nodes
-	_, diags := TypeCheck(r)
+	_, diags := TypeCheck(ctx, r)
 	return r, diags, nil
 }
 
@@ -511,7 +513,7 @@ func RunTemplate(ctx *pulumi.Context, t *ast.TemplateDecl, configPropertyMap res
 		return &r.sdiags
 	}
 
-	r, diags, err := PrepareTemplate(t, r, loader)
+	r, diags, err := PrepareTemplate(ctx.Context(), t, r, loader)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -552,7 +554,7 @@ func RunComponentTemplate(ctx *pulumi.Context,
 		return pulumi.URNOutput{}, nil, err
 	}
 
-	_, diags := TypeCheck(runner)
+	_, diags := TypeCheck(ctx.Context(), runner)
 	if diags.HasErrors() {
 		return pulumi.URNOutput{}, nil, diags
 	}
@@ -1519,7 +1521,7 @@ func (e *programEvaluator) registerResource(kvp resourceNode) (lateboundResource
 	if v.Options.PluginDownloadURL != nil {
 		pluginDownloadURL = v.Options.PluginDownloadURL.Value
 	}
-	pkg, typ, resolvedDescriptor, err := ResolveResource(context.TODO(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version,
+	pkg, typ, resolvedDescriptor, err := ResolveResource(e.pulumiCtx.Context(), e.pkgLoader, e.packageDescriptors, v.Type.Value, version,
 		pluginDownloadURL)
 	if err != nil {
 		e.error(v.Type, fmt.Sprintf("error resolving type of resource %v: %v", kvp.Key.Value, err))

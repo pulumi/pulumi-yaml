@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	b64 "encoding/base64"
@@ -353,7 +354,7 @@ func testTemplateDiags(t *testing.T, template *ast.TemplateDecl, callback func(*
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(template, newMockPackageMap())
-		_, diags := TypeCheck(runner)
+		_, diags := TypeCheck(ctx.Context(), runner)
 		if diags.HasErrors() {
 			return diags
 		}
@@ -435,6 +436,49 @@ outputs:
 `
 	tmpl := yamlTemplate(t, text)
 	testTemplate(t, tmpl, func(e *programEvaluator) {})
+}
+
+type loadContextKey struct{}
+
+// loadContextRecorder records the loadContextKey value of the context of each package load.
+type loadContextRecorder struct {
+	PackageLoader
+
+	mu     sync.Mutex
+	values []any
+}
+
+func (l *loadContextRecorder) LoadPackage(ctx context.Context, descriptor *schema.PackageDescriptor) (Package, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.values = append(l.values, ctx.Value(loadContextKey{}))
+	return l.PackageLoader.LoadPackage(ctx, descriptor)
+}
+
+func TestRunTemplatePackageLoadContext(t *testing.T) {
+	t.Parallel()
+
+	const text = `name: test-yaml
+runtime: yaml
+variables:
+  v:
+    fn::invoke:
+      function: test:invoke:fn
+resources:
+  res-a:
+    type: test:resource:type
+    properties:
+      foo: oof
+`
+	tmpl := yamlTemplate(t, text)
+	loader := &loadContextRecorder{PackageLoader: newMockPackageMap()}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return RunTemplate(ctx.WithValue(loadContextKey{}, "run"), tmpl, nil, loader)
+	}, pulumi.WithMocks(testProject, "dev", &testMonitor{}))
+	require.NoError(t, err)
+
+	// The type check and the evaluation each load the package of the function and of the resource.
+	assert.Equal(t, []any{"run", "run", "run", "run"}, loader.values)
 }
 
 func TestAssetOrArchive(t *testing.T) {
@@ -2306,7 +2350,7 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(tmpl, newMockPackageMap())
-		_, diags := TypeCheck(runner)
+		_, diags := TypeCheck(ctx.Context(), runner)
 		if diags.HasErrors() {
 			return diags
 		}
@@ -2349,7 +2393,7 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(tmpl, newMockPackageMap())
-		_, diags := TypeCheck(runner)
+		_, diags := TypeCheck(ctx.Context(), runner)
 		if diags.HasErrors() {
 			return diags
 		}
@@ -2615,7 +2659,7 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(tmpl, newMockPackageMap())
-		_, diags := TypeCheck(runner)
+		_, diags := TypeCheck(ctx.Context(), runner)
 		if diags.HasErrors() {
 			return diags
 		}
@@ -3008,7 +3052,7 @@ resources:
 	}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		runner := newRunner(tmpl, newMockPackageMap())
-		_, diags := TypeCheck(runner)
+		_, diags := TypeCheck(ctx.Context(), runner)
 		if diags.HasErrors() {
 			return diags
 		}
