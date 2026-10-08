@@ -275,12 +275,17 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 	}
 
 	// The yaml runtime is stateful and we need to change to the program directory before actually executing
-	// the template.
+	// the template. Restore the previous directory afterwards: the caller may delete the program directory
+	// once the run completes, and later requests on this host still need a valid working directory.
 	if pwd := req.Info.ProgramDirectory; pwd != "" {
-		err := os.Chdir(pwd)
+		prev, err := os.Getwd()
 		if err != nil {
 			return nil, err
 		}
+		if err := os.Chdir(pwd); err != nil {
+			return nil, err
+		}
+		defer func() { contract.IgnoreError(os.Chdir(prev)) }()
 	}
 
 	// Use the Pulumi Go SDK to create an execution context and to interact with the engine.
