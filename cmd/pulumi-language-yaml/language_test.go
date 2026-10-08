@@ -176,6 +176,10 @@ var expectedFailures = map[string]string{
 	"l2-explicit-extension-provider": "Added by v3.266.0: expected exactly 1 resources of type \"pulumi:providers:extbase\"; " +
 		"YAML registers packages with ctx.RegisterPackage, so the Go SDK does not map the extension to its " +
 		"base provider and the extension resource gets a default provider",
+
+	"l2-invoke-per-value-deps": "Added by v3.268.0: unexpected d.Dependencies (extra element a); the YAML runtime " +
+		"awaits every invoke argument and unions their dependencies onto the result instead of passing " +
+		"output values through the invoke",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
