@@ -149,8 +149,6 @@ var expectedFailures = map[string]string{
 
 	"l2-invoke-multi-argument": "Added by v3.251.0: YAML does not support multi-argument invokes",
 
-	"l2-failed-create-recover-continue-on-error": "Added by v3.252.0: Unknown Function; YAML does not support fn::recover",
-
 	"l1-for-expression": "Added by v3.257.0: Pulumi YAML cannot represent for loops",
 
 	"l2-invoke-dependencies":         "Tightened by v3.256.0: YAML invokes eagerly instead of declaring invoke dependencies to the engine",
@@ -178,6 +176,12 @@ var expectedFailures = map[string]string{
 	"l2-invoke-per-value-deps": "Added by v3.268.0: unexpected d.Dependencies (extra element a); the YAML runtime " +
 		"awaits every invoke argument and unions their dependencies onto the result instead of passing " +
 		"output values through the invoke",
+
+	"l2-recover-invoke":      "Added by v3.269.0: Unknown Function; YAML does not support fn::recover",
+	"l2-call-per-value-deps": "Added by v3.269.0: Unknown Function; YAML does not support fn::call",
+	"l2-extension-borrowed-type": "Added by v3.269.0: missing expected dependency borrowbase; " +
+		"GetProgramDependencies reports only packages named by resource types, not the base package " +
+		"whose types the extension schema borrows",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
