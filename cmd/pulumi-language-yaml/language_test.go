@@ -182,6 +182,13 @@ var expectedFailures = map[string]string{
 	"l2-extension-borrowed-type": "Added by v3.269.0: missing expected dependency borrowbase; " +
 		"GetProgramDependencies reports only packages named by resource types, not the base package " +
 		"whose types the extension schema borrows",
+
+	"l2-resource-read-id-rewrite": "Added by v3.271.0: *pcl.ReadResource generation unimplemented " +
+		"(panics in GenerateProject)",
+	"l2-failed-read-continue-on-error": "Added by v3.271.0: *pcl.ReadResource generation unimplemented " +
+		"(panics in GenerateProject)",
+	"l2-failed-create-component-continue-on-error": "Added by v3.272.0: *model.BinaryOpExpression; " +
+		`Unimplemented! Needed for  comp.value == "hello"`,
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
