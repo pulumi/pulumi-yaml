@@ -1,0 +1,15 @@
+resources:
+  failing:
+    type: fail_on_create:Resource
+    properties:
+      value: false
+  dependent:
+    type: simple:Resource
+    properties:
+      value: ${failing.value}
+  independent:
+    type: simple:Resource
+    properties:
+      value: true
+outputs:
+  failingValue: ${failing.value}
