@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Sign Windows language host and converter binaries with Azure Trusted Signing
+time: 2026-10-23T08:17:51Z
+custom:
+    PR: "1229"
