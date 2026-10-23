@@ -31,6 +31,9 @@ builds:
   - -w
   - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
   main: ./cmd/pulumi-language-yaml/
+  hooks:
+    post:
+    - scripts/sign-windows-binary.sh {{ .Path }}
 - id: pulumi-converter-yaml
   binary: pulumi-converter-yaml
   env:
@@ -47,3 +50,6 @@ builds:
   - -w
   - -X github.com/pulumi/pulumi-yaml/pkg/version.Version={{.Tag}}
   main: ./cmd/pulumi-converter-yaml/
+  hooks:
+    post:
+    - scripts/sign-windows-binary.sh {{ .Path }}
