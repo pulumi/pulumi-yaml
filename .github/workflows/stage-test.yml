@@ -81,7 +81,8 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
       - name: Set up Python ${{ inputs.python-version }}
         uses: actions/setup-python@v1
         with:
