@@ -2,16 +2,38 @@ name: Run Acceptance Tests from PR
 
 on:
   pull_request:
-    paths-ignore:
-      - 'CHANGELOG.md'
-      - 'CHANGELOG_PENDING.md'
 
 jobs:
+  should-test:
+    name: Check for code changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run-tests: ${{ steps.filter.outputs.code == 'true' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '**'
+              - '!CHANGELOG.md'
+              - '!.changes/**'
+
   lint:
+    needs: should-test
     uses: ./.github/workflows/stage-lint.yml
+    with:
+      run-tests: ${{ needs.should-test.outputs.run-tests == 'true' }}
   test:
+    needs: should-test
     uses: ./.github/workflows/stage-test.yml
     with:
+      run-tests: ${{ needs.should-test.outputs.run-tests == 'true' }}
       live-test: true
       coverage: true
     secrets:
