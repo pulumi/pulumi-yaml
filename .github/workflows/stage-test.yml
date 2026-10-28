@@ -4,6 +4,10 @@ name: Test
 on:
   workflow_call:
     inputs:
+      run-code-checks:
+        description: Run code checks; disable for changelog-only pull requests.
+        default: true
+        type: boolean
       live-test:
         description: |
           Whether to run tests against a live environment. When false, tests that require secrets
@@ -60,6 +64,8 @@ env:
 jobs:
   test:
     name: Test
+    # Keep the required test / Test check present when code tests are skipped.
+    if: inputs.run-code-checks
     runs-on: ubuntu-latest
     steps:
       - name: Authenticate with Pulumi Cloud

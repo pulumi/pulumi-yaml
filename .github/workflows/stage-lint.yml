@@ -2,6 +2,11 @@ name: Lint
 
 on:
   workflow_call:
+    inputs:
+      run-code-checks:
+        description: Run code checks; disable for changelog-only pull requests.
+        default: true
+        type: boolean
 
 permissions: read-all
 
@@ -11,6 +16,7 @@ env:
 
 jobs:
   lint:
+    if: inputs.run-code-checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -42,6 +48,7 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
   check-copyright:
+    if: inputs.run-code-checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
