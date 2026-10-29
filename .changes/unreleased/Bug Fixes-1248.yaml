@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Fix a crash caused by concurrent access to program state when an interpolated string contains an output followed by further references
+time: 2026-10-29T16:18:27.000000000Z
+custom:
+    PR: "1248"
