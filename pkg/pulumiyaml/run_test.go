@@ -3085,3 +3085,35 @@ components:
 		Summary:  "missing required `name` field.",
 	}}}, diags)
 }
+
+// Regression test for https://github.com/pulumi/pulumi-yaml/issues/1164: the parts of an
+// interpolation that follow an output must be looked up when the interpolation is
+// evaluated, not later from inside the output's apply callback. The callback can run on
+// another goroutine while the runner is still writing to the evaluator's maps.
+func TestInterpolateResolvesAccessesBeforeApply(t *testing.T) {
+	t.Parallel()
+
+	tmpl := template(t, &Template{
+		Variables: map[string]interface{}{
+			"foo": "oof",
+		},
+	})
+	testTemplate(t, tmpl, func(e *programEvaluator) {
+		pending, resolve, _ := e.pulumiCtx.NewOutput()
+		e.variables["pending"] = pending
+
+		v, ok := e.evaluateInterpolate(ast.MustInterpolate("${pending}-${foo}"))
+		require.True(t, ok)
+
+		// Writes to the evaluator's maps after evaluation must not affect the result.
+		e.variables["foo"] = "changed"
+		resolve("tuo")
+
+		out, ok := v.(pulumi.AnyOutput)
+		require.True(t, ok, "expected an output, got %T", v)
+		e.pulumiCtx.Export("out", out.ApplyT(func(x interface{}) (interface{}, error) {
+			assert.Equal(t, "tuo-oof", x)
+			return nil, nil
+		}))
+	})
+}
