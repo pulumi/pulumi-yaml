@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2381,38 +2382,52 @@ func (e *programEvaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.Objec
 }
 
 func (e *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
-	return e.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
-}
-
-func (e *programEvaluator) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
-	for ; len(parts) > 0; parts = parts[1:] {
-		i := parts[0]
-		b.WriteString(i.Text)
-
-		if i.Value != nil {
-			p, ok := e.evaluatePropertyAccess(x, i.Value)
-			if !ok {
-				return nil, false
-			}
-			if p, ok := p.(poisonMarker); ok {
-				return p, true
-			}
-
-			if o, ok := p.(pulumi.Output); ok {
-				return o.ApplyT(func(v interface{}) (interface{}, error) {
-					fmt.Fprintf(b, "%v", v)
-					v, ok := e.evaluateInterpolations(x, b, parts[1:])
-					if !ok {
-						return nil, fmt.Errorf("runtime error")
-					}
-					return v, nil
-				}), true
-			}
-
-			fmt.Fprintf(b, "%v", p)
+	// Resolve every property access up front, on the evaluating goroutine. Looking up
+	// later parts from inside an ApplyT callback would read the evaluator's resource,
+	// config and variable maps while the runner is still writing to them.
+	values := make([]interface{}, len(x.Parts))
+	var outputs []interface{}
+	var outputIndexes []int
+	for i, part := range x.Parts {
+		if part.Value == nil {
+			continue
 		}
+		p, ok := e.evaluatePropertyAccess(x, part.Value)
+		if !ok {
+			return nil, false
+		}
+		if p, ok := p.(poisonMarker); ok {
+			return p, true
+		}
+		if o, ok := p.(pulumi.Output); ok {
+			outputs = append(outputs, o)
+			outputIndexes = append(outputIndexes, i)
+		}
+		values[i] = p
 	}
-	return b.String(), true
+
+	format := func(values []interface{}) string {
+		var b strings.Builder
+		for i, part := range x.Parts {
+			b.WriteString(part.Text)
+			if part.Value != nil {
+				fmt.Fprintf(&b, "%v", values[i])
+			}
+		}
+		return b.String()
+	}
+
+	if len(outputs) == 0 {
+		return format(values), true
+	}
+
+	return pulumi.All(outputs...).ApplyT(func(resolved []interface{}) (interface{}, error) {
+		values := slices.Clone(values)
+		for j, i := range outputIndexes {
+			values[i] = resolved[j]
+		}
+		return format(values), nil
+	}), true
 }
 
 func unknownOutput() pulumi.Output {
