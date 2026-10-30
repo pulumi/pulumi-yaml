@@ -189,6 +189,9 @@ var expectedFailures = map[string]string{
 		"(panics in GenerateProject)",
 	"l2-failed-create-component-continue-on-error": "Added by v3.272.0: *model.BinaryOpExpression; " +
 		`Unimplemented! Needed for  comp.value == "hello"`,
+
+	"l1-operator-precedence": "Added by v3.273.0: *model.BinaryOpExpression; Unimplemented! Needed for ( (1 + 2)) * 3",
+	"l2-resource-exists":     "Added by v3.273.0: Unknown Function; YAML does not support fn::resourceExists",
 }
 
 // Add test names here that are expected to fail the converter (eject) round-trip test.
