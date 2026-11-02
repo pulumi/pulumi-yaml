@@ -104,7 +104,7 @@ test_cover: get_plugins get_schemas
 	@rm -rf coverage && mkdir -p coverage
 	$(eval COVERDIR := $(shell mktemp -d))
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
-	     ${GO} run ./scripts/gocov -coverdir=$(COVERDIR) -coverpkg=./... ./... -- -test.timeout=30m
+	     ${GO} run ./scripts/gocov -race -coverdir=$(COVERDIR) -coverpkg=./... ./... -- -test.timeout=30m
 	@go tool covdata textfmt -i=$(COVERDIR) -o=coverage/cover.out
 	@go tool covdata percent -i=$(COVERDIR) # also print a console report
 
