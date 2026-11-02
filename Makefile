@@ -92,7 +92,8 @@ bin/pulumi-converter-yaml: $(shell $(HELPMAKEGO) cmd/pulumi-converter-yaml)
 	$(call go_build,$@,github.com/pulumi/pulumi-yaml/cmd/pulumi-converter-yaml)
 
 # Ensure that in tests, the language server is accessible
-test:: build get_plugins get_schemas
+test:: get_plugins get_schemas
+	@$(MAKE) -B build BUILD_FLAGS="-race"
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
 	  ${GO} test --timeout 30m -count 1 -race -parallel ${CONCURRENCY} ./...
 
@@ -100,7 +101,7 @@ test:: build get_plugins get_schemas
 # Generates a coverage report in the coverage directory.
 .phony: test_cover
 test_cover: get_plugins get_schemas
-	@make build BUILD_FLAGS="-cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
+	@$(MAKE) -B build BUILD_FLAGS="-race -cover -coverpkg=github.com/pulumi/pulumi-yaml/..."
 	@rm -rf coverage && mkdir -p coverage
 	$(eval COVERDIR := $(shell mktemp -d))
 	PATH="${PWD}/bin:${PATH}" PULUMI_LIVE_TEST="${PULUMI_LIVE_TEST}" \
