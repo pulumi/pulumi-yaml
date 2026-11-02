@@ -5,6 +5,7 @@ package pulumiyaml
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
@@ -406,8 +407,11 @@ components:
 
 	var innerNames []string
 	var innerAliasURNs [][]string
+	var innerM sync.Mutex
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			innerM.Lock()
+			defer innerM.Unlock()
 			switch args.TypeToken {
 			case "test:index:myComponent":
 				return "", resource.PropertyMap{}, nil
@@ -682,8 +686,11 @@ components:
 		aliasURNs []string
 	}
 	var observed []observation
+	var observedM sync.Mutex
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			observedM.Lock()
+			defer observedM.Unlock()
 			switch args.TypeToken {
 			case "test:index:myComponent":
 				return "", resource.PropertyMap{}, nil
@@ -776,8 +783,11 @@ components:
 		aliasURNs []string
 	}
 	var observed []observation
+	var observedM sync.Mutex
 	mocks := &testMonitor{
 		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			observedM.Lock()
+			defer observedM.Unlock()
 			switch args.TypeToken {
 			case "test:index:myComponent":
 				return "", resource.PropertyMap{}, nil
