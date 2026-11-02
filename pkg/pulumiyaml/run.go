@@ -20,7 +20,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -393,7 +392,7 @@ func (r *Runner) setDefaultProviders() {
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 				if diags.HasErrors() {
-					r.sdiags.diags = append(r.sdiags.diags, diags...)
+					r.sdiags.Extend(diags...)
 					return false
 				}
 
@@ -431,7 +430,7 @@ func (r *Runner) setDefaultProviders() {
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 					if diags.HasErrors() {
-						r.sdiags.diags = append(r.sdiags.diags, diags...)
+						r.sdiags.Extend(diags...)
 						return false
 					}
 					t.CallOpts.Provider = expr
@@ -713,13 +712,13 @@ type evalContext struct {
 }
 
 func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail string) {
-	ctx.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
-	ctx.Runner.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.sdiags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.Runner.sdiags.Extend(syntax.Warning(rng, summary, detail))
 }
 
 func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
-	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
-	ctx.Runner.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+	ctx.sdiags.Extend(syntax.Error(rng, summary, detail))
+	ctx.Runner.sdiags.Extend(syntax.Error(rng, summary, detail))
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -2382,31 +2381,21 @@ func (e *programEvaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.Objec
 }
 
 func (e *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
-	// Resolve every property access up front, on the evaluating goroutine. Looking up
-	// later parts from inside an ApplyT callback would read the evaluator's resource,
-	// config and variable maps while the runner is still writing to them.
+	// Resolve every property access on the evaluating goroutine. A lookup from inside
+	// an apply callback would race with the runner's writes to the evaluator maps.
 	values := make([]interface{}, len(x.Parts))
-	var outputs []interface{}
-	var outputIndexes []int
 	for i, part := range x.Parts {
 		if part.Value == nil {
 			continue
 		}
-		p, ok := e.evaluatePropertyAccess(x, part.Value)
+		v, ok := e.evaluatePropertyAccess(x, part.Value)
 		if !ok {
 			return nil, false
 		}
-		if p, ok := p.(poisonMarker); ok {
-			return p, true
-		}
-		if o, ok := p.(pulumi.Output); ok {
-			outputs = append(outputs, o)
-			outputIndexes = append(outputIndexes, i)
-		}
-		values[i] = p
+		values[i] = v
 	}
 
-	format := func(values []interface{}) string {
+	return e.lift(func(values ...interface{}) (interface{}, bool) {
 		var b strings.Builder
 		for i, part := range x.Parts {
 			b.WriteString(part.Text)
@@ -2414,20 +2403,8 @@ func (e *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interfac
 				fmt.Fprintf(&b, "%v", values[i])
 			}
 		}
-		return b.String()
-	}
-
-	if len(outputs) == 0 {
-		return format(values), true
-	}
-
-	return pulumi.All(outputs...).ApplyT(func(resolved []interface{}) (interface{}, error) {
-		values := slices.Clone(values)
-		for j, i := range outputIndexes {
-			values[i] = resolved[j]
-		}
-		return format(values), nil
-	}), true
+		return b.String(), true
+	})(values...)
 }
 
 func unknownOutput() pulumi.Output {

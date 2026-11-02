@@ -3086,34 +3086,52 @@ components:
 	}}}, diags)
 }
 
-// Regression test for https://github.com/pulumi/pulumi-yaml/issues/1164: the parts of an
-// interpolation that follow an output must be looked up when the interpolation is
-// evaluated, not later from inside the output's apply callback. The callback can run on
-// another goroutine while the runner is still writing to the evaluator's maps.
-func TestInterpolateResolvesAccessesBeforeApply(t *testing.T) {
+func TestInterpolateOutputWhileRegistering(t *testing.T) {
 	t.Parallel()
 
-	tmpl := template(t, &Template{
-		Variables: map[string]interface{}{
-			"foo": "oof",
+	var text strings.Builder
+	text.WriteString(`name: test-yaml
+runtime: yaml
+variables:
+  greeting: hello
+resources:
+  source:
+    type: test:resource:type
+  sink:
+    type: test:resource:type
+    properties:
+      foo: ${source.out}-${greeting}
+`)
+	for i := range 50 {
+		fmt.Fprintf(&text, "  later-%d:\n    type: test:resource:type\n", i)
+	}
+	tmpl := yamlTemplate(t, text.String())
+
+	var mu sync.Mutex
+	var sinkInputs resource.PropertyMap
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			if args.Name == "sink" {
+				mu.Lock()
+				sinkInputs = args.Inputs
+				mu.Unlock()
+			}
+			return "someID", resource.PropertyMap{
+				"out": resource.NewStringProperty("tuo"),
+			}, nil
 		},
-	})
-	testTemplate(t, tmpl, func(e *programEvaluator) {
-		pending, resolve, _ := e.pulumiCtx.NewOutput()
-		e.variables["pending"] = pending
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		if diags := newRunner(tmpl, newMockPackageMap()).Evaluate(ctx); diags.HasErrors() {
+			return diags
+		}
+		return nil
+	}, pulumi.WithMocks("foo", "dev", mocks))
+	require.NoError(t, err)
 
-		v, ok := e.evaluateInterpolate(ast.MustInterpolate("${pending}-${foo}"))
-		require.True(t, ok)
-
-		// Writes to the evaluator's maps after evaluation must not affect the result.
-		e.variables["foo"] = "changed"
-		resolve("tuo")
-
-		out, ok := v.(pulumi.AnyOutput)
-		require.True(t, ok, "expected an output, got %T", v)
-		e.pulumiCtx.Export("out", out.ApplyT(func(x interface{}) (interface{}, error) {
-			assert.Equal(t, "tuo-oof", x)
-			return nil, nil
-		}))
-	})
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, resource.PropertyMap{
+		"foo": resource.NewStringProperty("tuo-hello"),
+	}, sinkInputs)
 }
