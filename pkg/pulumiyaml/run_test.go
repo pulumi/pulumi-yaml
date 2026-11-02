@@ -3085,3 +3085,53 @@ components:
 		Summary:  "missing required `name` field.",
 	}}}, diags)
 }
+
+func TestInterpolateOutputWhileRegistering(t *testing.T) {
+	t.Parallel()
+
+	var text strings.Builder
+	text.WriteString(`name: test-yaml
+runtime: yaml
+variables:
+  greeting: hello
+resources:
+  source:
+    type: test:resource:type
+  sink:
+    type: test:resource:type
+    properties:
+      foo: ${source.out}-${greeting}
+`)
+	for i := range 50 {
+		fmt.Fprintf(&text, "  later-%d:\n    type: test:resource:type\n", i)
+	}
+	tmpl := yamlTemplate(t, text.String())
+
+	var mu sync.Mutex
+	var sinkInputs resource.PropertyMap
+	mocks := &testMonitor{
+		NewResourceF: func(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+			if args.Name == "sink" {
+				mu.Lock()
+				sinkInputs = args.Inputs
+				mu.Unlock()
+			}
+			return "someID", resource.PropertyMap{
+				"out": resource.NewStringProperty("tuo"),
+			}, nil
+		},
+	}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		if diags := newRunner(tmpl, newMockPackageMap()).Evaluate(ctx); diags.HasErrors() {
+			return diags
+		}
+		return nil
+	}, pulumi.WithMocks("foo", "dev", mocks))
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, resource.PropertyMap{
+		"foo": resource.NewStringProperty("tuo-hello"),
+	}, sinkInputs)
+}

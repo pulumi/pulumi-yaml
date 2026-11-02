@@ -392,7 +392,7 @@ func (r *Runner) setDefaultProviders() {
 
 				expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 				if diags.HasErrors() {
-					r.sdiags.diags = append(r.sdiags.diags, diags...)
+					r.sdiags.Extend(diags...)
 					return false
 				}
 
@@ -430,7 +430,7 @@ func (r *Runner) setDefaultProviders() {
 
 					expr, diags := ast.VariableSubstitution(defaultProviderInfo.providerName.Value)
 					if diags.HasErrors() {
-						r.sdiags.diags = append(r.sdiags.diags, diags...)
+						r.sdiags.Extend(diags...)
 						return false
 					}
 					t.CallOpts.Provider = expr
@@ -712,13 +712,13 @@ type evalContext struct {
 }
 
 func (ctx *evalContext) addWarnDiag(rng *hcl.Range, summary string, detail string) {
-	ctx.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
-	ctx.Runner.sdiags.diags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.sdiags.Extend(syntax.Warning(rng, summary, detail))
+	ctx.Runner.sdiags.Extend(syntax.Warning(rng, summary, detail))
 }
 
 func (ctx *evalContext) addErrDiag(rng *hcl.Range, summary string, detail string) {
-	ctx.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
-	ctx.Runner.sdiags.diags.Extend(syntax.Error(rng, summary, detail))
+	ctx.sdiags.Extend(syntax.Error(rng, summary, detail))
+	ctx.Runner.sdiags.Extend(syntax.Error(rng, summary, detail))
 }
 
 func (ctx *evalContext) error(expr ast.Expr, summary string) (interface{}, bool) {
@@ -2381,38 +2381,30 @@ func (e *programEvaluator) evaluateObject(x *ast.ObjectExpr, entries []ast.Objec
 }
 
 func (e *programEvaluator) evaluateInterpolate(x *ast.InterpolateExpr) (interface{}, bool) {
-	return e.evaluateInterpolations(x, &strings.Builder{}, x.Parts)
-}
-
-func (e *programEvaluator) evaluateInterpolations(x *ast.InterpolateExpr, b *strings.Builder, parts []ast.Interpolation) (interface{}, bool) {
-	for ; len(parts) > 0; parts = parts[1:] {
-		i := parts[0]
-		b.WriteString(i.Text)
-
-		if i.Value != nil {
-			p, ok := e.evaluatePropertyAccess(x, i.Value)
-			if !ok {
-				return nil, false
-			}
-			if p, ok := p.(poisonMarker); ok {
-				return p, true
-			}
-
-			if o, ok := p.(pulumi.Output); ok {
-				return o.ApplyT(func(v interface{}) (interface{}, error) {
-					fmt.Fprintf(b, "%v", v)
-					v, ok := e.evaluateInterpolations(x, b, parts[1:])
-					if !ok {
-						return nil, fmt.Errorf("runtime error")
-					}
-					return v, nil
-				}), true
-			}
-
-			fmt.Fprintf(b, "%v", p)
+	// Resolve every property access on the evaluating goroutine. A lookup from inside
+	// an apply callback would race with the runner's writes to the evaluator maps.
+	values := make([]interface{}, len(x.Parts))
+	for i, part := range x.Parts {
+		if part.Value == nil {
+			continue
 		}
+		v, ok := e.evaluatePropertyAccess(x, part.Value)
+		if !ok {
+			return nil, false
+		}
+		values[i] = v
 	}
-	return b.String(), true
+
+	return e.lift(func(values ...interface{}) (interface{}, bool) {
+		var b strings.Builder
+		for i, part := range x.Parts {
+			b.WriteString(part.Text)
+			if part.Value != nil {
+				fmt.Fprintf(&b, "%v", values[i])
+			}
+		}
+		return b.String(), true
+	})(values...)
 }
 
 func unknownOutput() pulumi.Output {
