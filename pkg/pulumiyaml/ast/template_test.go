@@ -333,3 +333,37 @@ func TestOldCasingAssetWarns(t *testing.T) {
 	_, ok := source.(*FileAssetExpr)
 	assert.True(t, ok, "expected *FileAssetExpr, got %T", source)
 }
+
+// TestSdksSectionIsRejected verifies that an `sdks` key in a program returns an
+// error diagnostic instead of panicking. Sdks is filled in from the project's
+// generated SDK files after parsing, so it cannot be written in a template.
+func TestSdksSectionIsRejected(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test
+runtime: yaml
+sdks:
+  - name: random
+resources:
+  pet:
+    type: random:RandomPet
+`
+	syntax, sdiags := encoding.DecodeYAML("<stdin>", yaml.NewDecoder(strings.NewReader(text)), nil)
+	require.Len(t, sdiags, 0)
+
+	var template *TemplateDecl
+	var diags []*hcl.Diagnostic
+	require.NotPanics(t, func() {
+		tmpl, d := ParseTemplate([]byte(text), syntax)
+		template = tmpl
+		for _, diag := range d {
+			diags = append(diags, &diag.Diagnostic)
+		}
+	})
+	require.Len(t, diags, 1)
+	assert.Equal(t, hcl.DiagError, diags[0].Severity)
+	assert.Equal(t, "'sdks' cannot be set in a Pulumi YAML program", diags[0].Summary)
+	assert.Empty(t, template.Sdks)
+	assert.Len(t, template.Resources.Entries, 1)
+}

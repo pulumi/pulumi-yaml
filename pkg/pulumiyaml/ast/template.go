@@ -717,8 +717,10 @@ type TemplateDecl struct {
 	Variables     VariablesMapDecl
 	Resources     ResourcesMapDecl
 	Outputs       PropertyMapDecl
-	Sdks          []packages.PackageDecl
-	Components    ComponentListDecl
+	// Sdks is filled in from the project's generated SDK files after parsing,
+	// so it cannot be written in a template.
+	Sdks       []packages.PackageDecl `yaml:"-"`
+	Components ComponentListDecl
 }
 
 func (d *TemplateDecl) GetName() *StringExpr {
@@ -1083,9 +1085,14 @@ func parseRecord(objName string, dest recordDecl, node syntax.Node, noMatchWarni
 		var hasMatch bool
 		for _, f := range reflect.VisibleFields(t) {
 			if f.IsExported() && strings.EqualFold(f.Name, key) {
+				hasMatch = true
+				if f.Tag.Get("yaml") == "-" {
+					msg := fmt.Sprintf("'%s' cannot be set in a Pulumi YAML program", camel(f.Name))
+					diags.Extend(syntax.NodeError(kvp.Key, msg, ""))
+					break
+				}
 				diags.Extend(syntax.UnexpectedCasing(kvp.Key.Syntax().Range(), camel(f.Name), key))
 				diags.Extend(parseField(camel(f.Name), v.FieldByIndex(f.Index), kvp.Value)...)
-				hasMatch = true
 				break
 			}
 		}
