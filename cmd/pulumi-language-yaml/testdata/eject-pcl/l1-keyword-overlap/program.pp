@@ -1,3 +1,4 @@
+// Keywords in various languages should be renamed and work.
 classVar = "class_output_string"
 exportVar = "export_output_string"
 importVar = "import_output_string"

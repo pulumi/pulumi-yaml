@@ -1,3 +1,4 @@
+// This provider covers scenarios where user passes secret values to the provider.
 resource configGrpcProvider "pulumi:providers:config-grpc" {
 	__logicalName = "config_grpc_provider"
 	string1 = invoke("config-grpc:index:toSecret", {

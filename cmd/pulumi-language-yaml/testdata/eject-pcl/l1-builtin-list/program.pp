@@ -35,6 +35,7 @@ output splitOutput {
 	value = split("-", aString)
 }
 
+// Wrap in list to avoid unsafe-null-output (see l1-builtin-try/main.pp).
 output singleOrNoneOutput {
 	__logicalName = "singleOrNoneOutput"
 	value = [singleOrNone(singleOrNoneList)]

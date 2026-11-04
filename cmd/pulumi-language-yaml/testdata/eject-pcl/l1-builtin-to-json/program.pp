@@ -15,6 +15,7 @@ config aSecret string {
 	secret = true
 }
 
+// Nested object using config values
 nestedObject = {
 	"anObject" = {
 		"name" = aString,

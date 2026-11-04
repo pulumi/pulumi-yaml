@@ -1,8 +1,10 @@
 resources:
+  # The resource name is based on the parameter value
   example1:
     type: hipackage:HelloWorld
   exampleComponent1:
     type: hipackage:HelloWorldComponent
+  # The resource name is based on the parameter value
   example2:
     type: byepackage:GoodbyeWorld
   exampleComponent2:

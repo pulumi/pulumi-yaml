@@ -7,6 +7,7 @@ resources:
       value: true
     options:
       provider: ${provider}
+  # This should inherit the explicit provider from parent1
   child1:
     type: simple:Resource
     properties:
@@ -22,12 +23,14 @@ resources:
       string: ""
       numberArray: []
       booleanMap: {}
+  # This _should not_ inherit the provider from parent2 as it is a default provider.
   child2:
     type: simple:Resource
     properties:
       value: true
     options:
       parent: ${parent2}
+  # This _should not_ inherit the provider from parent1 as its from the wrong package.
   child3:
     type: primitive:Resource
     properties:

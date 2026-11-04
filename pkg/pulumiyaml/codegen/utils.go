@@ -3,7 +3,6 @@
 package codegen
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 
@@ -75,11 +74,27 @@ type BlockSyntax struct {
 	Trailing syntax.TriviaList
 }
 
+// convertTrivia converts the comments in s to the text of a YAML comment. Each comment line becomes a `#` line with the
+// same text, and a blank line between two comments stays a blank line.
 func (b BlockSyntax) convertTrivia(s syntax.TriviaList) string {
-	c := strings.TrimSpace(fmt.Sprint(s))
-	c = strings.TrimPrefix(c, "//")
-	c = strings.TrimSpace(c)
-	return c
+	var lines []string
+	// newlines counts the line breaks since the text of the last comment.
+	newlines := 0
+	for _, t := range s {
+		switch t := t.(type) {
+		case syntax.Comment:
+			if newlines > 1 {
+				lines = append(lines, "")
+			}
+			for _, l := range t.Lines {
+				lines = append(lines, "#"+l)
+			}
+			newlines = strings.Count(string(t.Bytes()), "\n")
+		case syntax.Whitespace:
+			newlines += strings.Count(string(t.Bytes()), "\n")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (b BlockSyntax) Range() *hcl.Range {

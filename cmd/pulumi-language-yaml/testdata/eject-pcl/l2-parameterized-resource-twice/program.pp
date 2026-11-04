@@ -20,6 +20,7 @@ package {
 	}
 }
 
+// The resource name is based on the parameter value
 resource example1 "hipackage:index:HelloWorld" {
 	__logicalName = "example1"
 }
@@ -28,6 +29,7 @@ resource exampleComponent1 "hipackage:index:HelloWorldComponent" {
 	__logicalName = "exampleComponent1"
 }
 
+// The resource name is based on the parameter value
 resource example2 "byepackage:index:GoodbyeWorld" {
 	__logicalName = "example2"
 }

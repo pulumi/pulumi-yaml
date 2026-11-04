@@ -1,7 +1,7 @@
 resources:
   # Stage 0: Initial resource creation
 
-  # // Resource with deleteBeforeReplace option
+  # Resource with deleteBeforeReplace option
   withOption:
     type: simple:Resource
     properties:

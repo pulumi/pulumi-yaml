@@ -1,7 +1,7 @@
 resources:
   # Stage 0: Initial resource creation
 
-  # // Scenario 1: Schema-based replaceOnChanges on replaceProp
+  # Scenario 1: Schema-based replaceOnChanges on replaceProp
   schemaReplace:
     type: replaceonchanges:ResourceA
     properties:

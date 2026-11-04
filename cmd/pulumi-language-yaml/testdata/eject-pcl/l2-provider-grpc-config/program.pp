@@ -1,3 +1,4 @@
+// Cover interesting schema shapes.
 resource configGrpcProvider "pulumi:providers:config-grpc" {
 	__logicalName = "config_grpc_provider"
 	string1 = ""

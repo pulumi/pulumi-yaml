@@ -1,9 +1,14 @@
 resources:
+  # A resource whose `elementType` property collides with the `ElementType()` method that
+  # generated Go SDK types must implement.
   elem:
     type: reservednames:ElementType
     properties:
       elementType:
         elementType: nested
 outputs:
+  # The whole object checks that languages serialize typed objects in stack outputs with
+  # their wire-format (camelCase) keys; the nested string exercises traversal through the
+  # renamed members.
   elementType: ${elem.elementType}
   nested: ${elem.elementType.elementType}

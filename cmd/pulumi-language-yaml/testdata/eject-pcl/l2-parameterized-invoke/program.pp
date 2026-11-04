@@ -9,6 +9,7 @@ package {
 	}
 }
 
+// The invoke name is based on the parameter value
 output parameterValue {
 	__logicalName = "parameterValue"
 	value = invoke("subpackage:index:doHelloWorld", {

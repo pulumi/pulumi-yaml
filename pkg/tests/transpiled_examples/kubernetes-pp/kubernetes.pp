@@ -3,6 +3,7 @@ config hostname string {
 	default = "example.com"
 }
 
+// namespace name generated based on resource name
 resource nginxDemo "kubernetes:core/v1:Namespace" {
 	__logicalName = "nginx-demo"
 }

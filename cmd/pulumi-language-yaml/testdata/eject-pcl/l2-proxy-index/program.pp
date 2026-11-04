@@ -1,3 +1,5 @@
+// Check we can index into properties of objects returned in outputs, this is similar to ref-ref but 
+// we index into the outputs
 resource res "ref-ref:index:Resource" {
 	__logicalName = "res"
 	data = {

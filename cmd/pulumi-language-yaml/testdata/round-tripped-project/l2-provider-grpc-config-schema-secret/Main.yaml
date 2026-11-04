@@ -1,4 +1,5 @@
 resources:
+  # This provider covers scenarios where configuration properties are marked as secret in the schema.
   configGrpcProvider:
     type: pulumi:providers:config-grpc
     name: config_grpc_provider

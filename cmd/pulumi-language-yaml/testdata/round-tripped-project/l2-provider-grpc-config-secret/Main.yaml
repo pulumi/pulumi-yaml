@@ -1,4 +1,5 @@
 resources:
+  # This provider covers scenarios where user passes secret values to the provider.
   configGrpcProvider:
     type: pulumi:providers:config-grpc
     name: config_grpc_provider

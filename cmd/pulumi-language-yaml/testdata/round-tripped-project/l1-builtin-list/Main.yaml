@@ -18,5 +18,6 @@ outputs:
     fn::split:
       - '-'
       - ${aString}
+  # Wrap in list to avoid unsafe-null-output (see l1-builtin-try/main.pp).
   singleOrNoneOutput:
     - fn::singleOrNone: ${singleOrNoneList}

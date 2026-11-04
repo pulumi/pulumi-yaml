@@ -17,6 +17,7 @@ resource mapMapUnionExample "union:index:Example" {
 	}
 }
 
+// List<Union<String, Enum>> pattern
 resource stringEnumUnionListExample "union:index:Example" {
 	__logicalName = "stringEnumUnionListExample"
 	stringEnumUnionListProperty = [
@@ -26,11 +27,13 @@ resource stringEnumUnionListExample "union:index:Example" {
 	]
 }
 
+// Safe enum: literal string matching an enum value
 resource safeEnumExample "union:index:Example" {
 	__logicalName = "safeEnumExample"
 	typedEnumProperty = "Block"
 }
 
+// Output enum: output from another resource used as enum input
 resource enumOutputExample "union:index:EnumOutput" {
 	__logicalName = "enumOutputExample"
 	name = "example"

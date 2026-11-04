@@ -88,6 +88,9 @@ resource example10 "discriminated-union-many:index:Example" {
 	}
 }
 
+// A SubsetExample's unionOf is typed as a 3-variant subset union. We should be
+// able to assign that output to an Example's unionOf, which is typed as the
+// full 10-variant union.
 resource subset1 "discriminated-union-many:index:SubsetExample" {
 	__logicalName = "subset1"
 	unionOf = {
