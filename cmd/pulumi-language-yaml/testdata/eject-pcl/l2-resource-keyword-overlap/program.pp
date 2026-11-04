@@ -13,6 +13,7 @@ resource modResource "simple:index:Resource" {
 	value = true
 }
 
+// TODO(pulumi/pulumi#18246): Pcl should support scoping based on resource type just like HCL does in TF so we can uncomment this.
 resource import "simple:index:Resource" {
 	__logicalName = "import"
 	value = true

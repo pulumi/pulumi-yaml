@@ -7,6 +7,8 @@ resources:
       count: 3
       ratio: 1.5
 outputs:
+  # Every property has a constant value in the schema, one per constant kind; reading them must
+  # bind without type errors.
   kind: ${first.kind}
   flag: ${first.flag}
   count: ${first.count}

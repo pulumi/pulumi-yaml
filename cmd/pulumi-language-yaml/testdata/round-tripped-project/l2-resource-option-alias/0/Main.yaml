@@ -1,4 +1,5 @@
 resources:
+  # Make a simple resource to use as a parent
   parent:
     type: simple:Resource
     properties:

@@ -1,7 +1,7 @@
 resources:
   # Stage 1: Change properties to trigger replacements
 
-  # // Resource with deleteBeforeReplace option - should delete before creating
+  # Resource with deleteBeforeReplace option - should delete before creating
   withOption:
     type: simple:Resource
     properties:

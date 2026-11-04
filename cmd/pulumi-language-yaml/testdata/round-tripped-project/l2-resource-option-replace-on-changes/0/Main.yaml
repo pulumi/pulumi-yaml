@@ -1,9 +1,13 @@
 resources:
+  # Stage 0: Initial resource creation
+  #
+  # Scenario 1: Schema-based replaceOnChanges on replaceProp
   schemaReplace:
     type: replaceonchanges:ResourceA
     properties:
       value: true
       replaceProp: true
+  # Scenario 2: Option-based replaceOnChanges on value
   optionReplace:
     type: replaceonchanges:ResourceB
     properties:
@@ -11,6 +15,7 @@ resources:
     options:
       replaceOnChanges:
         - value
+  # Scenario 3: Both schema and option - will change value
   bothReplaceValue:
     type: replaceonchanges:ResourceA
     properties:
@@ -19,6 +24,7 @@ resources:
     options:
       replaceOnChanges:
         - value
+  # Scenario 4: Both schema and option - will change replaceProp
   bothReplaceProp:
     type: replaceonchanges:ResourceA
     properties:
@@ -27,10 +33,12 @@ resources:
     options:
       replaceOnChanges:
         - value
+  # Scenario 5: No replaceOnChanges - baseline update
   regularUpdate:
     type: replaceonchanges:ResourceB
     properties:
       value: true
+  # Scenario 6: replaceOnChanges set but no change
   noChange:
     type: replaceonchanges:ResourceB
     properties:
@@ -38,6 +46,7 @@ resources:
     options:
       replaceOnChanges:
         - value
+  # Scenario 7: replaceOnChanges on value, but only replaceProp changes
   wrongPropChange:
     type: replaceonchanges:ResourceA
     properties:
@@ -46,6 +55,7 @@ resources:
     options:
       replaceOnChanges:
         - value
+  # Scenario 8: Multiple properties in replaceOnChanges array
   multiplePropReplace:
     type: replaceonchanges:ResourceA
     properties:

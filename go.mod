@@ -12,8 +12,8 @@ require (
 	github.com/hexops/autogold v1.3.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/pkg/v3 v3.273.0
-	github.com/pulumi/pulumi/sdk/v3 v3.273.0
+	github.com/pulumi/pulumi/pkg/v3 v3.274.1-0.20261104144243-c52b2f28f368
+	github.com/pulumi/pulumi/sdk/v3 v3.275.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.12.1
@@ -223,3 +223,5 @@ require (
 )
 
 tool github.com/pulumi/pulumi/pkg/v3/testing/pulumi-test-language
+
+replace github.com/pulumi/pulumi/sdk/v3 => github.com/pulumi/pulumi/sdk/v3 v3.274.1-0.20261104144243-c52b2f28f368

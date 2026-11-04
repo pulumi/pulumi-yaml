@@ -33,6 +33,8 @@ resource remotearc "asset-archive:index:ArchiveResource" {
 	value = remoteArchive("https://raw.githubusercontent.com/pulumi/pulumi/7b0eb7fb10694da2f31c0d15edf671df843e0d4c/cmd/pulumi-test-language/tests/testdata/l2-resource-asset-archive/archive.tar")
 }
 
+// Plain (non-nested) asset/archive outputs must round-trip through stack
+// outputs in every language.
 output assetOutput {
 	__logicalName = "assetOutput"
 	value = fileAsset("../test.txt")
@@ -43,6 +45,8 @@ output archiveOutput {
 	value = fileArchive("../archive.tar")
 }
 
+// Regression test for pulumi/pulumi#16384: array and map of assets/archives
+// must compose properly through Go program generation.
 output assetList {
 	__logicalName = "assetList"
 	value = [

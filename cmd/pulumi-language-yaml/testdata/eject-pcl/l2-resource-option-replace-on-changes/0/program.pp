@@ -1,9 +1,13 @@
+// Stage 0: Initial resource creation
+//
+// Scenario 1: Schema-based replaceOnChanges on replaceProp
 resource schemaReplace "replaceonchanges:index:ResourceA" {
 	__logicalName = "schemaReplace"
 	value = true
 	replaceProp = true
 }
 
+// Scenario 2: Option-based replaceOnChanges on value
 resource optionReplace "replaceonchanges:index:ResourceB" {
 	__logicalName = "optionReplace"
 	value = true
@@ -13,6 +17,7 @@ resource optionReplace "replaceonchanges:index:ResourceB" {
 	}
 }
 
+// Scenario 3: Both schema and option - will change value
 resource bothReplaceValue "replaceonchanges:index:ResourceA" {
 	__logicalName = "bothReplaceValue"
 	value = true
@@ -23,6 +28,7 @@ resource bothReplaceValue "replaceonchanges:index:ResourceA" {
 	}
 }
 
+// Scenario 4: Both schema and option - will change replaceProp
 resource bothReplaceProp "replaceonchanges:index:ResourceA" {
 	__logicalName = "bothReplaceProp"
 	value = true
@@ -33,11 +39,13 @@ resource bothReplaceProp "replaceonchanges:index:ResourceA" {
 	}
 }
 
+// Scenario 5: No replaceOnChanges - baseline update
 resource regularUpdate "replaceonchanges:index:ResourceB" {
 	__logicalName = "regularUpdate"
 	value = true
 }
 
+// Scenario 6: replaceOnChanges set but no change
 resource noChange "replaceonchanges:index:ResourceB" {
 	__logicalName = "noChange"
 	value = true
@@ -47,6 +55,7 @@ resource noChange "replaceonchanges:index:ResourceB" {
 	}
 }
 
+// Scenario 7: replaceOnChanges on value, but only replaceProp changes
 resource wrongPropChange "replaceonchanges:index:ResourceA" {
 	__logicalName = "wrongPropChange"
 	value = true
@@ -57,6 +66,7 @@ resource wrongPropChange "replaceonchanges:index:ResourceA" {
 	}
 }
 
+// Scenario 8: Multiple properties in replaceOnChanges array
 resource multiplePropReplace "replaceonchanges:index:ResourceA" {
 	__logicalName = "multiplePropReplace"
 	value = true

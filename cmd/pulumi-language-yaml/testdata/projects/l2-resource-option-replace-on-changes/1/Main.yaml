@@ -1,7 +1,7 @@
 resources:
   # Stage 1: Change properties to trigger replacements
 
-  # // Scenario 1: Change replaceProp → REPLACE (schema triggers)
+  # Scenario 1: Change replaceProp → REPLACE (schema triggers)
   schemaReplace:
     type: replaceonchanges:ResourceA
     properties:

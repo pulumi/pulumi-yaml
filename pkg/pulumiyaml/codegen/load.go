@@ -15,18 +15,62 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/pulumi/pulumi/pkg/v3/codegen"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/model"
+	pclsyntax "github.com/pulumi/pulumi/pkg/v3/codegen/hcl2/syntax"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/pcl"
 	"github.com/pulumi/pulumi/pkg/v3/codegen/schema"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/util/contract"
 	"github.com/zclconf/go-cty/cty"
+	"gopkg.in/yaml.v3"
 
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/ast"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/config"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/packages"
 	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax"
+	"github.com/pulumi/pulumi-yaml/pkg/pulumiyaml/syntax/encoding"
 )
+
+// yamlNode returns the YAML node that n was decoded from, if any.
+func yamlNode(n syntax.Node) (*yaml.Node, bool) {
+	if n == nil {
+		return nil, false
+	}
+	s, ok := n.Syntax().(encoding.YAMLSyntax)
+	return s.Node, ok && s.Node != nil
+}
+
+// yamlComment converts the text of a YAML comment to PCL comment trivia. A blank line inside the comment stays an empty
+// comment line. YAML ends the text of a comment that a blank line follows with a newline, and that newline is not part
+// of the comment.
+func yamlComment(text string) pclsyntax.TriviaList {
+	text = strings.TrimRight(text, "\n")
+	if text == "" {
+		return nil
+	}
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimPrefix(l, "#")
+	}
+	return pclsyntax.TriviaList{pclsyntax.Comment{Lines: lines}}
+}
+
+// entryComments returns the comments of a YAML map entry as PCL comment trivia. YAML attaches the comments above an
+// entry and on the line of its key to the key node, and a comment after a scalar value to the value node.
+//
+// Foot comments are dropped: YAML attaches a comment block that is followed by a blank line to the entry above it, and
+// that entry can be emitted far from its YAML neighbors.
+func entryComments(key, value syntax.Node) pclsyntax.TriviaList {
+	var trivia pclsyntax.TriviaList
+	if n, ok := yamlNode(key); ok {
+		trivia = append(trivia, yamlComment(n.HeadComment)...)
+		trivia = append(trivia, yamlComment(n.LineComment)...)
+	}
+	if n, ok := yamlNode(value); ok {
+		trivia = append(trivia, yamlComment(n.LineComment)...)
+	}
+	return trivia
+}
 
 type importer struct {
 	referencedStacks []string
@@ -715,6 +759,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		Body: &model.Body{
 			Items: bodyItems,
 		},
+		Tokens: blockTokens(kvp.Key, config, "config", labels...),
 	}
 	return configDef, nil
 }
@@ -814,10 +859,21 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry, latestPkgInfo map
 			}
 		}
 	}
-	return &model.Attribute{
-		Name:  imp.variables[name].Name,
-		Value: v,
-	}, diags
+	attr := &model.Attribute{
+		Name:   imp.variables[name].Name,
+		Value:  v,
+		Tokens: pclsyntax.NewAttributeTokens(imp.variables[name].Name),
+	}
+	attr.Tokens.Name.LeadingTrivia = entryComments(kvp.Key.Syntax(), value.Syntax())
+	return attr, diags
+}
+
+// blockTokens returns the tokens of a PCL block that is imported from the YAML map entry with the given key and value.
+// The tokens carry the comments of the entry.
+func blockTokens(key *ast.StringExpr, value interface{ Syntax() syntax.Node }, typ string, labels ...string) *pclsyntax.BlockTokens {
+	tokens := pclsyntax.NewBlockTokens(typ, labels...)
+	tokens.Type.LeadingTrivia = entryComments(key.Syntax(), value.Syntax())
+	return tokens
 }
 
 // gets the latest package version specified on a resource
@@ -1199,17 +1255,13 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		items = append(items, resourceOptions)
 	}
 
+	labels := []string{resourceVar.Name, string(token)}
 	r := &model.Block{
 		Type:   "resource",
-		Labels: []string{resourceVar.Name, string(token)},
+		Labels: labels,
 		Body:   &model.Body{Items: items},
+		Tokens: blockTokens(kvp.Key, resource, "resource", labels...),
 	}
-
-	// TODO: comments
-	//	if comment := attr.Key.GetComment(); comment != nil {
-	//		r.Tokens = hclsyntax.NewBlockTokens(r.Type, r.Labels...)
-	//		r.Tokens.Type.LeadingTrivia = hclsyntax.TriviaList{hclsyntax.NewComment(strings.Split(strings.TrimSpace(comment.Value), "\n"))}
-	//	}
 
 	return r, diags
 }
@@ -1226,6 +1278,7 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 	return &model.Block{
 		Type:   "output",
 		Labels: []string{outputVar.Name},
+		Tokens: blockTokens(kvp.Key, kvp.Value, "output", outputVar.Name),
 		Body: &model.Body{
 			Items: []model.BodyItem{
 				&model.Attribute{

@@ -205,6 +205,21 @@ func (f *formatter) formatExpression(x model.Expression) model.Expression {
 	return x
 }
 
+// leadingTrivia returns the leading trivia of a body item that keeps the comments in trivia. Each comment line prints
+// on its own line at the current indentation, and the item starts at the current indentation after the comments.
+func (f *formatter) leadingTrivia(trivia syntax.TriviaList) syntax.TriviaList {
+	leading := f.indent()
+	for _, t := range trivia {
+		if c, ok := t.(syntax.Comment); ok {
+			for _, l := range c.Lines {
+				leading = append(leading, syntax.Comment{Lines: []string{l}})
+				leading = append(leading, f.indent()...)
+			}
+		}
+	}
+	return leading
+}
+
 // formatBlock formats a PCL block as
 //
 //	type labels... {
@@ -215,25 +230,14 @@ func (f *formatter) formatExpression(x model.Expression) model.Expression {
 //
 // Unless the block is the first in its containing body, a newline is inserted before the block.
 func (f *formatter) formatBlock(block *model.Block, first bool) {
-	tokens := block.Tokens
-
-	var comments []syntax.Comment
-	if tokens != nil {
-		for _, t := range tokens.Type.LeadingTrivia {
-			if comment, ok := t.(syntax.Comment); ok {
-				comments = append(comments, comment)
-			}
-		}
+	var source syntax.TriviaList
+	if block.Tokens != nil {
+		source = block.Tokens.Type.LeadingTrivia
 	}
+	leadingTrivia := f.leadingTrivia(source)
 
 	block.Tokens = syntax.NewBlockTokens(block.Type, block.Labels...)
 
-	leadingTrivia := f.indent()
-	if len(comments) != 0 {
-		for _, c := range comments {
-			leadingTrivia = append(leadingTrivia, c)
-		}
-	}
 	if !first {
 		leadingTrivia = append(f.newline(), leadingTrivia...)
 	}
@@ -253,9 +257,14 @@ func (f *formatter) formatBlock(block *model.Block, first bool) {
 //
 // If the attribute follows a block, a newline is inserted before the attribute.
 func (f *formatter) formatAttribute(attr *model.Attribute, afterBlock bool) {
+	var source syntax.TriviaList
+	if attr.Tokens != nil {
+		source = attr.Tokens.Name.LeadingTrivia
+	}
+	leadingTrivia := f.leadingTrivia(source)
+
 	attr.Tokens = syntax.NewAttributeTokens(attr.Name)
 
-	leadingTrivia := f.indent()
 	if afterBlock {
 		leadingTrivia = append(f.newline(), leadingTrivia...)
 	}

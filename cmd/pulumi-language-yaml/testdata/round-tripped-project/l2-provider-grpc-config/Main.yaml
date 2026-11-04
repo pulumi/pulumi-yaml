@@ -1,4 +1,5 @@
 resources:
+  # Cover interesting schema shapes.
   configGrpcProvider:
     type: pulumi:providers:config-grpc
     name: config_grpc_provider

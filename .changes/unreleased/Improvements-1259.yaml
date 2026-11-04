@@ -1,0 +1,6 @@
+component: convert
+kind: Improvements
+body: Keep the comments on config, variables, resources, and outputs when converting YAML programs to other languages
+time: 2026-11-04T17:12:13.797413+01:00
+custom:
+    PR: "1259"

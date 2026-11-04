@@ -13,7 +13,7 @@ outputs:
         secretResponse: false
       return: response
   # referencing value from resource
-  # // invoke response is secret => whole output is secret
+  # invoke response is secret => whole output is secret
   firstSecret:
     fn::invoke:
       function: simple-invoke:secretInvoke

@@ -33,6 +33,7 @@ output numbers {
 	}
 }
 
+// Test that keys don't get renamed
 output keys {
 	__logicalName = "keys"
 	value = {

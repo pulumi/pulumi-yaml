@@ -6,6 +6,8 @@ resource first "constant:index:Resource" {
 	ratio = 1.5
 }
 
+// Every property has a constant value in the schema, one per constant kind; reading them must
+// bind without type errors.
 output kind {
 	__logicalName = "kind"
 	value = first.kind

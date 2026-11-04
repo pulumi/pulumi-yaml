@@ -1,4 +1,6 @@
 resources:
+  # Baseline for invoke dependency propagation: an invoke that reads properties from two different
+  # resources produces a return value whose consumer must depend on the union of both.
   a:
     type: simple-invoke:StringResource
     properties:
