@@ -56,17 +56,19 @@ func (f *formatter) formatObjectCons(x *model.ObjectConsExpression) {
 		x.Tokens.OpenBrace.TrailingTrivia = f.newline()
 		f.indented(func() {
 			for i, item := range x.Items {
+				leading, foot := item.Key.GetLeadingTrivia(), item.Value.GetTrailingTrivia()
+
 				f.formatExpression(item.Key)
-				item.Key.SetLeadingTrivia(f.indent())
+				item.Key.SetLeadingTrivia(f.leadingTrivia(leading))
 
 				x.Tokens.Items[i].Equals.LeadingTrivia = f.space()
 				x.Tokens.Items[i].Equals.TrailingTrivia = f.space()
 
 				f.formatExpression(item.Value)
 				if x.Tokens.Items[i].Comma == nil {
-					item.Value.SetTrailingTrivia(f.newline())
+					item.Value.SetTrailingTrivia(f.trailingTrivia(foot))
 				} else {
-					x.Tokens.Items[i].Comma.TrailingTrivia = f.newline()
+					x.Tokens.Items[i].Comma.TrailingTrivia = f.trailingTrivia(foot)
 				}
 			}
 		})
@@ -76,8 +78,8 @@ func (f *formatter) formatObjectCons(x *model.ObjectConsExpression) {
 
 // formatTupleCons formats a tuple construction expression.
 // - A tuple with no elements is formatted as `[]`
-// - A tuple with one element is formatted as `[value]`
-// - A tuple with more than one element is formatted as
+// - A tuple with one element and no comments is formatted as `[value]`
+// - Any other tuple is formatted as
 //
 //	[
 //	    value0,
@@ -87,10 +89,10 @@ func (f *formatter) formatObjectCons(x *model.ObjectConsExpression) {
 func (f *formatter) formatTupleCons(x *model.TupleConsExpression) {
 	x.Tokens = syntax.NewTupleConsTokens(len(x.Expressions))
 
-	switch len(x.Expressions) {
-	case 0:
+	switch {
+	case len(x.Expressions) == 0:
 		x.Tokens.CloseBracket.LeadingTrivia = nil
-	case 1:
+	case len(x.Expressions) == 1 && !hasComments(x.Expressions[0]):
 		f.formatExpression(x.Expressions[0])
 
 		x.Expressions[0].SetLeadingTrivia(nil)
@@ -99,14 +101,16 @@ func (f *formatter) formatTupleCons(x *model.TupleConsExpression) {
 		x.Tokens.OpenBracket.TrailingTrivia = f.newline()
 		f.indented(func() {
 			for i, item := range x.Expressions {
+				leading, foot := item.GetLeadingTrivia(), item.GetTrailingTrivia()
+
 				f.formatExpression(item)
 
-				item.SetLeadingTrivia(f.indent())
+				item.SetLeadingTrivia(f.leadingTrivia(leading))
 
 				if i < len(x.Tokens.Commas) {
-					x.Tokens.Commas[i].TrailingTrivia = f.newline()
+					x.Tokens.Commas[i].TrailingTrivia = f.trailingTrivia(foot)
 				} else {
-					item.SetTrailingTrivia(f.newline())
+					item.SetTrailingTrivia(f.trailingTrivia(foot))
 				}
 			}
 		})
@@ -220,6 +224,32 @@ func (f *formatter) leadingTrivia(trivia syntax.TriviaList) syntax.TriviaList {
 	return leading
 }
 
+// trailingTrivia returns the trailing trivia of a body item or of an element of a collection that keeps the comments in
+// trivia. The trivia ends the line of the item, and each comment line follows on its own line at the current
+// indentation.
+func (f *formatter) trailingTrivia(trivia syntax.TriviaList) syntax.TriviaList {
+	trailing := f.newline()
+	for _, t := range trivia {
+		if c, ok := t.(syntax.Comment); ok {
+			for _, l := range c.Lines {
+				trailing = append(trailing, f.indent()...)
+				trailing = append(trailing, syntax.Comment{Lines: []string{l}})
+			}
+		}
+	}
+	return trailing
+}
+
+// hasComments returns true if comments print before or after x.
+func hasComments(x model.Expression) bool {
+	for _, t := range append(x.GetLeadingTrivia(), x.GetTrailingTrivia()...) {
+		if _, ok := t.(syntax.Comment); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // formatBlock formats a PCL block as
 //
 //	type labels... {
@@ -230,11 +260,11 @@ func (f *formatter) leadingTrivia(trivia syntax.TriviaList) syntax.TriviaList {
 //
 // Unless the block is the first in its containing body, a newline is inserted before the block.
 func (f *formatter) formatBlock(block *model.Block, first bool) {
-	var source syntax.TriviaList
+	var leading, foot syntax.TriviaList
 	if block.Tokens != nil {
-		source = block.Tokens.Type.LeadingTrivia
+		leading, foot = block.Tokens.Type.LeadingTrivia, block.Tokens.CloseBrace.TrailingTrivia
 	}
-	leadingTrivia := f.leadingTrivia(source)
+	leadingTrivia := f.leadingTrivia(leading)
 
 	block.Tokens = syntax.NewBlockTokens(block.Type, block.Labels...)
 
@@ -248,7 +278,7 @@ func (f *formatter) formatBlock(block *model.Block, first bool) {
 	})
 
 	block.Tokens.CloseBrace.LeadingTrivia = f.indent()
-	block.Tokens.CloseBrace.TrailingTrivia = f.newline()
+	block.Tokens.CloseBrace.TrailingTrivia = f.trailingTrivia(foot)
 }
 
 // formatAttribute formats a PCL attribute as
@@ -270,11 +300,11 @@ func (f *formatter) formatAttribute(attr *model.Attribute, afterBlock bool) {
 	}
 	attr.Tokens.Name.LeadingTrivia = leadingTrivia
 
-	f.formatExpression(attr.Value)
-
 	if attr.Value != nil {
+		foot := attr.Value.GetTrailingTrivia()
+		f.formatExpression(attr.Value)
 		attr.Value.SetLeadingTrivia(f.space())
-		attr.Value.SetTrailingTrivia(f.newline())
+		attr.Value.SetTrailingTrivia(f.trailingTrivia(foot))
 	}
 }
 

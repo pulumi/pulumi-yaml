@@ -20,6 +20,7 @@ resources:
     type: replaceonchanges:ResourceA
     properties:
       value: false
+      # Changed from true
       replaceProp: true
     options:
       replaceOnChanges:
@@ -29,6 +30,7 @@ resources:
     type: replaceonchanges:ResourceA
     properties:
       value: true
+      # Unchanged
       replaceProp: false
     options:
       replaceOnChanges:
@@ -51,6 +53,7 @@ resources:
     type: replaceonchanges:ResourceA
     properties:
       value: true
+      # Unchanged (this is marked for replacement)
       replaceProp: false
     options:
       replaceOnChanges:
@@ -60,6 +63,7 @@ resources:
     type: replaceonchanges:ResourceA
     properties:
       value: false
+      # Changed from true
       replaceProp: true
     options:
       replaceOnChanges:

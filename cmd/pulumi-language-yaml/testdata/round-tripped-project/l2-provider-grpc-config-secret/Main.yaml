@@ -36,6 +36,7 @@ resources:
               - SECRET
               - SECRET2
           return: listString1
+      # TODO[pulumi/pulumi#17535] this currently breaks Go compilation unfortunately.
       listString2:
         - VALUE
         - fn::invoke:
@@ -43,6 +44,7 @@ resources:
             arguments:
               string1: SECRET
             return: string1
+      # TODO[pulumi/pulumi#17535] this breaks Go compilation as well.
       mapString2:
         key1: value1
         key2:

@@ -181,6 +181,76 @@ resource provider "pulumi:providers:aws" {
 }
 `,
 		},
+		{
+			name: "comments",
+			input: `variables:
+  # head on variable
+  obj: # line on variable key
+    # head on a
+    a: 1 # line on a
+    # foot after a
+
+    b:
+      - x # line on x
+      # head on y
+      - y
+  single:
+    # only element
+    - z
+resources:
+  # head on bucket
+
+  bucket:
+    type: aws:s3:Bucket
+    properties:
+      website:
+        # head on indexDocument
+        indexDocument: index.html
+      # foot after website
+
+  # foot after bucket
+
+outputs:
+  name: ${bucket.id}
+# end of file
+`,
+			expected: `// head on variable
+// line on variable key
+obj = {
+	// head on a
+	// line on a
+	"a" = 1,
+	// foot after a
+	"b" = [
+		// line on x
+		"x",
+		// head on y
+		"y"
+	]
+}
+single = [
+	// only element
+	"z"
+]
+
+// head on bucket
+resource bucket "aws:s3/bucket:Bucket" {
+	__logicalName = "bucket"
+	website = {
+		// head on indexDocument
+		indexDocument = "index.html"
+	}
+	// foot after website
+}
+// foot after bucket
+
+output name {
+	__logicalName = "name"
+	value = bucket.id
+}
+// end of file
+`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
