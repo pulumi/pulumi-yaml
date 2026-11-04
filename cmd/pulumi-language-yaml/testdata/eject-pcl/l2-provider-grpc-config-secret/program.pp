@@ -19,13 +19,17 @@ resource configGrpcProvider "pulumi:providers:config-grpc" {
 			"SECRET2"
 		]
 	}).listString1
+	// TODO[pulumi/pulumi#17535] this currently breaks Go compilation unfortunately.
 	listString2 = [
+		// mapString1 = invoke("config-grpc:index:toSecret", {mapString1 = { key1 = "SECRET", key2 = "SECRET2" }}).mapString1
 		"VALUE",
 		invoke("config-grpc:index:toSecret", {
 			string1 = "SECRET"
 		}).string1
 	]
+	// TODO[pulumi/pulumi#17535] this breaks Go compilation as well.
 	mapString2 = {
+		// os1 = invoke("config-grpc:index:toSecret", {objString1 = { x = "SECRET" }}).objString1
 		"key1" = "value1",
 		"key2" = invoke("config-grpc:index:toSecret", {
 			string1 = "SECRET"

@@ -21,6 +21,7 @@ resource optionReplace "replaceonchanges:index:ResourceB" {
 resource bothReplaceValue "replaceonchanges:index:ResourceA" {
 	__logicalName = "bothReplaceValue"
 	value = false
+	// Changed from true
 	replaceProp = true
 
 	options {
@@ -32,6 +33,7 @@ resource bothReplaceValue "replaceonchanges:index:ResourceA" {
 resource bothReplaceProp "replaceonchanges:index:ResourceA" {
 	__logicalName = "bothReplaceProp"
 	value = true
+	// Unchanged
 	replaceProp = false
 
 	options {
@@ -59,6 +61,7 @@ resource noChange "replaceonchanges:index:ResourceB" {
 resource wrongPropChange "replaceonchanges:index:ResourceA" {
 	__logicalName = "wrongPropChange"
 	value = true
+	// Unchanged (this is marked for replacement)
 	replaceProp = false
 
 	options {
@@ -70,6 +73,7 @@ resource wrongPropChange "replaceonchanges:index:ResourceA" {
 resource multiplePropReplace "replaceonchanges:index:ResourceA" {
 	__logicalName = "multiplePropReplace"
 	value = false
+	// Changed from true
 	replaceProp = true
 
 	options {

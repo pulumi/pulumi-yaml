@@ -3,6 +3,7 @@ resource configGrpcProvider "pulumi:providers:config-grpc" {
 	__logicalName = "config_grpc_provider"
 	string1 = ""
 	string2 = "x"
+	// Test a JSON-like string to see if it trips up JSON detectors.
 	string3 = "{}"
 	int1 = 0
 	int2 = 42

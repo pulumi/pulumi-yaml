@@ -1,0 +1,6 @@
+component: convert
+kind: Improvements
+body: Keep nested and foot comments when converting YAML programs to other languages
+time: 2026-11-04T17:12:14.241795+01:00
+custom:
+    PR: "1260"

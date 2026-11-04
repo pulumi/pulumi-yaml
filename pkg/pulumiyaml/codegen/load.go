@@ -55,21 +55,66 @@ func yamlComment(text string) pclsyntax.TriviaList {
 	return pclsyntax.TriviaList{pclsyntax.Comment{Lines: lines}}
 }
 
-// entryComments returns the comments of a YAML map entry as PCL comment trivia. YAML attaches the comments above an
-// entry and on the line of its key to the key node, and a comment after a scalar value to the value node.
+// entryComments returns the comments of a YAML map entry as PCL comment trivia. leading holds the comments that print
+// before the entry, and foot holds the comments that print after it.
 //
-// Foot comments are dropped: YAML attaches a comment block that is followed by a blank line to the entry above it, and
-// that entry can be emitted far from its YAML neighbors.
-func entryComments(key, value syntax.Node) pclsyntax.TriviaList {
-	var trivia pclsyntax.TriviaList
-	if n, ok := yamlNode(key); ok {
-		trivia = append(trivia, yamlComment(n.HeadComment)...)
-		trivia = append(trivia, yamlComment(n.LineComment)...)
+// YAML attaches the comments above an entry and on the line of its key to the key node, and a comment after a scalar
+// value to the value node. YAML attaches a comment block below an entry that ends at a blank line to the key node as a
+// foot comment.
+func (imp *importer) entryComments(key, value syntax.Node) (leading, foot pclsyntax.TriviaList) {
+	k, kok := yamlNode(key)
+	v, vok := yamlNode(value)
+	if kok {
+		leading = append(leading, yamlComment(k.HeadComment)...)
+		leading = append(leading, yamlComment(k.LineComment)...)
 	}
-	if n, ok := yamlNode(value); ok {
-		trivia = append(trivia, yamlComment(n.LineComment)...)
+	if vok {
+		leading = append(leading, yamlComment(v.LineComment)...)
+		foot = append(foot, yamlComment(v.FootComment)...)
 	}
-	return trivia
+	if kok {
+		foot = append(foot, yamlComment(k.FootComment)...)
+		foot = append(foot, yamlComment(imp.sectionFeet[k])...)
+	}
+	return leading, foot
+}
+
+// elementComments returns the comments of a YAML sequence element as PCL comment trivia. leading holds the comments
+// that print before the element, and foot holds the comments that print after it.
+func elementComments(element syntax.Node) (leading, foot pclsyntax.TriviaList) {
+	if n, ok := yamlNode(element); ok {
+		leading = append(leading, yamlComment(n.HeadComment)...)
+		leading = append(leading, yamlComment(n.LineComment)...)
+		foot = yamlComment(n.FootComment)
+	}
+	return leading, foot
+}
+
+// templateSections are the top-level keys of a template whose entries the importer emits.
+var templateSections = []string{"configuration", "config", "variables", "resources", "outputs"}
+
+// sectionFeet maps the key node of the last entry of each template section to the foot comment of the section key.
+// YAML attaches a comment block below a section that starts in the column of the section key, such as a comment at the
+// end of the file, to the section key. The comment prints after the last entry of the section.
+func sectionFeet(file *ast.TemplateDecl) map[*yaml.Node]string {
+	feet := map[*yaml.Node]string{}
+	obj, ok := file.Syntax().(*syntax.ObjectNode)
+	if !ok {
+		return feet
+	}
+	for i := 0; i < obj.Len(); i++ {
+		kvp := obj.Index(i)
+		section, ok := kvp.Value.(*syntax.ObjectNode)
+		if kvp.Key == nil || !ok || section.Len() == 0 || !slices.Contains(templateSections, kvp.Key.Value()) {
+			continue
+		}
+		key, kok := yamlNode(kvp.Key)
+		last, lok := yamlNode(section.Index(section.Len() - 1).Key)
+		if kok && lok && key.FootComment != "" {
+			feet[last] = key.FootComment
+		}
+	}
+	return feet
 }
 
 type importer struct {
@@ -89,6 +134,9 @@ type importer struct {
 	// passes unknown symbols through as scope traversals without diagnosing them — the
 	// snippet's eventual PCL binder is responsible for resolving (or rejecting) them.
 	snippet bool
+
+	// sectionFeet holds the foot comments of the template sections. See the sectionFeet function.
+	sectionFeet map[*yaml.Node]string
 }
 
 type packageInfo struct {
@@ -615,6 +663,11 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 			e, ediags := imp.importExpr(v, eHint)
 			diags.Extend(ediags...)
 
+			if e != nil {
+				leading, foot := elementComments(v.Syntax())
+				setComments(e, leading, foot)
+			}
+
 			expressions = append(expressions, e)
 		}
 		return &model.TupleConsExpression{
@@ -647,6 +700,14 @@ func (imp *importer) importExpr(node ast.Expr, hint schema.Type) (model.Expressi
 
 			v, vdiags := imp.importExpr(kvp.Value, hint)
 			diags.Extend(vdiags...)
+
+			leading, foot := imp.entryComments(kvp.Key.Syntax(), kvp.Value.Syntax())
+			if k != nil {
+				setComments(k, leading, nil)
+			}
+			if v != nil {
+				setComments(v, nil, foot)
+			}
 
 			items = append(items, model.ObjectConsItem{Key: k, Value: v})
 		}
@@ -759,7 +820,7 @@ func (imp *importer) importConfig(kvp ast.ConfigMapEntry) (model.BodyItem, synta
 		Body: &model.Body{
 			Items: bodyItems,
 		},
-		Tokens: blockTokens(kvp.Key, config, "config", labels...),
+		Tokens: imp.blockTokens(kvp.Key, config, "config", labels...),
 	}
 	return configDef, nil
 }
@@ -859,20 +920,40 @@ func (imp *importer) importVariable(kvp ast.VariablesMapEntry, latestPkgInfo map
 			}
 		}
 	}
-	attr := &model.Attribute{
-		Name:   imp.variables[name].Name,
-		Value:  v,
-		Tokens: pclsyntax.NewAttributeTokens(imp.variables[name].Name),
+	return imp.entryAttribute(imp.variables[name].Name, v, kvp.Key, value), diags
+}
+
+// entryAttribute returns a PCL attribute that is imported from the YAML map entry with the given key and value. The
+// attribute carries the comments of the entry.
+func (imp *importer) entryAttribute(
+	name string, x model.Expression, key *ast.StringExpr, value interface{ Syntax() syntax.Node },
+) *model.Attribute {
+	leading, foot := imp.entryComments(key.Syntax(), value.Syntax())
+	attr := &model.Attribute{Name: name, Value: x, Tokens: pclsyntax.NewAttributeTokens(name)}
+	attr.Tokens.Name.LeadingTrivia = leading
+	if x != nil {
+		setComments(x, nil, foot)
 	}
-	attr.Tokens.Name.LeadingTrivia = entryComments(kvp.Key.Syntax(), value.Syntax())
-	return attr, diags
+	return attr
+}
+
+// setComments sets the comments that print before and after x. The formatter lays them out.
+func setComments(x model.Expression, leading, foot pclsyntax.TriviaList) {
+	if len(leading) > 0 {
+		x.SetLeadingTrivia(leading)
+	}
+	if len(foot) > 0 {
+		x.SetTrailingTrivia(foot)
+	}
 }
 
 // blockTokens returns the tokens of a PCL block that is imported from the YAML map entry with the given key and value.
 // The tokens carry the comments of the entry.
-func blockTokens(key *ast.StringExpr, value interface{ Syntax() syntax.Node }, typ string, labels ...string) *pclsyntax.BlockTokens {
+func (imp *importer) blockTokens(
+	key *ast.StringExpr, value interface{ Syntax() syntax.Node }, typ string, labels ...string,
+) *pclsyntax.BlockTokens {
 	tokens := pclsyntax.NewBlockTokens(typ, labels...)
-	tokens.Type.LeadingTrivia = entryComments(key.Syntax(), value.Syntax())
+	tokens.Type.LeadingTrivia, tokens.CloseBrace.TrailingTrivia = imp.entryComments(key.Syntax(), value.Syntax())
 	return tokens
 }
 
@@ -994,10 +1075,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		for _, kvp := range pm.Entries {
 			v, vdiags := imp.importExpr(kvp.Value, hints[kvp.Key.Value])
 			diags.Extend(vdiags...)
-			items = append(items, &model.Attribute{
-				Name:  kvp.Key.Value,
-				Value: v,
-			})
+			items = append(items, imp.entryAttribute(kvp.Key.Value, v, kvp.Key, kvp.Value))
 		}
 	} else if resource.Properties.Expr != nil {
 		// Else write out a literal object that refers to each known property in the resource indexed off the referred to symbol
@@ -1260,7 +1338,7 @@ func (imp *importer) importResource(kvp ast.ResourcesMapEntry, latestPkgInfo map
 		Type:   "resource",
 		Labels: labels,
 		Body:   &model.Body{Items: items},
-		Tokens: blockTokens(kvp.Key, resource, "resource", labels...),
+		Tokens: imp.blockTokens(kvp.Key, resource, "resource", labels...),
 	}
 
 	return r, diags
@@ -1278,7 +1356,7 @@ func (imp *importer) importOutput(kvp ast.PropertyMapEntry) (model.BodyItem, syn
 	return &model.Block{
 		Type:   "output",
 		Labels: []string{outputVar.Name},
-		Tokens: blockTokens(kvp.Key, kvp.Value, "output", outputVar.Name),
+		Tokens: imp.blockTokens(kvp.Key, kvp.Value, "output", outputVar.Name),
 		Body: &model.Body{
 			Items: []model.BodyItem{
 				&model.Attribute{
@@ -1392,6 +1470,8 @@ func (imp *importer) findStackReferences(node ast.Expr) {
 
 func (imp *importer) importTemplate(file *ast.TemplateDecl) (*model.Body, syntax.Diagnostics) {
 	var diags syntax.Diagnostics
+	imp.sectionFeet = sectionFeet(file)
+
 	// Declare config variables, resources, and outputs.
 
 	for _, kvp := range append(file.Configuration.Entries, file.Config.Entries...) {
