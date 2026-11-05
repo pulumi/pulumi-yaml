@@ -1,0 +1,15 @@
+resources:
+  a:
+    type: output-value-input-deps:Custom
+    properties:
+      value: a
+  b:
+    type: output-value-input-deps:Custom
+    properties:
+      value: b
+  comp:
+    type: output-value-input-deps:Component
+    properties:
+      refs:
+        x: ${a.value}
+        y: ${b.value}
