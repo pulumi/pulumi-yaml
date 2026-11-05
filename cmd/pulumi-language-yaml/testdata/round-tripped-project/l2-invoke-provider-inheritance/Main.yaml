@@ -1,0 +1,33 @@
+resources:
+  provider:
+    type: pulumi:providers:simple-invoke
+  parent:
+    type: simple-invoke:StringResource
+    properties:
+      text: parent
+    options:
+      provider: ${provider}
+  child:
+    type: simple-invoke:StringResource
+    properties:
+      text: child
+    options:
+      parent: ${parent}
+variables:
+  parentData:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: parent
+      options:
+        parent: ${parent}
+  childData:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: child
+      options:
+        parent: ${child}
+outputs:
+  parentResult: ${parentData.result}
+  childResult: ${childData.result}

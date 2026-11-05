@@ -1,0 +1,36 @@
+resources:
+  provider:
+    type: pulumi:providers:simple-invoke
+  parent:
+    type: simple-invoke:StringResource
+    properties:
+      text: parent
+    options:
+      provider: ${provider}
+  # This should inherit the explicit provider from parent.
+  child:
+    type: simple-invoke:StringResource
+    properties:
+      text: child
+    options:
+      parent: ${parent}
+variables:
+  # This should use the explicit provider of parent.
+  parentData:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: parent
+      options:
+        parent: ${parent}
+  # This should use the explicit provider that child inherited from parent.
+  childData:
+    fn::invoke:
+      function: simple-invoke:myInvoke
+      arguments:
+        value: child
+      options:
+        parent: ${child}
+outputs:
+  parentResult: ${parentData.result}
+  childResult: ${childData.result}
