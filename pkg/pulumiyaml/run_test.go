@@ -3135,3 +3135,23 @@ resources:
 		"foo": resource.NewStringProperty("tuo-hello"),
 	}, sinkInputs)
 }
+
+func TestLoadDirPulumiYml(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "Pulumi.yml"), []byte("name: test\nruntime: yaml\n"), 0o600)
+	require.NoError(t, err)
+
+	template, diags, err := LoadDir(dir)
+	require.NoError(t, err)
+	require.False(t, diags.HasErrors())
+	require.Equal(t, "test", template.Name.Value)
+}
+
+func TestLoadPluginTemplateNoTemplateFile(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := LoadPluginTemplate(t.TempDir())
+	require.ErrorIs(t, err, ErrMissingTemplateFile)
+}
