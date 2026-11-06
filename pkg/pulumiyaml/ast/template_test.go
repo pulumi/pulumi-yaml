@@ -21,6 +21,7 @@ runtime: yaml
 config:
   some-string-array:
     type: array
+    description: A list of subnets
     value:
       - subnet1
       - subnet2

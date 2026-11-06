@@ -337,12 +337,13 @@ func (d *PropertyMapOrExprDecl) parse(name string, node syntax.Node) syntax.Diag
 type ConfigParamDecl struct {
 	declNode
 
-	Type    *StringExpr
-	Name    *StringExpr
-	Secret  *BooleanExpr
-	Default Expr
-	Value   Expr
-	Items   *ConfigParamDecl
+	Type        *StringExpr
+	Name        *StringExpr
+	Description *StringExpr
+	Secret      *BooleanExpr
+	Default     Expr
+	Value       Expr
+	Items       *ConfigParamDecl
 }
 
 func (d *ConfigParamDecl) recordSyntax() *syntax.Node {
