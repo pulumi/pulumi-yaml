@@ -146,6 +146,7 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 		MainTemplate+".json",
 		MainTemplate+".yaml",
 		"Pulumi.yaml",
+		"Pulumi.yml",
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading template %s: %w", filename, err)
@@ -223,6 +224,10 @@ func LoadPluginTemplate(directory string) (*ast.TemplateDecl, syntax.Diagnostics
 				return nil, nil, err
 			}
 		}
+	}
+
+	if template == nil {
+		return nil, diags, fmt.Errorf("reading template in %s: %w", directory, ErrMissingTemplateFile)
 	}
 
 	componentNames := make(map[string]bool)
