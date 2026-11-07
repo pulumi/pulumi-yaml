@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Return an error instead of crashing when a program contains an `sdks` key
+time: 2026-11-03T02:26:36.886629-05:00
+custom:
+    PR: "756"
