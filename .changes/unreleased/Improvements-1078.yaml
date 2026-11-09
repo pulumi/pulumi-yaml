@@ -1,6 +1,0 @@
-component: runtime
-kind: Improvements
-body: Remove the automatic alias from resources in YAML components to their names without the component prefix
-time: 2026-11-02T00:00:00.000000000Z
-custom:
-    PR: "1078"
