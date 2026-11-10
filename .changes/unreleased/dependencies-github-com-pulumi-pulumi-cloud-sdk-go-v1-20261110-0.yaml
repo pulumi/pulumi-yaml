@@ -1,0 +1,4 @@
+component: runtime
+kind: dependencies
+body: Update github.com/pulumi/pulumi-cloud-sdk/go to v1.20261110.0
+time: 2026-11-10T22:16:36.437145869Z
