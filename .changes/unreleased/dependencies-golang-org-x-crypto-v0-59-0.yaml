@@ -1,0 +1,4 @@
+component: runtime
+kind: dependencies
+body: Update golang.org/x/crypto to v0.59.0
+time: 2026-11-11T18:53:59.714230502Z
