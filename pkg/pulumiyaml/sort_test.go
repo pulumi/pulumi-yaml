@@ -4,7 +4,6 @@ package pulumiyaml
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -163,7 +162,7 @@ resources:
 			t.Parallel()
 
 			tmpl := yamlTemplate(t, strings.TrimSpace(text))
-			_, diags, err := PrepareTemplate(context.Background(), tmpl, nil, newMockPackageMap())
+			_, diags, err := PrepareTemplate(t.Context(), tmpl, nil, newMockPackageMap())
 			require.NoError(t, err)
 			assert.Contains(t, diags.Error(), "cannot set defaultProvider on non-provider resource")
 		})
