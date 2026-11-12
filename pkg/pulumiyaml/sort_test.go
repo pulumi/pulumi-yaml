@@ -4,9 +4,11 @@ package pulumiyaml
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +141,33 @@ func TestSortMultipleDefaultProviders(t *testing.T) {
 	assert.Equal(t, "alb", names[1])
 	assert.Equal(t, "testProvider", names[2])
 	assert.Equal(t, "echo", names[3])
+}
+
+func TestDefaultProviderOnNonProviderResource(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"non-provider type": `
+resources:
+  pet:
+    type: random:RandomPet
+    defaultProvider: true`,
+		"no type": `
+resources:
+  pet:
+    defaultProvider: true`,
+	}
+
+	for name, text := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpl := yamlTemplate(t, strings.TrimSpace(text))
+			_, diags, err := PrepareTemplate(context.Background(), tmpl, nil, newMockPackageMap())
+			require.NoError(t, err)
+			assert.Contains(t, diags.Error(), "cannot set defaultProvider on non-provider resource")
+		})
+	}
 }
 
 func TestSortErrorCycle(t *testing.T) {
