@@ -1,0 +1,6 @@
+component: runtime
+kind: bug-fixes
+body: Fix a crash when `defaultProvider` is set on a resource that isn't a provider
+time: 2026-11-12T13:36:43.000000-08:00
+custom:
+    PR: "1275"
