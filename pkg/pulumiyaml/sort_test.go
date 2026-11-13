@@ -145,28 +145,29 @@ func TestSortMultipleDefaultProviders(t *testing.T) {
 func TestDefaultProviderOnNonProviderResource(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]string{
-		"non-provider type": `
+	check := func(t *testing.T, text string) {
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		_, diags, err := PrepareTemplate(t.Context(), tmpl, nil, newMockPackageMap())
+		require.NoError(t, err)
+		assert.Contains(t, diags.Error(), "cannot set defaultProvider on non-provider resource")
+	}
+
+	t.Run("non-provider type", func(t *testing.T) {
+		t.Parallel()
+		check(t, `
 resources:
   pet:
     type: random:RandomPet
-    defaultProvider: true`,
-		"no type": `
+    defaultProvider: true`)
+	})
+
+	t.Run("no type", func(t *testing.T) {
+		t.Parallel()
+		check(t, `
 resources:
   pet:
-    defaultProvider: true`,
-	}
-
-	for name, text := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			tmpl := yamlTemplate(t, strings.TrimSpace(text))
-			_, diags, err := PrepareTemplate(t.Context(), tmpl, nil, newMockPackageMap())
-			require.NoError(t, err)
-			assert.Contains(t, diags.Error(), "cannot set defaultProvider on non-provider resource")
-		})
-	}
+    defaultProvider: true`)
+	})
 }
 
 func TestSortErrorCycle(t *testing.T) {
