@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +140,34 @@ func TestSortMultipleDefaultProviders(t *testing.T) {
 	assert.Equal(t, "alb", names[1])
 	assert.Equal(t, "testProvider", names[2])
 	assert.Equal(t, "echo", names[3])
+}
+
+func TestDefaultProviderOnNonProviderResource(t *testing.T) {
+	t.Parallel()
+
+	check := func(t *testing.T, text string) {
+		tmpl := yamlTemplate(t, strings.TrimSpace(text))
+		_, diags, err := PrepareTemplate(t.Context(), tmpl, nil, newMockPackageMap())
+		require.NoError(t, err)
+		assert.Contains(t, diags.Error(), "cannot set defaultProvider on non-provider resource")
+	}
+
+	t.Run("non-provider type", func(t *testing.T) {
+		t.Parallel()
+		check(t, `
+resources:
+  pet:
+    type: random:RandomPet
+    defaultProvider: true`)
+	})
+
+	t.Run("no type", func(t *testing.T) {
+		t.Parallel()
+		check(t, `
+resources:
+  pet:
+    defaultProvider: true`)
+	})
 }
 
 func TestSortErrorCycle(t *testing.T) {

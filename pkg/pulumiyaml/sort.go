@@ -165,7 +165,7 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 
 		// Check if the resource is a default provider
 		if resourceIsDefaultProvider(node) {
-			pkg := strings.Split(node.Value.Type.Value, ":")[2]
+			pkg := strings.TrimPrefix(node.Value.Type.Value, "pulumi:providers:")
 			defaultProviders[pkg] = node.key()
 		}
 
@@ -281,9 +281,10 @@ func topologicallySortedResources(t ast.Template, externalConfig []configNode) (
 	return sorted, diags
 }
 
-// resourceIsDefaultProvider returns true if the node is a default provider, otherwise false.
+// resourceIsDefaultProvider returns true if the node is a provider resource set as a default provider, otherwise false.
 func resourceIsDefaultProvider(res resourceNode) bool {
-	return res.Value.DefaultProvider != nil && res.Value.DefaultProvider.Value
+	return res.Value.Type != nil && strings.HasPrefix(res.Value.Type.Value, "pulumi:providers:") &&
+		res.Value.DefaultProvider != nil && res.Value.DefaultProvider.Value
 }
 
 // resourceNodeHasNoExplicitProvider returns true if the node is a resource
