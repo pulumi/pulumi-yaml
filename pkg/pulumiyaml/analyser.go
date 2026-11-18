@@ -72,7 +72,13 @@ type typeCache struct {
 	exprs         map[ast.Expr]schema.Type
 	resourceNames map[string]*ast.ResourceDecl
 	variableNames map[string]ast.Expr
+
+	// assigning holds the object type pairs isAssignable is currently checking, so that
+	// recursive object types terminate.
+	assigning map[objectTypePair]struct{}
 }
+
+type objectTypePair struct{ from, to *schema.ObjectType }
 
 func (tc *typeCache) registerResource(name string, resource *ast.ResourceDecl, typ schema.Type) {
 	tc.resourceNames[name] = resource
@@ -382,6 +388,20 @@ func (tc *typeCache) isAssignable(fromExpr ast.Expr, to schema.Type) *notAssigna
 			return fail
 		}
 		from := from.(*schema.ObjectType)
+
+		// Object types can be recursive (e.g. `Rule { rules: Rule[] }`). If we are already
+		// checking this pair further up the stack, assume it is assignable: any real
+		// mismatch is reported by that outer check.
+		pair := objectTypePair{from, to}
+		if _, ok := tc.assigning[pair]; ok {
+			return nil
+		}
+		if tc.assigning == nil {
+			tc.assigning = map[objectTypePair]struct{}{}
+		}
+		tc.assigning[pair] = struct{}{}
+		defer delete(tc.assigning, pair)
+
 		var objMap map[string]ast.ObjectProperty
 		primeMap := func() {
 			if obj, ok := fromExpr.(*ast.ObjectExpr); ok {

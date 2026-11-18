@@ -306,6 +306,99 @@ func TestTypePropertyAccess(t *testing.T) {
 	}
 }
 
+// selfReferentialRule builds an object type shaped like
+//
+//	Rule { kind: <kind>, rules?: Rule[] }
+func selfReferentialRule(token string, kind schema.Type) *schema.ObjectType {
+	rule := &schema.ObjectType{Token: token}
+	rule.Properties = []*schema.Property{
+		{Name: "kind", Type: kind},
+		{Name: "rules", Type: &schema.OptionalType{ElementType: &schema.ArrayType{ElementType: rule}}},
+	}
+	return rule
+}
+
+// Assigning a self-referential object type must terminate, whether the source and
+// destination are the same *schema.ObjectType or two structurally similar ones (as with
+// an fn::invoke result of type Rule assigned to a Rule-typed resource input).
+func TestTypeErrorSelfReferentialObject(t *testing.T) {
+	t.Parallel()
+
+	rule := selfReferentialRule("test:index:Rule", schema.StringType)
+	cases := []struct {
+		name     string
+		from, to schema.Type
+		message  string
+	}{
+		{name: "same type", from: rule, to: rule},
+		{
+			name: "structurally identical types",
+			from: selfReferentialRule("test:index:Rule", schema.StringType),
+			to:   selfReferentialRule("test:index:Rule", schema.StringType),
+		},
+		{
+			name: "incompatible types",
+			from: selfReferentialRule("test:index:Rule", schema.StringType),
+			to:   selfReferentialRule("test:index:NumericRule", schema.NumberType),
+			message: `Cannot assign 'test:index:Rule' to 'test:index:NumericRule':
+  kind: Cannot assign type 'string' to type 'number'`,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			expr := ast.StringSyntax(syntax.String("standin"))
+			tc := typeCache{exprs: map[ast.Expr]schema.Type{expr: c.from}}
+			result := tc.isAssignable(expr, c.to)
+			if c.message == "" {
+				assert.Nil(t, result)
+			} else {
+				require.NotNil(t, result)
+				assert.Equal(t, c.message, result.String())
+			}
+		})
+	}
+}
+
+// Passing the result of an invoke that returns a self-referential object type to a
+// resource input of that type must type check.
+func TestInvokeReturningSelfReferentialObject(t *testing.T) {
+	t.Parallel()
+
+	const text = `
+name: test-yaml
+runtime: yaml
+resources:
+  gate:
+    type: test:index:Gate
+    properties:
+      when:
+        fn::invoke:
+          function: test:index:allOf
+          arguments: {}
+`
+	loader := MockPackageLoader{packages: map[string]Package{
+		"test": MockPackage{
+			resourceTypeHint: func(typeName string) *schema.ResourceType {
+				return inputProperties(typeName, schema.Property{
+					Name: "when",
+					Type: selfReferentialRule("test:index:Rule", schema.StringType),
+				})
+			},
+			functionTypeHint: func(typeName string) *schema.Function {
+				return &schema.Function{
+					Token:   typeName,
+					Outputs: selfReferentialRule("test:index:Rule", schema.StringType),
+				}
+			},
+		},
+	}}
+
+	tmpl := yamlTemplate(t, strings.TrimSpace(text))
+	_, diags := TypeCheck(t.Context(), newRunner(tmpl, loader))
+	requireNoErrors(t, tmpl, diags)
+}
+
 // tests for type compatibility, i.e. int&number are compatible, int&string are not
 func TestConfigCompatibility(t *testing.T) {
 	t.Parallel()
