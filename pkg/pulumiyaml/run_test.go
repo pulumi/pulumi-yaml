@@ -3149,6 +3149,54 @@ func TestLoadDirPulumiYml(t *testing.T) {
 	require.Equal(t, "test", template.Name.Value)
 }
 
+func TestLoadMergedDir(t *testing.T) {
+	t.Parallel()
+
+	write := func(dir, name, content string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
+	}
+
+	t.Run("merges all files", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		write(dir, "a.yaml", "variables:\n  v: 1\nresources:\n  r1:\n    type: test:mod:Res\n")
+		write(dir, "b.yml", "resources:\n  r2:\n    type: test:mod:Res\noutputs:\n  o: ${r2.id}\n")
+		write(dir, "ignored.txt", "not yaml: [")
+
+		template, diags, err := LoadMergedDir(dir)
+		require.NoError(t, err)
+		require.False(t, diags.HasErrors())
+		require.Len(t, template.Variables.Entries, 1)
+		require.Len(t, template.Resources.Entries, 2)
+		assert.Equal(t, "r1", template.Resources.Entries[0].Key.Value)
+		assert.Equal(t, "r2", template.Resources.Entries[1].Key.Value)
+		require.Len(t, template.Outputs.Entries, 1)
+	})
+
+	t.Run("duplicate resource", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		write(dir, "a.yaml", "resources:\n  r:\n    type: test:mod:Res\n")
+		write(dir, "b.yaml", "resources:\n  r:\n    type: test:mod:Res\n")
+
+		_, diags, err := LoadMergedDir(dir)
+		require.Error(t, err)
+		require.Len(t, diags, 1)
+		assert.Equal(t, `Duplicate resource; A resource "r" was already declared.`, diags[0].Summary)
+		assert.Equal(t, "b.yaml", diags[0].Subject.Filename)
+		assert.Equal(t, 2, diags[0].Subject.Start.Line)
+	})
+
+	t.Run("no files", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := LoadMergedDir(t.TempDir())
+		assert.ErrorIs(t, err, ErrMissingTemplateFile)
+	})
+}
+
 func TestLoadPluginTemplateNoTemplateFile(t *testing.T) {
 	t.Parallel()
 

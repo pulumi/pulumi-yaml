@@ -49,9 +49,6 @@ import (
 )
 
 // MainTemplate is the assumed name of the JSON template file.
-// TODO: would be nice to permit multiple files, but we'd need to know which is "main", and there's
-// no notion of "import" so we'd need to be a bit more clever. Might be nice to mimic e.g. Kustomize.
-// One idea is to hijack Pulumi.yaml's "main" directive and then just globally toposort the rest.
 const MainTemplate = "Main"
 
 func LoadFromCompiler(compiler string, workingDirectory string, env []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
@@ -159,6 +156,60 @@ func LoadDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
 
 	if diags.HasErrors() {
 		return nil, diags, diags
+	}
+
+	sdks, err := packages.SearchPackageDecls(directory)
+	if err != nil {
+		diags.Extend(syntax.Error(nil, err.Error(), ""))
+	}
+	template.Sdks = sdks
+
+	return template, diags, nil
+}
+
+// LoadMergedDir loads every YAML file in the given directory, in alphabetical order, and merges them into a
+// single template. Defining the same resource, variable, output or config key in two files is an error.
+func LoadMergedDir(directory string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var template *ast.TemplateDecl
+	var diags syntax.Diagnostics
+	for _, entry := range entries {
+		if ext := filepath.Ext(entry.Name()); entry.IsDir() || (ext != ".yaml" && ext != ".yml") {
+			continue
+		}
+
+		bs, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			return nil, diags, err
+		}
+		t, loadDiags, err := LoadYAMLBytes(entry.Name(), bs)
+		diags.Extend(loadDiags...)
+		if err != nil {
+			return nil, diags, err
+		}
+		if diags.HasErrors() {
+			return nil, diags, diags
+		}
+
+		if template == nil {
+			template = t
+		} else {
+			diags.Extend(template.DuplicateKeyDiagnostics(t)...)
+			if diags.HasErrors() {
+				return nil, diags, diags
+			}
+			if err := template.Merge(t); err != nil {
+				return nil, diags, fmt.Errorf("merging %s: %w", entry.Name(), err)
+			}
+		}
+	}
+
+	if template == nil {
+		return nil, diags, fmt.Errorf("reading templates in %s: %w", directory, ErrMissingTemplateFile)
 	}
 
 	sdks, err := packages.SearchPackageDecls(directory)

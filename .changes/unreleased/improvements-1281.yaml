@@ -1,0 +1,6 @@
+component: runtime
+kind: Improvements
+body: Add the `merge` runtime option, which loads all YAML files in the `main` directory as one program and fails on duplicate resources, variables, outputs or config keys
+time: 2026-11-27T10:20:00.000000+01:00
+custom:
+    PR: "1281"
