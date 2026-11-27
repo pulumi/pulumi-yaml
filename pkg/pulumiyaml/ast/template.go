@@ -854,8 +854,13 @@ func (d *TemplateDecl) DuplicateKeyDiagnostics(other *TemplateDecl) syntax.Diagn
 		}
 		for _, k := range added {
 			if _, ok := seen[k.Value]; ok {
-				diags.Extend(syntax.NodeError(k.Syntax(),
-					fmt.Sprintf("Duplicate %s; A %s %q was already declared.", kind, kind, k.Value), ""))
+				var msg string
+				if kind == "output" {
+					msg = fmt.Sprintf("Duplicate %s; An %s %q was already declared.", kind, kind, k.Value)
+				} else {
+					msg = fmt.Sprintf("Duplicate %s; A %s %q was already declared.", kind, kind, k.Value)
+				}
+				diags.Extend(syntax.NodeError(k.Syntax(), msg, ""))
 			}
 		}
 	}
