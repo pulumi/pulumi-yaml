@@ -31,6 +31,11 @@ func TestRandom(t *testing.T) {
 }
 
 //nolint:paralleltest // uses parallel programtest
+func TestMultiFile(t *testing.T) {
+	testWrapper(t, exampleDir("multi-file"))
+}
+
+//nolint:paralleltest // uses parallel programtest
 func TestExampleAwsx(t *testing.T) {
 	testWrapper(t, exampleDir("awsx-fargate"), RequireLiveRun, awsConfig)
 }

@@ -837,8 +837,49 @@ func (d *TemplateDecl) Merge(other *TemplateDecl) error {
 		return fmt.Errorf("cannot merge templates with different namespaces")
 	}
 	d.Config.Entries = append(d.Config.Entries, other.Config.Entries...)
+	d.Variables.Entries = append(d.Variables.Entries, other.Variables.Entries...)
+	d.Resources.Entries = append(d.Resources.Entries, other.Resources.Entries...)
+	d.Outputs.Entries = append(d.Outputs.Entries, other.Outputs.Entries...)
 	d.Components.Entries = append(d.Components.Entries, other.Components.Entries...)
 	return nil
+}
+
+// DuplicateKeyDiagnostics reports every config, variable, resource and output key of other that d already defines.
+func (d *TemplateDecl) DuplicateKeyDiagnostics(other *TemplateDecl) syntax.Diagnostics {
+	var diags syntax.Diagnostics
+	check := func(kind string, existing, added []*StringExpr) {
+		seen := make(map[string]struct{}, len(existing))
+		for _, k := range existing {
+			seen[k.Value] = struct{}{}
+		}
+		for _, k := range added {
+			if _, ok := seen[k.Value]; ok {
+				var msg string
+				if kind == "output" {
+					msg = fmt.Sprintf("Duplicate %s; An %s %q was already declared.", kind, kind, k.Value)
+				} else {
+					msg = fmt.Sprintf("Duplicate %s; A %s %q was already declared.", kind, kind, k.Value)
+				}
+				diags.Extend(syntax.NodeError(k.Syntax(), msg, ""))
+			}
+		}
+	}
+	keys := func(n int, key func(int) *StringExpr) []*StringExpr {
+		ks := make([]*StringExpr, n)
+		for i := range ks {
+			ks[i] = key(i)
+		}
+		return ks
+	}
+	check("config", keys(len(d.Config.Entries), func(i int) *StringExpr { return d.Config.Entries[i].Key }),
+		keys(len(other.Config.Entries), func(i int) *StringExpr { return other.Config.Entries[i].Key }))
+	check("variable", keys(len(d.Variables.Entries), func(i int) *StringExpr { return d.Variables.Entries[i].Key }),
+		keys(len(other.Variables.Entries), func(i int) *StringExpr { return other.Variables.Entries[i].Key }))
+	check("resource", keys(len(d.Resources.Entries), func(i int) *StringExpr { return d.Resources.Entries[i].Key }),
+		keys(len(other.Resources.Entries), func(i int) *StringExpr { return other.Resources.Entries[i].Key }))
+	check("output", keys(len(d.Outputs.Entries), func(i int) *StringExpr { return d.Outputs.Entries[i].Key }),
+		keys(len(other.Outputs.Entries), func(i int) *StringExpr { return other.Outputs.Entries[i].Key }))
+	return diags
 }
 
 func parseTypeSpec(configDecl *ConfigParamDecl) (schema.TypeSpec, error) {

@@ -93,7 +93,19 @@ func (host *yamlLanguageHost) loadPluginTemplate(directory string) (*ast.Templat
 	return template, diags, nil
 }
 
-func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+func (host *yamlLanguageHost) loadTemplate(options map[string]interface{}, directory string, compilerEnv []string) (*ast.TemplateDecl, syntax.Diagnostics, error) {
+	compiler, err := parseCompiler(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	merge, err := parseMerge(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	if compiler != "" && merge {
+		return nil, nil, errors.New("the compiler and merge options cannot be used together")
+	}
+
 	// We can't cache comppiled templates because at the first point we call loadTemplate (in
 	// GetRequiredPackages) we don't have the compiler environment (with PULUMI_STACK etc) set.
 	if entry, ok := host.templateCache[directory]; ok && compiler == "" {
@@ -102,8 +114,9 @@ func (host *yamlLanguageHost) loadTemplate(compiler, directory string, compilerE
 
 	var template *ast.TemplateDecl
 	var diags syntax.Diagnostics
-	var err error
-	if compiler == "" {
+	if merge {
+		template, diags, err = pulumiyaml.LoadMergedDir(directory)
+	} else if compiler == "" {
 		template, diags, err = pulumiyaml.LoadDir(directory)
 	} else {
 		template, diags, err = pulumiyaml.LoadFromCompiler(compiler, directory, compilerEnv)
@@ -136,16 +149,22 @@ func parseCompiler(options map[string]interface{}) (string, error) {
 	return "", nil
 }
 
+func parseMerge(options map[string]interface{}) (bool, error) {
+	if merge, ok := options["merge"]; ok {
+		if merge, ok := merge.(bool); ok {
+			return merge, nil
+		}
+		return false, errors.New("merge option must be a boolean")
+	}
+
+	return false, nil
+}
+
 // GetRequiredPackages computes the complete set of anticipated packages required by a program.
 func (host *yamlLanguageHost) GetRequiredPackages(ctx context.Context,
 	req *pulumirpc.GetRequiredPackagesRequest,
 ) (*pulumirpc.GetRequiredPackagesResponse, error) {
-	compiler, err := parseCompiler(req.Info.Options.AsMap())
-	if err != nil {
-		return nil, err
-	}
-
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(req.Info.Options.AsMap(), req.Info.ProgramDirectory, nil)
 	if errors.Is(err, pulumiyaml.ErrMissingTemplateFile) {
 		template, diags, err = host.loadPluginTemplate(req.Info.ProgramDirectory)
 	}
@@ -222,12 +241,7 @@ func (host *yamlLanguageHost) Run(ctx context.Context, req *pulumirpc.RunRequest
 		fmt.Sprintf(`PULUMI_ROOT_DIRECTORY=%s`, req.Info.RootDirectory),
 	}
 
-	compiler, err := parseCompiler(req.Info.Options.AsMap())
-	if err != nil {
-		return nil, err
-	}
-
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, compilerEnv)
+	template, diags, err := host.loadTemplate(req.Info.Options.AsMap(), req.Info.ProgramDirectory, compilerEnv)
 	if err != nil {
 		return &pulumirpc.RunResponse{Error: err.Error()}, nil
 	}
@@ -488,12 +502,7 @@ func (host *yamlLanguageHost) InstallDependencies(req *pulumirpc.InstallDependen
 func (host *yamlLanguageHost) GetProgramDependencies(ctx context.Context, req *pulumirpc.GetProgramDependenciesRequest) (*pulumirpc.GetProgramDependenciesResponse, error) {
 	// YAML doesn't _really_ have dependencies per-se but we can list all the "packages" that are referenced
 	// in the program here.
-	compiler, err := parseCompiler(req.Info.Options.AsMap())
-	if err != nil {
-		return nil, err
-	}
-
-	template, diags, err := host.loadTemplate(compiler, req.Info.ProgramDirectory, nil)
+	template, diags, err := host.loadTemplate(req.Info.Options.AsMap(), req.Info.ProgramDirectory, nil)
 	if err != nil {
 		return nil, err
 	}

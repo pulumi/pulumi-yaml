@@ -1,0 +1,2 @@
+outputs:
+  password: ${randomPassword.result}

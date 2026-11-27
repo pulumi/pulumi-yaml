@@ -123,6 +123,8 @@ func LoadTemplate(dir string) (*workspace.Project, *ast.TemplateDecl, hcl.Diagno
 			return nil, nil, nil, fmt.Errorf("compiler option must be a string, got %v", reflect.TypeOf(compilerOpt))
 		}
 		t, diags, err = pulumiyaml.LoadFromCompiler(compiler, main, nil)
+	} else if merge, _ := proj.Runtime.Options()["merge"].(bool); merge {
+		t, diags, err = pulumiyaml.LoadMergedDir(main)
 	} else {
 		t, diags, err = pulumiyaml.LoadDir(main)
 	}

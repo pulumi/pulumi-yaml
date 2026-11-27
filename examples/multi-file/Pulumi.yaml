@@ -1,0 +1,7 @@
+name: multi-file
+description: Splits a program over multiple files that are merged
+main: ./working-dir
+runtime:
+  name: yaml
+  options:
+    merge: true
